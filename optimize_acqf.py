@@ -76,6 +76,8 @@ def optimize(optimization_strategy, cleo, acqf, N, q, num_iter, step_size, one_h
     with open(out_path, 'w') as f:
         json.dump(datas,f,indent=4)
 
+
+# add hydra decorator with config
 if __name__ == "__main__":
     
     args = get_args()
