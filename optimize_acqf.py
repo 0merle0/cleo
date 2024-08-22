@@ -28,29 +28,58 @@ def get_args():
 
     return parser.parse_args()
 
-def optimize(optimization_strategy, cleo, acqf, N, q, num_iter, step_size, one_hot, fragment_representation, out_path):
+def optimize(optimization_strategy, 
+            cleo, 
+            acqf, 
+            N, 
+            q, 
+            num_iter, 
+            step_size, 
+            one_hot, 
+            fragment_representation, 
+            out_path):
     '''
         optimize acqf using the specified strategy and save the output sequences
     '''
 
     if optimization_strategy == 'policy':
         # optimizing using policy grad, RL style
-        policy = policy_optimize_acquisition_function(acqf, cleo.fragment_dictionary, N=N, q=q, num_iter=num_iter, step_size=step_size, one_hot=one_hot)
+        policy = policy_optimize_acquisition_function(acqf, 
+                                                    cleo.fragment_dictionary, 
+                                                    N=N, 
+                                                    q=q, 
+                                                    num_iter=num_iter, 
+                                                    step_size=step_size, 
+                                                    one_hot=one_hot)
 
-        candidate_seqs = get_candidates_from_policy(policy, cleo.fragment_dictionary)
+        candidate_seqs = get_candidates_from_policy(policy, 
+                                                    cleo.fragment_dictionary)
 
     elif optimization_strategy == 'sequence':
         # optimizing in sequence space directly
-        optimized_seqs = optimize_acquisition_function(acqf, cleo.all_seqs, N=N, q=q, num_iter=num_iter, step_size=step_size)
+        optimized_seqs = optimize_acquisition_function(acqf, 
+                                                    cleo.all_seqs, 
+                                                    N=N, 
+                                                    q=q,   
+                                                    num_iter=num_iter, 
+                                                    step_size=step_size)
 
-        candidate_seqs, min_distances = round_to_nearest_sequences(optimized_seqs, cleo.all_seqs)
+        candidate_seqs, min_distances = round_to_nearest_sequences(optimized_seqs, 
+                                                    cleo.all_seqs)
         
     elif optimization_strategy == 'fragment':
         # optimizing in fragment space directly
-        optimized_seqs = optimize_acquisition_function(acqf, cleo.all_seqs, N=N, q=q, num_iter=num_iter, step_size=step_size,
-                                              fragment_representation=fragment_representation, fragment_dictionary=cleo.fragment_dictionary)
+        optimized_seqs = optimize_acquisition_function(acqf, 
+                                                    cleo.all_seqs, 
+                                                    N=N, 
+                                                    q=q, 
+                                                    num_iter=num_iter, 
+                                                    step_size=step_size,
+                                                    fragment_representation=fragment_representation, 
+                                                    fragment_dictionary=cleo.fragment_dictionary)
 
-        candidate_seqs = get_candidates_from_fragment_opt(optimized_seqs, cleo.fragment_dictionary)
+        candidate_seqs = get_candidates_from_fragment_opt(optimized_seqs, 
+                                                    cleo.fragment_dictionary)
 
     else:
         sys.exit(f'optimization strategy is not available: {optimization_strategy}')

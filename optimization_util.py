@@ -101,7 +101,14 @@ def get_one_hot(num_start_seqs, num_classes=20):
     return torch.nn.functional.one_hot(tmp, num_classes=num_classes)
 
 
-def policy_optimize_acquisition_function(acqf, fragment_dictionary, N=24, q=8, num_iter=1000, step_size=0.05, print_metrics=False, device='cpu'):
+def policy_optimize_acquisition_function(acqf, 
+                                        fragment_dictionary, 
+                                        N=24, 
+                                        q=8, 
+                                        num_iter=1000, 
+                                        step_size=0.05, 
+                                        print_metrics=False, 
+                                        device='cpu'):
     '''
         using policy optimization strategy from: https://openreview.net/pdf?id=WV1ZXTH0OIn
         optmize acquisition funciton by defining policy over fragment space
@@ -254,7 +261,11 @@ def round_to_nearest_sequences(output_seqs, seq_pool):
     
     return nearest_seqs, min_distances
 
-def get_candidate_acquisition_values(candidate_seqs, acqf, one_hot=False, fragment_representation=False, fragment_dictionary=None):
+def get_candidate_acquisition_values(candidate_seqs, 
+                                    acqf, 
+                                    one_hot=False, 
+                                    fragment_representation=False, 
+                                    fragment_dictionary=None):
     '''
         given seq list [(name,aa_seq),] return the acquisition function value for the batch
     '''
