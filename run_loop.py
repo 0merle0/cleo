@@ -1,92 +1,66 @@
-import sys
-import os
-import copy
 import glob
-import json
-import shutil
 import torch
-import random
 import secrets
-import botorch
 import scipy
-from tqdm import tqdm
-import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset, Sampler
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from collections import OrderedDict
+import hydra
+from omegaconf import DictConfig, OmegaConf
 import gpytorch
-
-from sklearn.model_selection import train_test_split
-from botorch.acquisition import qUpperConfidenceBound, qExpectedImprovement
-
-sys.path.append('/home/jgershon/git/cleo/')
-import fragment_util
+from botorch.acquisition import qUpperConfidenceBound
 import pdb_util
-from cleo import CLEO
-from model_util import train_gp, evaluate_gp, seq_activity_dataset, save_gp, load_gp, GP
+from model_util import FragmentDataset, train_gp
 from optimization_util import *
+from icecream import ic
+
 aa2num = pdb_util.aa12num
 num2aa = pdb_util.num2aa1
 
-from sklearn.model_selection import train_test_split
+
+@hydra.main(version_base=None, config_name="config")
+def iterative_opt(cfg: DictConfig) -> None:
+    '''
+        Big optimization loop with using dataset.
+    '''
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f'using device: {device}')
+
+    raw_enz_df = pd.read_csv(cfg.dataset_path)
+    enz_df = raw_enz_df[raw_enz_df['# Stop'] == 0]
+
+    # get datasets to test
+    start_csvs = glob.glob('/home/jgershon/Desktop/BO/arnold_data/*.csv')
+    uids = []
+    for x in start_csvs:
+        uids.append(x.split('/')[-1].split('_pos')[0])
+    uids = list(set(uids))
+
+    topk_df = enz_df.sort_values('fitness',ascending=False)[:cfg.top_k_from_dataset]
+    topk_dataset = FragmentDataset(topk_df, input_col='AAs', label_col='fitness')
 
 
-# building dataset
+    # make fragment dictionary
+    fragment_dictionary = {i+1:[(x,x) for x in num2aa] for i in range(4)}
 
-# path to fragments for order
-# df must have cols 'name' , 'fragment' , 'seq'
-# fragment_csv = '/home/jgershon/Desktop/HYDROLASE/super/fragments_for_order.csv'
+    # BO settings
+    num_rounds = cfg.iterative_opt.num_rounds # 30
+    num_restarts = cfg.iterative_opt.num_restarts # 3
+    qUCB_beta = cfg.candidate_selection.qUCB_beta # 0.5
+    N = cfg.candidate_selection.num_restarts # 16
+    q = cfg.candidate_selection.batch_size # 100
+    num_iter_acqf = cfg.candidate_selection.num_iter_acqf # 500
+    step_size = cfg.candidate_selection.step_size # 0.05
 
-# data_csvs = [
-#     '/home/jgershon/Desktop/HYDROLASE/super/training_data/round0_randomsample.csv',
-# ]
-
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print(f'using device: {device}')
-
-raw_enz_df = pd.read_csv('/home/jgershon/Desktop/BO/four-site_simplified_AA_data.csv')
-enz_df = raw_enz_df[raw_enz_df['# Stop'] == 0]
-
-# get datasets to test
-start_csvs = glob.glob('/home/jgershon/Desktop/BO/arnold_data/*.csv')
-uids = []
-for x in start_csvs:
-    uids.append(x.split('/')[-1].split('_pos')[0])
-uids = list(set(uids))
-
-top1k_df = enz_df.sort_values('fitness',ascending=False)[:5000]
-top1k_dataset = seq_activity_dataset(top1k_df, input_col='AAs', label_col='fitness')
-
-
-# make fragment dictionary
-fragment_dictionary = {i+1:[(x,x) for x in num2aa] for i in range(4)}
-
-
-# BO settings
-num_rounds = 30
-num_restarts = 3
-qUCB_beta = 0.5
-N = 16
-q = 100
-num_iter_acqf = 500
-step_size = 0.05
-
-# surrogate train settings
-training_iter = 500
-lr = 0.001
-input_dim = 80 # fixed for right now
-hidden_dim = 32
-
-
-for uid in uids:
+    # surrogate train settings
+    training_iter = cfg.surrogate.training_iter # 250
+    lr = cfg.surrogate.lr # 0.001
+    input_dim = cfg.surrogate.input_dim # 80 # fixed for right now
+    hidden_dim = cfg.surrogate.hidden_dim # 32
     
     for restart in range(num_restarts):
 
-        test_run_id = secrets.token_hex(4)
+
+        # neet to add logic here for selecting starting dataset
 
         matches = glob.glob(f'/home/jgershon/Desktop/BO/arnold_data/*{uid}_pos_start*')
         matches.sort()
@@ -103,7 +77,6 @@ for uid in uids:
             'top_candidate':[],
             'start_dataset':[],
             'test_run_id':[],
-
         }
 
         seq_meta_data = {
@@ -120,12 +93,11 @@ for uid in uids:
             print(f'round {round_+1} : max seen {max_fitness}')
             run_meta_data['round'].append(round_+1)
             run_meta_data['top_candidate'].append(max_fitness)
-            run_meta_data['start_dataset'].append(uid)
-            run_meta_data['test_run_id'].append(test_run_id)
+            run_meta_data['test_run_id'].append(restart)
 
             # first train model
 
-            dataset = seq_activity_dataset(train_df, input_col='seq', label_col='fitness')
+            dataset = FragmentDataset(train_df, input_col='seq', label_col='fitness')
 
             train_x = dataset.featurized_seqs
             train_y = dataset.activities
@@ -150,8 +122,8 @@ for uid in uids:
 
             # get top1k spearmanr
             with torch.no_grad(), gpytorch.settings.fast_pred_var():
-                etop1k = model.posterior(top1k_dataset.featurized_seqs.to(device))
-            top1k_spearmanr = scipy.stats.spearmanr(top1k_dataset.activities, etop1k.mean.cpu())[0]
+                etopk = model.posterior(topk_dataset.featurized_seqs.to(device))
+            top1k_spearmanr = scipy.stats.spearmanr(topk_dataset.activities, etopk.mean.cpu())[0]
 
             run_meta_data['train_spearmanr'].append(train_spearmanr)
             run_meta_data['top1k_spearmanr'].append(top1k_spearmanr)
@@ -159,7 +131,6 @@ for uid in uids:
 
             # optimize acqf
             acqf = qUpperConfidenceBound(model, qUCB_beta)
-            #acqf = qExpectedImprovement(model, max_fitness)
 
             policy = policy_optimize_acquisition_function(acqf, fragment_dictionary, N=N, q=q, num_iter=num_iter_acqf, step_size=step_size, device=device)
 
@@ -188,11 +159,14 @@ for uid in uids:
             train_df = pd.concat([train_df,to_add_df])
 
 
-            
-        out = f'/home/jgershon/Desktop/BO/arnold_data/run_metadata/long30round/dataset_{uid}_test_run_{test_run_id}'
+        # will need to edit this to change to take in custom path
+        out = f'/home/jgershon/Desktop/BO/arnold_data/run_metadata/long30round/dataset_{uid}_test_run_{restart}'
 
         run_meta_data_df = pd.DataFrame(run_meta_data)
         run_meta_data_df.to_csv(f'{out}_run_meta_data.csv')
 
         seq_meta_data_df = pd.DataFrame(seq_meta_data)
         seq_meta_data_df.to_csv(f'{out}_seq_meta_data.csv')
+
+if __name__ == "__main__":
+    iterative_opt()

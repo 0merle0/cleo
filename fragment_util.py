@@ -1,7 +1,3 @@
-import sys, os
-import glob
-import json
-import numpy as np
 import torch
 import pandas as pd
 
@@ -62,7 +58,6 @@ def featurize_fragments(names, fragment_dictionary):
     '''
         split sequences by fragment and return features for training over fragment space
     '''
-
     frag_nums = []
     for n in names:
         split = n.split('frag')[1:]
