@@ -143,6 +143,7 @@ num2aa1=[
         'M','F','P','S',
         'T','W','Y','V',
         ]
+
 aa12num= {x:i for i,x in enumerate(num2aa1)}
 
 
@@ -175,7 +176,7 @@ aa2long=[
 
 def get_rmsd(a, b, eps=1e-6):
     '''
-    align crds b to a : always use all alphas
+    align crds b to a : always use all c-alphas
     expexted tensor of shape (L,3)
     '''
     assert a.shape == b.shape, 'make sure tensors are the same size'
@@ -199,7 +200,7 @@ def get_rmsd(a, b, eps=1e-6):
     # Rotation matrix U
     U = torch.einsum('kj,ji->ki',(d*V),W)
 
-    # Rotate xyz_hal
+    # Rotate b
     rP = torch.einsum('kj,ji->ki',b.type(torch.float32),U.type(torch.float32))
 
     L = rP.shape[0]

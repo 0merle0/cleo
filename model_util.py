@@ -9,6 +9,7 @@ import seaborn as sns
 import gpytorch
 from icecream import ic
 
+
 class FeatureEmbedder(nn.Module):
     
     def __init__(self, input_dim, hidden_dim):
@@ -27,6 +28,7 @@ class FeatureEmbedder(nn.Module):
         return self.hidden_layers(x.float())
         
     
+
 class GP(gpytorch.models.ExactGP, botorch.models.gpytorch.GPyTorchModel):
     # must inherit botorch model to work
     def __init__(
@@ -50,6 +52,7 @@ class GP(gpytorch.models.ExactGP, botorch.models.gpytorch.GPyTorchModel):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
 
 def save_gp(model, train_params, save_path):
     '''
@@ -112,22 +115,15 @@ def train_gp(train_params=None, device='cpu'):
 
     loss_list = []
     print(f'now training model : {device}')
+
     # TRAINING
     for i in tqdm(range(training_iter)):
-        # Zero gradients from previous iteration
         optimizer.zero_grad()
-        # Output from model
         output = model(train_x)
-
-        # Calc loss and backprop gradients
         loss = -mll(output, train_y)
-
         loss.backward()
-
         optimizer.step()
-        
         loss_list.append(loss.item())
-
 
     # Get into evaluation (predictive posterior) mode
     model.eval()
@@ -136,7 +132,12 @@ def train_gp(train_params=None, device='cpu'):
     return model, loss_list
 
 
-def evaluate_gp(model, train_set, test_set=None, one_hot=True, show_plot=True, save_fig=None):
+def evaluate_gp(model, 
+                train_set, 
+                test_set=None, 
+                one_hot=True, 
+                show_plot=True, 
+                save_fig=None):
     '''
         evaluate the gp and get plot of pred vs true
     '''
@@ -180,7 +181,11 @@ def evaluate_gp(model, train_set, test_set=None, one_hot=True, show_plot=True, s
     
     # get difference between means
     plt.figure(dpi=150)
-    plt.plot([int(all_activities.min()-1),int(all_activities.max()+1)],[int(all_activities.min()-1),int(all_activities.max()+1)],color='k',linestyle='--',alpha=0.3)
+    plt.plot([int(all_activities.min()-1),int(all_activities.max()+1)],
+            [int(all_activities.min()-1),int(all_activities.max()+1)],
+            color='k',
+            linestyle='--',
+            alpha=0.3)
     if test_set != None:
         plt.title(f'spearmanr train: {spearmanr:.3f}, spearmanr test: {spearmanr_test:.3f}')
     else:
