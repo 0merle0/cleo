@@ -1,15 +1,8 @@
 import sys, os
 import secrets
 import json
-from cleo import CLEO
+from git.cleo.cleo_dep import CLEO
 import argparse
-import torch
-import gpytorch
-import botorch
-import scipy
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 from botorch.acquisition import qUpperConfidenceBound
 from model_util import load_gp
 from optimization_util import *

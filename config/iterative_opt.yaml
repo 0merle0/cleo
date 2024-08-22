@@ -1,0 +1,7 @@
+defaults:
+  - surrogate
+  - candidate_selection
+iterative_opt:
+  dataset_path: '/home/jgershon/git/cleo/data/four-site_simplified_AA_data.csv'
+  top_k_from_dataset: 5000
+
