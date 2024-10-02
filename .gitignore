@@ -1,1 +1,3 @@
 experiments/*
+*.swp
+__pycache__/
