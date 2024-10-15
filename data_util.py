@@ -1,53 +1,129 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import fragment_util
 import pdb_util
+import pytorch_lightning as pl
+import pandas as pd
+from icecream import ic
 
 class FragmentDataset(Dataset):
     
-    def __init__(self, 
-                 df, 
-                 input_col='seq', 
-                 label_col='norm_activity', 
-                 name_col='name', 
-                 fragment_dictionary=None, 
-                 fragment_representation=False):
+    def __init__(self, input_feats, labels):
+        """Simplified dataset."""
 
         super(FragmentDataset, self).__init__()
+        self.input_feats = input_feats
+        self.labels = labels
 
-        '''
-            initialize and build training set from csvs
-        '''
-        self.seqs = df[input_col].tolist()
-        self.activities = torch.tensor(df[label_col].tolist())
+    def __len__(self):
+        return len(self.input_feats)
+    
+    def __getitem__(self, index):
+        return self.input_feats[index], self.labels[index]
+    
+
+class FragmentDataModule(pl.LightningDataModule):
+    def __init__(self, cfg):
+        super(FragmentDataModule, self).__init__()
+        self.cfg = cfg
+    
+    def get_train_val_split(self, input_feats, labels):
+        """Split data into train and val."""
+        if self.cfg.use_validation:
+            ic('Using validation')
+            from sklearn.model_selection import train_test_split
+            train_input_feats, val_input_feats, \
+                train_labels, val_labels = train_test_split(
+                                        input_feats, 
+                                        labels, 
+                                        test_size=self.cfg.val_size, 
+                                        random_state=self.cfg.seed
+                                    )
+            train_dataset = FragmentDataset(train_input_feats, train_labels)
+            val_dataset = FragmentDataset(val_input_feats, val_labels)
+        else:
+            train_dataset = FragmentDataset(input_feats, labels)
+            val_dataset = None
         
-        if fragment_representation:
+        return train_dataset, val_dataset
+
+    def featurize_inputs(self, 
+                         df, 
+                         input_col, 
+                         label_col, 
+                         name_col, 
+                         fragment_csv,
+                         ):
+        
+        labels = torch.tensor(df[label_col].tolist())
+        
+        if self.cfg.fragment_representation:
+            assert fragment_csv is not None, 'Must provide fragment csv if training over fragment space'
             # if training over fragment space
-            self.featurized_seqs = fragment_util.featurize_fragments(df[name_col].tolist(), fragment_dictionary)
+            fragment_dictionary = fragment_util.get_fragment_dictionary(fragment_csv)
+            input_feats = fragment_util.featurize_fragments(
+                                                        df[name_col].tolist(), 
+                                                        fragment_dictionary
+                                                        )
             num_classes = max([len(fragment_dictionary[x]) for x in fragment_dictionary])
         else:
             # get num seqs
-            self.featurized_seqs = []
-            for seq in self.seqs:
-                self.featurized_seqs.append([pdb_util.aa12num[x] for x in seq])
+            input_feats = []
+            for seq in df[input_col].tolist():
+                input_feats.append([pdb_util.aa12num[x] for x in seq])
             num_classes = 20
 
         # if one hot then featurize the sequences to be one hot
-        self.featurized_seqs = get_one_hot(self.featurized_seqs, num_classes=num_classes)
-        self.featurized_seqs = self.featurized_seqs.reshape(self.featurized_seqs.shape[0],-1)
-        
-    def __len__(self):
-        return len(self.featurized_seqs)
-    
-    def __getitem__(self, index):
-        return self.featurized_seqs[index], self.activities[index]
-    
+        input_feats = self.get_one_hot(input_feats, num_classes=num_classes)
+        input_feats = input_feats.reshape(input_feats.shape[0],-1)
+        return input_feats, labels
 
-def get_one_hot(seqs,  num_classes=20):
-    '''
-        go from num seq to one hot seq
-    '''
-    one_hot_seqs = []
-    for x in seqs:
-        one_hot_seqs.append(torch.nn.functional.one_hot(torch.tensor(x),num_classes=num_classes)[None])
-    return torch.cat(one_hot_seqs,dim=0)
+    def prepare_data(self):
+        """Load local data on cpu."""
+        self.df = pd.read_csv(self.path_to_data)
+        input_feats, labels = self.featurize_inputs(self.df,
+                                                    self.cfg.input_col,
+                                                    self.cfg.label_col,
+                                                    self.cfg.name_col,
+                                                    self.cfg.fragment_csv
+                                                    )
+        self.train_data, self.val_data = self.get_train_val_split(input_feats, labels)
+
+    def setup(self, stage):
+        """Called on each DDP process."""
+        # currently not being used at the moment
+        pass
+
+    def get_one_hot(seqs, num_classes=20):
+        '''
+            go from num seq to one hot seq
+        '''
+        one_hot_seqs = []
+        for x in seqs:
+            one_hot_seqs.append(torch.nn.functional.one_hot(torch.tensor(x),num_classes=num_classes)[None])
+        return torch.cat(one_hot_seqs,dim=0)
+
+    def train_dataloader(self):
+        """Training dataloader."""
+        return DataLoader(self.train_dataset, 
+                               batch_size=self.cfg.batch_size,
+                               shuffle=True,
+                               num_workers=self.cfg.num_workers)
+
+    def val_dataloader(self):
+        """Validation dataloader."""
+        if self.val:
+            return DataLoader(self.val_dataset,
+                               batch_size=self.cfg.batch_size,
+                               shuffle=False,
+                               num_workers=self.cfg.num_workers)
+        else:
+            return None 
+
+    def test_dataloader(self):
+        """Test dataloader not used."""
+        return None
+    
+    def predict_dataloader(self):
+        """Predict dataloader not used."""
+        return None

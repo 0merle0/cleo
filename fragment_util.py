@@ -1,13 +1,13 @@
 import torch
 import pandas as pd
 
-def get_fragment_dictionary(fragments_csv):
+def get_fragment_dictionary(fragment_csv):
     '''
         parse fragment order csv
         csv must have columns: 'name','fragment','seq'
     '''
     # read in csv
-    library_df = pd.read_csv(fragments_csv)
+    library_df = pd.read_csv(fragment_csv)
     
     # get number of fragments
     num_fragments = len(library_df['fragment'].unique())

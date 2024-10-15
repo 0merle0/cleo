@@ -1,0 +1,26 @@
+debug: true
+run_name: 'test'
+ckpt_monitor: 'val/mse'
+ckpt_mode: 'min'
+max_epochs: 500
+log_every_n_steps: 1
+val_check_interval: 2500
+data:
+  batch_size: 16
+  num_workers: 2
+  input_col: 'seq'
+  label_col: 'activity'
+  name_col: 'frag'
+  fragment_csv: null # 'data/fragments.csv'
+  fragment_representation: true
+  use_validation: true
+  val_size: 0.1
+  seed: 123
+model:
+  lr: 1e-3
+  num_models: 4
+  mlp_cfg:
+    input_dim: 20
+    hidden_dim: 128
+    out_dim: 1
+    p_drop: 0.2
