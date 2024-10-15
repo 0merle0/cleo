@@ -12,20 +12,25 @@ from icecream import ic
 
 class FeatureEmbedder(nn.Module):
     
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, 
+                input_dim, 
+                hidden_dim,
+                p_drop=0.2,
+                ):
         super(FeatureEmbedder, self).__init__()
         
         # make intermediate layers
-        self.hidden_layers = nn.Sequential(
+        self.mlp = nn.Sequential(
                 nn.Linear(input_dim, hidden_dim),
                 nn.ReLU(),
+                nn.Dropout(p_drop),
                 nn.Linear(hidden_dim, hidden_dim),
                 nn.ReLU(),
+                nn.Dropout(p_drop),
                 nn.Linear(hidden_dim, hidden_dim),
             )
-        
     def forward(self, x):
-        return self.hidden_layers(x.float())
+        return self.mlp(x.float())
         
     
 
