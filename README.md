@@ -25,4 +25,6 @@ To contribute to the codebase please follow the general workflow:
 
 Make sure you merge the latest changes from main before submitting your PR.
 
+
+### Combinatorial library design and optimization overview
 ![alt text](./figs/poster.jpg)
