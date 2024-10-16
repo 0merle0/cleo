@@ -109,6 +109,7 @@ class FragmentDataModule(pl.LightningDataModule):
         elif self.cfg.validation_mode is None:
             ic('Validation is turned off')
             df_train = df
+
         else:
             raise Exception(f'Validation mode not recognized: {self.cfg.validation_mode}')
 
