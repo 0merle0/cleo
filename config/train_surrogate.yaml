@@ -6,12 +6,13 @@ max_epochs: 500
 log_every_n_steps: 1
 val_check_interval: 2500
 data:
+  dataset: 'data/four-site_clean_simplified_AA_data.csv'
   batch_size: 16
   num_workers: 2
-  input_col: 'seq'
-  label_col: 'activity'
-  name_col: 'frag'
-  fragment_csv: null # 'data/fragments.csv'
+  input_col: 'AAs'
+  label_col: 'fitness'
+  name_col: 'frag_names'
+  fragment_csv: 'data/four-site_fragments.csv'
   fragment_representation: true
   use_validation: true
   val_size: 0.1
@@ -20,7 +21,7 @@ model:
   lr: 1e-3
   num_models: 4
   mlp_cfg:
-    input_dim: 20
+    input_dim: 80
     hidden_dim: 128
     out_dim: 1
     p_drop: 0.2

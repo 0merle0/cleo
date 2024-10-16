@@ -30,7 +30,7 @@ class FragmentDataModule(pl.LightningDataModule):
     def get_train_val_split(self, input_feats, labels):
         """Split data into train and val."""
         if self.cfg.use_validation:
-            ic('Using validation')
+            ic('Random validation')
             from sklearn.model_selection import train_test_split
             train_input_feats, val_input_feats, \
                 train_labels, val_labels = train_test_split(
@@ -70,7 +70,7 @@ class FragmentDataModule(pl.LightningDataModule):
             # get num seqs
             input_feats = []
             for seq in df[input_col].tolist():
-                input_feats.append([pdb_util.aa12num[x] for x in seq])
+                input_feats.append(torch.tensor([pdb_util.aa12num[x] for x in seq]))
             num_classes = 20
 
         # if one hot then featurize the sequences to be one hot
@@ -80,28 +80,26 @@ class FragmentDataModule(pl.LightningDataModule):
 
     def prepare_data(self):
         """Load local data on cpu."""
-        self.df = pd.read_csv(self.path_to_data)
+        self.df = pd.read_csv(self.cfg.dataset)
         input_feats, labels = self.featurize_inputs(self.df,
                                                     self.cfg.input_col,
                                                     self.cfg.label_col,
                                                     self.cfg.name_col,
                                                     self.cfg.fragment_csv
                                                     )
-        self.train_data, self.val_data = self.get_train_val_split(input_feats, labels)
+        self.train_dataset, self.val_dataset = self.get_train_val_split(input_feats, labels)
 
     def setup(self, stage):
         """Called on each DDP process."""
         # currently not being used at the moment
         pass
 
-    def get_one_hot(seqs, num_classes=20):
-        '''
-            go from num seq to one hot seq
-        '''
+    def get_one_hot(self, seqs, num_classes=20):
+        """Go from num seq to one hot seq."""
         one_hot_seqs = []
         for x in seqs:
-            one_hot_seqs.append(torch.nn.functional.one_hot(torch.tensor(x),num_classes=num_classes)[None])
-        return torch.cat(one_hot_seqs,dim=0)
+            one_hot_seqs.append(torch.nn.functional.one_hot(x,num_classes=num_classes))
+        return torch.stack(one_hot_seqs)
 
     def train_dataloader(self):
         """Training dataloader."""
@@ -112,13 +110,13 @@ class FragmentDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         """Validation dataloader."""
-        if self.val:
-            return DataLoader(self.val_dataset,
+        val_loader = None
+        if self.cfg.use_validation:
+            val_loader =  DataLoader(self.val_dataset,
                                batch_size=self.cfg.batch_size,
                                shuffle=False,
                                num_workers=self.cfg.num_workers)
-        else:
-            return None 
+        return val_loader 
 
     def test_dataloader(self):
         """Test dataloader not used."""

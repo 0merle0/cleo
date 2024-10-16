@@ -1,0 +1,16 @@
+torch
+botorch
+pytorch-lightning
+pandas
+matplotlib
+seaborn
+numpy
+scipy
+scikit-learn
+gpytorch
+tqdm
+rich
+icecream
+colorama
+executing
+asttokens
