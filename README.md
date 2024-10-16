@@ -6,7 +6,7 @@ this code base is split into basic elements of iterative optimization
 ### Setup
 To set up the environment, use the following command guide:
 ```
-conda create --name cleo  python=3.9
+conda create --name cleo python=3.9
 conda activate cleo
 pip install -r requirements.txt
 ```
