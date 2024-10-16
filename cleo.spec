@@ -75,7 +75,8 @@ pip install e3nn \
    einops \
    submitit \
    biopython \
-   botorch 
+   botorch \
+   rich
 
 # deepspeed
 pip install deepspeed

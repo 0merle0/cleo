@@ -22,7 +22,7 @@ def train_surrogate(cfg):
     logger = None
     callbacks = []
     callbacks.append(pl.callbacks.RichModelSummary(max_depth=2))
-    callbacks.append(pl.callbacks.RichProgressBar()) 
+    callbacks.append(pl.callbacks.RichProgressBar())
     if not cfg.debug:
         # if not in debug mode, save config, set up logger and checkpointer
         ckpt_dir = f'./ckpt/{cfg.run_name}/{cfg.run_name}:{datetime_str}'
