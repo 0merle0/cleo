@@ -5,6 +5,8 @@ import pdb_util
 import pytorch_lightning as pl
 import pandas as pd
 from icecream import ic
+from sklearn.model_selection import train_test_split
+
 
 class FragmentDataset(Dataset):
     
@@ -27,11 +29,17 @@ class FragmentDataModule(pl.LightningDataModule):
         super(FragmentDataModule, self).__init__()
         self.cfg = cfg
     
-    def get_train_val_split(self, input_feats, labels):
+    def get_train_val_split(self, df):
         """Split data into train and val."""
-        if self.cfg.use_validation:
+        if self.cfg.validation_mode == 'random':
             ic('Random validation')
-            from sklearn.model_selection import train_test_split
+            input_feats, labels = self.featurize_inputs(self.df,
+                                                        self.cfg.input_col,
+                                                        self.cfg.label_col,
+                                                        self.cfg.name_col,
+                                                        self.cfg.fragment_csv
+                                                    )
+
             train_input_feats, val_input_feats, \
                 train_labels, val_labels = train_test_split(
                                         input_feats, 
@@ -39,11 +47,49 @@ class FragmentDataModule(pl.LightningDataModule):
                                         test_size=self.cfg.val_size, 
                                         random_state=self.cfg.seed
                                     )
+
             train_dataset = FragmentDataset(train_input_feats, train_labels)
             val_dataset = FragmentDataset(val_input_feats, val_labels)
-        else:
+
+        elif self.cfg.validation_mode == 'top-k':
+            ic('Top k validation')
+            raise Exception('Not implemented yet')
+
+        elif self.cfg.validation_mode == 'label':
+            ic('Label validation')
+            df_train = df[~df[self.cfg.val_label]]
+            df_val = df[df[self.cfg.val_label]]
+
+            train_input_feats, train_labels = self.featurize_inputs(df_train,
+                                                                    self.cfg.input_col,
+                                                                    self.cfg.label_col,
+                                                                    self.cfg.name_col,
+                                                                    self.cfg.fragment_csv
+                                                                )
+            val_input_feats, val_labels = self.featurize_inputs(df_val,
+                                                                self.cfg.input_col,
+                                                                self.cfg.label_col,
+                                                                self.cfg.name_col,
+                                                                self.cfg.fragment_csv
+                                                            )       
+
+            train_dataset = FragmentDataset(train_input_feats, train_labels)
+            val_dataset = FragmentDataset(val_input_feats, val_labels)
+
+        elif self.cfg.validation_mode is None:
+            ic('Validation is turned off')
+            input_feats, labels = self.featurize_inputs(df,
+                                                        self.cfg.input_col,
+                                                        self.cfg.label_col,
+                                                        self.cfg.name_col,
+                                                        self.cfg.fragment_csv
+                                                    )
             train_dataset = FragmentDataset(input_feats, labels)
             val_dataset = None
+        
+        
+        else:
+            raise Exception(f'Validation mode not recognized: {self.cfg.validation_mode}')
         
         return train_dataset, val_dataset
 
@@ -80,14 +126,8 @@ class FragmentDataModule(pl.LightningDataModule):
 
     def prepare_data(self):
         """Load local data on cpu."""
-        self.df = pd.read_csv(self.cfg.dataset)
-        input_feats, labels = self.featurize_inputs(self.df,
-                                                    self.cfg.input_col,
-                                                    self.cfg.label_col,
-                                                    self.cfg.name_col,
-                                                    self.cfg.fragment_csv
-                                                    )
-        self.train_dataset, self.val_dataset = self.get_train_val_split(input_feats, labels)
+        df = pd.read_csv(self.cfg.dataset)
+        self.train_dataset, self.val_dataset = self.get_train_val_split(df)
 
     def setup(self, stage):
         """Called on each DDP process."""
@@ -111,7 +151,7 @@ class FragmentDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         """Validation dataloader."""
         val_loader = None
-        if self.cfg.use_validation:
+        if self.cfg.validation_mode is not None:
             val_loader =  DataLoader(self.val_dataset,
                                batch_size=self.cfg.batch_size,
                                shuffle=False,
