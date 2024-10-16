@@ -1,15 +1,16 @@
-debug: true
-run_name: 'test'
+debug: false
+run_name: 'initial_test'
 trainer:
   max_epochs: 500
   log_every_n_steps: 1
   check_val_every_n_epoch: 1
 checkpointer:
-  monitor: 'val/mse'
-  mode: 'min'
+  monitor: 'val/pearsonr'
+  mode: 'max'
 data:
   dataset: 'data/four-site_clean_simplified_AA_data_2k_train_random_test.csv'
-  batch_size: 16
+  train_batch_size: 32
+  val_batch_size: 32
   num_workers: 1
   input_col: 'AAs'
   label_col: 'fitness'
