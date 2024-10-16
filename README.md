@@ -22,6 +22,7 @@ To contribute to the codebase please follow the general workflow:
 1. create a new branch
 2. develop and push changes to new branch
 3. make a pull request to merge your branch into main
+
 Make sure you merge the latest changes from main before submitting your PR.
 
 ![alt text](./figs/poster.jpg)
