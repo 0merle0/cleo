@@ -92,6 +92,7 @@ class Ensemble(pl.LightningModule):
         self.log_dict(to_log)
 
     def on_validation_epoch_end(self):
+        """Compute ensemble metrics at end of validation epoch."""
         y_true = torch.cat(self.val_y, dim=0)
         y_pred = torch.cat(self.val_y_hat, dim=0)
         
