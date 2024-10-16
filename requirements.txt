@@ -1,6 +1,7 @@
 torch
 botorch
 pytorch-lightning
+wandb
 pandas
 matplotlib
 seaborn
