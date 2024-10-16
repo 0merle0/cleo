@@ -2,3 +2,6 @@ experiments/*
 *.swp
 __pycache__/
 logs/
+ckpt/
+lightning_logs/
+outputs/

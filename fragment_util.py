@@ -16,7 +16,7 @@ def get_fragment_dictionary(fragment_csv):
     fragment_dictionary = {}
     for i in range(num_fragments):
         tmp = library_df[library_df['fragment']==i+1]
-        fragment_dictionary[i+1] = [(f'frag{i+1}_{name}',frag) for name,frag in zip(tmp['name'].tolist(),tmp['seq'].tolist())]
+        fragment_dictionary[i+1] = [(name,frag) for name,frag in zip(tmp['name'].tolist(),tmp['seq'].tolist())]
     
     # alphabetically sort all fragments
     for x in fragment_dictionary:
@@ -25,7 +25,7 @@ def get_fragment_dictionary(fragment_csv):
     return fragment_dictionary
 
 
-def make_all_sequences(fragment_dictionary, seq_list=[('','')], frag_num=1):
+def make_all_sequences(fragment_dictionary, seq_list=[('','')], frag_num=1, to_join_on=':'):
     '''
         recursive func to make all possible sequences in list
     '''
@@ -35,7 +35,7 @@ def make_all_sequences(fragment_dictionary, seq_list=[('','')], frag_num=1):
             if frag_num == 1:
                 catname = name_to_add
             else:
-                catname = name+'_'+name_to_add
+                catname = name+to_join_on+name_to_add
             new_seq_list.append((catname,seq+frag_to_add))
     
     frag_num += 1
@@ -54,23 +54,16 @@ def get_all_sequences(fragment_dictionary):
     all_seqs.sort()
     return all_seqs
 
-def featurize_fragments(names, fragment_dictionary):
+def featurize_fragments(names, fragment_dictionary, to_split_on=':'):
     '''
         split sequences by fragment and return features for training over fragment space
     '''
     frag_nums = []
     for n in names:
-        split = n.split('frag')[1:]
+        frag_list = n.split(to_split_on)
 
         # check to make sure split is correct
-        assert len(split) == len(fragment_dictionary)
-        
-        frag_list = []
-        for s in split:
-            tmp = 'frag'+s
-            if '_' == tmp[-1]:
-                tmp = tmp[:-1]
-            frag_list.append(tmp)
+        assert len(frag_list) == len(fragment_dictionary), "Check you are splitting correctly"
         
         tmp_nums = []
         for i,f in enumerate(frag_list):
