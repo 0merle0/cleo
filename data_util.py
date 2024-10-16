@@ -148,7 +148,7 @@ class FragmentDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         """Training dataloader."""
         return DataLoader(self.train_dataset, 
-                               batch_size=self.cfg.batch_size,
+                               batch_size=self.cfg.train_batch_size,
                                shuffle=True,
                                num_workers=self.cfg.num_workers)
 
@@ -157,7 +157,7 @@ class FragmentDataModule(pl.LightningDataModule):
         val_loader = None
         if self.cfg.validation_mode is not None:
             val_loader =  DataLoader(self.val_dataset,
-                               batch_size=self.cfg.batch_size,
+                               batch_size=self.cfg.val_batch_size,
                                shuffle=False,
                                num_workers=self.cfg.num_workers)
         return val_loader 
