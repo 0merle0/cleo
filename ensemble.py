@@ -107,6 +107,8 @@ class Ensemble(pl.LightningModule):
         pred_std = y_pred.std(dim=1)
         to_log['val/std'] = pred_std.mean().item()
         
+        self.log_dict(to_log)
+        
         # clear lists for next epoch
         self.val_y_hat.clear()
         self.val_y.clear()

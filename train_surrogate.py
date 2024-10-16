@@ -25,7 +25,7 @@ def train_surrogate(cfg):
     callbacks.append(pl.callbacks.RichProgressBar()) 
     if not cfg.debug:
         # if not in debug mode, save config, set up logger and checkpointer
-        ckpt_dir = f'./ckpt/{cfg.run_name}:{datetime_str}'
+        ckpt_dir = f'./ckpt/{cfg.run_name}/{cfg.run_name}:{datetime_str}'
         os.makedirs(ckpt_dir, exist_ok=True)
         OmegaConf.save(cfg, f'{ckpt_dir}/config.yaml')
 
@@ -36,19 +36,20 @@ def train_surrogate(cfg):
                                 log_model=False
                             )
         callbacks.append(pl.callbacks.ModelCheckpoint(
-                                        dirpath=ckpt_dir, 
-                                        monitor=cfg.ckpt_mointer, 
-                                        mode=cfg.ckpt_mode
+                                        save_last=True,
+                                        dirpath=ckpt_dir,
+                                        monitor=cfg.checkpointer.monitor, 
+                                        mode=cfg.checkpointer.mode
                                        )
                                     )
 
     # setup pytorch lightning trainer
     trainer = pl.Trainer(
-        max_epochs=cfg.max_epochs,
+        max_epochs=cfg.trainer.max_epochs,
         logger=logger,
-        log_every_n_steps=cfg.log_every_n_steps,
-        val_check_interval=cfg.val_check_interval,
         callbacks=callbacks,
+        log_every_n_steps=cfg.trainer.log_every_n_steps,
+        check_val_every_n_epoch=cfg.trainer.check_val_every_n_epoch,
     )
 
     # train model
