@@ -1,4 +1,6 @@
 torch
+hydra
+omegaconf
 botorch
 pytorch-lightning
 wandb
@@ -15,5 +17,3 @@ icecream
 colorama
 executing
 asttokens
-omegaconf
-hydra-core
