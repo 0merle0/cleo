@@ -1,4 +1,6 @@
 torch
+hydra
+omegaconf
 botorch
 pytorch-lightning
 wandb
