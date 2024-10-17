@@ -38,6 +38,7 @@ class Ensemble(pl.LightningModule):
     def __init__(self, cfg):
 
         super(Ensemble, self).__init__()
+        self.cfg = cfg
         self.num_models = cfg.num_models
         self.mlp_cfg = cfg.mlp_cfg
         self.lr = cfg.lr
@@ -57,16 +58,37 @@ class Ensemble(pl.LightningModule):
         optimizers = [torch.optim.Adam(model.parameters(), lr=self.lr) for model in self.models]
         return optimizers
     
+    def split_batch(self, x):
+        """Split batch into equal parts for each model."""
+        batch_size = x.size(0)
+        assert batch_size % self.num_models == 0, "Batch size must be divisible by number of models."
+        split_batch_size = batch_size // self.num_models
+        x_list = [x[i*split_batch_size:(i+1)*split_batch_size] for i in range(self.num_models)]
+        return x_list
+    
     def training_step(self, batch, batch_idx):
         """Training step for each model."""
         x, y = batch
         optimizers = self.optimizers()
+        
+        # Split batch amongst models
+        if self.cfg.split_batch_mode:
+            x_list = self.split_batch(x)
+            y_list = self.split_batch(y)
+        else:
+            x_list = [x]*self.num_models
+            y_list = [y]*self.num_models
 
         to_log = {}
-        for n, (model, opt) in enumerate(zip(self.models, optimizers)):
+        for n in range(self.num_models):
+            model = self.models[n]
+            _x = x_list[n]
+            _y = y_list[n]
+            opt = optimizers[n]
+
             opt.zero_grad()
-            y_hat = model(x)
-            loss = self.mse_loss(y_hat, y.unsqueeze(-1))
+            y_hat = model(_x)
+            loss = self.mse_loss(y_hat, _y.unsqueeze(-1))
             self.manual_backward(loss)
             opt.step()
             to_log[f"train/model_{n+1}_mse"] = loss.item()
