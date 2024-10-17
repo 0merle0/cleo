@@ -15,3 +15,5 @@ icecream
 colorama
 executing
 asttokens
+omegaconf
+hydra-core
