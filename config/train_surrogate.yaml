@@ -1,5 +1,5 @@
 debug: false
-run_name: 'initial_test'
+run_name: 'test'
 trainer:
   max_epochs: 500
   log_every_n_steps: 1
@@ -9,7 +9,7 @@ checkpointer:
   mode: 'max'
 data:
   dataset: 'data/four-site_clean_simplified_AA_data_2k_train_random_test.csv'
-  train_batch_size: 32
+  train_batch_size: 128
   val_batch_size: 32
   num_workers: 1
   input_col: 'AAs'
@@ -24,6 +24,7 @@ data:
 model:
   lr: 1e-3
   num_models: 4
+  split_batch_mode: false # if true, batch size for each model will be B//N
   mlp_cfg:
     input_dim: 80
     hidden_dim: 32
