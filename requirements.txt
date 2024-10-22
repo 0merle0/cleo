@@ -1,5 +1,5 @@
 torch
-hydra
+hydra-core
 omegaconf
 botorch
 pytorch-lightning
