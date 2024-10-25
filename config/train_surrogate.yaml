@@ -1,7 +1,7 @@
 debug: false
-run_name: 'test'
+run_name: 'nll_10models'
 trainer:
-  max_epochs: 500
+  max_epochs: 10000
   log_every_n_steps: 1
   check_val_every_n_epoch: 1
 checkpointer:
@@ -9,7 +9,7 @@ checkpointer:
   mode: 'max'
 data:
   dataset: 'data/four-site_clean_simplified_AA_data_2k_train_random_test.csv'
-  train_batch_size: 128
+  train_batch_size: 32
   val_batch_size: 32
   num_workers: 1
   input_col: 'AAs'
@@ -23,10 +23,13 @@ data:
   seed: 123
 model:
   lr: 1e-3
-  num_models: 4
+  num_models: 10
   split_batch_mode: false # if true, batch size for each model will be B//N
-  mlp_cfg:
+  base_model:
     input_dim: 80
-    hidden_dim: 32
-    out_dim: 1
+    hidden_dim: 64
+    output_dim: 1
     p_drop: 0.2
+    predict_variance: true # if true, predict variance
+  loss:
+    loss_fn: 'nll' # mle, nll

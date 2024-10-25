@@ -13,11 +13,6 @@ def train_surrogate(cfg):
     now = datetime.datetime.now()
     datetime_str = now.strftime("%Y-%m-%d-%H-%M-%S")
 
-    # setup datamodule
-    datamodule = FragmentDataModule(cfg.data)
-
-    # setup model
-    model = Ensemble(cfg.model)
 
     logger = None
     callbacks = []
@@ -42,6 +37,12 @@ def train_surrogate(cfg):
                                         mode=cfg.checkpointer.mode
                                        )
                                     )
+
+    # setup datamodule
+    datamodule = FragmentDataModule(cfg.data)
+
+    # setup model
+    model = Ensemble(cfg.model)
 
     # setup pytorch lightning trainer
     trainer = pl.Trainer(
