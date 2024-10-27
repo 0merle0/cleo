@@ -1,7 +1,7 @@
 debug: false
-run_name: 'nll_10models'
+run_name: 'base_config'
 trainer:
-  max_epochs: 10000
+  max_epochs: 1000
   log_every_n_steps: 1
   check_val_every_n_epoch: 1
 checkpointer:
@@ -9,11 +9,11 @@ checkpointer:
   mode: 'max'
 data:
   dataset: 'data/four-site_clean_simplified_AA_data_2k_train_random_test.csv'
-  train_batch_size: 32
+  train_batch_size: 10
   val_batch_size: 32
   num_workers: 1
   input_col: 'AAs'
-  label_col: 'fitness'
+  label_col: 'znorm_fitness'
   name_col: 'frag_names'
   fragment_csv: 'data/four-site_fragments.csv'
   use_fragment_representation: true
@@ -24,12 +24,14 @@ data:
 model:
   lr: 1e-3
   num_models: 10
-  split_batch_mode: false # if true, batch size for each model will be B//N
+  split_batch_mode: true # if true, batch size for each model will be B//N
   base_model:
     input_dim: 80
-    hidden_dim: 64
+    hidden_dim: 8
     output_dim: 1
     p_drop: 0.2
     predict_variance: true # if true, predict variance
+    variance_transform: "softplus" # softplus, sigmoid, clamp
+    variance_scale: 1.0
   loss:
     loss_fn: 'nll' # mle, nll

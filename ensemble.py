@@ -41,8 +41,19 @@ class BaseModel(nn.Module):
         if self.cfg.predict_variance:
             # transform output with softplus to ensure positive variance
             # taken from https://arxiv.org/pdf/1612.01474
-            var = torch.log(1 + torch.exp(self.var_head(x)))
-            out["var"] = torch.clamp(var, min=1e-6)
+            var = self.var_head(x)
+            if self.cfg.variance_transform == "softplus":
+                var = torch.log(1 + torch.exp(var))
+                var = torch.clamp(var, min=1e-6)
+            elif self.cfg.variance_transform == "sigmoid":
+                var = torch.sigmoid(var)
+                var = torch.clamp(var, min=1e-6)
+            elif self.cfg.variance_transform == "clamp":
+                var = torch.clamp(var, min=1e-6)
+            else:
+                raise ValueError(f"Variance transform {self.cfg.variance_transform} not supported.")
+
+            out["var"] = var*self.cfg.variance_scale
         return out
 
 
@@ -232,6 +243,8 @@ class Ensemble(pl.LightningModule):
         se = (gt - mean_pred)**2
         se_var_corr, _ = stats.pearsonr(se, std_pred**2)
         to_log["val/se_var_corr"] = se_var_corr
+
+        to_log["val/mse"] = se.mean().item()
 
         self.log_dict(to_log)
         
