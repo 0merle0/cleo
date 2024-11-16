@@ -6,7 +6,9 @@ import pytorch_lightning as pl
 import pandas as pd
 from icecream import ic
 from sklearn.model_selection import train_test_split
-
+import glob
+import os
+import pdb
 
 class FragmentDataset(Dataset):
     
@@ -18,6 +20,8 @@ class FragmentDataset(Dataset):
                     name_col,
                     fragment_csv,
                     use_fragment_representation,
+                    use_pretrained_embeddings,
+                    embedding_path,
                 ):
         """Simplified dataset."""
 
@@ -28,7 +32,9 @@ class FragmentDataset(Dataset):
                                             label_col,
                                             name_col,
                                             fragment_csv,
-                                            use_fragment_representation,                                        
+                                            use_fragment_representation,
+                                            use_pretrained_embeddings,
+                                            embedding_path                                        
                                         )   
         self.input_feats, self.labels = features
 
@@ -47,10 +53,13 @@ class FragmentDataset(Dataset):
                             name_col, 
                             fragment_csv,
                             use_fragment_representation,
+                            use_pretrained_embeddings,
+                            embedding_path
                         ):
         """Featurize inputs from dataframe."""
-        labels = torch.tensor(df[label_col].tolist())
-        
+        labels = torch.tensor(df[label_col].tolist()) 
+        # use_pretrained_embeddings = True
+
         if use_fragment_representation:
             assert fragment_csv is not None, 'Must provide fragment csv if training over fragment space'
             # if training over fragment space
@@ -60,6 +69,27 @@ class FragmentDataset(Dataset):
                                                         fragment_dictionary
                                                         )
             num_classes = max([len(fragment_dictionary[x]) for x in fragment_dictionary])
+            input_feats = self.get_one_hot(input_feats, num_classes=num_classes)
+            input_feats = input_feats.reshape(input_feats.shape[0],-1)
+        elif use_pretrained_embeddings:
+            print('Using pretrained embeddings')
+            if embedding_path is None:
+                raise Exception('Must provide embedding path if using pretrained embeddings')
+            # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            # df['embedding_path'] = df['AAs'].apply(lambda x: f'/home/ssalike/Projects/cleo/mpnn_embeddings/tmp/arnoldlab_pmpnn_embeddings1_{x}.pt')
+            all_embeddings = []
+
+            # Iterate through each row in the dataframe
+            for _, row in df.iterrows():
+                path = os.path.join(embedding_path, f"{row['AAs']}_pca_top100.pt")
+                # path = f"/home/ssalike/Projects/cleo/pca/transformed_embeddings_mean_pooled/{row['AAs']}_pca_top100.pt"
+                embedding_dict = torch.load(path, map_location='cpu') 
+                embedding = embedding_dict[row['AAs']]
+                all_embeddings.append(embedding)
+
+            input_feats = torch.stack(all_embeddings)
+            # pdb.set_trace()
+            # input_feats = input_feats.reshape(input_feats.shape[0],-1)
         else:
             # get num seqs
             input_feats = []
@@ -67,9 +97,13 @@ class FragmentDataset(Dataset):
                 input_feats.append(torch.tensor([pdb_util.aa12num[x] for x in seq]))
             num_classes = 20
 
-        # if one hot then featurize the sequences to be one hot
-        input_feats = self.get_one_hot(input_feats, num_classes=num_classes)
-        input_feats = input_feats.reshape(input_feats.shape[0],-1)
+            # if one hot then featurize the sequences to be one hot
+            input_feats = self.get_one_hot(input_feats, num_classes=num_classes)
+            input_feats = input_feats.reshape(input_feats.shape[0],-1)
+
+
+
+
         return input_feats, labels
 
     def __len__(self):
@@ -121,7 +155,11 @@ class FragmentDataModule(pl.LightningDataModule):
                                             name_col=self.cfg.name_col,
                                             fragment_csv=self.cfg.fragment_csv,
                                             use_fragment_representation=self.cfg.use_fragment_representation,
+                                            use_pretrained_embeddings=self.cfg.use_pretrained_embeddings.use,
+                                            embedding_path=self.cfg.use_pretrained_embeddings.embeddings_path
                                         )
+        print('Train dataset length:', len(train_dataset))
+        print('First input shape:', train_dataset[0][0].shape)
         val_dataset = None
         if df_val is not None:
             val_dataset = FragmentDataset(
@@ -131,6 +169,8 @@ class FragmentDataModule(pl.LightningDataModule):
                                             name_col=self.cfg.name_col,
                                             fragment_csv=self.cfg.fragment_csv,
                                             use_fragment_representation=self.cfg.use_fragment_representation,
+                                            use_pretrained_embeddings=self.cfg.use_pretrained_embeddings.use,
+                                            embedding_path=self.cfg.use_pretrained_embeddings.embeddings_path
                                         )   
         
         return train_dataset, val_dataset
