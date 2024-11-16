@@ -1,0 +1,30 @@
+{
+  "os":  "Linux-5.15.0-124-generic-x86_64-with-glibc2.35",
+  "python":  "3.9.20",
+  "startedAt":  "2024-11-14T22:11:17.963097Z",
+  "program":  "<python with no main file>",
+  "git":  {
+    "remote":  "git@github.com:0merle0/cleo.git",
+    "commit":  "2869681e1a9f317a728bb428919dda45f25b907e"
+  },
+  "email":  "ssalike@uw.edu",
+  "root":  "/home/ssalike/git/cleo",
+  "host":  "danio",
+  "username":  "ssalike",
+  "executable":  "/home/ssalike/.conda/envs/cleo/bin/python",
+  "cpu_count":  14,
+  "cpu_count_logical":  20,
+  "disk":  {
+    "/":  {
+      "total":  "966543671296",
+      "used":  "15529934848"
+    }
+  },
+  "memory":  {
+    "total":  "32946577408"
+  },
+  "cpu":  {
+    "count":  14,
+    "countLogical":  20
+  }
+}
