@@ -59,5 +59,16 @@ def train_surrogate(cfg):
         datamodule=datamodule,
     )
 
+    # test model
+    ckpt_path = None
+    if not cfg.debug:
+        ckpt_path = f"{ckpt_dir}/last.ckpt"
+
+    trainer.test(
+        model=model,
+        datamodule=datamodule,
+        ckpt_path=ckpt_path
+    )
+
 if __name__ == "__main__":
     train_surrogate()

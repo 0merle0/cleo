@@ -10,6 +10,7 @@ import seaborn as sns
 from icecream import ic
 from scipy import stats
 from torch.distributions.normal import Normal
+import wandb
 
 class BaseModel(nn.Module):
     """
@@ -285,4 +286,132 @@ class Ensemble(pl.LightningModule):
             "var": var_stack, # shape: (batch, model, out_dim)
         }
         return to_return
+
+    def test_step(self, batch, batch_idx):
+        """
+        Test step for ensemble. Collects predictions for final evaluation.
+        """
+        x, y = batch
+
+        # Initialize storage lists on first batch
+        if batch_idx == 0:
+            self.test_y = []
+            self.test_mean = []
+            self.test_var = []
+            self.test_min_dists = []
+            self.test_mean_dists = []
+
+        output_list = []
+        for model in self.models:
+            output = model(x.float())
+            output_list.append(output)
+
+        self.test_y.append(y.cpu())
+        mean_stack = torch.stack([o["mean"].cpu() for o in output_list])
+        self.test_mean.append(mean_stack.permute(1,0,2))
+
+        self.test_min_dists.append(self.trainer.datamodule.test_dataset.min_dists[batch_idx*len(y):(batch_idx+1)*len(y)])
+        self.test_mean_dists.append(self.trainer.datamodule.test_dataset.mean_dists[batch_idx*len(y):(batch_idx+1)*len(y)])
+        
+        if self.cfg.base_model.predict_variance:
+            var_stack = torch.stack([o["var"].cpu() for o in output_list])
+            self.test_var.append(var_stack.permute(1,0,2))
+
+    def on_test_end(self):
+        """
+        Compute ensemble metrics on full test dataset and create scatter plot.
+        """
+        gt = torch.cat(self.test_y, dim=0)
+        mean_stack = torch.cat(self.test_mean, dim=0)
+        var_stack = None
+        if self.cfg.base_model.predict_variance:
+            var_stack = torch.cat(self.test_var, dim=0)
+            mean_pred, std_pred = self.mix_gaussians(mean_stack, var_stack)
+        else:
+            mean_pred = mean_stack.mean(dim=1).squeeze()
+            std_pred = mean_stack.std(dim=1).squeeze()
+            
+        to_log = {}
+
+        # Compute metrics on full test set
+        output = {"mean": mean_stack, "var": var_stack}
+        # to_log[f"test/{self.cfg.loss.loss_fn}"] = self.calc_loss(gt, output).item()
+        
+        corr, _ = stats.pearsonr(gt.numpy().flatten(), mean_pred.numpy().flatten())
+        to_log["test/pearsonr"] = corr
+        to_log["test/std"] = std_pred.mean().item()
+        
+        se = (gt - mean_pred)**2
+        se_var_corr, _ = stats.pearsonr(se.numpy().flatten(), std_pred.numpy().flatten()**2)
+        to_log["test/se_var_corr"] = se_var_corr
+        to_log["test/mse"] = se.mean().item()
+
+        self.logger.experiment.log(to_log)
+
+        # Create scatter plot
+        plt.figure(figsize=(10, 10))
+        plt.scatter(gt.numpy(), mean_pred.numpy(), alpha=0.5)
+        plt.plot([gt.min(), gt.max()], [gt.min(), gt.max()], 'r--')
+        plt.xlabel('True Values')
+        plt.ylabel('Predicted Values')
+        plt.title(f'Test Predictions (Pearson r = {corr:.3f})')
+        
+        if self.cfg.base_model.predict_variance:
+            idx = torch.randperm(len(gt))[:100]
+            plt.errorbar(gt[idx].numpy(), mean_pred[idx].numpy(), 
+                        yerr=2*std_pred[idx].numpy(),
+                        fmt='none', alpha=0.2, color='gray')
+        
+        # Log everything to wandb
+        self.logger.experiment.log({
+            "test/predictions_scatter": wandb.Image(plt)
+        })
+        
+        plt.close()
+
+        if self.cfg.base_model.predict_variance:
+            # 1. True fitness vs min distance plot
+            min_dists = torch.cat(self.test_min_dists, dim=0).numpy()
+            std_pred_numpy = std_pred.numpy()
+
+            plt.figure(figsize=(10, 10), dpi=100)
+            sns.stripplot(x=min_dists, y=std_pred_numpy, alpha=0.1)
+            plt.xlabel('Minimum Distance from Training Set')
+            plt.ylabel('Standard Deviation of Predictions')
+            dist_std_corr, _ = stats.pearsonr(min_dists, std_pred_numpy)
+            plt.title(f'Distance vs. Uncertainty (Pearson r = {dist_std_corr:.2f})')
+            self.logger.experiment.log({
+                "test/distance_vs_uncertainty": wandb.Image(plt)
+            })
+            plt.close()
+
+            # 2. True fitness vs sigma plot
+            plt.figure(figsize=(10, 10), dpi=100)
+            sigma_true_corr, _ = stats.pearsonr(gt.numpy().flatten(), std_pred.numpy().flatten())
+            plt.scatter(gt.numpy(), std_pred.numpy(), alpha=0.1)
+            plt.xlabel('True Fitness')
+            plt.ylabel('Sigma (std)')
+            plt.title(f'True Fitness vs. Uncertainty (Pearson r = {sigma_true_corr:.2f})')
+            self.logger.experiment.log({
+                "test/sigma_vs_true": wandb.Image(plt)
+            })
+            plt.close()
+
+            # 3. Squared error vs sigma plot
+            plt.figure(figsize=(10, 10), dpi=100)
+            plt.scatter(se.numpy(), std_pred.numpy(), alpha=0.1)
+            plt.xlabel('Squared Error')
+            plt.ylabel('Standard Deviation of Predictions')
+            plt.title(f'Error vs. Uncertainty (Pearson r = {se_var_corr:.2f})')
+            self.logger.experiment.log({
+                "test/sigma_vs_error": wandb.Image(plt)
+            })
+            plt.close()
+        
+        # Clean up
+        del self.test_y
+        del self.test_mean
+        del self.test_var
+        del self.test_min_dists
+        del self.test_mean_dists
     

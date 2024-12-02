@@ -1,33 +1,38 @@
 debug: false
-run_name: 'base_config'
+run_name: 'mpnn_embeddings'
 trainer:
-  max_epochs: 500
+  max_epochs: 800
   log_every_n_steps: 1
-  check_val_every_n_epoch: 1
+  check_val_every_n_epoch: 10
 checkpointer:
   monitor: 'val/pearsonr'
   mode: 'max'
 data:
-  dataset: 'data/four-site_clean_simplified_AA_data_2k_train_random_test.csv'
+  dataset: 'data/four-site_clean_simplified_AA_data_2k_train_enriched_test.csv'
+  test_dataset: 'data/four-site_clean_simplified_AA_data.csv'
   train_batch_size: 10
-  val_batch_size: 32
-  num_workers: 1
+  val_batch_size: 10
+  test_batch_size: 3200
+  num_workers: 4
   input_col: 'AAs'
   label_col: 'znorm_fitness'
   name_col: 'frag_names'
   fragment_csv: 'data/four-site_fragments.csv'
-  use_fragment_representation: true
+  use_fragment_representation: False
   validation_mode: label # random, top-k, label, or null
   val_label: val
   val_size: 0.1
   seed: 123
+  use_pretrained_embeddings:
+    use: True
+    embeddings_path: "/net/databases/lab/itopt/francis_arnold_embeddings/mpnn_positional/"
 model:
-  lr: 1e-3
+  lr: 1e-4
   num_models: 10
   split_batch_mode: true # if true, batch size for each model will be B//N
   base_model:
-    input_dim: 80
-    hidden_dim: 8
+    input_dim: 512
+    hidden_dim: 512
     output_dim: 1
     p_drop: 0.2
     predict_variance: true # if true, predict variance
