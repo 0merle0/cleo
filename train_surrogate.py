@@ -7,7 +7,7 @@ from pytorch_lightning.loggers import WandbLogger
 from ensemble import Ensemble
 from data_util import FragmentDataModule
 
-@hydra.main(version_base=None, config_path="./config", config_name="train_surrogate")
+@hydra.main(version_base=None, config_path="./config")
 def train_surrogate(cfg):
     """Train surrogate model."""
     now = datetime.datetime.now()
@@ -23,6 +23,9 @@ def train_surrogate(cfg):
         ckpt_dir = f'./ckpt/{cfg.run_name}/{cfg.run_name}:{datetime_str}'
         os.makedirs(ckpt_dir, exist_ok=True)
         OmegaConf.save(cfg, f'{ckpt_dir}/config.yaml')
+        
+        # set num workers to 1 for debugging
+        cfg.data.num_workers = 1
 
         logger = WandbLogger(
                                 name=cfg.run_name,

@@ -10,27 +10,23 @@ import gpytorch
 from icecream import ic
 
 
-class FeatureEmbedder(nn.Module):
-    
-    def __init__(self, 
-                input_dim, 
-                hidden_dim,
-                p_drop=0.2,
-                ):
-        super(FeatureEmbedder, self).__init__()
+class MLP(nn.Module):
+    # this is a near replica of base model in ensemble.py
+    def __init__(self, cfg):
+        super(MLP, self).__init__()
         
         # make intermediate layers
-        self.mlp = nn.Sequential(
-                nn.Linear(input_dim, hidden_dim),
+        self.layers = nn.Sequential(
+                nn.Linear(cfg.input_dim, cfg.hidden_dim),
                 nn.ReLU(),
-                nn.Dropout(p_drop),
-                nn.Linear(hidden_dim, hidden_dim),
+                nn.Dropout(cfg.p_drop),
+                nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
                 nn.ReLU(),
-                nn.Dropout(p_drop),
-                nn.Linear(hidden_dim, hidden_dim),
+                nn.Dropout(cfg.p_drop),
+                nn.Linear(cfg.hidden_dim, cfg.hidden_dim)
             )
     def forward(self, x):
-        return self.mlp(x.float())
+        return self.layers(x.float())
         
     
 
@@ -41,19 +37,19 @@ class GP(gpytorch.models.ExactGP, botorch.models.gpytorch.GPyTorchModel):
         train_x=None, 
         train_y=None, 
         likelihood=None, 
-        input_dim=None,
-        hidden_dim=None,
+        mlp_cfg=None,
     ):
+        
         super().__init__(train_x, train_y, likelihood)
-        self.embedding = FeatureEmbedder(input_dim, hidden_dim)
-        self.mean_module = gpytorch.means.ConstantMean()
+        self.mlp = MLP(mlp_cfg)
+        self.mean_module = gpytorch.means.LinearMean(mlp_cfg.hidden_dim)
         self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
         
         self._num_outputs = 1 # added according to: github.com/pytorch/botorch/issues/354
         
     def forward(self, x):
         
-        x = self.embedding(x)
+        x = self.mlp(x)
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
@@ -78,13 +74,10 @@ def load_gp(model_path):
     train_params = tmp['train_params']
     state_dict = tmp['state_dict']
 
-    gp_keys = ['train_x','train_y','input_dim','hidden_dim']
-    gp_params = {k:train_params[k] for k in gp_keys}
-
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    gp_params['likelihood'] = likelihood
+    train_params['likelihood'] = likelihood
 
-    model = GP(**gp_params)
+    model = GP(**train_params)
 
     model.load_state_dict(state_dict)
 

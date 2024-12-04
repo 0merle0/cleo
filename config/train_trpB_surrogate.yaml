@@ -1,4 +1,4 @@
-debug: false
+debug: true
 run_name: 'base_config'
 trainer:
   max_epochs: 500
@@ -12,15 +12,22 @@ data:
   train_batch_size: 10
   val_batch_size: 32
   num_workers: 1
-  input_col: 'AAs'
-  label_col: 'znorm_fitness'
-  name_col: 'frag_names'
-  fragment_csv: 'data/four-site_fragments.csv'
-  use_fragment_representation: true
   validation_mode: label # random, top-k, label, or null
   val_label: val
   val_size: 0.1
   seed: 123
+  dataset_cfg:
+    input_type: 'fragment' # embedding, sequence, or fragment
+    label_col: 'znorm_fitness'
+    name_col: 'frag_names'
+    seq_col: 'AAs'
+    split_fragments_on: ':'
+    path_connecting_variable: '-'
+    num_fragments_in_subfolder: 2
+    fragment_csv: 'data/trpB_arnold/four-site_fragments.csv'
+    path_to_embeddings: null
+    embedding_key: null
+    embedding_shape: "BLD"
 model:
   lr: 1e-3
   num_models: 10
