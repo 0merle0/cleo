@@ -1,0 +1,46 @@
+debug: false
+run_name: 'test_super_sequence'
+trainer:
+  max_epochs: 500
+  log_every_n_steps: 1
+  check_val_every_n_epoch: 1
+checkpointer:
+  monitor: 'val/pearsonr'
+  mode: 'max'
+data:
+  dataset: '/home/jgershon/projects/itopt/super/241202_filtered_data.csv'
+  train_batch_size: 4
+  val_batch_size: 32
+  num_workers: 1
+  validation_mode: label # random, top-k, label, or null
+  val_label: val
+  val_size: 0.1
+  seed: 123
+  dataset_cfg:
+    input_type: 'sequence' # embedding, sequence, or fragment
+    label_col: 'fitness'
+    name_col: 'name'
+    seq_col: 'sequence'
+    input_shape: 'BD' # BLD (keep seq length dim) or BD (flatten seq length dim)
+    split_fragments_on: ':'
+    path_connecting_variable: '-'
+    num_fragments_in_subfolder: 2
+    num_fragments: 4
+    fragment_csv: 'data/super/super_fragment_data.csv'
+    path_to_embeddings: '/projects/ml/itopt/datasets/esm_embeddings'
+    embedding_key: null # use:  null for ESM   |   h_V for mpnn
+model:
+  lr: 1e-3
+  num_models: 10
+  split_batch_mode: false # if true, batch size for each model will be B//N
+  base_model:
+    model_type: 'mlp' # conv1d, mlp
+    input_dim: 3200
+    hidden_dim: 64
+    output_dim: 1
+    kernel_size: 5
+    p_drop: 0.2
+    predict_variance: true # if true, predict variance
+    variance_transform: "softplus" # softplus, sigmoid, clamp
+  loss:
+    loss_fn: 'nll' # mle, nll
