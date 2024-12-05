@@ -60,6 +60,23 @@ class FragmentDataset(Dataset):
             # using one hot seqeunce encoding
             input_feat = torch.tensor([pdb_util.aa12num[x] for x in seq])
             input_feat = torch.nn.functional.one_hot(input_feat,num_classes=20)
+
+        #NOTE: this is a quick patch to concatenate esm and mpnn embeddings
+        elif self.cfg.input_type == 'esm+mpnn':
+            name_split = name.split(self.cfg.split_fragments_on)
+            subfolder = self.cfg.path_connecting_variable.join(name_split[:self.cfg.num_fragments_in_subfolder])
+            file_name = self.cfg.path_connecting_variable.join(name_split[:self.cfg.num_fragments]) + ".pt"
+            
+            esm_path = os.path.join(self.cfg.path_to_embeddings, 'esm_embeddings', subfolder, file_name)
+            mpnn_path = os.path.join(self.cfg.path_to_embeddings, 'mpnn_embeddings', subfolder, file_name)
+            assert os.path.exists(esm_path), f'Embedding path does not exist: {esm_path}'
+            assert os.path.exists(mpnn_path), f'Embedding path does not exist: {mpnn_path}'
+
+            esm_input_feat = torch.load(esm_path, map_location='cpu')[1:-1] # remove irrelevant tokens
+            mpnn_input_feat = torch.load(mpnn_path, map_location='cpu')
+            mpnn_input_feat = mpnn_input_feat["h_V"][0]
+
+            input_feat = torch.cat([esm_input_feat, mpnn_input_feat], dim=-1)
         
         else:
             raise Exception(f'Input type not recognized: {self.cfg.input_type}')

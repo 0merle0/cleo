@@ -10,6 +10,8 @@ from data_util import FragmentDataModule
 @hydra.main(version_base=None, config_path="./config")
 def train_surrogate(cfg):
     """Train surrogate model."""
+
+    OmegaConf.set_struct(cfg, False)
     now = datetime.datetime.now()
     datetime_str = now.strftime("%Y-%m-%d-%H-%M-%S")
 
