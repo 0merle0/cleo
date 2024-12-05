@@ -133,30 +133,19 @@ class FragmentDataModule(pl.LightningDataModule):
         df = pd.read_csv(self.cfg.dataset)
         self.train_dataset, self.val_dataset = self.get_train_val_split(df) 
         
-
         # test data       
         if self.cfg.test_dataset is not None:
-            train_seqs = df[~df[self.cfg.val_label]][self.cfg.input_col].tolist()
+
+            train_seqs = df[~df[self.cfg.val_label]][self.cfg.dataset_cfg.seq_col].tolist()
             test_df = pd.read_csv(self.cfg.test_dataset)
             min_dists = []
             mean_dists = []
-            for seq in test_df[self.cfg.input_col]:
+            for seq in test_df[self.cfg.dataset_cfg.seq_col]:
                 dists = self.compute_distances(seq, train_seqs)
                 min_dists.append(min(dists))
                 mean_dists.append(sum(dists) / len(dists))
-
             
-            self.test_dataset = FragmentDataset(
-                                                test_df,
-                                                input_col=self.cfg.input_col,
-                                                label_col=self.cfg.label_col,
-                                                name_col=self.cfg.name_col,
-                                                fragment_csv=self.cfg.fragment_csv,
-                                                use_fragment_representation=self.cfg.use_fragment_representation,
-                                                use_pretrained_embeddings=self.cfg.use_pretrained_embeddings.use,
-                                                embedding_path=self.cfg.use_pretrained_embeddings.embeddings_path
-                                            )
-            
+            self.test_dataset = FragmentDataset(self.cfg.dataset_cfg, test_df)  
             self.test_dataset.min_dists = torch.tensor(min_dists)
             self.test_dataset.mean_dists = torch.tensor(mean_dists)
 
