@@ -8,7 +8,7 @@ checkpointer:
   monitor: 'val/pearsonr'
   mode: 'max'
 data:
-  dataset: '/home/jgershon/projects/itopt/super/241202_filtered_data.csv'
+  dataset: 'data/super/241204_super_random_purified_data.csv'
   train_batch_size: 4
   val_batch_size: 32
   num_workers: 1
@@ -18,7 +18,7 @@ data:
   seed: 123
   dataset_cfg:
     input_type: 'sequence' # embedding, sequence, or fragment
-    label_col: 'fitness'
+    label_col: 'z_score_norm_rate'
     name_col: 'name'
     seq_col: 'sequence'
     input_shape: 'BD' # BLD (keep seq length dim) or BD (flatten seq length dim)
