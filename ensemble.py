@@ -10,6 +10,34 @@ import seaborn as sns
 from icecream import ic
 from scipy import stats
 from torch.distributions.normal import Normal
+import logging
+
+class AttentionPooling(nn.Module):
+    def __init__(self, input_dim, embed_dim):
+        super(AttentionPooling, self).__init__()
+        self.query_vector = nn.Parameter(torch.randn(1, embed_dim))
+        self.key_proj = nn.Linear(input_dim, embed_dim)
+        self.value_proj = nn.Linear(input_dim, embed_dim)
+        self.scale = embed_dim ** 0.5
+
+    def forward(self, x, mask=None):
+        """Tensor of shape (B, L, D) where B is batch size, L is sequence length, 
+        and D is feature dimension output shape (B, D).
+        """
+        K = self.key_proj(x)
+        if mask != None:
+            K * mask.unsqueeze(-1)
+        V = self.value_proj(x)
+        Q_cls = self.query_vector.expand(x.size(0), -1, -1)
+
+        # Compute attention scores
+        attention_scores = torch.bmm(Q_cls, K.transpose(1, 2)) / self.scale
+        attention_weights = F.softmax(attention_scores, dim=-1)
+        context_vector = torch.bmm(attention_weights, V)
+        # Residual Connection
+        context_vector += Q_cls
+
+        return context_vector.squeeze(1)
 import wandb
 
 class BaseModel(nn.Module):
@@ -20,16 +48,32 @@ class BaseModel(nn.Module):
     def __init__(self, cfg):
         super(BaseModel, self).__init__()
         self.cfg = cfg
+
+        activation = nn.ReLU()
+        dropout = nn.Dropout(cfg.p_drop)
         
-        self.trunk = nn.Sequential(
-                nn.Linear(cfg.input_dim, cfg.hidden_dim),
-                nn.ReLU(),
-                nn.Dropout(cfg.p_drop),
-                nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
-                nn.ReLU(),
-                nn.Dropout(cfg.p_drop),
-                nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
-            )
+        if cfg.model_type == "mlp":
+            self.trunk = nn.Sequential(
+                    nn.Linear(cfg.input_dim, cfg.hidden_dim),
+                    activation,
+                    dropout,
+                    nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
+                    activation,
+                    dropout,
+                    nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
+                )
+        elif cfg.model_type == "conv1d":
+            self.trunk = nn.Sequential(
+                    nn.Conv1d(cfg.input_dim, cfg.hidden_dim, cfg.kernel_size),
+                    dropout,
+                    activation,
+                    nn.Conv1d(cfg.hidden_dim, cfg.hidden_dim, cfg.kernel_size),
+                    activation,
+                    dropout,
+                )
+            self.attn_pool = AttentionPooling(cfg.hidden_dim, cfg.hidden_dim)
+        else:
+            raise ValueError(f"Model type {cfg.model_type} not supported.")
         
         self.mean_head = nn.Linear(cfg.hidden_dim, cfg.output_dim)
         if cfg.predict_variance:
@@ -37,7 +81,14 @@ class BaseModel(nn.Module):
 
     def forward(self, x):
         out = {}
-        x = self.trunk(x)
+        if self.cfg.model_type == "conv1d":
+            x = x.permute(0,2,1)
+            x = self.trunk(x)
+            x = x.permute(0,2,1)
+            x = self.attn_pool(x)
+        else:
+            x = self.trunk(x)
+
         out["mean"] = self.mean_head(x)
         if self.cfg.predict_variance:
             # transform output with softplus to ensure positive variance
@@ -54,7 +105,7 @@ class BaseModel(nn.Module):
             else:
                 raise ValueError(f"Variance transform {self.cfg.variance_transform} not supported.")
 
-            out["var"] = var*self.cfg.variance_scale
+            out["var"] = var
         return out
 
 
@@ -105,6 +156,7 @@ class Ensemble(pl.LightningModule):
         """
         # Ensure sigma is positive to avoid instability (e.g., use a clamp)
         var = torch.clamp(var, min=var_clip)
+        
 
         # NLL loss from: https://arxiv.org/pdf/1612.01474
         #   modified to remove constant terms
@@ -219,7 +271,7 @@ class Ensemble(pl.LightningModule):
         """
         Compute ensemble metrics at end of validation epoch.
         """
-        gt = torch.cat(self.val_y, dim=0)
+        gt = torch.cat(self.val_y, dim=0).squeeze()
         mean_stack = torch.cat(self.val_mean, dim=0)
         var_stack = None
         if self.cfg.base_model.predict_variance:
@@ -231,7 +283,7 @@ class Ensemble(pl.LightningModule):
             
         to_log = {}
 
-        output = {"mean": mean_stack, "var": var_stack}
+        output = {"mean": mean_pred, "var": std_pred**2}
         to_log[f"val/{self.cfg.loss.loss_fn}"] = self.calc_loss(gt, output).item()
         
         # compute pearsonr correlation
