@@ -7,17 +7,13 @@ from pytorch_lightning.loggers import WandbLogger
 from ensemble import Ensemble
 from data_util import FragmentDataModule
 
-@hydra.main(version_base=None, config_path="./config", config_name="train_surrogate")
+@hydra.main(version_base=None, config_path="./config")
 def train_surrogate(cfg):
     """Train surrogate model."""
+
+    OmegaConf.set_struct(cfg, False)
     now = datetime.datetime.now()
     datetime_str = now.strftime("%Y-%m-%d-%H-%M-%S")
-
-    # setup datamodule
-    datamodule = FragmentDataModule(cfg.data)
-
-    # setup model
-    model = Ensemble(cfg.model)
 
     logger = None
     callbacks = []
@@ -25,9 +21,13 @@ def train_surrogate(cfg):
     callbacks.append(pl.callbacks.RichProgressBar())
     if not cfg.debug:
         # if not in debug mode, save config, set up logger and checkpointer
-        ckpt_dir = f'./ckpt/{cfg.run_name}/{cfg.run_name}:{datetime_str}'
+        ckpt_dir = f'./ckpt/{cfg.run_name}/{cfg.run_name}.{datetime_str}'
+        cfg.ckpt_dir = ckpt_dir # add ckpt_dir to cfg
         os.makedirs(ckpt_dir, exist_ok=True)
         OmegaConf.save(cfg, f'{ckpt_dir}/config.yaml')
+        
+        # set num workers to 1 for debugging
+        cfg.data.num_workers = 1
 
         logger = WandbLogger(
                                 name=cfg.run_name,
@@ -42,6 +42,12 @@ def train_surrogate(cfg):
                                         mode=cfg.checkpointer.mode
                                        )
                                     )
+
+    # setup datamodule
+    datamodule = FragmentDataModule(cfg.data)
+
+    # setup model
+    model = Ensemble(cfg.model)
 
     # setup pytorch lightning trainer
     trainer = pl.Trainer(

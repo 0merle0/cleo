@@ -54,13 +54,17 @@ def get_all_sequences(fragment_dictionary):
     all_seqs.sort()
     return all_seqs
 
-def featurize_fragments(names, fragment_dictionary, to_split_on=':'):
+def featurize_fragments(names, fragment_dictionary, to_split_on=':', num_fragments=None):
     '''
         split sequences by fragment and return features for training over fragment space
     '''
     frag_nums = []
     for n in names:
         frag_list = n.split(to_split_on)
+
+        if num_fragments is not None:
+            frag_list = frag_list[:num_fragments]
+            # sometimes the names have extra information appended to it
 
         # check to make sure split is correct
         assert len(frag_list) == len(fragment_dictionary), "Check you are splitting correctly"

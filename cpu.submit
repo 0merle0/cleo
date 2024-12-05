@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH -p cpu
+#SBATCH -J itopt
+#SBATCH --mem=48g
+#SBATCH --ntasks=1
+#SBATCH --time=12:00:00
+#SBATCH -q train
+#SBATCH -o logs/logs.out
+
+### change 5-digit MASTER_PORT as you wish, slurm will raise Error if duplicated with others
+### change WORLD_SIZE as gpus/node * num_nodes
+export MASTER_PORT=53367
+
+### get the first node name as master address - customized for vgg slurm
+### e.g. master(gnodee[2-5],gnoded1) == gnodee2
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+
+source activate /home/jgershon/.conda/envs/cleo
+
+srun python train_surrogate.py -cn train_surrogate
