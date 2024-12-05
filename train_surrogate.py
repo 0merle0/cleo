@@ -13,14 +13,14 @@ def train_surrogate(cfg):
     now = datetime.datetime.now()
     datetime_str = now.strftime("%Y-%m-%d-%H-%M-%S")
 
-
     logger = None
     callbacks = []
     callbacks.append(pl.callbacks.RichModelSummary(max_depth=2))
     callbacks.append(pl.callbacks.RichProgressBar())
     if not cfg.debug:
         # if not in debug mode, save config, set up logger and checkpointer
-        ckpt_dir = f'./ckpt/{cfg.run_name}/{cfg.run_name}:{datetime_str}'
+        ckpt_dir = f'./ckpt/{cfg.run_name}/{cfg.run_name}.{datetime_str}'
+        cfg.ckpt_dir = ckpt_dir # add ckpt_dir to cfg
         os.makedirs(ckpt_dir, exist_ok=True)
         OmegaConf.save(cfg, f'{ckpt_dir}/config.yaml')
         
