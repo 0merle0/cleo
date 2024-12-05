@@ -1,0 +1,44 @@
+debug: true
+run_name: 'base_config'
+trainer:
+  max_epochs: 500
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+checkpointer:
+  monitor: 'val/pearsonr'
+  mode: 'max'
+data:
+  dataset: 'data/four-site_clean_simplified_AA_data_2k_train_random_test.csv'
+  train_batch_size: 10
+  val_batch_size: 32
+  num_workers: 1
+  validation_mode: label # random, top-k, label, or null
+  val_label: val
+  val_size: 0.1
+  seed: 123
+  dataset_cfg:
+    input_type: 'fragment' # embedding, sequence, or fragment
+    label_col: 'znorm_fitness'
+    name_col: 'frag_names'
+    seq_col: 'AAs'
+    split_fragments_on: ':'
+    path_connecting_variable: '-'
+    num_fragments_in_subfolder: 2
+    fragment_csv: 'data/trpB_arnold/four-site_fragments.csv'
+    path_to_embeddings: null
+    embedding_key: null
+    embedding_shape: "BLD"
+model:
+  lr: 1e-3
+  num_models: 10
+  split_batch_mode: true # if true, batch size for each model will be B//N
+  base_model:
+    input_dim: 80
+    hidden_dim: 8
+    output_dim: 1
+    p_drop: 0.2
+    predict_variance: true # if true, predict variance
+    variance_transform: "softplus" # softplus, sigmoid, clamp
+    variance_scale: 1.0
+  loss:
+    loss_fn: 'nll' # mle, nll
