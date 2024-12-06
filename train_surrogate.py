@@ -7,6 +7,9 @@ from pytorch_lightning.loggers import WandbLogger
 from ensemble import Ensemble
 from data_util import FragmentDataModule
 
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 @hydra.main(version_base=None, config_path="./config")
 def train_surrogate(cfg):
     """Train surrogate model."""
