@@ -76,7 +76,17 @@ class BaseModel(nn.Module):
         
         self.mean_head = nn.Linear(cfg.hidden_dim, cfg.output_dim)
         if cfg.predict_variance:
-            self.var_head = nn.Linear(cfg.hidden_dim, cfg.output_dim)
+
+            if cfg.var_head_style == "mlp":
+                self.var_head = nn.Sequential(
+                    nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
+                    activation,
+                    nn.Linear(cfg.hidden_dim, cfg.output_dim),
+                )
+            elif cfg.var_head_style == "linear":
+                self.var_head = nn.Linear(cfg.hidden_dim, cfg.output_dim)
+            else:
+                raise ValueError(f"Variance head style {cfg.var_head_style} not supported.")
 
     def forward(self, x):
         out = {}
@@ -92,6 +102,8 @@ class BaseModel(nn.Module):
         if self.cfg.predict_variance:
             # transform output with softplus to ensure positive variance
             # taken from https://arxiv.org/pdf/1612.01474
+            if self.cfg.stop_grads_trough_variance_head:
+                x = x.detach()
             var = self.var_head(x)
             if self.cfg.variance_transform == "softplus":
                 var = torch.log(1 + torch.exp(var))
