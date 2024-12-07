@@ -1,12 +1,12 @@
 debug: false
-run_name: 'test_super_sequence'
+run_name: 'train_super_sequence'
 trainer:
   max_epochs: 500
   log_every_n_steps: 50
   check_val_every_n_epoch: 1
 checkpointer:
-  monitor: 'val/pearsonr'
-  mode: 'max'
+  monitor: 'val/nll'
+  mode: 'min'
 data:
   dataset: 'data/super/241204_super_random_purified_data.csv'
   train_batch_size: 4
@@ -34,9 +34,9 @@ model:
   num_models: 10
   split_batch_mode: false # if true, batch size for each model will be B//N
   base_model:
-    model_type: 'mlp' # conv1d, mlp
+    model_type: 'mlp' # conv1d, mlp, linear
     input_dim: 3200
-    hidden_dim: 64
+    hidden_dim: 16
     output_dim: 1
     kernel_size: 5
     p_drop: 0.2
