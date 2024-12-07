@@ -50,8 +50,10 @@ class BaseModel(nn.Module):
 
         activation = nn.ReLU()
         dropout = nn.Dropout(cfg.p_drop)
-        
-        if cfg.model_type == "mlp":
+        if cfg.model_type == "linear":
+            cfg.hidden_dim = cfg.input_dim
+
+        elif cfg.model_type == "mlp":
             self.trunk = nn.Sequential(
                     nn.Linear(cfg.input_dim, cfg.hidden_dim),
                     activation,
@@ -61,6 +63,7 @@ class BaseModel(nn.Module):
                     dropout,
                     nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
                 )
+
         elif cfg.model_type == "conv1d":
             self.trunk = nn.Sequential(
                     nn.Conv1d(cfg.input_dim, cfg.hidden_dim, cfg.kernel_size),
@@ -85,7 +88,7 @@ class BaseModel(nn.Module):
             x = self.trunk(x)
             x = x.permute(0,2,1)
             x = self.attn_pool(x)
-        else:
+        elif self.cfg.model_type == "mlp":
             x = self.trunk(x)
 
         out["mean"] = self.mean_head(x)
@@ -288,13 +291,31 @@ class Ensemble(pl.LightningModule):
         # compute pearsonr correlation
         corr, _ = stats.pearsonr(gt, mean_pred)
         to_log["val/pearsonr"] = corr
-
         to_log["val/std"] = std_pred.mean().item()
+
+        # save plot of ground truth vs. prediction
+        plt.figure(dpi=150)
+        sns.scatterplot(x=gt, y=mean_pred, alpha=0.5)
+        plt.xlabel("Ground Truth")
+        plt.ylabel("Predicted Mean")
+        plt.title(f"Ground Truth vs. Prediction | pearsonR {corr:.3f}")
+        plt.savefig(f"{self.cfg.ckpt_dir}/val_gt_pred_scatter.png")
+        plt.close()
+
         
         # compute correlation between variance and squared error
         se = (gt - mean_pred)**2
         se_var_corr, _ = stats.pearsonr(se, std_pred**2)
         to_log["val/se_var_corr"] = se_var_corr
+
+        # save plot for variance vs. squared error
+        plt.figure(dpi=150)
+        sns.scatterplot(x=se, y=std_pred**2, alpha=0.5)
+        plt.xlabel("Squared Error")
+        plt.ylabel("Predicted Variance")
+        plt.title(f"Squared Error vs. Predicted Variance | pearsonR {se_var_corr:.3f}")
+        plt.savefig(f"{self.cfg.ckpt_dir}/val_se_var_scatter.png")
+        plt.close()
 
         to_log["val/mse"] = se.mean().item()
 
