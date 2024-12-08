@@ -311,9 +311,14 @@ class Ensemble(pl.LightningModule):
         to_log[f"val/{self.cfg.loss.loss_fn}"] = self.calc_loss(gt, output).item()
 
         # compute pearsonr correlation
-        corr, _ = stats.pearsonr(gt, mean_pred)
-        to_log["val/pearsonr"] = corr
+        pearsonr_corr, _ = stats.pearsonr(gt, mean_pred)
+        to_log["val/pearsonr"] = pearsonr_corr
+
         to_log["val/std"] = std_pred.mean().item()
+
+        # compute spearmanr correlation
+        spearmanr_corr, _ = stats.spearmanr(gt, mean_pred)
+        to_log["val/spearmanr"] = spearmanr_corr
 
         if not self.full_cfg.debug:
             # save plot of ground truth vs. prediction
@@ -321,7 +326,7 @@ class Ensemble(pl.LightningModule):
             sns.scatterplot(x=gt, y=mean_pred, alpha=0.5)
             plt.xlabel("Ground Truth")
             plt.ylabel("Predicted Mean")
-            plt.title(f"Ground Truth vs. Prediction | pearsonR {corr:.3f}")
+            plt.title(f"Ground Truth vs. Prediction | pearsonR {pearsonr_corr:.3f}")
             plt.savefig(f"{self.cfg.ckpt_dir}/val_gt_pred_scatter.png")
             plt.close()
 
@@ -343,6 +348,22 @@ class Ensemble(pl.LightningModule):
             plt.close()
 
         to_log["val/mse"] = se.mean().item()
+
+        # compute top-k accuracy
+        k_list = self.cfg.top_k_accuracy
+        for k in k_list:
+            if k > gt.size(0):
+                break
+            gt_topk_values, gt_topk_indices = gt.topk(
+                k, dim=0, largest=True, sorted=True
+            )
+            pred_topk_values, pred_topk_indices = mean_pred.topk(
+                k, dim=0, largest=True, sorted=True
+            )
+            correct_topk = torch.isin(pred_topk_indices, gt_topk_indices)
+            topk_accuracy = correct_topk.sum().float() / gt_topk_indices.size(0)
+
+            to_log[f"val/top{k}_accuracy"] = topk_accuracy.item()
 
         self.log_dict(to_log)
 
