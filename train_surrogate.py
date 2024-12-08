@@ -46,9 +46,6 @@ def train_surrogate(cfg):
             )
         )
 
-    # print the contents of cfg in yaml format
-    print(OmegaConf.to_yaml(cfg))
-
     # setup datamodule
     datamodule = FragmentDataModule(cfg)
 
