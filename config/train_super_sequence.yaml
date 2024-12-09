@@ -1,7 +1,7 @@
 debug: false
 run_name: 'train_super_sequence'
 trainer:
-  max_epochs: 500
+  max_epochs: 2000
   log_every_n_steps: 50
   check_val_every_n_epoch: 1
 checkpointer:
@@ -31,7 +31,7 @@ data:
     path_to_embeddings: '/projects/ml/itopt/datasets/esm_embeddings'
     embedding_key: null # use:  null for ESM   |   h_V for mpnn
 model:
-  lr: 1e-3
+  lr: 1e-4
   num_models: 10
   split_batch_mode: false # if true, batch size for each model will be B//N
   base_model:
