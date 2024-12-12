@@ -9,11 +9,12 @@ from data_util import FragmentDataModule
 
 @hydra.main(version_base=None, config_path="./config")
 def train_surrogate(cfg):
+    # cfg is the configuation object loaded by hydra from the config.yaml file. It typically contains the hyperparameters and other settings for the model, data, and training.
     """Train surrogate model."""
 
-    OmegaConf.set_struct(cfg, False)
-    now = datetime.datetime.now()
-    datetime_str = now.strftime("%Y-%m-%d-%H-%M-%S")
+    OmegaConf.set_struct(cfg, False) # allow for dynamic attribute assignment to be modified dynamically at runtime
+    now = datetime.datetime.now()   
+    datetime_str = now.strftime("%Y-%m-%d-%H-%M-%S")    # timestamp for logging, year-month-day-hour-minute-second
 
     logger = None
     callbacks = []
