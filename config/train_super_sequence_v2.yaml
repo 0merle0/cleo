@@ -1,9 +1,0 @@
-defaults:
-  - base
-run_name: 'train_super_sequence'
-data:
-  dataset_cfg:
-    input_type: 'sequence' # embedding, sequence, or fragment
-model:
-  base_model:
-    model_type: 'mlp' # conv1d, mlp, linear

@@ -1,53 +1,10 @@
 defaults:
   - base
-debug: false
 run_name: 'train_super_sequence'
-trainer:
-  max_epochs: 2000
-  log_every_n_steps: 1000
-  check_val_every_n_epoch: 1
-checkpointer:
-  monitor: 'val/nll'
-  mode: 'min'
 data:
-  dataset: 'data/super/241204_super_random_purified_data.csv'
-  train_batch_size: 4
-  val_batch_size: 32
-  num_workers: 1
-  validation_mode: label # random, top-k, label, or null
-  top_k_validation: 384
-  val_label: val
-  val_size: 0.1
-  seed: 123
   dataset_cfg:
     input_type: 'sequence' # embedding, sequence, or fragment
-    label_col: 'z_score_norm_rate'
-    name_col: 'name'
-    seq_col: 'sequence'
-    input_shape: 'BD' # BLD (keep seq length dim) or BD (flatten seq length dim)
-    split_fragments_on: ':'
-    path_connecting_variable: '-'
-    num_fragments_in_subfolder: 2
-    num_fragments: 4
-    fragment_csv: 'data/super/super_fragment_data.csv'
-    path_to_embeddings: '/projects/ml/itopt/datasets/esm_embeddings'
-    embedding_key: null # use:  null for ESM   |   h_V for mpnn
 model:
-  lr: 1e-4
-  num_models: 10
-  split_batch_mode: false # if true, batch size for each model will be B//N
   base_model:
-    model_type: 'mlp' # conv1d, mlp, linear
+    model_type: 'mlp' # conv1d, mlp, linearmodel:
     input_dim: 3200
-    hidden_dim: 16
-    output_dim: 1
-    kernel_size: 5
-    p_drop: 0.2
-    regularization: 'l2' # l1, l2, l1_l2, none
-    predict_variance: true # if true, predict variance
-    variance_transform: "softplus" # softplus, sigmoid, clamp
-  loss:
-    loss_fn: 'mse' # mse, nll
-    l1_lambda: 0.1
-    l2_lambda: 0.1
-  top_k_accuracy: [10,20,40]
