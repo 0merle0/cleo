@@ -15,7 +15,7 @@ data:
   val_batch_size: 32
   num_workers: 1
   validation_mode: label # random, top-k, label, or null
-  top_k_validation: 300
+  top_k_validation: 384
   val_label: val
   val_size: 0.1
   seed: 123
@@ -43,8 +43,11 @@ model:
     output_dim: 1
     kernel_size: 5
     p_drop: 0.2
+    regularization: 'l2' # l1, l2, l1_l2, none
     predict_variance: true # if true, predict variance
     variance_transform: "softplus" # softplus, sigmoid, clamp
   loss:
-    loss_fn: 'nll' # mle, nll
+    loss_fn: 'mse' # mse, nll
+    l1_lambda: 0.1
+    l2_lambda: 0.1
   top_k_accuracy: [10,20,40]
