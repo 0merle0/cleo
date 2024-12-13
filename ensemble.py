@@ -217,7 +217,7 @@ class Ensemble(pl.LightningModule):
             regularization_loss = 0.0
 
         elif self.cfg.base_model.regularization == "l1":
-            assert 0 <= self.cfg.loss.l2_lambda <= 1
+            assert 0 <= self.cfg.loss.l1_lambda <= 1
 
             norm_order = 1
             lambd = self.cfg.loss.l1_lambda  # Regularization weight for L1
