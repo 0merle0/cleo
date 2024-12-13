@@ -190,13 +190,14 @@ class Ensemble(pl.LightningModule):
 
         return loss
 
-    def calc_loss(self, gt, output):
+    def calc_loss(self, gt, output, model):
         """
         Calculate loss.
         """
+
         if self.cfg.loss.loss_fn == "mse":
             mean = output["mean"]
-            loss = F.mse_loss(mean, gt, reduction="mean")
+            prediction_loss = F.mse_loss(mean, gt, reduction="mean")
 
         elif self.cfg.loss.loss_fn == "nll":
             assert (
@@ -204,12 +205,54 @@ class Ensemble(pl.LightningModule):
             ), "Variance must be predicted for NLL loss."
             mean = output["mean"]
             var = output["var"]
-            loss = self.gaussNLL(mean, var, gt, reduction="mean")
+            prediction_loss = self.gaussNLL(mean, var, gt, reduction="mean")
 
         else:
             raise ValueError(f"Loss type {self.cfg.loss_type} not supported.")
 
-        return loss
+        ## Add regularization to the loss
+        batch_size = mean.size(0)
+
+        if self.cfg.base_model.regularization is None:
+            regularization_loss = 0.0
+
+        elif self.cfg.base_model.regularization == "l1":
+            assert 0 <= self.cfg.loss.l2_lambda <= 1
+
+            norm_order = 1
+            lambd = self.cfg.loss.l1_lambda  # Regularization weight for L1
+
+            # Iterate through the ensemble model
+            norm = 0.0
+            for name, param in model.named_parameters():
+                if "weight" in name:
+                    norm += torch.linalg.norm(param, ord=norm_order) ** (norm_order)
+
+            regularization_loss = lambd * norm / (batch_size)
+
+        elif self.cfg.base_model.regularization == "l2":
+            assert 0 <= self.cfg.loss.l2_lambda <= 1
+
+            norm_order = 2
+            lambd = self.cfg.loss.l2_lambda  # Regularization weight for L1
+
+            # Iterate through the ensemble model
+            norm = 0.0
+            for name, param in model.named_parameters():
+                if "weight" in name:
+                    norm += torch.linalg.norm(param, ord=norm_order) ** (norm_order)
+
+            regularization_loss = lambd * norm / (batch_size)
+
+        else:
+            raise ValueError(
+                f"Regularization type {self.cfg.base_model.regularization} not supported."
+            )
+
+        ## Calculate the loss
+        loss = prediction_loss + regularization_loss
+
+        return loss, prediction_loss, regularization_loss
 
     def mix_gaussians(self, mean, var):
         """
@@ -249,11 +292,18 @@ class Ensemble(pl.LightningModule):
 
             opt.zero_grad()
             output = model(_x.float())
-            loss = self.calc_loss(_y, output)
+            loss, prediction_loss, regularization_loss = self.calc_loss(
+                _y, output, model
+            )
             self.manual_backward(loss)
             opt.step()
-            key = f"train/model_{n+1}_{self.cfg.loss.loss_fn}"
-            to_log[key] = loss.item()
+            to_log[f"train/model_{n+1}_{self.cfg.loss.loss_fn}_loss"] = loss.item()
+            to_log[f"train/model_{n+1}_{self.cfg.loss.loss_fn}_prediction_loss"] = (
+                prediction_loss.item()
+            )
+            to_log[f"train/model_{n+1}_{self.cfg.loss.loss_fn}_regularization_loss"] = (
+                regularization_loss.item()
+            )
             mean_loss += loss.item() / len(self.models)
 
         to_log[f"train/mean_{self.cfg.loss.loss_fn}"] = mean_loss
@@ -270,7 +320,9 @@ class Ensemble(pl.LightningModule):
         mean_loss = 0
         for n, model in enumerate(self.models):
             output = model(x.float())
-            loss = self.calc_loss(y, output)
+            loss, prediction_loss, regularization_loss = self.calc_loss(
+                y, output, model
+            )
             key = f"val/model_{n+1}_{self.cfg.loss.loss_fn}"
             to_log[key] = loss.item()
             output_list.append(output)
@@ -295,6 +347,7 @@ class Ensemble(pl.LightningModule):
         """
         Compute ensemble metrics at end of validation epoch.
         """
+
         gt = torch.cat(self.val_y, dim=0).squeeze()
         mean_stack = torch.cat(self.val_mean, dim=0)
         var_stack = None
@@ -308,7 +361,10 @@ class Ensemble(pl.LightningModule):
         to_log = {}
 
         output = {"mean": mean_pred, "var": std_pred**2}
-        to_log[f"val/{self.cfg.loss.loss_fn}"] = self.calc_loss(gt, output).item()
+
+        to_log[f"val/{self.cfg.loss.loss_fn}"] = self.gaussNLL(
+            output["mean"], output["var"], gt, reduction="mean"
+        )
 
         # compute pearsonr correlation
         pearsonr_corr, _ = stats.pearsonr(gt, mean_pred)
