@@ -1,7 +1,7 @@
 debug: false
 run_name: 'train_super_sequence'
 trainer:
-  max_epochs: 2000
+  max_epochs: 500
   log_every_n_steps: 1000
   check_val_every_n_epoch: 1
 checkpointer:
