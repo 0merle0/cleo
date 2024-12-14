@@ -210,6 +210,14 @@ class Ensemble(pl.LightningModule):
         else:
             raise ValueError(f"Loss type {self.cfg.loss_type} not supported.")
 
+        if (
+            self.cfg.base_model.regularization is not None
+            and self.cfg.base_model.model_type == "conv1d"
+        ):
+            raise ValueError(
+                "This type of regularization has not been implemented yet for conv1d models."
+            )
+
         ## Add regularization to the loss
         batch_size = mean.size(0)
 
@@ -240,7 +248,9 @@ class Ensemble(pl.LightningModule):
             norm = 0.0
             for name, param in model.named_parameters():
                 if "weight" in name:
-                    norm += torch.linalg.norm(param, ord=norm_order) ** (norm_order)
+                    norm += (
+                        0  # torch.linalg.norm(param, ord=norm_order) ** (norm_order)
+                    )
 
             regularization_loss = lambd * norm / (batch_size)
 
