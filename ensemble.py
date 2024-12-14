@@ -245,9 +245,7 @@ class Ensemble(pl.LightningModule):
             norm = 0.0
             for name, param in model.named_parameters():
                 if "weight" in name:
-                    norm += (
-                        0  # torch.linalg.norm(param, ord=norm_order) ** (norm_order)
-                    )
+                    norm += torch.linalg.norm(param, ord=norm_order) ** (norm_order)
 
             regularization_loss = lambd * norm / (batch_size)
 
