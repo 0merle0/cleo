@@ -210,12 +210,9 @@ class Ensemble(pl.LightningModule):
         else:
             raise ValueError(f"Loss type {self.cfg.loss_type} not supported.")
 
-        if (
-            self.cfg.base_model.regularization is not None
-            and self.cfg.base_model.model_type == "conv1d"
-        ):
+        if self.cfg.input_type.dataset_cfg.input_type == "embedding":
             raise ValueError(
-                "This type of regularization has not been implemented yet for conv1d models."
+                "This type of regularization has not been implemented yet for embedding input features."
             )
 
         ## Add regularization to the loss
