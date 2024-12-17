@@ -44,3 +44,4 @@ model:
     variance_transform: "softplus" # softplus, sigmoid, clamp
   loss:
     loss_fn: 'nll' # mle, nll
+  top_k_accuracy: [10,20,40]

@@ -37,14 +37,16 @@ def train_surrogate(cfg):
             save_dir="./logs/wandb_logs",
             log_model=False,
         )
-        callbacks.append(
-            pl.callbacks.ModelCheckpoint(
-                save_last=True,
-                dirpath=ckpt_dir,
-                monitor=cfg.checkpointer.monitor,
-                mode=cfg.checkpointer.mode,
+        
+        if cfg.data.validation_mode:
+            callbacks.append(
+                pl.callbacks.ModelCheckpoint(
+                    save_last=True,
+                    dirpath=ckpt_dir,
+                    monitor=cfg.checkpointer.monitor,
+                    mode=cfg.checkpointer.mode,
+                )
             )
-        )
 
     # setup datamodule
     datamodule = FragmentDataModule(cfg)
