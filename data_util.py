@@ -133,6 +133,10 @@ class FragmentDataModule(pl.LightningDataModule):
         self.full_cfg = cfg
         self.cfg = cfg.data
 
+        # only init val loader if in validation mode
+        if self.cfg.validation_mode:
+            self.val_dataloader = self._val_dataloader
+
     def get_train_val_split(self, df):
         """Split data into train and val."""
 
@@ -190,22 +194,11 @@ class FragmentDataModule(pl.LightningDataModule):
             num_workers=self.cfg.num_workers,
         )
 
-    def val_dataloader(self):
+    def _val_dataloader(self):
         """Validation dataloader."""
-        val_loader = None
-        if self.cfg.validation_mode is not None:
-            val_loader = DataLoader(
-                self.val_dataset,
-                batch_size=self.cfg.val_batch_size,
-                shuffle=False,
-                num_workers=self.cfg.num_workers,
-            )
-        return val_loader
-
-    def test_dataloader(self):
-        """Test dataloader not used."""
-        return None
-
-    def predict_dataloader(self):
-        """Predict dataloader not used."""
-        return None
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.cfg.val_batch_size,
+            shuffle=False,
+            num_workers=self.cfg.num_workers,
+        )
