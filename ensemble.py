@@ -210,15 +210,10 @@ class Ensemble(pl.LightningModule):
         else:
             raise ValueError(f"Loss type {self.cfg.loss_type} not supported.")
 
-        if self.full_cfg.data.dataset_cfg.input_type == "embedding":
-            raise ValueError(
-                "This type of regularization has not been implemented yet for embedding input features."
-            )
-
         ## Add regularization to the loss
         batch_size = mean.size(0)
 
-        if self.cfg.base_model.regularization is None:
+        if self.cfg.base_model.regularization == "none":
             regularization_loss = 0.0
 
         elif self.cfg.base_model.regularization == "l1":
