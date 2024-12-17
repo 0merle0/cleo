@@ -53,13 +53,23 @@ def train_surrogate(cfg):
     model = Ensemble(cfg)
 
     # setup pytorch lightning trainer
-    trainer = pl.Trainer(
-        max_epochs=cfg.trainer.max_epochs,
-        logger=logger,
-        callbacks=callbacks,
-        log_every_n_steps=cfg.trainer.log_every_n_steps,
-        check_val_every_n_epoch=cfg.trainer.check_val_every_n_epoch,
-    )
+    if cfg.data.validation_mode is None:
+        trainer = pl.Trainer(
+            max_epochs=cfg.trainer.max_epochs,
+            logger=logger,
+            callbacks=callbacks,
+            log_every_n_steps=cfg.trainer.log_every_n_steps,
+            check_val_every_n_epoch=cfg.trainer.check_val_every_n_epoch,
+            num_sanity_val_steps=0,
+        )
+    else:
+        trainer = pl.Trainer(
+            max_epochs=cfg.trainer.max_epochs,
+            logger=logger,
+            callbacks=callbacks,
+            log_every_n_steps=cfg.trainer.log_every_n_steps,
+            check_val_every_n_epoch=cfg.trainer.check_val_every_n_epoch,
+        )
 
     # train model
     trainer.fit(
