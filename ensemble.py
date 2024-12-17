@@ -85,7 +85,7 @@ class BaseModel(nn.Module):
             raise ValueError(f"Model type {self.cfg.model_type} not supported.")
 
         self.mean_head = nn.Linear(self.cfg.hidden_dim, self.cfg.output_dim)
-        if self.cfg.predict_variance:
+        if not self.cfg.fixed_variance:
             self.var_head = nn.Linear(self.cfg.hidden_dim, self.cfg.output_dim)
 
     def forward(self, x):
@@ -98,8 +98,11 @@ class BaseModel(nn.Module):
         elif self.cfg.model_type == "mlp":
             x = self.trunk(x)
 
-        out["mean"] = self.mean_head(x)
-        if self.cfg.predict_variance:
+        mean = self.mean_head(x)
+
+        if self.cfg.fixed_variance:
+            var = torch.ones_like(mean) * self.cfg.fixed_variance
+        else:
             # transform output with softplus to ensure positive variance
             # taken from https://arxiv.org/pdf/1612.01474
             var = self.var_head(x)
@@ -116,8 +119,11 @@ class BaseModel(nn.Module):
                     f"Variance transform {self.cfg.variance_transform} not supported."
                 )
 
-            out["var"] = var
-        return out
+        ret = {
+            "mean": mean,  # shape: (batch, out_dim)
+            "var": var,  # shape: (batch, out_dim)
+        }
+        return ret
 
 
 class Ensemble(pl.LightningModule):
@@ -194,7 +200,7 @@ class Ensemble(pl.LightningModule):
         """
         Calculate loss.
         """
-
+        
         if self.cfg.loss.loss_fn == "mse":
             mean = output["mean"]
             prediction_loss = F.mse_loss(mean, gt, reduction="mean")
