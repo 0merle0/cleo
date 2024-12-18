@@ -196,7 +196,7 @@ class FragmentDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         """Validation dataloader."""
-        val_loader = None
+        val_loader = []
         if self.cfg.validation_mode is not None:
             val_loader = DataLoader(
                 self.val_dataset,
