@@ -47,5 +47,5 @@ model:
     mse_weight: 0
     nll_weight: 1
     regularization_order: 2
-    regularization_lambda: 0.1
+    regularization_lambda: 0.0
   top_k_accuracy: [10,20,40]
