@@ -1,5 +1,5 @@
 defaults:
-  - base
+  - super_base
 run_name: 'train_super_esm'
 data:
   dataset_cfg:

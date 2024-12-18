@@ -33,7 +33,6 @@ data:
 model:
   lr: 1e-4
   num_models: 10
-  split_batch_mode: false # if true, batch size for each model will be B//N
   base_model:
     model_type: 'mlp' # conv1d, mlp, linear
     input_dim: 3200
@@ -41,11 +40,12 @@ model:
     output_dim: 1
     kernel_size: 5
     p_drop: 0.2
-    regularization: none # l1, l2, l1_l2, none
     predict_variance: true # if true, predict variance
     variance_transform: "softplus" # softplus, sigmoid, clamp
+    fixed_variance: 1.0
   loss:
-    loss_fn: 'nll' # mse, nll
-    l1_lambda: 0.1
-    l2_lambda: 0.1
+    mse_weight: 0
+    nll_weight: 1
+    regularization_order: 2
+    regularization_lambda: 0.1
   top_k_accuracy: [10,20,40]

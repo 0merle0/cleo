@@ -12,6 +12,7 @@ from scipy import stats
 from torch.distributions.normal import Normal
 import logging
 from omegaconf import DictConfig, OmegaConf
+from torch.nn.utils import parameters_to_vector
 
 
 class AttentionPooling(nn.Module):
@@ -85,7 +86,7 @@ class BaseModel(nn.Module):
             raise ValueError(f"Model type {self.cfg.model_type} not supported.")
 
         self.mean_head = nn.Linear(self.cfg.hidden_dim, self.cfg.output_dim)
-        if not self.cfg.fixed_variance:
+        if self.cfg.predict_variance:
             self.var_head = nn.Linear(self.cfg.hidden_dim, self.cfg.output_dim)
 
     def forward(self, x):
@@ -99,10 +100,8 @@ class BaseModel(nn.Module):
             x = self.trunk(x)
 
         mean = self.mean_head(x)
-
-        if self.cfg.fixed_variance:
-            var = torch.ones_like(mean) * self.cfg.fixed_variance
-        else:
+            
+        if self.cfg.predict_variance:
             # transform output with softplus to ensure positive variance
             # taken from https://arxiv.org/pdf/1612.01474
             var = self.var_head(x)
@@ -118,6 +117,8 @@ class BaseModel(nn.Module):
                 raise ValueError(
                     f"Variance transform {self.cfg.variance_transform} not supported."
                 )
+        else:
+            var = torch.ones_like(mean) * self.cfg.fixed_variance
 
         ret = {
             "mean": mean,  # shape: (batch, out_dim)
@@ -162,6 +163,7 @@ class Ensemble(pl.LightningModule):
         """
         Split batch into equal parts for each model.
         """
+        # NOTE: this is not currently being used
         batch_size = x.size(0)
         assert (
             batch_size % self.cfg.num_models == 0
@@ -196,69 +198,41 @@ class Ensemble(pl.LightningModule):
 
         return loss
 
+    def parameter_regularization(self, model, reg_order, reg_lambda):
+        """
+        Regularize model parameters.
+        """
+        all_params = parameters_to_vector(model.parameters())
+        norm = (torch.abs(all_params)**reg_order).sum()
+        return norm * reg_lambda
+
     def calc_loss(self, gt, output, model):
         """
         Calculate loss.
         """
+        mean = output["mean"]
+        var = output["var"]
         
-        if self.cfg.loss.loss_fn == "mse":
-            mean = output["mean"]
-            prediction_loss = F.mse_loss(mean, gt, reduction="mean")
+        mse_weight = self.cfg.loss.mse_weight
+        mse_loss = F.mse_loss(mean, gt, reduction="mean")
 
-        elif self.cfg.loss.loss_fn == "nll":
-            assert (
-                self.cfg.base_model.predict_variance
-            ), "Variance must be predicted for NLL loss."
-            mean = output["mean"]
-            var = output["var"]
-            prediction_loss = self.gaussNLL(mean, var, gt, reduction="mean")
+        nll_weight = self.cfg.loss.nll_weight
+        nll_loss = self.gaussNLL(mean, var, gt, reduction="mean")
+        
+        reg_order = self.cfg.loss.regularization_order
+        reg_lambda = self.cfg.loss.regularization_lambda
+        regularization_loss = self.parameter_regularization(model, reg_order, reg_lambda)
 
-        else:
-            raise ValueError(f"Loss type {self.cfg.loss_type} not supported.")
+        loss = mse_loss*mse_weight + nll_loss*nll_weight + regularization_loss
 
-        ## Add regularization to the loss
-        batch_size = mean.size(0)
+        loss_dict = {
+            "mse": mse_loss,
+            "nll": nll_loss,
+            f"regularization_l{reg_order}": regularization_loss,
+            "loss": loss,
+            }
 
-        if self.cfg.base_model.regularization == "none":
-            regularization_loss = 0.0
-
-        elif self.cfg.base_model.regularization == "l1":
-            assert 0 <= self.cfg.loss.l1_lambda
-
-            norm_order = 1
-            lambd = self.cfg.loss.l1_lambda  # Regularization weight for L1
-
-            # Iterate through the ensemble model
-            norm = 0.0
-            for name, param in model.named_parameters():
-                if "weight" in name:
-                    norm += torch.linalg.norm(param, ord=norm_order) ** (norm_order)
-
-            regularization_loss = lambd * norm / (batch_size)
-
-        elif self.cfg.base_model.regularization == "l2":
-            assert 0 <= self.cfg.loss.l2_lambda
-
-            norm_order = 2
-            lambd = self.cfg.loss.l2_lambda  # Regularization weight for L1
-
-            # Iterate through the ensemble model
-            norm = 0.0
-            for name, param in model.named_parameters():
-                if "weight" in name:
-                    norm += torch.linalg.norm(param, ord=norm_order) ** (norm_order)
-
-            regularization_loss = lambd * norm / (batch_size)
-
-        else:
-            raise ValueError(
-                f"Regularization type {self.cfg.base_model.regularization} not supported."
-            )
-
-        ## Calculate the loss
-        loss = prediction_loss + regularization_loss
-
-        return loss, prediction_loss, regularization_loss
+        return loss, loss_dict
 
     def mix_gaussians(self, mean, var):
         """
@@ -280,39 +254,21 @@ class Ensemble(pl.LightningModule):
         x, y = batch
         optimizers = self.optimizers()
 
-        # Split batch amongst models
-        if self.cfg.split_batch_mode:
-            x_list = self.split_batch(x)
-            y_list = self.split_batch(y)
-        else:
-            x_list = [x] * self.cfg.num_models
-            y_list = [y] * self.cfg.num_models
-
         to_log = {}
         mean_loss = 0
         for n in range(self.cfg.num_models):
             model = self.models[n]
-            _x = x_list[n]
-            _y = y_list[n]
             opt = optimizers[n]
-
             opt.zero_grad()
-            output = model(_x.float())
-            loss, prediction_loss, regularization_loss = self.calc_loss(
-                _y, output, model
-            )
+            output = model(x.float())
+            loss, loss_dict = self.calc_loss(y, output, model)
             self.manual_backward(loss)
             opt.step()
-            to_log[f"train/model_{n+1}_{self.cfg.loss.loss_fn}_loss"] = loss.item()
-            to_log[f"train/model_{n+1}_{self.cfg.loss.loss_fn}_prediction_loss"] = (
-                prediction_loss.item()
-            )
-            to_log[f"train/model_{n+1}_{self.cfg.loss.loss_fn}_regularization_loss"] = (
-                regularization_loss
-            )
+
+            to_log.update({f"train/{k}_model_{n+1}":v for k,v in loss_dict.items()})
             mean_loss += loss.item() / len(self.models)
 
-        to_log[f"train/mean_{self.cfg.loss.loss_fn}"] = mean_loss
+        to_log["train/mean_loss"] = mean_loss
         self.log_dict(to_log)
 
     def validation_step(self, batch, batch_idx):
@@ -326,15 +282,13 @@ class Ensemble(pl.LightningModule):
         mean_loss = 0
         for n, model in enumerate(self.models):
             output = model(x.float())
-            loss, prediction_loss, regularization_loss = self.calc_loss(
-                y, output, model
-            )
-            key = f"val/model_{n+1}_{self.cfg.loss.loss_fn}"
-            to_log[key] = loss.item()
+            loss, loss_dict = self.calc_loss(y, output, model)
+
             output_list.append(output)
+            to_log.update({f"val/{k}_model_{n+1}":v for k,v in loss_dict.items()})
             mean_loss += loss.item() / len(self.models)
 
-        to_log[f"val/mean_{self.cfg.loss.loss_fn}"] = mean_loss
+        to_log["val/mean_loss"] = mean_loss
 
         self.val_y.append(y.cpu())
 
@@ -343,9 +297,10 @@ class Ensemble(pl.LightningModule):
             mean_stack.permute(1, 0, 2)
         )  # permute to (batch, model, out_dim)
 
-        if "var" in output:
-            var_stack = torch.stack([o["var"].cpu() for o in output_list])
-            self.val_var.append(var_stack.permute(1, 0, 2))
+        var_stack = torch.stack([o["var"].cpu() for o in output_list])
+        self.val_var.append(
+            var_stack.permute(1, 0, 2)
+        ) # permute to (batch, model, out_dim)
 
         self.log_dict(to_log)
 
@@ -353,34 +308,23 @@ class Ensemble(pl.LightningModule):
         """
         Compute ensemble metrics at end of validation epoch.
         """
-
         gt = torch.cat(self.val_y, dim=0).squeeze()
         mean_stack = torch.cat(self.val_mean, dim=0)
-        var_stack = None
-        if self.cfg.base_model.predict_variance:
-            var_stack = torch.cat(self.val_var, dim=0)
-            mean_pred, std_pred = self.mix_gaussians(mean_stack, var_stack)
-        else:
-            mean_pred = mean_stack.mean(dim=1).squeeze()
-            std_pred = mean_stack.std(dim=1).squeeze()
+        var_stack = torch.cat(self.val_var, dim=0)
+        mean_pred, std_pred = self.mix_gaussians(mean_stack, var_stack)
 
         to_log = {}
+        to_log["val/std_mean"] = std_pred.mean().item()
+        to_log["val/std_min"] = std_pred.min().item()
+        to_log["val/std_max"] = std_pred.max().item()
 
-        output = {"mean": mean_pred, "var": std_pred**2}
-
-        to_log[f"val/{self.cfg.loss.loss_fn}"] = self.gaussNLL(
-            output["mean"], output["var"], gt, reduction="mean"
+        to_log["val/nll"] = self.gaussNLL(
+            mean_pred, std_pred**2, gt, reduction="mean"
         )
 
         # compute pearsonr correlation
         pearsonr_corr, _ = stats.pearsonr(gt, mean_pred)
         to_log["val/pearsonr"] = pearsonr_corr
-
-        to_log["val/std"] = std_pred.mean().item()
-
-        # compute spearmanr correlation
-        spearmanr_corr, _ = stats.spearmanr(gt, mean_pred)
-        to_log["val/spearmanr"] = spearmanr_corr
 
         if not self.full_cfg.debug:
             # save plot of ground truth vs. prediction
@@ -391,6 +335,10 @@ class Ensemble(pl.LightningModule):
             plt.title(f"Ground Truth vs. Prediction | pearsonR {pearsonr_corr:.3f}")
             plt.savefig(f"{self.cfg.ckpt_dir}/val_gt_pred_scatter.png")
             plt.close()
+
+        # compute spearmanr correlation
+        spearmanr_corr, _ = stats.spearmanr(gt, mean_pred)
+        to_log["val/spearmanr"] = spearmanr_corr
 
         # compute correlation between variance and squared error
         se = (gt - mean_pred) ** 2
