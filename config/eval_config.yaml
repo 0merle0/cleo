@@ -1,0 +1,4 @@
+run_prefix: 'fragment_model'     # prefix name of the run that you give. Final name will be prefix_predictions.csv
+base_path: '/home/jq01/git/cleo_jason_working_branch/ckpt/241217_train_final_fragment_wo_val_run1/241217_train_final_fragment_wo_val_run1.2024-12-17-13-09-20' # path to the checkpoint
+ckpt_name: 'last.ckpt'  # name of the checkpoint file
+dataset_path: './data/super/241217_super_pool_and_evaluated.csv'   # path to the full dataset
