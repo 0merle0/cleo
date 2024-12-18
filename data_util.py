@@ -7,6 +7,7 @@ import pytorch_lightning as pl
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import logging
+from icecream import ic
 
 
 class FragmentDataset(Dataset):
@@ -152,7 +153,10 @@ class FragmentDataModule(pl.LightningDataModule):
 
         elif self.cfg.validation_mode == "top-k":
             logging.info("Top k validation")
-            raise Exception("Not implemented yet")
+            df_val = df.sort_values(
+                by=self.cfg.dataset_cfg.label_col, ascending=False
+            ).head(self.cfg.top_k_validation)
+            df_train = df[~df.index.isin(df_val.index)]
 
         elif self.cfg.validation_mode == "label":
             logging.info("Label validation")
