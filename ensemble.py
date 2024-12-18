@@ -221,14 +221,14 @@ class Ensemble(pl.LightningModule):
         
         reg_order = self.cfg.loss.regularization_order
         reg_lambda = self.cfg.loss.regularization_lambda
-        regularization_loss = self.parameter_regularization(model, reg_order, reg_lambda)
+        reg_loss = self.parameter_regularization(model, reg_order, reg_lambda)
 
-        loss = mse_loss*mse_weight + nll_loss*nll_weight + regularization_loss
+        loss = mse_loss*mse_weight + nll_loss*nll_weight + reg_loss
 
         loss_dict = {
             "mse": mse_loss,
             "nll": nll_loss,
-            f"regularization_l{reg_order}": regularization_loss,
+            f"regularization_l{reg_order}": reg_loss,
             "loss": loss,
             }
 
