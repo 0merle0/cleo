@@ -3,7 +3,7 @@ import datetime
 from omegaconf import DictConfig, OmegaConf
 import hydra
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import WandbLogger, CSVLogger
 from ensemble import Ensemble
 from data_util import FragmentDataModule
 
@@ -16,7 +16,7 @@ def train_surrogate(cfg):
     now = datetime.datetime.now()
     datetime_str = now.strftime("%Y-%m-%d-%H-%M-%S")
 
-    logger = None
+    loggers = None
     callbacks = []
     callbacks.append(pl.callbacks.RichModelSummary(max_depth=2))
     callbacks.append(pl.callbacks.RichProgressBar())
@@ -28,23 +28,32 @@ def train_surrogate(cfg):
         os.makedirs(ckpt_dir, exist_ok=True)
         OmegaConf.save(cfg, f"{ckpt_dir}/config.yaml")
 
-        # set num workers to 1 for debugging
-        cfg.data.num_workers = 1
-
-        logger = WandbLogger(
-            name=cfg.run_name,
-            project="itopt",
-            save_dir="./logs/wandb_logs",
-            log_model=False,
+        loggers = []
+        loggers.append(WandbLogger(
+                name=cfg.run_name,
+                project="itopt",
+                save_dir="./logs/wandb_logs",
+                log_model=False,
+            )
         )
+        loggers.append(CSVLogger(
+                save_dir=f"{ckpt_dir}/csv_logs",
+                name=cfg.run_name,
+                flush_logs_every_n_steps=1000, # NOTE: add this to the configs
+            )
+        )
+        
         callbacks.append(
             pl.callbacks.ModelCheckpoint(
                 save_last=True,
                 dirpath=ckpt_dir,
-                monitor=cfg.checkpointer.monitor,
+                monitor=cfg.checkpointer.monitor if cfg.data.validation_mode else None,
                 mode=cfg.checkpointer.mode,
             )
         )
+    else:
+        # set num workers to 1 for debugging
+        cfg.data.num_workers = 1
 
     # setup datamodule
     datamodule = FragmentDataModule(cfg)
@@ -53,23 +62,13 @@ def train_surrogate(cfg):
     model = Ensemble(cfg)
 
     # setup pytorch lightning trainer
-    if cfg.data.validation_mode is None:
-        trainer = pl.Trainer(
-            max_epochs=cfg.trainer.max_epochs,
-            logger=logger,
-            callbacks=callbacks,
-            log_every_n_steps=cfg.trainer.log_every_n_steps,
-            check_val_every_n_epoch=cfg.trainer.check_val_every_n_epoch,
-            num_sanity_val_steps=0,
-        )
-    else:
-        trainer = pl.Trainer(
-            max_epochs=cfg.trainer.max_epochs,
-            logger=logger,
-            callbacks=callbacks,
-            log_every_n_steps=cfg.trainer.log_every_n_steps,
-            check_val_every_n_epoch=cfg.trainer.check_val_every_n_epoch,
-        )
+    trainer = pl.Trainer(
+        max_epochs=cfg.trainer.max_epochs,
+        logger=loggers,
+        callbacks=callbacks,
+        log_every_n_steps=cfg.trainer.log_every_n_steps,
+        check_val_every_n_epoch=cfg.trainer.check_val_every_n_epoch,
+    )
 
     # train model
     trainer.fit(
