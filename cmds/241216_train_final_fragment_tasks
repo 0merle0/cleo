@@ -1,0 +1,5 @@
+source activate /home/jq01/.conda/envs/cleo; cd /home/jq01/git/cleo_jason_working_branch; python /home/jq01/git/cleo_jason_working_branch/train_surrogate.py -cn 241216_train_final_fragment run_name=241216_train_final_fragment_run1
+source activate /home/jq01/.conda/envs/cleo; cd /home/jq01/git/cleo_jason_working_branch; python /home/jq01/git/cleo_jason_working_branch/train_surrogate.py -cn 241216_train_final_fragment run_name=241216_train_final_fragment_run2
+source activate /home/jq01/.conda/envs/cleo; cd /home/jq01/git/cleo_jason_working_branch; python /home/jq01/git/cleo_jason_working_branch/train_surrogate.py -cn 241216_train_final_fragment run_name=241216_train_final_fragment_run3
+source activate /home/jq01/.conda/envs/cleo; cd /home/jq01/git/cleo_jason_working_branch; python /home/jq01/git/cleo_jason_working_branch/train_surrogate.py -cn 241216_train_final_fragment run_name=241216_train_final_fragment_run4
+source activate /home/jq01/.conda/envs/cleo; cd /home/jq01/git/cleo_jason_working_branch; python /home/jq01/git/cleo_jason_working_branch/train_surrogate.py -cn 241216_train_final_fragment run_name=241216_train_final_fragment_run5
