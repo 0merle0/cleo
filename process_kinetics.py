@@ -703,7 +703,7 @@ def main(cfg):
         plate_number = unique_pair[1]
         title = f"[mscarlett] (\u03BCM) - Sample {sample_number}, Plate {plate_number}"
         figure_name = f"mcarlett_heatmap_sample{sample_number}_plate{plate_number}"
-        figure_directory = directories["graphs"]
+        figure_directory = directories["graphs/per_plate"]
         write_figure = True
         write_format = "png"
 
@@ -725,7 +725,7 @@ def main(cfg):
         plate_number = unique_pair[1]
         title = f"Kinetics - Sample {sample_number}, Plate {plate_number}"
         figure_name = f"kinetics_sample{sample_number}_plate{plate_number}"
-        figure_directory = directories["graphs"]
+        figure_directory = directories["graphs/per_plate"]
         write_figure = True
         write_format = "png"
 
