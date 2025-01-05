@@ -21,4 +21,4 @@ export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 
 source activate /home/jgershon/.conda/envs/cleo
 
-srun python train_surrogate.py -cn train_surrogate
+srun python train_surrogate.py -cn nonlinear_output_head

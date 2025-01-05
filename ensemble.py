@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, copy
 import torch
 from tqdm import tqdm
 import torch.nn as nn
@@ -54,6 +54,23 @@ class BaseModel(nn.Module):
 
         activation = nn.ReLU()
         dropout = nn.Dropout(self.cfg.p_drop)
+
+        def build_output_head(hidden_dim, output_dim, head_type):
+            if head_type == "mlp":
+                out_head = nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim),
+                    activation,
+                    nn.Linear(hidden_dim, hidden_dim),
+                    activation,
+                    nn.Linear(hidden_dim, output_dim),
+                )
+            elif head_type == "linear":
+                out_head = nn.Linear(hidden_dim, output_dim)
+            else:
+                raise ValueError(f"Output head type {head_type} not supported.")
+            return out_head
+
+
         if self.cfg.model_type == "linear":
             self.cfg.hidden_dim = self.cfg.input_dim
 
@@ -85,12 +102,14 @@ class BaseModel(nn.Module):
         else:
             raise ValueError(f"Model type {self.cfg.model_type} not supported.")
 
-        self.mean_head = nn.Linear(self.cfg.hidden_dim, self.cfg.output_dim)
+        self.mean_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
         if self.cfg.predict_variance:
-            self.var_head = nn.Linear(self.cfg.hidden_dim, self.cfg.output_dim)
+            if self.cfg.concat_mean_pred:
+                self.var_head = build_output_head(self.cfg.hidden_dim+1, self.cfg.output_dim, self.cfg.output_head_type)
+            else:
+                self.var_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
 
     def forward(self, x):
-        out = {}
         if self.cfg.model_type == "conv1d":
             x = x.permute(0, 2, 1)
             x = self.trunk(x)
@@ -100,8 +119,12 @@ class BaseModel(nn.Module):
             x = self.trunk(x)
 
         mean = self.mean_head(x)
-            
+
         if self.cfg.predict_variance:
+            if self.cfg.stop_grad_variance:
+                x = x.detach()
+            if self.cfg.concat_mean_pred:
+                x = torch.cat([x, mean.detach()],dim=-1)
             # transform output with softplus to ensure positive variance
             # taken from https://arxiv.org/pdf/1612.01474
             var = self.var_head(x)
@@ -355,6 +378,18 @@ class Ensemble(pl.LightningModule):
                 f"Squared Error vs. Predicted Variance | pearsonR {se_var_corr:.3f}"
             )
             plt.savefig(f"{self.cfg.ckpt_dir}/val_se_var_scatter.png")
+            plt.close()
+
+        if not self.full_cfg.debug:
+            # save plot for mu vs. sigma
+            plt.figure(dpi=150)
+            sns.scatterplot(x=mean_pred, y=std_pred, alpha=0.5)
+            plt.xlabel("Mu pred")
+            plt.ylabel("Sigma pred")
+            plt.title(
+                "Correlation between mu and sigma"
+            )
+            plt.savefig(f"{self.cfg.ckpt_dir}/val_mu_sigma_scatter.png")
             plt.close()
 
         to_log["val/mse"] = se.mean().item()

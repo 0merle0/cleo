@@ -43,6 +43,8 @@ model:
     predict_variance: true # if true, predict variance
     variance_transform: "softplus" # softplus, sigmoid, clamp
     fixed_variance: 1.0
+    output_head_type: "mlp" # mlp, linear
+    stop_grad_variance: false
   loss:
     mse_weight: 0
     nll_weight: 1
