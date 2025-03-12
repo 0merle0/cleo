@@ -1,0 +1,12 @@
+defaults:
+  - super_base
+run_name: 'train_super_sequence'
+data:
+  dataset: '/home/ritib/projects/antibody_iptm_predictor/cleo/data/super/241204_super_random_purified_data.csv'
+  dataset_cfg:
+    input_type: 'sequence' # embedding, sequence, or fragment
+    fragment_csv: '/home/ritib/projects/antibody_iptm_predictor/cleo/data/super/super_fragment_data.csv'
+model:
+  base_model:
+    model_type: 'mlp' # conv1d, mlp, linearmodel:
+    input_dim: 3200

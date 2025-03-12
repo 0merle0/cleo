@@ -1,0 +1,12 @@
+defaults:
+  - super_base
+run_name: "test_on_tcdb400"
+data:
+  dataset_cfg:
+    input_type: 'sequence' # embedding, sequence, or fragment
+    dataset: "/home/ritib/projects/antibody_iptm_predictor/cleo/data/tcdb400/tcdb400_cdrs_iptms.csv"
+    max_length: 1000 # longest AA sequence * 20 (for one-hot encoding)
+model:
+  base_model:
+    model_type: 'mlp' # conv1d, mlp
+    input_dim: 128
