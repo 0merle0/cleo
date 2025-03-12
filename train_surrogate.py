@@ -31,7 +31,7 @@ def train_surrogate(cfg):
         loggers = []
         loggers.append(WandbLogger(
                 name=cfg.run_name,
-                project="itopt",
+                project="combo_ab_filter",
                 save_dir="./logs/wandb_logs",
                 log_model=False,
             )
