@@ -5,3 +5,5 @@ logs/
 ckpt/
 lightning_logs/
 outputs/
+notebooks/.ipynb_checkpoints/
+data/super/.ipynb_checkpoints/
