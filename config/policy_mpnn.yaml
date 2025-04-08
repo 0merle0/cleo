@@ -1,0 +1,7 @@
+model_type: "protein_mpnn"
+pdb: "/home/jgershon/projects/itopt/declan/TS1_trp_6_conformers_0008_000_10-atomized-bb-False_4_9_MPNN.pdb" # from Declan
+batch_size: 16
+temperature: 1.0
+omit_AA: "CX"
+lr: 1e-4
+fixed_residues: "A29 A30 A31 A32 A60 A61 A62 A63 A100 A101 A102 A103"
