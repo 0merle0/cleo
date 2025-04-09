@@ -45,8 +45,6 @@ class PolicyMPNN:
         self.ligand_mpnn_cutoff_for_score = 8.0
 
 
-
-
     def load_mpnn_model(self):
         """
         Load the MPNN model based on the configuration.
