@@ -1,3 +1,6 @@
+defaults:
+  - af3_inference@af3 
+  
 model_type: "protein_mpnn"
 pdb: "/home/jgershon/projects/itopt/declan/TS1_trp_6_conformers_0008_000_10-atomized-bb-False_4_9_MPNN.pdb" # from Declan
 batch_size: 16
