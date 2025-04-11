@@ -10,6 +10,7 @@ from policy_utils import PolicyMPNN, alphabet, restype_STRtoINT
 from reward_utils import af3_reward
 from typing import List, Dict, Any
 import pdb as pdb_lib
+from hydra.utils import instantiate
 
 def sequence_to_indices(sequence: str) -> List[int]:
     """Convert an amino acid sequence to a list of indices."""
@@ -69,7 +70,6 @@ def test_af3_reward(cfg: DictConfig) -> None:
     policy_output = create_mock_policy_output(sequences)
     
     # Test directly with reward class
-    from hydra.utils import instantiate
     reward_fn = instantiate(cfg.reward)
     # pdb_lib.set_trace()
     # We pass None for feature_dict since the reward function doesn't use it
