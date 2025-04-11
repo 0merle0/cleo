@@ -146,6 +146,9 @@ class PolicyMPNN:
         if fixed_residues:
             protein_dict["chain_mask"] = protein_dict["chain_mask"] * fixed_positions
 
+            
+        protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
+
         # also from mpnn args
         omit_AA_list = self.cfg.omit_AA
         omit_AA = torch.tensor(np.array([AA in omit_AA_list for AA in alphabet]).astype(np.float32), device=self.device)

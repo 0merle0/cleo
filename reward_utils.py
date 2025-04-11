@@ -41,7 +41,7 @@ class EnrichAminoAcidReward(Reward):
     """
         Simple reward to upweight an amino acid of interest
 
-        Make sure final reward ends up on same 
+        Make sure final reward ends up on same device
     """
     def __init__(self, AA_to_enrich=None):
         self.AA_to_enrich = AA_to_enrich
