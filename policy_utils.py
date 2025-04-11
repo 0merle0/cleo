@@ -339,7 +339,6 @@ class PolicyMPNN:
         # apply mask and take sum over each seq in the batch
         batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1,-2))
 
-        # batched_reward = (out["S"] == aa_index_of_interest).sum(dim=-1).float()
         batched_reward, metrics = self.reward_fn(step, out, feature_dict, self.device)
         to_log.update(metrics)
 
@@ -373,7 +372,6 @@ class PolicyMPNN:
 
         # encode initial state (run mpnn encoder)
         h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
-
 
         # train loop
         start_time = time.time()
