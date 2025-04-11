@@ -1,12 +1,20 @@
 defaults:
   - af3_inference@af3 
   
-model_type: "protein_mpnn"
-pdb: "/home/jgershon/projects/itopt/declan/TS1_trp_6_conformers_0008_000_10-atomized-bb-False_4_9_MPNN.pdb" # from Declan
+run_name: test_V1 # name for the run
+output_dir: /home/jgershon/projects/itopt/policy_mpnn/testing
+pdb: /home/jgershon/projects/itopt/declan/TS1_trp_6_conformers_0008_000_10-atomized-bb-False_4_9_MPNN.pdb # from Declan
 batch_size: 16
-temperature: 1.0
-omit_AA: "CX"
+N_steps: 500
 lr: 1e-4
+checkpoint_every_n_steps: 10
+eval: false
+checkpoint_path: null
+
+# -- MPNN params --
+model_type: protein_mpnn # protein_mpnn or ligand_mpnn
+temperature: 1.0
+omit_AA: CX
 fixed_residues: "A29 A30 A31 A32 A60 A61 A62 A63 A100 A101 A102 A103"
 
 
