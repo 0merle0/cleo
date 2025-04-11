@@ -2,8 +2,8 @@
 
 # ===== Output Configuration =====
 
-input_csv: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/af3_standalone/apo_seq.csv"  # CSV with design_name, protein_sequence and optionally catres_design, catres_input columns
-datadir: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/af3_standalone/try2/"
+input_csv: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/af3_standalone/placeholder.csv"  # CSV with design_name, protein_sequence and optionally catres_design, catres_input columns
+datadir: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/cleo_tests6/"
 outdir: "./af3_output" # specific output directory, will be set in the pipeline script
 specs_json: /home/ssalike/Projects/acyl_transferase_SM/penicillin/af3_inputs/winAS_pnG_specs2_af3.json
 prefix: acyl  # Prefix for output files
@@ -39,24 +39,24 @@ slurm:
   J: null
   p: "gpu" # for the prediction jobs
   gres: "gpu:a4000:1" # for the prediction jobs
-  submit: true
-  in_proc: false
+  submit: False
+  in_proc: false # submits jobs to slurm for prediction
   keep_logs: true
-  pre_process_locally: True
+  pre_process_locally: True # run on the current node
 
 analyze_slurm: # for the analysis jobs
   J: null
   p: "cpu"
   submit: True
-  in_proc: True
+  in_proc: True # run on the current node
   keep_logs: true
 
 # ===== States to process in pipeline =====
-states: ["acyl", "apo"]
+states: ["acyl"]
 
 # ===== Analysis Configuration =====
 analyze:
-  update_contigs: true
-  cautious: true
+  update_contigs: false # relevant if you expect the contig positions to change 
+  cautious: false
 tmp_pre: af3_metrics
 

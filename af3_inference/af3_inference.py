@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Any
 import shutil
 
 # Import utility functions for Slurm job submission
-from util import slurm_tools
+from af3_inference.util import slurm_tools
 
 # Set up logging
 logging.basicConfig(
@@ -29,6 +29,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Define script directory for relative paths
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def main_af3(input_df, cfg: HydraConfig) -> List[int]:
     """
@@ -134,8 +137,11 @@ def _get_paths(cfg: HydraConfig) -> Dict[str, str]:
         paths['af3_container'] = cfg.paths.get('af3_container', 
                                 "/software/containers/users/ikalvet/mlfold3/mlfold3_01.sif")
         
-        paths['process_script'] = cfg.paths.get('process_script', 
-                                 "/home/ssalike/git/rf_flow_working_b/rf_diffusion/benchmark/util/process_fasta_to_json.py")
+        # Always join with SCRIPT_DIR if the provided path is not absolute
+        process_script_path = cfg.paths.get('process_script', "util/process_csv_to_json.py")
+        if not os.path.isabs(process_script_path):
+            process_script_path = os.path.join(SCRIPT_DIR, process_script_path)
+        paths['process_script'] = process_script_path
         
         paths['af3_script'] = cfg.paths.get('af3_script', 
                             "/opt/alphafold3/run_alphafold_custom.py")
@@ -143,7 +149,7 @@ def _get_paths(cfg: HydraConfig) -> Dict[str, str]:
         # Set default paths
         paths['apptainer'] = "/projects/ml/cifutils/apptainer/cifutils_2025-01-27.sif"
         paths['af3_container'] = "/software/containers/users/ikalvet/mlfold3/mlfold3_01.sif"
-        paths['process_script'] = "/home/ssalike/git/rf_flow_working_b/rf_diffusion/benchmark/util/process_fasta_to_json.py"
+        paths['process_script'] = os.path.join(SCRIPT_DIR, "util/process_csv_to_json.py")
         paths['af3_script'] = "/opt/alphafold3/run_alphafold_custom.py"
     
     return paths
@@ -201,12 +207,12 @@ def _generate_job_files(
             print(preproc_cmd, file=preproc_file)
             
             # Write prediction command - AlphaFold3 specific
-            chunk_out_dir = output_dir / f'folder{i}'
+            chunk_out_dir = output_dir
             os.makedirs(chunk_out_dir, exist_ok=True)
             
             pred_cmd = (f'{paths["af3_container"]} python {paths["af3_script"]} '
                        f'--input_dir {chunk_dir} '
-                       f'--output_dir {output_dir} --num_diffusion_samples 1')
+                       f'--output_dir {chunk_out_dir} --num_diffusion_samples 1')
             
             # Add additional arguments if specified
             if hasattr(cfg, 'af3_args') and cfg.af3_args:
@@ -297,7 +303,7 @@ def process_state(input_df, state, specs, cfg):
 
 
     ##### ANALYSIS #####
-    from analyze_chai_results import main as main_analyze_chai
+    from af3_inference.analyze_chai_results import main as main_analyze_chai
 
     prefix = cfg.prefix
     suffix = cfg.get('suffix', '')
@@ -331,14 +337,12 @@ def process_state(input_df, state, specs, cfg):
 
     return combined_df
 
-
-@hydra.main(version_base=None, config_path='../config', config_name='af3_inference')
-def main(cfg: HydraConfig, input_df: Optional[pd.DataFrame] = None):
+def main(cfg, input_df: Optional[pd.DataFrame] = None):
     """
     Main function for the AF3 inference pipeline.
     
     Args:
-        cfg: Hydra configuration object
+        cfg: Configuration object
         input_df: Optional pandas DataFrame. If not provided, will load from cfg.input_csv
     """
     # Load input CSV file if DataFrame not provided
@@ -346,18 +350,22 @@ def main(cfg: HydraConfig, input_df: Optional[pd.DataFrame] = None):
         logger.info(f"Loading input CSV from {cfg.input_csv}")
         input_df = pd.read_csv(cfg.input_csv)
     else:
-        return_result_df = True
         logger.info("Using provided input DataFrame")
         
     logger.info(f"Loaded {len(input_df)} designs")
     
+    # get current working directory to switch back to it after processing
+    cwd = os.getcwd()
+
     # Create output directory
     os.makedirs(cfg.datadir, exist_ok=True)
     # Save input DataFrame to the output directory
     input_csv_path = os.path.join(cfg.datadir, 'input.csv')
     input_df.to_csv(input_csv_path, index=False)
+    cfg.input_csv = input_csv_path
     # change current working directory to output directory
-    os.chdir(cfg.datadir)
+    main_datadir = cfg.datadir
+    os.chdir(main_datadir)
     states = cfg.states  
     design_specs_json = cfg.specs_json
 
@@ -368,6 +376,7 @@ def main(cfg: HydraConfig, input_df: Optional[pd.DataFrame] = None):
 
     for state in states:
         print(f"Processing state: {state}")
+        cfg.datadir = os.path.join(main_datadir, f'{state}')
         metrics_df = process_state(
             input_df=input_df, 
             state=state, 
@@ -375,14 +384,6 @@ def main(cfg: HydraConfig, input_df: Optional[pd.DataFrame] = None):
             cfg=cfg
         )
         all_metrics[state] = metrics_df
-
-                # Store metrics for this state
-        if metrics_df is not None and not metrics_df.empty:
-            # Add state prefix to column names except 'name'
-            metrics_df_renamed = metrics_df.rename(
-                columns={col: f"{state}_{col}" if col != 'name' else col for col in metrics_df.columns}
-            )
-            all_metrics[state] = metrics_df_renamed
     
     # Merge all metrics with the input dataframe
     result_df = input_df.copy()
@@ -390,18 +391,19 @@ def main(cfg: HydraConfig, input_df: Optional[pd.DataFrame] = None):
     # Merge with metrics from each state
     for state, metrics_df in all_metrics.items():
         if not metrics_df.empty:
-            # Rename 'name' column to 'design_name' for joining
-            metrics_df = metrics_df.rename(columns={'name': 'design_name'})
             
             # Merge with result dataframe
-            result_df = pd.merge(result_df, metrics_df, on='design_name', how='left')
+            result_df = pd.merge(result_df, metrics_df, on='name', how='left')
     
     # Save the final result
-    result_csv = os.path.join(cfg.output_dir, 'final_results.csv')
+    result_csv = os.path.join(main_datadir, 'af3_metrics.csv')
     result_df.to_csv(result_csv, index=False)
 
-    if return_result_df:
-        return result_df
+    # switch back to the original working directory
+    os.chdir(cwd)
+    cfg.datadir = main_datadir
+
+    return result_df
         
 if __name__ == "__main__":
     main()

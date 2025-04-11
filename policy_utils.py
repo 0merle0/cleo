@@ -4,16 +4,16 @@ import torch
 import numpy as np
 sys.path.append("/software/lab/mpnn/fused_mpnn")
 
-from data_utils import (
-    featurize,
-    get_score,
-    get_seq_rec,
-    make_pair_bias,
-    parse_a3m,
-    parse_PDB,
-    subsample_msa,
-    write_full_PDB,
-)
+# from data_utils import (
+#     featurize,
+#     get_score,
+#     get_seq_rec,
+#     make_pair_bias,
+#     parse_a3m,
+#     parse_PDB,
+#     subsample_msa,
+#     write_full_PDB,
+# )
 from model_utils import ProteinMPNN
 
 PROTEIN_MPNN_CKPT_PATH = "/databases/mpnn/vanilla_model_weights/v_48_020.pt"
@@ -43,7 +43,12 @@ class PolicyMPNN:
         # defaults from mpnn
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
-
+        
+        # instantiate reward function if defined in config
+        self.reward_fn = None
+        if hasattr(self.cfg, 'reward'):
+            from hydra.utils import instantiate
+            self.reward_fn = instantiate(self.cfg.reward)
 
     def load_mpnn_model(self):
         """
@@ -302,10 +307,24 @@ class PolicyMPNN:
         return output_dict
 
 
-        def get_reward(self, output):
-            pass
+    def get_reward(self, output_dict, feature_dict):
+        """
+        Calculate rewards for the sampled sequences
+        
+        Args:
+            output_dict: Dictionary with generated sequences and probabilities
+            feature_dict: Dictionary with model features
+            
+        Returns:
+            Tensor of rewards with shape (batch_size,)
+        """
+        if self.reward_fn:
+            return self.reward_fn(output_dict, feature_dict)
+        
+        # Default to zero rewards if no reward function specified
+        return torch.zeros(self.cfg.batch_size, device=self.device)
 
 
 
-        def train_step(self, ):
-            pass
+    def train_step(self, ):
+        pass

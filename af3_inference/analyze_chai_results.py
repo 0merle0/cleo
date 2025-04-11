@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import hydra
 from hydra.core.hydra_config import HydraConfig
-import rf_diffusion.benchmark.util.slurm_tools as slurm_tools
+import af3_inference.util.slurm_tools as slurm_tools
 from pathlib import Path
 import json
 
@@ -203,30 +203,30 @@ def main(conf: HydraConfig):
             print(f'Submitted array job {analyze_job} with {int(np.ceil(len(enzyme_list)/conf.chunk))} jobs to analyze {len(enzyme_list)} enzymes')
             
             # Wait for jobs to complete if not running in_proc
-            if not conf.slurm.in_proc:
-                slurm_tools.wait_for_jobs([analyze_job])
-                
-            # Combine CSV files
-            csv_out_dir = os.path.join(conf.datadir, f'{conf.tmp_pre}_analysis_csvs')
-            csv_files = glob.glob(os.path.join(csv_out_dir, 'chai_metrics.csv.*'))
+        if not conf.slurm.in_proc:
+            slurm_tools.wait_for_jobs([analyze_job])
             
-            if csv_files:
-                # Read and combine all CSV files
-                dfs = []
-                for csv_file in csv_files:
-                    try:
-                        df = pd.read_csv(csv_file)
-                        dfs.append(df)
-                    except pd.errors.EmptyDataError:
-                        print(f"Warning: Empty CSV file found: {csv_file}")
-                        continue
-                
-                if dfs:
-                    combined_df = pd.concat(dfs).reset_index(drop=True)
-                    # Save combined CSV to datadir
-                    output_path = os.path.join(conf.datadir, 'metrics_combined.csv')
-                    combined_df.to_csv(output_path, index=False)
-                    print(f"Combined metrics saved to: {output_path}")
+        # Combine CSV files
+        csv_out_dir = os.path.join(conf.datadir, f'{conf.tmp_pre}_analysis_csvs')
+        csv_files = glob.glob(os.path.join(csv_out_dir, 'chai_metrics.csv.*'))
+        
+        if csv_files:
+            # Read and combine all CSV files
+            dfs = []
+            for csv_file in csv_files:
+                try:
+                    df = pd.read_csv(csv_file)
+                    dfs.append(df)
+                except pd.errors.EmptyDataError:
+                    print(f"Warning: Empty CSV file found: {csv_file}")
+                    continue
+            
+            if dfs:
+                combined_df = pd.concat(dfs).reset_index(drop=True)
+                # Save combined CSV to datadir
+                output_path = os.path.join(conf.datadir, 'metrics_combined.csv')
+                combined_df.to_csv(output_path, index=False)
+                print(f"Combined metrics saved to: {output_path}")
     
     return combined_df
 
