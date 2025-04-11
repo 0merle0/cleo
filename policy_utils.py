@@ -79,6 +79,11 @@ class PolicyMPNN:
         else:
             raise ValueError("Invalid model type specified. Choose 'ligand_mpnn' or 'protein_mpnn'.")
 
+        
+        # load checkpoint if provided
+        if self.cfg.checkpoint_path:
+            ckpt_path = self.cfg.checkpoint_path
+
         # load model
         model = ProteinMPNN(node_features=128,
                         edge_features=128,
