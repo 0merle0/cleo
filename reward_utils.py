@@ -30,13 +30,14 @@ class Reward(ABC):
         return sequences
 
     @abstractmethod
-    def __call__(self, policy_output, feature_dict):
+    def __call__(self, step, policy_output, feature_dict, device):
         """
             Compute rewards for each sequence in the sampled_sequences
-            rewards should be returned as tensor of shape (B,)
+            rewards should be returned as tensor of shape (B,), as well as any metrics you would like to track
 
             policy_output: Output from the policy network - dict
             feature_dict: Feature dictionary - dict
+
         """
         pass
 
@@ -44,17 +45,25 @@ class Reward(ABC):
 class EnrichAminoAcidReward(Reward):
     """
         Simple reward to upweight an amino acid of interest
+
+        Make sure final reward ends up on same device
     """
-    def __init__(self, AA_to_enrich):
+    def __init__(self, AA_to_enrich=None):
         self.AA_to_enrich = AA_to_enrich
         assert AA_to_enrich in alphabet, f"Amino acid {AA_to_enrich} not in alphabet"
         self.AA_to_enrich_idx = alphabet.index(AA_to_enrich)
 
-    def __call__(self, policy_output, feature_dict):
+    @torch.no_grad()
+    def __call__(self, step, policy_output, feature_dict, device):
         sampled_seqs = policy_output["S"]
-        batched_reward = (sampled_seqs == self.AA_to_enrich_idx).float().sum(dim=-1)
-        batched_reward = batched_reward / sampled_seqs.shape[1]
-        return batched_reward
+        num_correct_aas = (sampled_seqs == self.AA_to_enrich_idx).float().sum(dim=-1)
+        batched_reward = num_correct_aas / sampled_seqs.shape[1]
+        
+        metrics = {
+            "num_correct_aas": num_correct_aas.detach().mean().cpu()
+        }
+
+        return batched_reward.to(device), metrics
 
 
 class af3_reward(Reward):
