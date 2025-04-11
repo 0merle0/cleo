@@ -2,19 +2,13 @@ import sys, os
 import json
 import torch
 import numpy as np
+from tqdm import tqdm
+import time
 sys.path.append("/software/lab/mpnn/fused_mpnn")
 
-from data_utils import (
-    featurize,
-    get_score,
-    get_seq_rec,
-    make_pair_bias,
-    parse_a3m,
-    parse_PDB,
-    subsample_msa,
-    write_full_PDB,
-)
+from data_utils import featurize, parse_PDB
 from model_utils import ProteinMPNN
+import hydra
 
 PROTEIN_MPNN_CKPT_PATH = "/databases/mpnn/vanilla_model_weights/v_48_020.pt"
 LIGAND_MPNN_CKPT_PATH = "/databases/mpnn/ligand_mpnn_model_weights/s25_r010_t300_p.pt"
@@ -33,9 +27,21 @@ class PolicyMPNN:
 
         self.cfg = cfg
         self.device = DEVICE
+        self.run_name = cfg.run_name
+        self.output_dir = cfg.output_dir
+        
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # log reward history
+        self.reward_history = [0]
 
         # load model
         self.model = self.load_mpnn_model()
+
+        if self.cfg.train:
+            self.model.train()
+        else:
+            self.model.eval()
 
         # load optimizer
         self.optimizer = self.get_optimizer()
@@ -43,6 +49,13 @@ class PolicyMPNN:
         # defaults from mpnn
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
+
+        self.reward_fn = hydra.utils.instantiate(cfg.reward)
+
+        # checkpointing utils
+        self.checkpoint_every_n_steps = self.cfg.checkpoint_every_n_steps
+        self.best_seen_reward = 0
+        self.step_at_best_seen_reward = 0
 
 
     def load_mpnn_model(self):
@@ -168,7 +181,6 @@ class PolicyMPNN:
         """
         Run the MPNN model without gradient tracking.
         """
-        self.model.eval()
         with torch.no_grad():
             h_V, h_E, E_idx = self.model.encode(feature_dict)
         return h_V, h_E, E_idx
@@ -197,9 +209,8 @@ class PolicyMPNN:
 
     def rollout(self, feature_dict, h_V, h_E, E_idx):
         """
-            Ripped from fused MPNN decoding, modified to allow grads to flow through this pass
+        Ripped from fused MPNN decoding, modified to allow grads to flow through this pass
         """
-        self.model.train()  # Set model to training mode to ensure dropout is active if any
 
         # decode
         B_decoder = feature_dict["batch_size"]
@@ -215,7 +226,6 @@ class PolicyMPNN:
         symmetry_list_of_lists = feature_dict["symmetry_residues"] #[[0, 1, 14], [10,11,14,15], [20, 21]] #indices to select X over length - L
         symmetry_weights_list_of_lists = feature_dict["symmetry_weights"] #[[1.0, 1.0, 1.0], [-2.0,1.1,0.2,1.1], [2.3, 1.1]]
         B, L = S_true.shape
-
 
         decoding_order = torch.argsort((chain_mask+0.0001)*(torch.abs(randn))) #[numbers will be smaller for places where chain_M = 0.0 and higher for places where chain_M = 1.0]
 
@@ -280,12 +290,10 @@ class PolicyMPNN:
 
 
             # JG need to add code here to pick out specific samples
-            # probs = torch.nn.functional.softmax((logits.detach()+bias_t) / temperature, dim=-1) #[B,21]
-            probs = torch.nn.functional.softmax((logits+bias_t) / temperature, dim=-1) #[B,21]
+            probs = torch.nn.functional.softmax((logits.detach()+bias_t) / temperature, dim=-1) #[B,21]
 
             probs_sample = probs[:,:20]/torch.sum(probs[:,:20], dim=-1, keepdim=True) #hard omit X #[B,20]
             S_t = torch.multinomial(probs_sample, 1)[:,0] #[B]
-
 
             all_probs.scatter_(1, t[:,None,None].repeat(1,1,20), (chain_mask_t[:,None,None]*probs_sample[:,None,:]).float())
             all_log_probs.scatter_(1, t[:,None,None].repeat(1,1,21), (chain_mask_t[:,None,None]*log_probs[:,None,:]).float())
@@ -301,11 +309,121 @@ class PolicyMPNN:
 
         return output_dict
 
+    def train_step(self, init_state, feature_dict):
+        """
+        Single training step given featurized example
+        """
 
-        def get_reward(self, output):
-            pass
+        to_log = {}
+        self.optimizer.zero_grad()
+
+        h_V_in, h_E_in, E_idx_in = init_state
+
+        # turn on grads for state features
+        h_V_in.requires_grad = True
+        h_E_in.requires_grad = True
+
+        # run the policy
+        out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in)
+
+        # mask for what was actually decoded in the sequence
+        seq_mask = torch.nn.functional.one_hot(out["S"], num_classes=len(alphabet)).float()
+
+        # apply mask and take sum over each seq in the batch
+        batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1,-2))
+
+        # batched_reward = (out["S"] == aa_index_of_interest).sum(dim=-1).float()
+        batched_reward, metrics = self.reward_fn(out, feature_dict)
+        to_log.update(metrics)
+
+        # get baseline first
+        baseline = np.mean(self.reward_history).item()
+
+        # baseline subtracted reward
+        baseline_subtracted_reward = batched_reward - baseline
+
+        # compute loss
+        loss = -(batched_log_probs * baseline_subtracted_reward).mean()
+
+        # optimizer update
+        loss.backward()
+        self.optimizer.step()
+
+        to_log["loss"] = loss.detach().cpu().item()
+        to_log["reward"] = batched_reward.mean().cpu().item()
+        
+        return to_log
+
+    def train(self):
+        """
+        Run the main training loop
+        """
+
+        N_train = self.cfg.N_train
+
+        # featurize from input pdb (in future maybe policy is trained with a variety of pdbs)
+        feature_dict = self.featurize_pdb(self.cfg.pdb)
+
+        # encode initial state (run mpnn encoder)
+        h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
+
+        # train loop
+        start_time = time.time()
+        for step in tqdm(range(N_train), desc="Training"):
+            
+            # clone initial state variables
+            init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
+            
+            # train step
+            to_log = self.train_step(init_state, feature_dict)
+
+            # metric logging
+            runtime = time.time() - start_time
+            self.log_metrics(step, runtime, to_log)
+
+            # model checkpointing
+            if step > 0 and self.checkpoint_every_n_steps % step == 0:
+                self.checkpoint_model(step, to_log)
 
 
+    def log_metrics(self, step, runtime, to_log):
+        """
+        Log training metrics
+        """
+        metrics_to_log = [k for k,v in to_log.items() if isinstance(v, float)]
+        log_path = os.path.join(self.output_dir, f"{self.run_name}_train_metrics.csv")
+        if not os.path.exists(log_path):
+            with open(log_path,'w') as f:
+                f.write("step,runtime,"\
+                        +",".join([f"{m}" for m in metrics_to_log])\
+                        +'\n')
+        with open(log_path,'a') as f:
+            f.write(f"{step},{runtime:.4f},"\
+                    +",".join([f"{to_log[m]:.4f}" for m in metrics_to_log])\
+                    +'\n')
 
-        def train_step(self, ):
-            pass
+    
+    def checkpoint_model(self, step, to_log):
+        """
+        Checkpoint model
+            - save last model
+            - save best model
+        """
+        
+        curr_reward = to_log["reward"]
+        ckpt = {
+                "config":dict(self.cfg),
+                "step":step,
+                "reward":curr_reward,
+                "model_state_dict":self.model.state_dict(),
+            }
+
+        ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_last.pt")
+        torch.save(ckpt, ckpt_path)
+
+        if curr_reward > self.best_seen_reward:
+            self.best_seen_reward = curr_reward
+            self.step_at_best_seen_reward = step
+
+            best_ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_best.pt")
+            torch.save(ckpt, best_ckpt_path)
