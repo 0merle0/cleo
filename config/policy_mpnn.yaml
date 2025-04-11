@@ -2,9 +2,11 @@ run_name: test_V1 # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn/testing
 pdb: /home/jgershon/projects/itopt/declan/TS1_trp_6_conformers_0008_000_10-atomized-bb-False_4_9_MPNN.pdb # from Declan
 batch_size: 16
-N_train: 100
+N_train: 500
 lr: 1e-4
 checkpoint_every_n_steps: 10
+eval: false
+checkpoint_path: null
 
 # -- MPNN params --
 model_type: protein_mpnn # protein_mpnn or ligand_mpnn
