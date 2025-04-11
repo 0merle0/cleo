@@ -316,7 +316,7 @@ class PolicyMPNN:
 
         return output_dict
 
-    def train_step(self, init_state, feature_dict):
+    def train_step(self, step, init_state, feature_dict):
         """
         Single training step given featurized example
         """
@@ -340,7 +340,7 @@ class PolicyMPNN:
         batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1,-2))
 
         # batched_reward = (out["S"] == aa_index_of_interest).sum(dim=-1).float()
-        batched_reward, metrics = self.reward_fn(out, feature_dict, self.device)
+        batched_reward, metrics = self.reward_fn(step, out, feature_dict, self.device)
         to_log.update(metrics)
 
         # get baseline first
@@ -377,13 +377,13 @@ class PolicyMPNN:
 
         # train loop
         start_time = time.time()
-        for step in tqdm(range(self.cfg.N_train), desc="Training"):
+        for step in tqdm(range(self.cfg.N_steps), desc="Training"):
             
             # clone initial state variables
             init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
             
             # train step
-            to_log = self.train_step(init_state, feature_dict)
+            to_log = self.train_step(step, init_state, feature_dict)
 
             # metric logging
             runtime = time.time() - start_time
