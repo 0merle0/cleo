@@ -33,14 +33,13 @@ class PolicyMPNN:
         os.makedirs(self.output_dir, exist_ok=True)
 
         # log reward history
-        self.reward_history = [0]
+        self.reward_history = [torch.tensor(0., dtype=torch.float32, device=self.device)]
 
         # load model
         self.model = self.load_mpnn_model()
+        self.model.to(self.device)
 
-        if self.cfg.train:
-            self.model.train()
-        else:
+        if self.cfg.eval:
             self.model.eval()
 
         # load optimizer
@@ -333,11 +332,12 @@ class PolicyMPNN:
         batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1,-2))
 
         # batched_reward = (out["S"] == aa_index_of_interest).sum(dim=-1).float()
-        batched_reward, metrics = self.reward_fn(out, feature_dict)
+        batched_reward, metrics = self.reward_fn(out, feature_dict, self.device)
         to_log.update(metrics)
 
         # get baseline first
-        baseline = np.mean(self.reward_history).item()
+        baseline = torch.stack(self.reward_history).mean()
+        self.reward_history.append(batched_reward.mean())
 
         # baseline subtracted reward
         baseline_subtracted_reward = batched_reward - baseline
@@ -358,8 +358,7 @@ class PolicyMPNN:
         """
         Run the main training loop
         """
-
-        N_train = self.cfg.N_train
+        self.model.train()
 
         # featurize from input pdb (in future maybe policy is trained with a variety of pdbs)
         feature_dict = self.featurize_pdb(self.cfg.pdb)
@@ -367,9 +366,10 @@ class PolicyMPNN:
         # encode initial state (run mpnn encoder)
         h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
 
+
         # train loop
         start_time = time.time()
-        for step in tqdm(range(N_train), desc="Training"):
+        for step in tqdm(range(self.cfg.N_train), desc="Training"):
             
             # clone initial state variables
             init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
@@ -384,7 +384,9 @@ class PolicyMPNN:
             # model checkpointing
             if step > 0 and self.checkpoint_every_n_steps % step == 0:
                 self.checkpoint_model(step, to_log)
-
+        
+        print("Training complete.")
+        print(f"Best reward seen: {self.best_seen_reward:.4f} at step {self.step_at_best_seen_reward}")
 
     def log_metrics(self, step, runtime, to_log):
         """

@@ -40,13 +40,16 @@ class Reward(ABC):
 class EnrichAminoAcidReward(Reward):
     """
         Simple reward to upweight an amino acid of interest
+
+        Make sure final reward ends up on same 
     """
     def __init__(self, AA_to_enrich=None):
         self.AA_to_enrich = AA_to_enrich
         assert AA_to_enrich in alphabet, f"Amino acid {AA_to_enrich} not in alphabet"
         self.AA_to_enrich_idx = alphabet.index(AA_to_enrich)
 
-    def __call__(self, policy_output, feature_dict):
+    @torch.no_grad()
+    def __call__(self, policy_output, feature_dict, device):
         sampled_seqs = policy_output["S"]
         num_correct_aas = (sampled_seqs == self.AA_to_enrich_idx).float().sum(dim=-1)
         batched_reward = num_correct_aas / sampled_seqs.shape[1]
@@ -55,6 +58,6 @@ class EnrichAminoAcidReward(Reward):
             "num_correct_aas": num_correct_aas.detach().mean().cpu()
         }
 
-        return batched_reward, metrics
+        return batched_reward.to(device), metrics
 
 
