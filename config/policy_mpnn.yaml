@@ -8,3 +8,14 @@ temperature: 1.0
 omit_AA: "CX"
 lr: 1e-4
 fixed_residues: "A29 A30 A31 A32 A60 A61 A62 A63 A100 A101 A102 A103"
+
+
+reward:
+  _target_: reward_utils.af3_reward
+  af3_config: ${af3}
+  metric_name: "acyl_rmsd_full_motif_best"  # Column name to use for reward
+  lower_threshold: 0.25  # Values below this get reward 1.0
+  upper_threshold: 5  # Values above this get reward 0.0
+
+test_seq_list: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/af3_standalone/testseqs.list"
+test_output_csv: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/af3_standalone/reward_results.csv"  # Optional: where to save results

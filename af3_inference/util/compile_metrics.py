@@ -13,7 +13,7 @@ import numpy as np
 import glob
 import json
 import copy
-import pdb
+import pdb as pdb_lib
 
 ## load all metrics function from metrics.py
 from metrics import *
@@ -265,6 +265,7 @@ def compute_ensemble_statistics(all_stats):
 def get_state_stats(enzyme_names, state_specs, datadir):
     """Process statistics for each enzyme in the given state."""
     # Parse reference structure
+    # pdb_lib.set_trace()
     ref_array = parse_pdb(state_specs['ref'])
     
     # Extract residue specifications
@@ -673,7 +674,7 @@ def get_metrics(pred_dir, ref_pdb, motif_dict, motif_dict_full, distance_pairs, 
     """
     Compute RMSD values and geometric measurements for an ensemble of PDB files.
     """
-    # pdb.set_trace()
+    # pdb_lib.set_trace()
     ref_array = parse_pdb(ref_pdb)
     pdb_best = glob.glob(pred_dir + f"/{enz_name}/*{enz_name}*.cif")[0]
     all_pdbs = glob.glob(pred_dir + f"/{enz_name}/*/*.cif")

@@ -14,7 +14,6 @@ import json
 import pandas as pd
 from typing import List, Dict, Any, Optional
 import logging
-import pdb
 import numpy as np
 # Set up logging
 logging.basicConfig(
@@ -22,7 +21,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
+# import pdb as pdb_lib
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Convert FASTA files to JSON files for AlphaFold3")
@@ -144,16 +143,18 @@ def parse_bonds(bonds_json: str, row: pd.Series) -> List[List[Any]]:
         bonds = json.loads(bonds_json)
         
         # Map bonds to hallucinated indices if CSV is provided
-        if row['catres_design'] and row['catres_input']:
+        if 'catres_design' in row and 'catres_input' in row:
             residue_mapping = create_residue_mapping(row['catres_input'], row['catres_design'])
             bonds = map_bonds_with_csv_mapping(bonds, residue_mapping)
+        else:
+            logger.warning("No residue mapping provided. Using original bonds as in json.")
         
         return bonds
     except Exception as e:
         logger.error(f"Error parsing bonds: {e}")
         return None
 
-def parse_ptm(ptm_json: str, residue_mapping: Dict[str, str] = None) -> Dict[str, Any]:
+def parse_ptm(ptm_json: str, row: pd.Series) -> Dict[str, Any]:
     """
     Parse PTM JSON string and map residue index if needed.
     
@@ -170,9 +171,10 @@ def parse_ptm(ptm_json: str, residue_mapping: Dict[str, str] = None) -> Dict[str
     try:
         # Parse JSON string to dict
         ptm = json.loads(ptm_json)
-        
+        # pdb_lib.set_trace()
         # Map residue index if mapping is provided
-        if residue_mapping and 'res_idx' in ptm:
+        if 'catres_design' in row and 'catres_input' in row:
+            residue_mapping = create_residue_mapping(row['catres_input'], row['catres_design'])
             # Construct residue ID as it would appear in the mapping (assuming chain A)
             res_id = f"A{ptm['res_idx']}"
             
@@ -188,7 +190,7 @@ def parse_ptm(ptm_json: str, residue_mapping: Dict[str, str] = None) -> Dict[str
                 ptm['res_idx'] = mapped_num
                 logger.info(f"Mapped PTM residue from {res_id} to {mapped_res_id}")
             else:
-                logger.warning(f"No mapping found for PTM residue {res_id}. Using original.")
+                logger.warning(f"No mapping found for PTM residue {res_id}. Using the index specified in the json.")
         
         return ptm
     except Exception as e:
@@ -220,7 +222,7 @@ def process(
     fasta_name = row['name']
     
     # Generate 5 random seeds
-    num_seeds = 5
+    num_seeds = 1
     random_seeds = [int(np.random.randint(0, 2**32-1)) for _ in range(num_seeds)]    
     # Initialize JSON data structure
     json_data = {
@@ -313,7 +315,7 @@ def main():
         
         # Parse bonds and PTM if provided (with CSV mapping)
         bonds = parse_bonds(args.bonds, row) if args.bonds else None
-        ptm = parse_ptm(args.ptm) if args.ptm else None
+        ptm = parse_ptm(args.ptm, row) if args.ptm else None
         
         process(
             row=row, 
