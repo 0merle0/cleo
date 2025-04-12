@@ -20,6 +20,7 @@ fixed_residues: "A29 A30 A31 A32 A60 A61 A62 A63 A100 A101 A102 A103"
 
 reward:
   _target_: reward_utils.af3_reward
+  datadir: ${output_dir}
   af3_config: ${af3}
   metric_name: "acyl_rmsd_full_motif_best"  # Column name to use for reward
   lower_threshold: 0.25  # Values below this get reward 1.0

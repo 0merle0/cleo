@@ -99,8 +99,7 @@ def filter_dataframe(df, filters):
     """Filter dataframe based on constraints"""
     return df[df.apply(lambda r: row_passes_constraints(r, filters), axis=1)]
 
-@hydra.main(version_base=None, config_path='configs/', config_name='analyze_chai')
-def main(conf: HydraConfig):
+def main(conf: HydraConfig, state_specs_json: str):
     '''
     ### Expected conf keys ###
     datadir:        Directory containing CHAI prediction results
@@ -132,7 +131,7 @@ def main(conf: HydraConfig):
         enzyme_list = [os.path.basename(f).split('.')[0] for f in glob.glob(os.path.join(conf.fasta_dir, '*.fasta'))]
     else:
         # Find all PDB files and extract unique enzyme names
-        json_path = conf.specs_json
+        json_path = state_specs_json
         with open(json_path, 'r') as f:
             specs = json.load(f)
         # get the datadir for the first state i.e first key in specs
@@ -156,7 +155,7 @@ def main(conf: HydraConfig):
     
     # Create job list
     job_fn = os.path.join(conf.datadir, f'{conf.tmp_pre}.jobs.analyze_chai.list')
-    job_list_file = open(job_fn, 'w') if conf.slurm.submit else sys.stdout
+    job_list_file = open(job_fn, 'w') if conf.analyze_slurm.submit else sys.stdout
     
     apptainer_datahub = '/home/ssalike/git/datahub_latest/datahub_2025-02-15.sif'
 
@@ -174,7 +173,7 @@ def main(conf: HydraConfig):
         cmd = f'{apptainer_datahub} python {script_dir}/util/compile_metrics.py '\
               f'--input_list {tmp_fn} '\
               f'--outcsv {csv_out_dir}/chai_metrics.csv.{i} '\
-              f'--specs_json {conf.specs_json}'
+              f'--specs_json {state_specs_json}'
         
         # Add outdir if it's not None
         if conf.outdir is not None:
@@ -183,17 +182,17 @@ def main(conf: HydraConfig):
         print(cmd, file=job_list_file)
     
     # Submit jobs
-    if conf.slurm.submit:
+    if conf.analyze_slurm.submit:
         job_list_file.close()
-        job_name = conf.slurm.J or f'chai_{os.path.basename(conf.datadir.strip("/"))}'
+        job_name = conf.analyze_slurm.J or f'chai_{os.path.basename(conf.datadir.strip("/"))}'
         
         analyze_job, proc = slurm_tools.array_submit(
             job_fn, 
-            p=conf.slurm.p,
-            gres=None if conf.slurm.p=='cpu' else conf.slurm.gres,
-            log=conf.slurm.keep_logs,
+            p=conf.analyze_slurm.p,
+            gres=None if conf.analyze_slurm.p=='cpu' else conf.analyze_slurm.gres,
+            log=conf.analyze_slurm.keep_logs,
             J=job_name,
-            in_proc=conf.slurm.in_proc
+            in_proc=conf.analyze_slurm.in_proc
         )
 
         # return analyze_job
@@ -203,7 +202,7 @@ def main(conf: HydraConfig):
             print(f'Submitted array job {analyze_job} with {int(np.ceil(len(enzyme_list)/conf.chunk))} jobs to analyze {len(enzyme_list)} enzymes')
             
             # Wait for jobs to complete if not running in_proc
-        if not conf.slurm.in_proc:
+        if not conf.analyze_slurm.in_proc:
             slurm_tools.wait_for_jobs([analyze_job])
             
         # Combine CSV files

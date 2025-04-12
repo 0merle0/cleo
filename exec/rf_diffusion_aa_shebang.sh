@@ -59,7 +59,7 @@ if [ -z "$APPTAINER_NAME" ]; then
         SIF_PATH=""
 
         if [ -f $IPD_FILE ]; then
-            SIF_PATH=$(readlink -f "$SCRIPT_DIR/bakerlab_rf_diffusion_aa.sif" )
+            SIF_PATH=$(readlink -f "$SCRIPT_DIR/mlfold.sif" )
             if [ -z $SIF_PATH ] || [ ! -f $SIF_PATH ]; then
                 SIF_PATH=""
                 echo "You're at the IPD and something is wrong. The target of this symlink doesn't exist: $SCRIPT_DIR/mlfold.sif"

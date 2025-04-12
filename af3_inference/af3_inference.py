@@ -321,7 +321,6 @@ def process_state(input_df, state, specs, cfg):
     with open(state_specs_file, 'w') as f:
         json.dump(state_metrics, f, indent=2)
 
-    cfg.specs_json = state_specs_file
     metrics_csv = os.path.join(cfg.datadir, f'{analysis_prefix}_metrics.csv')
 
     if hasattr(cfg.analyze, 'cautious') and cfg.analyze.cautious and os.path.exists(metrics_csv):
@@ -329,8 +328,8 @@ def process_state(input_df, state, specs, cfg):
         combined_df = pd.read_csv(metrics_csv)
     else:
         print('Running AF3 analysis')
-        cfg.slurm = cfg.analyze_slurm
-        combined_df = main_analyze_chai(cfg)
+        # cfg.slurm = cfg.analyze_slurm
+        combined_df = main_analyze_chai(cfg, state_specs_file)
         print('AF3 analysis jobs finished, moving onto next state')
         if not combined_df.empty:  # Only save if the dataframe isn't empty
             combined_df.to_csv(metrics_csv, index=False)
