@@ -5,7 +5,7 @@
 input_csv: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/af3_standalone/placeholder.csv"  # CSV with design_name, protein_sequence and optionally catres_design, catres_input columns
 datadir: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/cleo_tests6/"
 outdir: "./af3_output" # specific output directory, will be set in the pipeline script
-specs_json: /home/ssalike/Projects/acyl_transferase_SM/penicillin/af3_inputs/winAS_pnG_specs2_af3.json
+specs_json: /projects/ml/itopt/policy_mpnn/data/winAS_pnG_specs2_af3.json
 prefix: acyl  # Prefix for output files
 suffix: try2
 chunk: 1  # Number of sequences to process per job
