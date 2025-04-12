@@ -2,7 +2,7 @@ defaults:
   - af3_inference@af3 
   
 run_name: test_af3_winAS # name for the run
-output_dir: /home/ssalike/Projects/itopt/policy_mpnn/opt_1/
+output_dir: /home/ssalike/Projects/itopt/policy_mpnn/opt_3_exponential_rewards/
 pdb: /projects/ml/itopt/policy_mpnn/data/pd_input_make2.pdb # winAS
 batch_size: 16
 N_steps: 500
@@ -23,7 +23,8 @@ reward:
   output_dir: ${output_dir}
   af3_config: ${af3}
   metric_name: "acyl_rmsd_full_motif_best"  # Column name to use for reward
-  lower_threshold: 0.1  # Values below this get reward 1.0
+  lower_threshold: 0.01  # Values below this get reward 1.0
   upper_threshold: 10  # Values above this get reward 0.0
+  normalization_type: "exponential"
 
 test_seq_list: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/af3_standalone/testseqs.list"
