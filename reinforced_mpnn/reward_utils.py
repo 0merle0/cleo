@@ -73,7 +73,7 @@ class af3_reward(Reward):
         Uses configurable thresholds to map metric values to the [0,1] range.
         For metrics like RMSD where lower is better.
     """
-    def __init__(self, output_dir, af3_config, metric_name="rmsd", lower_threshold=0.25, upper_threshold=3.0):
+    def __init__(self, output_dir, af3_config, metric_name="rmsd", lower_threshold=0.25, upper_threshold=3.0, normalization_type="linear"):
         """
         Initialize AF3 reward function
         
@@ -88,6 +88,12 @@ class af3_reward(Reward):
         self.metric_name = metric_name
         self.lower_threshold = lower_threshold
         self.upper_threshold = upper_threshold
+        self.normalization_type = normalization_type
+
+        if normalization_type == "exponential":
+            print(f"Using exponential reward normalization with lower_threshold: {lower_threshold} and upper_threshold: {upper_threshold}")
+            # Calculate the steepness to achieve min reward at upper_threshold
+            self.exp_steepness = -np.log(lower_threshold)
         
     def sequences_to_dataframe(self, sequences):
         """
@@ -114,8 +120,15 @@ class af3_reward(Reward):
         # Values between thresholds get scaled linearly
         between = (values >= self.lower_threshold) & (values <= self.upper_threshold)
         if np.any(between):
-            range_size = self.upper_threshold - self.lower_threshold
-            normalized[between] = 1.0 - (values[between] - self.lower_threshold) / range_size
+            if self.normalization_type == "linear":
+                # Linear scaling - same as before
+                range_size = self.upper_threshold - self.lower_threshold
+                normalized[between] = 1.0 - (values[between] - self.lower_threshold) / range_size
+            elif self.normalization_type == "exponential":
+                # Exponential scaling
+                normalized_values = (values[between] - self.lower_threshold) / (self.upper_threshold - self.lower_threshold)
+                # Apply exponential decay: e^(-k*x) - gives 1.0 at lower and 0 at upper threshold
+                normalized[between] = (np.exp(-self.exp_steepness * normalized_values) - np.exp(-self.exp_steepness)) / (1 - np.exp(-self.exp_steepness))
             
         return normalized
         
