@@ -118,7 +118,7 @@ class af3_reward(Reward):
             
         return normalized
         
-    def __call__(self, policy_output, feature_dict):
+    def __call__(self, step, policy_output, feature_dict, device):
         # Get the sequences from policy output
         sequences = self.get_sequences(policy_output)
         
@@ -126,7 +126,7 @@ class af3_reward(Reward):
         input_df = self.sequences_to_dataframe(sequences)
         # need to update the datadir based on the current iteration
         iter = policy_output["iter"] if "iter" in policy_output else 0
-        self.af3_config.datadir = os.path.join(self.af3_config.datadir, f"iter_{iter}")
+        self.af3_config.datadir = os.path.join(self.output_dir.datadir, f"af3_outputs/iter_{step}")
         # Create a temporary directory for AF3 outputs if needed
         os.makedirs(self.af3_config.datadir, exist_ok=True)
         
@@ -152,4 +152,11 @@ class af3_reward(Reward):
         # save a csv to self.af3_config.datadir
         input_df.to_csv(os.path.join(self.af3_config.datadir, f"af3_metrics.csv"), index=False)
         # Convert to tensor and return
-        return torch.tensor(normalized_scores, dtype=torch.float32)
+        reward = torch.tensor(normalized_scores, dtype=torch.float32)
+
+        # convert raw rmsds to a dictionary
+        metrics = {
+            f"{self.metric_name}_mean": result_df[self.metric_name].values.mean(),
+        }
+
+        return reward.to(device), metrics

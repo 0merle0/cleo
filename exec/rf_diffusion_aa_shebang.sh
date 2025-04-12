@@ -62,7 +62,7 @@ if [ -z "$APPTAINER_NAME" ]; then
             SIF_PATH=$(readlink -f "$SCRIPT_DIR/bakerlab_rf_diffusion_aa.sif" )
             if [ -z $SIF_PATH ] || [ ! -f $SIF_PATH ]; then
                 SIF_PATH=""
-                echo "You're at the IPD and something is wrong. The target of this symlink doesn't exist: $SCRIPT_DIR/bakerlab_rf_diffusion_aa.sif"
+                echo "You're at the IPD and something is wrong. The target of this symlink doesn't exist: $SCRIPT_DIR/mlfold.sif"
             else
                 echo "You're at the IPD and we found this sif: $SIF_PATH"
             fi
