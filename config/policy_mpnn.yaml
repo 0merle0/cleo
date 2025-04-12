@@ -12,7 +12,7 @@ eval: false
 checkpoint_path: null
 
 # -- MPNN params --
-model_type: protein_mpnn # protein_mpnn or ligand_mpnn
+model_type: ligand_mpnn # protein_mpnn or ligand_mpnn
 temperature: 1.0
 omit_AA: CX
 fixed_residues: "A29 A30 A31 A32 A60 A61 A62 A63 A100 A101 A102 A103"
