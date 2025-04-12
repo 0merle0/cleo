@@ -8,7 +8,7 @@ outdir: "./af3_output" # specific output directory, will be set in the pipeline 
 specs_json: /projects/ml/itopt/policy_mpnn/data/winAS_pnG_specs2_af3.json
 prefix: acyl  # Prefix for output files
 suffix: try2
-chunk: 1  # Number of sequences to process per job
+chunk: 8  # Number of sequences to process per job
 
 # For use in pipeline script
 skip_af3_jobs: False
@@ -37,9 +37,9 @@ ptm_json:
 # ===== Slurm Job Settings =====
 slurm:
   J: null
-  p: "gpu" # for the prediction jobs
-  gres: "gpu:a4000:1" # for the prediction jobs
-  submit: False
+  p: "gpu-train" # for the prediction jobs
+  gres: "gpu:h200:1" # for the prediction jobs
+  submit: True
   in_proc: false # submits jobs to slurm for prediction
   keep_logs: true
   pre_process_locally: True # run on the current node
