@@ -1,5 +1,5 @@
 run_name: test_PPO_2 # name for the run
-output_dir: /home/ssalike/Projects/itopt/policy_mpnn/ppo_tests/test3/
+output_dir: /home/ssalike/Projects/itopt/policy_mpnn/ppo_tests/test5/
 pdb: /projects/ml/itopt/policy_mpnn/data/pd_input_make2.pdb 
 batch_size: 4
 N_steps: 500
