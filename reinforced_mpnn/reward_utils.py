@@ -4,7 +4,6 @@ import torch
 from policy_utils import alphabet
 from af3_inference.af3_inference import main as af3_main
 import pdb as pdb_lib
-from af3_inference.af3_inference import main as af3_main
 import os 
 import pandas as pd
 
@@ -57,13 +56,13 @@ class EnrichAminoAcidReward(Reward):
     def __call__(self, step, policy_output, feature_dict, device):
         sampled_seqs = policy_output["S"]
         num_correct_aas = (sampled_seqs == self.AA_to_enrich_idx).float().sum(dim=-1)
-        batched_reward = num_correct_aas / sampled_seqs.shape[1]
+        reward = num_correct_aas / sampled_seqs.shape[1]
         
         metrics = {
             "num_correct_aas": num_correct_aas.detach().mean().cpu()
         }
 
-        return batched_reward.to(device), metrics
+        return reward.to(device), metrics
 
 
 class af3_reward(Reward):
