@@ -36,7 +36,7 @@ ptm_json:
 
 # ===== Slurm Job Settings =====
 slurm:
-  J: mpnn_policy_train
+  J: mpnn_ppo_train
   p: "gpu-train" # for the prediction jobs
   gres: "gpu:h200:1" # for the prediction jobs
   submit: True

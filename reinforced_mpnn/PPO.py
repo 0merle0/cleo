@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-
+import pdb as pdb_lib
 from policy_utils import PolicyMPNN, alphabet
 
 
@@ -102,79 +102,82 @@ class PPOPolicy(PolicyMPNN):
         pooled = h_V.mean(dim=1)  # [B, C]
         return self.value_net(pooled)
     
-    def collect_experience(self, step, n_rollouts, init_state, feature_dict):
-        """Collect experience for PPO using the current policy"""
+    def collect_experience(self, step, init_state, feature_dict):
+        """Collect experience for PPO using the current policy
+        
+        Processes a single batch of sequences and stores each sequence
+        as a separate experience in the buffer.
+        """
         self.buffer.clear()
         
         h_V_in, h_E_in, E_idx_in = init_state
         
-        for _ in range(n_rollouts):
-            # Make fresh copies before passing to rollout
-            h_V = h_V_in.clone().detach().requires_grad_(True)
-            h_E = h_E_in.clone().detach().requires_grad_(True)
-            
-            # Get sequence and probabilities
-            out = self.rollout(feature_dict, h_V, h_E, E_idx_in)
-            
-            # Calculate log probs for the sampled sequence
-            S = out["S"]
-            log_probs = out["log_probs"]
-            seq_mask = torch.nn.functional.one_hot(S, num_classes=len(alphabet)).float()
-            log_prob = (log_probs * seq_mask).sum(dim=(-1,-2))
-            
-            # Normalize log_prob by sequence length for better numerical stability
-            seq_length = S.shape[0] * S.shape[1]  # B x L
-            normalized_log_prob = log_prob / seq_length
-            
-            # Get value estimate
-            value = self.estimate_value(h_V)
-            
-            # Get reward - no gradient tracking needed
-            with torch.no_grad():
-                reward, _ = self.reward_fn(step, out, feature_dict, self.device)
-            
-            # Store experience - detach everything
+        # Make fresh copies before passing to rollout
+        h_V = h_V_in.clone().detach().requires_grad_(True)
+        h_E = h_E_in.clone().detach().requires_grad_(True)
+        
+        # Get sequence and probabilities
+        out = self.rollout(feature_dict, h_V, h_E, E_idx_in)
+        
+        # Get batched outputs
+        S = out["S"]  # Shape: [batch_size, L]
+        log_probs = out["log_probs"]  # Shape: [batch_size, L, n_tokens]
+        
+        # Calculate log probs for each sequence
+        seq_mask = torch.nn.functional.one_hot(S, num_classes=len(alphabet)).float()
+        batch_log_probs = (log_probs * seq_mask).sum(dim=(-1,-2))  # Shape: [batch_size]
+        
+        # Normalize by sequence length
+        seq_length = S.shape[1]  # L (sequence length)
+        normalized_log_probs = batch_log_probs / seq_length
+        
+        # Get value estimates
+        batch_values = self.estimate_value(h_V)  # Should return [batch_size, 1]
+        
+        # Get rewards - no gradient tracking needed
+        with torch.no_grad():
+            batch_rewards, _ = self.reward_fn(step, out, feature_dict, self.device)
+        
+        # Store each sequence in the batch as a separate experience
+        batch_size = S.shape[0]
+
+        # pdb_lib.set_trace()
+        for i in range(batch_size):
             self.buffer.add(
-                normalized_log_prob.detach(), 
-                value.detach(), 
-                reward.detach(), 
-                S.detach() if isinstance(S, torch.Tensor) else S,
-                (h_V.detach(), h_E.detach()),
-                done=True  # Assuming each rollout is a complete episode
+                normalized_log_probs[i].detach(),
+                batch_values[0].detach(),
+                batch_rewards[i].detach(),
+                S[i].detach() if isinstance(S, torch.Tensor) else S[i],
+                (h_V.detach(), h_E.detach()),  # Keep h_V sliced to maintain batch dim
+                done=True  # Each sequence is a complete "episode"
             )
         
         # Compute returns and advantages
+        # pdb_lib.set_trace()
         returns, advantages = self.compute_returns_and_advantages()
         
         return self.buffer.get_batch(), returns, advantages
         
     def compute_returns_and_advantages(self):
-        """Compute returns and advantages using GAE"""
-        # Convert lists to tensors
-        rewards = torch.stack(self.buffer.rewards)
-        values = torch.stack(self.buffer.values)
-        dones = torch.stack(self.buffer.dones) if self.buffer.dones else torch.zeros_like(rewards)
+        """Compute returns and advantages for protein sequences
         
-        # Initialize advantages and returns
-        advantages = torch.zeros_like(rewards).to(self.device)
-        returns = torch.zeros_like(rewards).to(self.device)
+        This function handles a single batch of sequences, treating each sequence
+        as an independent experience.
+        """
+        # Get rewards and values from buffer
+        rewards = torch.stack(self.buffer.rewards) # Shape: [batch_size]
+        values = torch.stack(self.buffer.values).squeeze() # Shape: [batch_size]
+              
+        # Simple advantage calculation - just reward minus value
+        returns = rewards  # For single-step environments, return = reward
+        advantages = rewards - values  # Simple advantage estimate
         
-        # GAE calculation
-        lastgaelam = 0
-        for t in reversed(range(len(rewards))):
-            if t == len(rewards) - 1:
-                nextnonterminal = 1.0  # Assume last state is non-terminal for simplicity
-                nextvalues = 0         # Terminal state value is 0
-            else:
-                nextnonterminal = 1.0 - dones[t + 1]  # Use next state's done flag
-                nextvalues = values[t + 1]
-                
-            delta = rewards[t] + self.gamma * nextvalues * nextnonterminal - values[t]
-            advantages[t] = lastgaelam = delta + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
-            
-        # Calculate returns
-        returns = advantages + values
+        # Normalize advantages (optional but recommended)
+        if hasattr(self, 'norm_adv') and self.norm_adv:
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         
+        # pdb_lib.set_trace()
+
         return returns, advantages
 
     def update_policy(self, batch, returns, advantages, init_state, feature_dict):
@@ -196,6 +199,7 @@ class PPOPolicy(PolicyMPNN):
         
         # Mini-batch updates
         batch_size = len(old_log_probs)
+        # pdb_lib.set_trace()
         
         _, _, E_idx_in = init_state
         
@@ -239,13 +243,17 @@ class PPOPolicy(PolicyMPNN):
                     S = mb_sequences[i]
                     
                     # Run forward pass with current policy
-                    out = self.rollout(feature_dict, h_V, h_E, E_idx_in)
+                    # pdb_lib.set_trace()
+                    feature_dict_mb = feature_dict.copy()
+                    feature_dict_mb["batch_size"] = 1
+                    feature_dict_mb["randn"] = torch.randn([1, feature_dict_mb["mask"].shape[1]], device=self.device)
+                    out = self.rollout(feature_dict_mb, h_V, h_E, E_idx_in)
                     
                     # Calculate log probs for the sequence
                     log_probs = out["log_probs"]
                     seq_mask = torch.nn.functional.one_hot(S, num_classes=len(alphabet)).float()
                     new_log_prob = (log_probs * seq_mask).sum(dim=(-1,-2))
-                    seq_length = S.shape[0] * S.shape[1]
+                    seq_length = S.shape[0] 
                     new_log_prob = new_log_prob / seq_length
                     
                     # Calculate entropy
@@ -358,11 +366,10 @@ class PPOPolicy(PolicyMPNN):
         # 2. Collect experience
         batch, returns, advantages = self.collect_experience(
             step=step,
-            n_rollouts=self.cfg.batch_size, 
             init_state=fresh_init_state,
             feature_dict=feature_dict
         )
-        
+        # pdb_lib.set_trace()
         # 3. Update policy and value networks using PPO
         metrics = self.update_policy(batch, returns, advantages, fresh_init_state, feature_dict)
         
