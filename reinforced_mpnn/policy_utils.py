@@ -214,7 +214,14 @@ class PolicyMPNN:
         return h_nn
 
 
-    def rollout(self, feature_dict, h_V, h_E, E_idx):
+    def rollout(self, 
+                feature_dict, 
+                h_V, 
+                h_E, 
+                E_idx,
+                decoding_order=None, # B, L
+                sampled_actions=None, # B, L
+            ):
         """
         Ripped from fused MPNN decoding, modified to allow grads to flow through this pass
         """
@@ -230,11 +237,11 @@ class PolicyMPNN:
         #chain_labels = feature_dict["chain_labels"] #[B,L] - integer labels for chain letters
         randn = feature_dict["randn"] #[B,L] - random numbers for decoding order; only the first entry is used since decoding within a batch needs to match for symmetry
         temperature = feature_dict["temperature"] #float - sampling temperature; prob = softmax(logits/temperature)
-        symmetry_list_of_lists = feature_dict["symmetry_residues"] #[[0, 1, 14], [10,11,14,15], [20, 21]] #indices to select X over length - L
-        symmetry_weights_list_of_lists = feature_dict["symmetry_weights"] #[[1.0, 1.0, 1.0], [-2.0,1.1,0.2,1.1], [2.3, 1.1]]
         B, L = S_true.shape
 
-        decoding_order = torch.argsort((chain_mask+0.0001)*(torch.abs(randn))) #[numbers will be smaller for places where chain_M = 0.0 and higher for places where chain_M = 1.0]
+        # else use the provided decoding order
+        if decoding_order is None:
+            decoding_order = torch.argsort((chain_mask+0.0001)*(torch.abs(randn))) #[numbers will be smaller for places where chain_M = 0.0 and higher for places where chain_M = 1.0]
 
         E_idx = E_idx.repeat(B_decoder, 1, 1)
         permutation_matrix_reverse = torch.nn.functional.one_hot(decoding_order, num_classes=L).float()
@@ -292,6 +299,8 @@ class PolicyMPNN:
 
 
             h_V_t = torch.gather(h_V_stack[-1], 1, t[:,None,None].repeat(1,1,h_V_stack[-1].shape[-1]))[:,0]
+
+
             logits = self.model.W_out(h_V_t) #[B,21]
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1) #[B,21]
 
@@ -300,7 +309,12 @@ class PolicyMPNN:
             probs = torch.nn.functional.softmax((logits.detach()+bias_t) / temperature, dim=-1) #[B,21]
 
             probs_sample = probs[:,:20]/torch.sum(probs[:,:20], dim=-1, keepdim=True) #hard omit X #[B,20]
-            S_t = torch.multinomial(probs_sample, 1)[:,0] #[B]
+            
+            # if you are already provided with sampled sequence just grab what you need
+            if sampled_actions is None:
+                S_t = torch.multinomial(probs_sample, 1)[:,0] #[B]
+            else:
+                S_t = sampled_actions[torch.arange(B), t]
 
             all_probs.scatter_(1, t[:,None,None].repeat(1,1,20), (chain_mask_t[:,None,None]*probs_sample[:,None,:]).float())
             all_log_probs.scatter_(1, t[:,None,None].repeat(1,1,21), (chain_mask_t[:,None,None]*log_probs[:,None,:]).float())
@@ -312,7 +326,13 @@ class PolicyMPNN:
                 S.scatter_(1, t[:,None], S_t[:,None])
 
 
-        output_dict = {"S": S, "sampling_probs": all_probs, "log_probs": all_log_probs, "decoding_order": decoding_order}
+        output_dict = {
+            "S": S, 
+            "sampling_probs": all_probs, 
+            "log_probs": all_log_probs, 
+            "decoding_order": decoding_order, 
+            "state_features": h_V_stack[-1].detach(),
+        }
 
         return output_dict
 
