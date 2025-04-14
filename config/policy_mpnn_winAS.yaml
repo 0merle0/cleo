@@ -19,7 +19,7 @@ fixed_residues: "A142 A17 A37 A99"
 
 
 reward:
-  _target_: reward_utils.af3_reward
+  _target_: reward_utils.af3_reward 
   output_dir: ${output_dir}
   af3_config: ${af3}
   metric_name: "acyl_rmsd_full_motif_best"  # Column name to use for reward
