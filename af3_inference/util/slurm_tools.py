@@ -120,7 +120,7 @@ def is_running(job_ids):
 
     return out
 
-def wait_for_jobs(job_ids, interval=60):
+def wait_for_jobs(job_ids, interval=10):
     '''Returns when all the SLURM jobs given in `job_ids` aren't running
     anymore.'''
     if job_ids:
