@@ -215,7 +215,7 @@ class PolicyMPNN:
         return h_nn
 
 
-    def rollout(self, feature_dict, h_V, h_E, E_idx):
+    def rollout(self, feature_dict, h_V, h_E, E_idx, decoding_order=None, sampled_actions=None):
         """
         Ripped from fused MPNN decoding, modified to allow grads to flow through this pass
         """
@@ -235,7 +235,8 @@ class PolicyMPNN:
         symmetry_weights_list_of_lists = feature_dict["symmetry_weights"] #[[1.0, 1.0, 1.0], [-2.0,1.1,0.2,1.1], [2.3, 1.1]]
         B, L = S_true.shape
 
-        decoding_order = torch.argsort((chain_mask+0.0001)*(torch.abs(randn))) #[numbers will be smaller for places where chain_M = 0.0 and higher for places where chain_M = 1.0]
+        if decoding_order is None:
+            decoding_order = torch.argsort((chain_mask+0.0001)*(torch.abs(randn))) #[numbers will be smaller for places where chain_mask is 0.0]
 
         E_idx = E_idx.repeat(B_decoder, 1, 1)
         permutation_matrix_reverse = torch.nn.functional.one_hot(decoding_order, num_classes=L).float()
@@ -301,7 +302,11 @@ class PolicyMPNN:
             probs = torch.nn.functional.softmax((logits.detach()+bias_t) / temperature, dim=-1) #[B,21]
 
             probs_sample = probs[:,:20]/torch.sum(probs[:,:20], dim=-1, keepdim=True) #hard omit X #[B,20]
-            S_t = torch.multinomial(probs_sample, 1)[:,0] #[B]
+
+            if sampled_actions is None:
+                 S_t = torch.multinomial(probs_sample, 1)[:,0] #[B]
+            else:
+                 S_t = sampled_actions[torch.arange(B), t]
 
             all_probs.scatter_(1, t[:,None,None].repeat(1,1,20), (chain_mask_t[:,None,None]*probs_sample[:,None,:]).float())
             all_log_probs.scatter_(1, t[:,None,None].repeat(1,1,21), (chain_mask_t[:,None,None]*log_probs[:,None,:]).float())

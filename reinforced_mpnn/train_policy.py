@@ -3,6 +3,7 @@ from omegaconf import OmegaConf
 import hydra
 from policy_utils import PolicyMPNN
 from PPO import PPOPolicy
+from GRPO import GRPO_singleprompt
 
 
 @hydra.main(version_base=None, config_path="../config")
@@ -18,6 +19,9 @@ def train_policy(cfg):
     if cfg.get('algorithm').lower() == 'ppo':
         print(f"Using PPO algorithm for training")
         policy = PPOPolicy(cfg)
+    elif cfg.get('algorithm').lower() == 'grpo':
+        print(f"Using GRPO algorithm for training")
+        policy = GRPO_singleprompt(cfg)
     else:
         print(f"Using REINFORCE algorithm for training")
         policy = PolicyMPNN(cfg)
