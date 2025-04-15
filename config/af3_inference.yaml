@@ -17,8 +17,8 @@ cautious: true
 # ===== Paths Configuration =====
 paths:
   process_script: "./util/process_csv_to_json.py"
-  af3_container: "/home/ssalike/apptainer/mlfold3.sif"
-  af3_script: "/home/ssalike/git/alphafold3/jake_run_af3.py"
+  af3_container: "/software/containers/users/ikalvet/mlfold3/mlfold3_01.sif"
+  af3_script: "/opt/alphafold3/run_alphafold_custom.py "
   apptainer: "/home/ssalike/git/datahub_latest/datahub_2025-02-15.sif"
 
 # ===== Ligand Configuration (will be loaded from specs_json)=====
