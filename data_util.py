@@ -112,6 +112,7 @@ class FragmentDataset(Dataset):
             mpnn_input_feat = mpnn_input_feat["h_V"][0]
 
             input_feat = torch.cat([esm_input_feat, mpnn_input_feat], dim=-1)
+        
 
         else:
             raise Exception(f"Input type not recognized: {self.cfg.input_type}")
