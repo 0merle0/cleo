@@ -1,0 +1,13 @@
+defaults:
+- super_base
+run_name: train_super_vae_latent_max_residues_per_patch_1
+data:
+  dataset_cfg:
+    input_type: vae_latent
+    input_shape: BD
+    path_to_embeddings: /net/tukwila/jgershon/projects/latent_diffusion/chai_preds_from_saman/latents/
+    subfolder: max_residues_per_patch_1
+model:
+  base_model:
+    model_type: mlp
+    input_dim: 1512

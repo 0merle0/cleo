@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=48g
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a4000:1
+#SBATCH --gres=gpu:a6000:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --ntasks=1
 #SBATCH --time=12:00:00
@@ -21,4 +21,4 @@ export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 
 source activate /home/jgershon/.conda/envs/cleo
 
-srun python train_surrogate.py -cn nonlinear_output_head
+srun python train_surrogate.py -cn train_super_sequence

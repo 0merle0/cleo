@@ -1,6 +1,6 @@
 defaults:
   - super_base
-run_name: 'train_super_sequence'
+run_name: 'train_super_sequence_baseline'
 data:
   dataset_cfg:
     input_type: 'sequence' # embedding, sequence, or fragment

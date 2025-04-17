@@ -112,7 +112,19 @@ class FragmentDataset(Dataset):
             mpnn_input_feat = mpnn_input_feat["h_V"][0]
 
             input_feat = torch.cat([esm_input_feat, mpnn_input_feat], dim=-1)
-        
+
+        elif self.cfg.input_type == "vae_latent":
+            latent_path = os.path.join(
+                self.cfg.path_to_embeddings, self.cfg.subfolder, f"{self.cfg.subfolder}_{name}.pt"
+            )
+            assert os.path.exists(
+                latent_path
+            ), f"VAE latent path does not exist: {latent_path}"
+            input_feat = torch.load(latent_path, map_location="cpu")
+            
+            # sample random index from the latent
+            index_to_use = torch.randperm(input_feat.shape[0])[0]
+            input_feat = input_feat[index_to_use]
 
         else:
             raise Exception(f"Input type not recognized: {self.cfg.input_type}")
