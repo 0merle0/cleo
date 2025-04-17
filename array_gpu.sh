@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p gpu
 #SBATCH --mem=8g
-#SBATCH --gres=gpu:a4000:1
+#SBATCH --gres=gpu:a6000:1
 #SBATCH -c 1
 #SBATCH -o logs/ajob_%j_%a.out
 #SBATCH -J ajob
