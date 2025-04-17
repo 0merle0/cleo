@@ -1,0 +1,37 @@
+run_name: test_GRPO # name for the run
+output_dir: /home/ssalike/Projects/itopt/policy_mpnn/ppo_tests/test6_grpo/
+pdb: /projects/ml/itopt/policy_mpnn/data/pd_input_make2.pdb 
+batch_size: 16
+N_steps: 500
+algorithm: grpo
+lr: 1e-4
+checkpoint_every_n_steps: 10
+eval: false
+checkpoint_path: null
+
+
+# -- PPO hyperparameters --
+clip_param: 0.2         # PPO clipping parameter
+value_coef: 0.5         # Value loss coefficient
+entropy_coef: 0.01      # Entropy coefficient
+max_grad_norm: 0.5      # Max gradient norm for clipping
+ppo_epochs: 4           # Number of PPO epochs
+mini_batch_size: 2      # PPO mini-batch size (reduced for better stability)
+target_kl: 0.015        # Target KL divergence for early stopping
+gamma: 0.99             # Discount factor
+gae_lambda: 0.95        # GAE parameter (renamed from lambda_)
+norm_adv: true          # Normalize advantages per minibatch
+clip_vloss: true        # Use clipped value loss
+anneal_lr: false        # Optional: Enable learning rate annealing
+
+
+# -- MPNN params --
+model_type: ligand_mpnn # protein_mpnn or ligand_mpnn
+temperature: 1.0
+omit_AA: CX
+fixed_residues: "A142 A17 A37 A99"
+
+# -- reward function --
+reward:
+  _target_: reward_utils.EnrichAminoAcidReward
+  AA_to_enrich: E

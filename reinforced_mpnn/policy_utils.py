@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 import time
 sys.path.append("/software/lab/mpnn/fused_mpnn")
-
+import pdb as pdb_lib
 from data_utils import featurize, parse_PDB
 from model_utils import ProteinMPNN
 import hydra
@@ -49,6 +49,7 @@ class PolicyMPNN:
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
 
+        # pdb_lib.set_trace()
         self.reward_fn = hydra.utils.instantiate(cfg.reward)
 
         # checkpointing utils
