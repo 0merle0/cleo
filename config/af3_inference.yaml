@@ -3,7 +3,7 @@
 # ===== Output Configuration =====
 
 input_csv: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/af3_standalone/placeholder.csv"  # CSV with design_name, protein_sequence and optionally catres_design, catres_input columns
-datadir: "/home/ssalike/Projects/acyl_transferase_SM/penicillin/trash/cleo_tests6/"
+datadir: null
 outdir: "./af3_output" # specific output directory, will be set in the pipeline script
 specs_json: /projects/ml/itopt/policy_mpnn/data/winAS_pnG_specs2_af3.json
 prefix: acyl  # Prefix for output files
@@ -19,7 +19,7 @@ paths:
   process_script: "./util/process_csv_to_json.py"
   af3_container: "/software/containers/users/ikalvet/mlfold3/mlfold3_01.sif"
   af3_script: "/opt/alphafold3/run_alphafold_custom.py "
-  apptainer: "/home/ssalike/git/datahub_latest/datahub_2025-02-15.sif"
+  apptainer: "/projects/ml/itopt/policy_mpnn/containers/datahub_2025-02-15.sif"
 
 # ===== Ligand Configuration (will be loaded from specs_json)=====
 ligand_data:
