@@ -4,11 +4,11 @@ import torch
 import numpy as np
 from tqdm import tqdm
 import time
+import hydra
+
 sys.path.append("/software/lab/mpnn/fused_mpnn")
-import pdb as pdb_lib
 from data_utils import featurize, parse_PDB
 from model_utils import ProteinMPNN
-import hydra
 
 PROTEIN_MPNN_CKPT_PATH = "/databases/mpnn/vanilla_model_weights/v_48_020.pt"
 LIGAND_MPNN_CKPT_PATH = "/databases/mpnn/ligand_mpnn_model_weights/s25_r010_t300_p.pt"
@@ -49,7 +49,7 @@ class PolicyMPNN:
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
 
-        # pdb_lib.set_trace()
+        # get reward function
         self.reward_fn = hydra.utils.instantiate(cfg.reward)
 
         # checkpointing utils
@@ -183,7 +183,6 @@ class PolicyMPNN:
         feature_dict["randn"] = torch.randn([feature_dict["batch_size"], feature_dict["mask"].shape[1]], device=self.device)
 
         return feature_dict
-
 
     def encode_initial_state(self, feature_dict):
         """

@@ -1,3 +1,4 @@
+import sys, os, copy
 from abc import ABC, abstractmethod
 import numpy as np
 import torch
@@ -6,6 +7,8 @@ from af3_inference.af3_inference import main as af3_main
 import pdb as pdb_lib
 import os 
 import pandas as pd
+from omegaconf import OmegaConf
+
 
 class Reward(ABC):
     """
@@ -59,12 +62,89 @@ class EnrichAminoAcidReward(Reward):
         reward = num_correct_aas / sampled_seqs.shape[1]
         
         metrics = {
-            "num_correct_aas": num_correct_aas.detach().mean().cpu()
+            "num_correct_aas": num_correct_aas.mean().cpu().item()
         }
 
         return reward.to(device), metrics
 
 
+class PenicillinPipelineReward(Reward):
+    """
+        Penicillin active site, using af3 RMSD as reward
+    """
+
+    def __init__(self, pipeline_config_path, output_dir, rmsd_ub=10.0, rmsd_lb=0.0):
+
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
+        # if we used an apptainer we would could install cifutils and datahub directly
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/cifutils/src")
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/datahub/src")        
+        os.environ["PYTHONPATH"] = ":" # pipeline will freak if this is not set
+
+        from pipelines.pipeline import main as run_pipeline
+
+        self.run_pipeline = run_pipeline
+        self.pipeline_config = OmegaConf.load(pipeline_config_path)
+        self.output_dir = output_dir
+        self.rmsd_ub = rmsd_ub
+        self.rmsd_lb = rmsd_lb
+
+    def get_input_df(self, sequences):
+        """
+        Convert list of sequences to DataFrame format required by AF3
+        """
+
+        df = pd.DataFrame(
+            {
+                "sequence": sequences,
+                "name": [f"seq_{i:04}" for i in range(len(sequences))],
+                "origin.path": [f"seq_{i:04}.path" for i in range(len(sequences))],
+            }
+        )
+
+        return df
+
+    @torch.no_grad()
+    def __call__(self, step, policy_output, feature_dict, device):
+
+        config = copy.deepcopy(self.pipeline_config)
+        config.rundir = os.path.join(self.output_dir, f"pipeline_output_iter_{step:04}")
+
+        # Get the sequences from policy output
+        sequences = self.get_sequences(policy_output)
+        
+        # Create a DataFrame for AF3
+        df_input = self.get_input_df(sequences)
+
+        # Run the pipeline
+        df_out = self.run_pipeline(df_input, config)
+
+        # Reward shaping
+        as_rmsd = torch.tensor(df_out["alignment.motif_allatom_align.motif_allatom_rmsd"].tolist())
+        iptm = torch.tensor(df_out["af3_iptm"].tolist())
+
+        # Normalize RMSD to [0,1] range
+        as_rmsd_clamped = torch.clamp(as_rmsd, min=self.rmsd_lb, max=self.rmsd_ub)
+        rmsd_reward =  1 - (as_rmsd_clamped / (self.rmsd_ub - self.rmsd_lb))
+
+        # Combine rmsd and iptm rewards
+        reward = rmsd_reward * iptm
+
+        metrics = {
+            "rmsd_mean": as_rmsd.mean().cpu().item(),
+            "rmsd_min": as_rmsd.min().cpu().item(),
+            "rmsd_max": as_rmsd.max().cpu().item(),
+            "iptm_mean": iptm.mean().cpu().item(),
+            "iptm_min": iptm.min().cpu().item(),
+            "iptm_max": iptm.max().cpu().item(),
+        }
+
+        return reward.to(device), metrics
+
+
+
+
+# AF3 reward pre-pipeline
 class af3_reward(Reward):
     """
         Reward based on AlphaFold3 score
@@ -100,7 +180,7 @@ class af3_reward(Reward):
         """
 
         df = pd.DataFrame({
-            'name': [f'seq_{i}' for i in range(len(sequences))],
+            'name': [f'seq_{i:04}' for i in range(len(sequences))],
             'seq': sequences
         })
         return df
@@ -173,3 +253,6 @@ class af3_reward(Reward):
         }
 
         return reward.to(device), metrics
+
+
+
