@@ -1,5 +1,5 @@
-run_name: test_GRPO # name for the run
-output_dir: /home/ssalike/Projects/itopt/policy_mpnn/ppo_tests/test6_grpo/
+run_name: GRPO_enrichAA_base_r1 # name for the run
+output_dir: /home/ssalike/Projects/itopt/policy_mpnn/ppo_tests/test7_grpo/
 pdb: /projects/ml/itopt/policy_mpnn/data/pd_input_make2.pdb 
 batch_size: 16
 N_steps: 500
@@ -15,8 +15,8 @@ clip_param: 0.2         # PPO clipping parameter
 value_coef: 0.5         # Value loss coefficient
 entropy_coef: 0.01      # Entropy coefficient
 max_grad_norm: 0.5      # Max gradient norm for clipping
-ppo_epochs: 4           # Number of PPO epochs
-mini_batch_size: 2      # PPO mini-batch size (reduced for better stability)
+ppo_epochs: 8           # Number of PPO epochs
+mini_batch_size: 4      # PPO mini-batch size (reduced for better stability)
 target_kl: 0.015        # Target KL divergence for early stopping
 gamma: 0.99             # Discount factor
 gae_lambda: 0.95        # GAE parameter (renamed from lambda_)

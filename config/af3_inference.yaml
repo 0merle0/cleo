@@ -39,7 +39,7 @@ slurm:
   J: mpnn_ppo_train
   p: "gpu-train" # for the prediction jobs
   gres: "gpu:h200:1" # for the prediction jobs
-  submit: True
+  submit: true
   in_proc: false # submits jobs to slurm for prediction
   keep_logs: true
   pre_process_locally: True # run on the current node

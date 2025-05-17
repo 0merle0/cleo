@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import pdb as pdb_lib
 from policy_utils import PolicyMPNN, alphabet
+import wandb
 
 class ExperienceBuffer:
     """Storage for PPO experience collection"""
@@ -101,11 +102,16 @@ class GRPO_singleprompt(PolicyMPNN):
         
         # Normalize by sequence length
         seq_length = S.shape[1]  # L (sequence length)
-        normalized_log_probs = batch_log_probs / seq_length
+        normalized_log_probs = batch_log_probs 
         
         # Get rewards - no gradient tracking needed
         with torch.no_grad():
-            batch_rewards, _ = self.reward_fn(step, out, feature_dict, self.device)
+            batch_rewards, reward_metrics = self.reward_fn(step, out, feature_dict, self.device)
+            
+            # Log reward metrics to wandb
+            if wandb.run and reward_metrics:
+                self.aux_metrics = {f"reward_metrics/{k}": v for k, v in reward_metrics.items()}
+
         
         # Store each sequence in the batch as a separate experience
         batch_size = S.shape[0]
@@ -128,20 +134,26 @@ class GRPO_singleprompt(PolicyMPNN):
         return self.buffer.get_batch(), returns, advantages
         
     def compute_returns_and_advantages(self):
-        """Compute returns and advantages for protein sequences
-        
-        This function handles a single batch of sequences, treating each sequence
-        as an independent experience.
+        """
+        Compute returns and advantages for protein sequences
         """
         # Get rewards and values from buffer
         rewards = torch.stack(self.buffer.rewards) # Shape: [batch_size]
         returns = rewards  # For single-step environments, return = reward
         
-        # pdb_lib.set_trace()
         # Calculate advantages as normalized rewards
         advantages = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
         
-        # pdb_lib.set_trace()
+        # Log reward distribution to wandb
+        if wandb.run:
+            # Note: Removed the wandb.log call here as it will be handled in train_step
+            # This ensures consistent step counting
+            self.reward_stats = {
+                "rewards/mean": rewards.mean().item(),
+                "rewards/std": rewards.std().item(),
+                "rewards/min": rewards.min().item(),
+                "rewards/max": rewards.max().item(),
+            }
 
         return returns, advantages
 
@@ -206,7 +218,7 @@ class GRPO_singleprompt(PolicyMPNN):
                     # pdb_lib.set_trace()
                     feature_dict_mb = feature_dict.copy()
                     feature_dict_mb["batch_size"] = 1
-                    feature_dict_mb["randn"] = torch.randn([1, feature_dict_mb["mask"].shape[1]], device=self.device)
+                    # feature_dict_mb["randn"] = torch.randn([1, feature_dict_mb["mask"].shape[1]], device=self.device)
                     decoding_order_sampled = mb_decoding_order[i].unsqueeze(0)
                     sampled_actions = S.unsqueeze(0)
                     # pdb_lib.set_trace()
@@ -217,7 +229,7 @@ class GRPO_singleprompt(PolicyMPNN):
                     seq_mask = torch.nn.functional.one_hot(S, num_classes=len(alphabet)).float()
                     new_log_prob = (log_probs * seq_mask).sum(dim=(-1,-2))
                     seq_length = S.shape[0] 
-                    new_log_prob = new_log_prob / seq_length
+                    new_log_prob = new_log_prob 
                     
                     # Calculate entropy
                     probs = torch.exp(log_probs)
@@ -246,7 +258,7 @@ class GRPO_singleprompt(PolicyMPNN):
                         mb_approx_kls.append(approx_kl)
                     
                     # Combined loss
-                    loss = pg_loss - self.entropy_coef * entropy
+                    loss = pg_loss - self.entropy_coef * entropy 
                     
                     # Scale the loss by minibatch size for better stability
                     loss = loss / len(mb_indices)
@@ -289,6 +301,15 @@ class GRPO_singleprompt(PolicyMPNN):
             'clipfrac': np.mean(clipfracs)
         }
         
+        # Store policy metrics for logging in train_step
+        self.policy_metrics = {
+            'policy/policy_loss': metrics['policy_loss'],
+            'policy/entropy': metrics['entropy'],
+            'policy/kl_divergence': metrics['kl'],
+            'policy/clip_fraction': metrics['clipfrac'],
+            'policy/total_loss': metrics['total_loss']
+        }
+        
         return metrics
 
     def train_step(self, step, init_state, feature_dict):
@@ -320,5 +341,22 @@ class GRPO_singleprompt(PolicyMPNN):
         
         to_log.update(metrics)
         to_log['reward'] = avg_reward
+        
+        # 5. Log all metrics to wandb with the same step value
+        if wandb.run:
+            # Combine all metrics
+            wandb_log = {}
+            # Add reward stats (previously logged in compute_returns_and_advantages)
+            if hasattr(self, 'aux_metrics'):
+                wandb_log.update(self.aux_metrics)
+            if hasattr(self, 'reward_stats'):
+                wandb_log.update(self.reward_stats)
+            # Add policy metrics (previously logged in update_policy)
+            if hasattr(self, 'policy_metrics'):
+                wandb_log.update(self.policy_metrics)
+            # Add current metrics
+            wandb_log['reward'] = avg_reward
+            # Log everything at once with the same step
+            wandb.log(wandb_log, step=step)
         
         return to_log

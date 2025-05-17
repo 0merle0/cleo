@@ -2,8 +2,8 @@ defaults:
   - af3_inference@af3 
 
 
-run_name: test_PPO_af3 # name for the run
-output_dir: /home/ssalike/Projects/itopt/policy_mpnn/grpo_tests/af3_test1/
+run_name: GRPO_af3_r1_lr1e4_batch16_linearr_clip02 # name for the run
+output_dir: /home/ssalike/Projects/itopt/policy_mpnn/grpo_tests/af3_wconf_r1_lr5e5/
 pdb: /projects/ml/itopt/policy_mpnn/data/pd_input_make2.pdb 
 batch_size: 16
 N_steps: 50
@@ -12,6 +12,7 @@ lr: 1e-4
 checkpoint_every_n_steps: 10
 eval: false
 checkpoint_path: null
+wandb_mode: online
 
 
 # -- PPO hyperparameters --
@@ -20,7 +21,7 @@ value_coef: 0.5         # Value loss coefficient
 entropy_coef: 0.01      # Entropy coefficient
 max_grad_norm: 0.5      # Max gradient norm for clipping
 ppo_epochs: 4           # Number of PPO epochs
-mini_batch_size: 2      # PPO mini-batch size (reduced for better stability)
+mini_batch_size: 8      # PPO mini-batch size (reduced for better stability)
 target_kl: 0.015        # Target KL divergence for early stopping
 gamma: 0.99             # Discount factor
 gae_lambda: 0.95        # GAE parameter (renamed from lambda_)
@@ -32,7 +33,7 @@ anneal_lr: false        # Optional: Enable learning rate annealing
 # -- MPNN params --
 model_type: ligand_mpnn # protein_mpnn or ligand_mpnn
 temperature: 1.0
-omit_AA: CX
+omit_AA: null
 fixed_residues: "A142 A17 A37 A99"
 
 # -- reward function --
@@ -41,6 +42,7 @@ reward:
   output_dir: ${output_dir}
   af3_config: ${af3}
   metric_name: "acyl_rmsd_full_motif_best"  # Column name to use for reward
+  confidence_normalize_metric: "acyl_iptm"
   lower_threshold: 0.01  # Values below this get reward 1.0
   upper_threshold: 10  # Values above this get reward 0.0
-  normalization_type: "exponential"
+  normalization_type: "linear"
