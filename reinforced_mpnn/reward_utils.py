@@ -72,7 +72,7 @@ class af3_reward(Reward):
         Uses configurable thresholds to map metric values to the [0,1] range.
         For metrics like RMSD where lower is better.
     """
-    def __init__(self, output_dir, af3_config, metric_name="rmsd", lower_threshold=0.25, upper_threshold=3.0, normalization_type="linear"):
+    def __init__(self, output_dir, af3_config, metric_name="rmsd", confidence_normalize_metric=None,lower_threshold=0.25, upper_threshold=3.0, normalization_type="linear"):
         """
         Initialize AF3 reward function
         
@@ -88,6 +88,7 @@ class af3_reward(Reward):
         self.lower_threshold = lower_threshold
         self.upper_threshold = upper_threshold
         self.normalization_type = normalization_type
+        self.confidence_normalize_metric = confidence_normalize_metric 
 
         if normalization_type == "exponential":
             print(f"Using exponential reward normalization with lower_threshold: {lower_threshold} and upper_threshold: {upper_threshold}")
@@ -161,15 +162,27 @@ class af3_reward(Reward):
         
         # Normalize to [0,1] range
         normalized_scores = self.normalize_metric(metric_values)
+
+        if self.confidence_normalize_metric:
+            conf_values = result_df[self.confidence_normalize_metric].values
+            # pdb_lib.set_trace()
+            normalized_scores = normalized_scores * conf_values
+
         input_df['reward'] = normalized_scores
         # save a csv to self.af3_config.datadir
         input_df.to_csv(os.path.join(self.af3_config.datadir, f"af3_metrics.csv"), index=False)
         # Convert to tensor and return
         reward = torch.tensor(normalized_scores, dtype=torch.float32)
-
         # convert raw rmsds to a dictionary
         metrics = {
             f"{self.metric_name}_mean": result_df[self.metric_name].values.mean(),
+            f"{self.metric_name}_std": result_df[self.metric_name].values.std(),
+            f"{self.metric_name}_min": result_df[self.metric_name].values.min(),
+            f"{self.metric_name}_max": result_df[self.metric_name].values.max(),
+            f"{self.confidence_normalize_metric}_mean": conf_values.mean() if self.confidence_normalize_metric else None,
+            f"{self.confidence_normalize_metric}_std": conf_values.std() if self.confidence_normalize_metric else None,
+            f"{self.confidence_normalize_metric}_min": conf_values.min() if self.confidence_normalize_metric else None,
+            f"{self.confidence_normalize_metric}_max": conf_values.max() if self.confidence_normalize_metric else None
         }
 
         return reward.to(device), metrics
