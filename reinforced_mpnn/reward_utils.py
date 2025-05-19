@@ -68,12 +68,12 @@ class EnrichAminoAcidReward(Reward):
         return reward.to(device), metrics
 
 
-class PenicillinPipelineReward(Reward):
+class AF3RMSDPipelineReward(Reward):
     """
         Penicillin active site, using af3 RMSD as reward
     """
 
-    def __init__(self, pipeline_config_path, output_dir, rmsd_ub=10.0, rmsd_lb=0.0):
+    def __init__(self, pipeline_config_path, output_dir, rmsd_ub=10.0, rmsd_lb=0.0, fragment_configs=None):
 
         sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
         # if we used an apptainer we would could install cifutils and datahub directly
@@ -88,6 +88,7 @@ class PenicillinPipelineReward(Reward):
         self.output_dir = output_dir
         self.rmsd_ub = rmsd_ub
         self.rmsd_lb = rmsd_lb
+        self.fragment_configs = fragment_configs
 
     def get_input_df(self, sequences):
         """
@@ -112,9 +113,14 @@ class PenicillinPipelineReward(Reward):
 
         # Get the sequences from policy output
         sequences = self.get_sequences(policy_output)
+
+        if self.fragment_configs is not None:
+            sequences = self.get_combos(sequences, self.fragment_configs)
+            pass
         
         # Create a DataFrame for AF3
         df_input = self.get_input_df(sequences)
+        
 
         # Run the pipeline
         df_out = self.run_pipeline(df_input, config)
