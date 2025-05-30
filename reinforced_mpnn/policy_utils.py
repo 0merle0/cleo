@@ -358,7 +358,7 @@ class PolicyMPNN:
         seq_mask = torch.nn.functional.one_hot(out["S"], num_classes=len(alphabet)).float()
 
         # apply mask and take sum over each seq in the batch
-        batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1,-2))
+        batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1))
 
         batched_reward, metrics = self.reward_fn(step, out, feature_dict, self.device)
         to_log.update(metrics)
@@ -370,8 +370,13 @@ class PolicyMPNN:
         # baseline subtracted reward
         baseline_subtracted_reward = batched_reward - baseline
 
-        # compute loss
-        loss = -(batched_log_probs * baseline_subtracted_reward).mean()
+        # batched_log_probs [B, L]
+        if baseline_subtracted_reward.shape != batched_log_probs.shape:
+            # if reward is not per residue, we need to sum over log probs
+            loss = -(batched_log_probs.sum(dim=-1) * baseline_subtracted_reward).mean()
+        else:
+            # else reward is per residue, so apply per residue reward and then sum
+            loss = -(batched_log_probs * baseline_subtracted_reward).sum(dim=-1).mean()
 
         # optimizer update
         loss.backward()

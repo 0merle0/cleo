@@ -3,11 +3,13 @@ from abc import ABC, abstractmethod
 import numpy as np
 import torch
 from policy_utils import alphabet
-from af3_inference.af3_inference import main as af3_main
+# from af3_inference.af3_inference import main as af3_main
 import pdb as pdb_lib
 import os 
 import pandas as pd
 from omegaconf import OmegaConf
+
+from fragment_utils import make_fragment_dict, sample_sequences, get_fragment_rewards
 
 
 class Reward(ABC):
@@ -68,12 +70,12 @@ class EnrichAminoAcidReward(Reward):
         return reward.to(device), metrics
 
 
-class PenicillinPipelineReward(Reward):
+class AF3RMSDPipelineReward(Reward):
     """
         Penicillin active site, using af3 RMSD as reward
     """
 
-    def __init__(self, pipeline_config_path, output_dir, rmsd_ub=10.0, rmsd_lb=0.0):
+    def __init__(self, pipeline_config_path, output_dir, rmsd_ub=10.0, rmsd_lb=0.0, frag_cfg=None):
 
         sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
         # if we used an apptainer we would could install cifutils and datahub directly
@@ -88,6 +90,29 @@ class PenicillinPipelineReward(Reward):
         self.output_dir = output_dir
         self.rmsd_ub = rmsd_ub
         self.rmsd_lb = rmsd_lb
+        self.frag_cfg = frag_cfg
+
+        # make subdirectory for pipeline output
+        pipeline_output_dir = os.path.join(self.output_dir, "pipeline_output")
+        os.makedirs(pipeline_output_dir, exist_ok=True)
+    
+    def get_sequences(self, policy_output, chain_mask=None):
+        """
+            Return list of sampled sequences
+        """
+        sampled_sequences = policy_output["S"]
+
+        if chain_mask is not None:
+            sampled_sequences = sampled_sequences[:, chain_mask]
+
+        B = sampled_sequences.shape[0]
+        
+        sequences = [] 
+        for i in range(B):
+            seq = sampled_sequences[i]
+            seq_str = "".join([alphabet[int(s)] for s in seq])
+            sequences.append(seq_str)
+        return sequences
 
     def get_input_df(self, sequences):
         """
@@ -108,13 +133,29 @@ class PenicillinPipelineReward(Reward):
     def __call__(self, step, policy_output, feature_dict, device):
 
         config = copy.deepcopy(self.pipeline_config)
-        config.rundir = os.path.join(self.output_dir, f"pipeline_output_iter_{step:04}")
+        config.rundir = os.path.join(
+            self.output_dir, 
+            "pipeline_output", 
+            f"pipeline_output_iter_{step:04}"
+        )
+
+        # Get the chain mask if available
+        # just take sequences from the first chain
+        chain_mask = feature_dict["chain_labels"]==0 # [1, L]
+        chain_mask = chain_mask[0] # [L,]
 
         # Get the sequences from policy output
-        sequences = self.get_sequences(policy_output)
+        sequences = self.get_sequences(policy_output, chain_mask=chain_mask)
+
+        if self.frag_cfg is not None:
+            fragment_dict = make_fragment_dict(sequences, self.frag_cfg.fragment_bounds)
+            samples = sample_sequences(fragment_dict, self.frag_cfg.sample_size, self.frag_cfg.min_sample)
+            names = [x[0] for x in samples]
+            sequences = [x[1] for x in samples]
         
         # Create a DataFrame for AF3
         df_input = self.get_input_df(sequences)
+        
 
         # Run the pipeline
         df_out = self.run_pipeline(df_input, config)
@@ -130,6 +171,14 @@ class PenicillinPipelineReward(Reward):
         # Combine rmsd and iptm rewards
         reward = rmsd_reward * iptm
 
+        if self.frag_cfg is not None:
+            reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
+
+        # make sure reward is properly padded when designing multiple chains
+        if len(reward.shape) == 2 and reward.shape[1] != chain_mask.shape[0]:
+            padding = torch.ones(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
+            reward = torch.cat([reward, padding], dim=1)
+
         metrics = {
             "rmsd_mean": as_rmsd.mean().cpu().item(),
             "rmsd_min": as_rmsd.min().cpu().item(),
@@ -140,6 +189,10 @@ class PenicillinPipelineReward(Reward):
         }
 
         return reward.to(device), metrics
+
+
+
+
 
 
 
