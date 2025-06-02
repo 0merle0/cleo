@@ -8,6 +8,7 @@ import pdb as pdb_lib
 import os 
 import pandas as pd
 from omegaconf import OmegaConf
+import subprocess
 
 from fragment_utils import make_fragment_dict, sample_sequences, get_fragment_rewards
 
@@ -75,7 +76,15 @@ class AF3RMSDPipelineReward(Reward):
         Penicillin active site, using af3 RMSD as reward
     """
 
-    def __init__(self, pipeline_config_path, output_dir, rmsd_ub=10.0, rmsd_lb=0.0, frag_cfg=None):
+    def __init__(
+            self, 
+            pipeline_config_path, 
+            output_dir, 
+            rmsd_ub=10.0, 
+            rmsd_lb=0.0, 
+            frag_cfg=None, 
+            max_retries=3
+        ):
 
         sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
         # if we used an apptainer we would could install cifutils and datahub directly
@@ -91,6 +100,7 @@ class AF3RMSDPipelineReward(Reward):
         self.rmsd_ub = rmsd_ub
         self.rmsd_lb = rmsd_lb
         self.frag_cfg = frag_cfg
+        self.max_retries = max_retries
 
         # make subdirectory for pipeline output
         pipeline_output_dir = os.path.join(self.output_dir, "pipeline_output")
@@ -138,8 +148,7 @@ class AF3RMSDPipelineReward(Reward):
             "pipeline_output", 
             f"pipeline_output_iter_{step:04}"
         )
-
-        # Get the chain mask if available
+        
         # just take sequences from the first chain
         chain_mask = feature_dict["chain_labels"]==0 # [1, L]
         chain_mask = chain_mask[0] # [L,]
@@ -155,10 +164,22 @@ class AF3RMSDPipelineReward(Reward):
         
         # Create a DataFrame for AF3
         df_input = self.get_input_df(sequences)
-        
 
-        # Run the pipeline
         df_out = self.run_pipeline(df_input, config)
+
+        # Run the pipeline with retries
+        # num_retries = 0
+        # while num_retries < self.max_retries:
+        #     try:
+        #         break
+        #     except Exception as e:
+        #         print(f"Pipeline run failed on attempt {num_retries + 1}:\n {e}")
+        #         num_retries += 1
+        #         continue
+
+        # add code to delete af3 outputs to save space
+        af3_out_dir = os.path.join(config.rundir, "af3/outputs")
+        subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
 
         # Reward shaping
         as_rmsd = torch.tensor(df_out["alignment.motif_allatom_align.motif_allatom_rmsd"].tolist())
@@ -189,9 +210,6 @@ class AF3RMSDPipelineReward(Reward):
         }
 
         return reward.to(device), metrics
-
-
-
 
 
 

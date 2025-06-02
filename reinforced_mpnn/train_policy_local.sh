@@ -5,4 +5,4 @@ export HYDRA_FULL_ERROR=1
 
 # apptainer -s run --nv /software/containers/mlfold.sif train_policy.py -cn penicillin_vanilla_pg
 
-source activate newlatent; python train_policy.py -cn penicillin_vanilla_pg
+source activate newlatent; python train_policy.py -cn protease_vanilla_pg
