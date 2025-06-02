@@ -1,0 +1,6 @@
+standard_curve_path: "/projects/ml/itopt/neo2_standards/241202_standard_curves_jake_mod.json"
+mscarlett_threshold: 0.025
+cv_threshold: 1
+rate_stdev_from_background: 3
+fit_time_interval_low: 0
+fit_time_interval_high: 900
