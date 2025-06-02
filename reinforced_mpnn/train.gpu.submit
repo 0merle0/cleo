@@ -6,13 +6,13 @@
 #SBATCH -J itopt
 #SBATCH --mem=64g
 #SBATCH --ntasks=1
-#SBATCH --time=7-00:00:00
+#SBATCH --time=4-00:00:00
 #SBATCH -o logs/logs_%j.out
 
 
 ### change 5-digit MASTER_PORT as you wish, slurm will raise Error if duplicated with others
 ### change WORLD_SIZE as gpus/node * num_nodes
-export MASTER_PORT=48478
+export MASTER_PORT=49221
 
 ### get the first node name as master address - customized for vgg slurm
 ### e.g. master(gnodee[2-5],gnoded1) == gnodee2
@@ -21,4 +21,10 @@ export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export PYTHONPATH=$PYTHONPATH:/home/jgershon/git/cleo/reinforced_mpnn/:/home/jgershon/git/cleo/
 export HYDRA_FULL_ERROR=1
 
-source activate newlatent; python train_policy.py -cn heme_vanilla_pg
+source activate newlatent; python train_policy.py -cn protease_vanilla_pg
+
+
+# source activate newlatent; python train_policy.py -cn penicillin_vanilla_pg \
+#                                                     temperature=0.5 \
+#                                                     run_name=penicillin_vanilla_pg_fragmented_T0.5 \
+#                                                     output_dir=/home/jgershon/projects/itopt/policy_mpnn/penicillin_vanilla_pg_fragmented_T0.5
