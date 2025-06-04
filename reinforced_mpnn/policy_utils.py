@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 import time
 import hydra
+from omegaconf import OmegaConf
 
 sys.path.append("/software/lab/mpnn/fused_mpnn")
 from data_utils import featurize, parse_PDB
@@ -30,7 +31,11 @@ class PolicyMPNN:
         self.run_name = cfg.run_name
         self.output_dir = cfg.output_dir
         
+        # create output directory if it does not exist
         os.makedirs(self.output_dir, exist_ok=True)
+
+        # save config in output directory
+        OmegaConf.save(config=cfg, f=os.path.join(self.output_dir, f"{self.run_name}_config.yaml"))
 
         # log reward history
         self.reward_history = [torch.tensor(0., dtype=torch.float32, device=self.device)]
