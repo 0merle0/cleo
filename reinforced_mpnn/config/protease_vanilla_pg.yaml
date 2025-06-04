@@ -1,5 +1,5 @@
-run_name: protease_vanilla_pg # name for the run
-output_dir: /home/jgershon/projects/itopt/policy_mpnn/protease_vanilla_pg
+run_name: protease_vanilla_pg_fragmented_5frag # name for the run
+output_dir: /home/jgershon/projects/itopt/policy_mpnn/protease_vanilla_pg_fragmented_5frag
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/protease/promising_24_hojae.cif
 batch_size: 16
 N_steps: 500
@@ -22,7 +22,8 @@ reward:
   output_dir: ${output_dir}
   rmsd_ub: 10.0
   rmsd_lb: 0.0
-  # frag_cfg:
-  #   fragment_bounds: [[0,24],[25,49],[50,74],[75,99],[100,124],[125,149],[150,184]]
-  #   sample_size: 4
-  #   min_sample: 1
+  frag_cfg:
+    # fragment_bounds: [[0,24],[25,49],[50,74],[75,99],[100,124],[125,149],[150,184]] # 7 fragments, diverged
+    fragment_bounds: [[0,30],[31,75],[76,117],[118,150],[150,184]] # 5 fragments, diverged
+    sample_size: 64
+    min_sample: 2

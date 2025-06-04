@@ -1,5 +1,5 @@
-run_name: penicillin_vanilla_pg_fragmented # name for the run
-output_dir: /home/jgershon/projects/itopt/policy_mpnn/penicillin_vanilla_pg_fragmented
+run_name: penicillin_vanilla_pg_fragmented_rmsd_correct # name for the run
+output_dir: /home/jgershon/projects/itopt/policy_mpnn/penicillin_vanilla_pg_fragmented_rmsd_correct
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/penicillin_enzyme/pd_input_make2.pdb # winAS
 batch_size: 16
 N_steps: 500
