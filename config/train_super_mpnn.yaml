@@ -1,0 +1,13 @@
+defaults:
+  - super_base
+run_name: 'train_super_mpnn'
+data:
+  dataset_cfg:
+    input_type: 'embedding' # embedding, sequence, or fragment
+    input_shape: 'BLD' # BLD (keep seq length dim) or BD (flatten seq length dim)
+    path_to_embeddings: '/projects/ml/itopt/datasets/mpnn_embeddings'
+    embedding_key: 'h_V' # use:  null for ESM   |   h_V for mpnn
+model:
+  base_model:
+    model_type: 'conv1d' # conv1d, mlp
+    input_dim: 128

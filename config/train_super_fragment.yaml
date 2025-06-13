@@ -1,0 +1,10 @@
+defaults:
+  - super_base
+run_name: 'train_super_fragment'
+data:
+  dataset_cfg:
+    input_type: 'fragment' # embedding, sequence, or fragment
+model:
+  base_model:
+    model_type: 'mlp' # conv1d, mlp, linear
+    input_dim: 120
