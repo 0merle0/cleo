@@ -1,4 +1,4 @@
-run_name: heme_vanilla_pg_proteinMPNN_fragmented # name for the run
+run_name: heme_dapo # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/heme_enzyme/elliot_design.pdb
 batch_size: 16
@@ -7,7 +7,13 @@ lr: 1e-4
 checkpoint_every_n_steps: 10
 eval: false
 checkpoint_path: null
-algorithm: vanillaPG
+algorithm: dapo
+
+# -- DAPO params --
+N_updates: 16 # number of rollouts per step
+update_batch_size: 2 # number of rollouts to use for each update
+clip_eps_low: 0.2 # lower bound for clipping value taken from paper
+clip_eps_high: 0.28 # upper bound for clipping value taken from paper
 
 # -- MPNN params --
 model_type: protein_mpnn # protein_mpnn or ligand_mpnn

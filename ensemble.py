@@ -104,7 +104,7 @@ class BaseModel(nn.Module):
 
         self.mean_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
         if self.cfg.predict_variance:
-            if self.cfg.concat_mean_pred:
+            if "concat_mean_pred" in self.cfg and self.cfg.concat_mean_pred:
                 self.var_head = build_output_head(self.cfg.hidden_dim+1, self.cfg.output_dim, self.cfg.output_head_type)
             else:
                 self.var_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
@@ -123,7 +123,7 @@ class BaseModel(nn.Module):
         if self.cfg.predict_variance:
             if self.cfg.stop_grad_variance:
                 x = x.detach()
-            if self.cfg.concat_mean_pred:
+            if "concat_mean_pred" in self.cfg and self.cfg.concat_mean_pred:
                 x = torch.cat([x, mean.detach()],dim=-1)
             # transform output with softplus to ensure positive variance
             # taken from https://arxiv.org/pdf/1612.01474

@@ -1,9 +1,11 @@
 defaults:
   - super_base
-run_name: 'train_super_sequence'
+run_name: super_surrogate_round0_no_val
 data:
+  validation_mode: null
   dataset_cfg:
     input_type: 'sequence' # embedding, sequence, or fragment
+
 model:
   base_model:
     model_type: 'mlp' # conv1d, mlp, linearmodel:

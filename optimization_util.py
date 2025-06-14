@@ -292,3 +292,157 @@ def get_candidate_acquisition_values(candidate_seqs,
     acquisition_values = acqf(candidate_input)
 
     return float(acquisition_values)
+
+
+# 250611 - adding new features
+class BatchUCBwithEntropy:
+    def __init__(self, model, model_batch_size=64, gamma=0.1, eps=1e-8):
+        """
+        Args:
+            model (Ensemble): The ensemble model to use for predictions.
+            model_batch_size (int): Batch size for model inference.
+            gamma (float): Entropy weight for the acquisition function.
+        """
+        self.model = model # Ensemble model
+        self.model_batch_size = model_batch_size # batch size for model inference
+        self.gamma = gamma # entropy weight
+        self.eps = eps # small value to avoid log(0)
+
+    @torch.no_grad()
+    def __call__(self, X):
+
+        N, q, d = X.shape
+        X_r = X.reshape(N*q, d) # Flatten first two dimensions for batching
+        r = X_r.shape[0]
+
+        num_batches = r // self.model_batch_size + (1 if r % self.model_batch_size > 0 else 0)
+        if r % self.model_batch_size > 0:
+            num_batches += 1
+
+        ucb_list = []
+        for i in range(num_batches):
+            start = i * self.model_batch_size
+            end = min((i + 1) * self.model_batch_size, r)
+            batch_X = X_r[start:end]
+
+            # get predictions
+            out = self.model(batch_X)
+
+            # calculate UCB
+            ucb = out['mu'] + out['sigma']
+            ucb_list.append(ucb)
+
+
+        # rebatch the outputs so N, q
+        batched_ucb = torch.cat(ucb_list, dim=0).reshape(N, q).mean(dim=1)  # Average over q dim so just (N,)
+
+
+        # compute entropy of each batch
+        # X_norm  = (X.sum(dim=1)/(q*d/20)) # normalize final dim to sum to 1
+        # entropy = -torch.sum(X_norm * torch.log(X_norm + self.eps), dim=-1)  # Entropy calculation
+
+        # compute residue wise entropy
+        X_seq_view = X.view(N, q, -1, 20)
+        X_freqs = X_seq_view.sum(dim=1)/q # sum over batch to get frequencies at each position
+        entropy = (-torch.sum(X_freqs * torch.log(X_freqs + self.eps), dim=-1)).mean(dim=-1)  # Entropy calculation over the sequence length
+
+        reward = batched_ucb + self.gamma * entropy # (N,)
+
+        metrics = {
+            'ucb': batched_ucb.mean().item(),
+            'entropy': entropy.mean().item(),
+        }
+
+        return reward, metrics
+    
+
+def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, device):
+
+    feasible_mask = get_feasible_mask(fragment_dictionary)
+
+    # initialize policy
+    policy = torch.randn(q,feasible_mask.shape[0],feasible_mask.shape[1])*0.01 #scaling factor
+    feasible_mask = (feasible_mask[None]).repeat(q,1,1)
+
+    # set non fragments to << 0 so they do not get sampled
+    policy[~feasible_mask] = -torch.inf
+    policy = policy.to(device)
+    policy = torch.nan_to_num(policy)
+    policy = policy.requires_grad_(True)
+
+
+
+    optimizer = torch.optim.Adam([policy], lr=lr)
+    collected_rewards = []
+
+    metric_logs = {"step":[], "reward":[]}
+
+    # REINFORCE LOOP
+    with tqdm(total=num_iter, desc='Reward: ') as pbar:
+
+        for i in range(num_iter):
+            
+            optimizer.zero_grad()
+
+            # softmax policy to get probabilities
+
+            soft_policy = torch.softmax(policy,dim=-1)
+
+            # make categorical distribution
+            m = torch.distributions.Categorical(soft_policy)
+
+            sampled_actions = []
+            sampled_log_probs = []
+            for j in range(N):
+                # sample action
+                action = m.sample()
+                sampled_log_probs.append(m.log_prob(action)[None])
+                sampled_actions.append(action[None])
+
+            actions = torch.cat(sampled_actions,dim=0)
+            log_probs = torch.cat(sampled_log_probs,dim=0)
+
+            # convert from fragments to num seq
+            sampled_seqs = get_seqs_from_action(actions, fragment_dictionary)[0].long()
+            sampled_seqs = torch.nn.functional.one_hot(sampled_seqs, num_classes = 20)
+            sampled_seqs = sampled_seqs.reshape(sampled_seqs.shape[0],sampled_seqs.shape[1],-1)
+
+            # get reward
+            reward, metrics = acqf(sampled_seqs.to(device))
+
+            # log metrics
+            for k, v in metrics.items():
+                if k not in metric_logs:
+                    metric_logs[k] = []
+                metric_logs[k].append(v)
+            metric_logs["step"].append(i)
+            metric_logs["reward"].append(float(reward.mean().detach()))
+
+            # substract beta term "moving average"
+            beta_term = 0
+            if i > 0:
+                beta_term = np.mean(collected_rewards)
+
+            collected_rewards.append(float(reward.mean().detach()))
+
+            beta_subtract_reward = reward - beta_term
+
+            # calculate policy loss
+            loss = (-log_probs * beta_subtract_reward[...,None,None].repeat(1,q,actions.shape[-1])).sum(dim=(1,2)).mean()
+
+            # opt
+            loss.backward()
+            optimizer.step()
+
+            pbar.set_postfix({'Reward': f'{float(reward.mean()):.3f}'})
+            pbar.update(1)
+
+
+    # get candidates from policy
+    candidates = get_candidates_from_policy(m, fragment_dictionary)
+
+    return candidates, metric_logs
+        
+
+
+

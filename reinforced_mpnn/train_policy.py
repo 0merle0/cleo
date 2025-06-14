@@ -27,6 +27,11 @@ def train_policy(cfg):
         print(f"Using vanilla REINFORCE algorithm for training")
         from policy_utils import PolicyMPNN
         policy = PolicyMPNN(cfg)
+
+    elif cfg.get('algorithm').lower() == 'dapo':
+        print(f"Using DAPO algorithm for training")
+        from dapo import PolicyMPNNvDAPO
+        policy = PolicyMPNNvDAPO(cfg)
     
     else:
         raise ValueError(f"Unsupported algorithm: {cfg.get('algorithm')}. Supported algorithms are 'ppo', 'grpo', and 'vanillaPG'.")
