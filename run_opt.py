@@ -39,7 +39,7 @@ def main(cfg):
     fragment_dictionary = {int(k):v for k,v in fragment_dictionary.items()}
 
     # get candidate seqs
-    candidate_seqs, logs = opt_loop(
+    candidate_seqs, logs, policy = opt_loop(
         acqf,
         fragment_dictionary, 
         cfg.opt_loop.N, 
@@ -67,6 +67,10 @@ def main(cfg):
     logs_df = pd.DataFrame(logs)
     logs_path = os.path.join(out_path, "metrics.csv")
     logs_df.to_csv(logs_path, index=False)
+
+    # save policy
+    policy_path = os.path.join(out_path, "policy.pt")
+    torch.save(policy, policy_path)
 
     print(f"Optimization completed. Results saved to {out_path}")
 

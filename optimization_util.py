@@ -441,7 +441,7 @@ def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, device):
     # get candidates from policy
     candidates = get_candidates_from_policy(m, fragment_dictionary)
 
-    return candidates, metric_logs
+    return candidates, metric_logs, m
         
 
 
