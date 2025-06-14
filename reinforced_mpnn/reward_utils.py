@@ -165,6 +165,9 @@ class AF3RMSDPipelineReward(Reward):
         # Create a DataFrame for AF3
         df_input = self.get_input_df(sequences)
 
+        # debugging to see if we are getting memory accum errors
+        # subprocess.run(["nvidia-smi"])
+
         df_out = self.run_pipeline(df_input, config)
 
         # Run the pipeline with retries

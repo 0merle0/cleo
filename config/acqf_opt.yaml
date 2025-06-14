@@ -1,0 +1,18 @@
+# acquition function optimization configuration file
+
+run_name: round_1_gamma_7.50
+
+outdir: /home/jgershon/projects/itopt/super/super_acqf_comparison/acqf_opt_runs
+surrogate_ckpt: /home/jgershon/git/cleo/ckpt/super_surrogate_round0_no_val/super_surrogate_round0_no_val.2025-06-10-09-11-32
+
+opt_loop:
+  N: 24
+  q: 128
+  fragment_dictionary: /home/jgershon/projects/itopt/super/super_acqf_comparison/fragment_dictionary.json
+  num_iter: 100000
+  lr: 0.01
+
+acqf:
+  model_batch_size: 256
+  gamma: 7.50
+  eps: 1e-8

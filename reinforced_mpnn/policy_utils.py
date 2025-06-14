@@ -29,7 +29,7 @@ class PolicyMPNN:
         self.cfg = cfg
         self.device = DEVICE
         self.run_name = cfg.run_name
-        self.output_dir = cfg.output_dir
+        self.output_dir = os.path.join(cfg.output_dir, cfg.run_name)
         
         # create output directory if it does not exist
         os.makedirs(self.output_dir, exist_ok=True)
@@ -38,7 +38,8 @@ class PolicyMPNN:
         OmegaConf.save(config=cfg, f=os.path.join(self.output_dir, f"{self.run_name}_config.yaml"))
 
         # log reward history
-        self.reward_history = [torch.tensor(0., dtype=torch.float32, device=self.device)]
+        # self.reward_history = [torch.tensor(0., dtype=torch.float32, device=self.device)]
+        self.reward_history = [0]
 
         # load model
         self.model = self.load_mpnn_model()
@@ -232,16 +233,27 @@ class PolicyMPNN:
         """
 
         # decode
-        B_decoder = feature_dict["batch_size"]
-        S_true = feature_dict["S"] #[B,L] - integer proitein sequence encoded using "restype_STRtoINT
-        #R_idx = feature_dict["R_idx"] #[B,L] - primary sequence residue index
-        mask = feature_dict["mask"] #[B,L] - mask for missing regions - should be removed! all ones most of the time
-        chain_mask = feature_dict["chain_mask"] #[B,L] - mask for which residues need to be fixed; 0.0 - fixed; 1.0 - will be designed
-        bias = feature_dict["bias"] #[B,L,21] - amino acid bias per position
+        
 
-        #chain_labels = feature_dict["chain_labels"] #[B,L] - integer labels for chain letters
-        randn = feature_dict["randn"] #[B,L] - random numbers for decoding order; only the first entry is used since decoding within a batch needs to match for symmetry
-        temperature = feature_dict["temperature"] #float - sampling temperature; prob = softmax(logits/temperature)
+        if sampled_actions is None:
+            B_decoder = feature_dict["batch_size"]
+            S_true = feature_dict["S"] #[B,L] - integer proitein sequence encoded using "restype_STRtoINT
+            mask = feature_dict["mask"] #[B,L] - mask for missing regions - should be removed! all ones most of the time
+            chain_mask = feature_dict["chain_mask"] #[B,L] - mask for which residues need to be fixed; 0.0 - fixed; 1.0 - will be designed
+            bias = feature_dict["bias"] #[B,L,21] - amino acid bias per position
+            randn = feature_dict["randn"] #[B,L] - random numbers for decoding order; only the first entry is used since decoding within a batch needs to match for symmetry
+            temperature = feature_dict["temperature"] #float - sampling temperature; prob = softmax(logits/temperature)
+        
+        else:
+            # when providing sampled actions, they may not be the same size as the featurized batch
+            B_decoder = sampled_actions.shape[0]
+            S_true = sampled_actions #[B,L] - sampled sequence
+            mask = feature_dict["mask"][:1].repeat(B_decoder, 1) #[B_decoder,L]
+            chain_mask = feature_dict["chain_mask"][:1].repeat(B_decoder, 1) #[B_decoder,L]
+            bias = feature_dict["bias"][:1].repeat(B_decoder, 1, 1) #[B_decoder,L,21]
+            randn = feature_dict["randn"][:1].repeat(B_decoder, 1) #[B_decoder,L]
+            temperature = feature_dict["temperature"] #float - sampling temperature; prob = softmax(logits/temperature)
+
         B, L = S_true.shape
 
         # else use the provided decoding order
@@ -368,8 +380,9 @@ class PolicyMPNN:
         to_log.update(metrics)
 
         # get baseline first
-        baseline = torch.stack(self.reward_history).mean()
-        self.reward_history.append(batched_reward.mean())
+        # baseline = torch.stack(self.reward_history).mean()
+        baseline = torch.tensor(self.reward_history, dtype=torch.float32, device=self.device).mean()
+        self.reward_history.append(batched_reward.mean().item())
 
         # baseline subtracted reward
         baseline_subtracted_reward = batched_reward - baseline
