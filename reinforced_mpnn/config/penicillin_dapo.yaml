@@ -1,4 +1,4 @@
-run_name: penicillin_dapo # name for the run
+run_name: penicillin_dapo_fragmented_16updatesteps # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/penicillin_enzyme/pd_input_make2.pdb # winAS
 batch_size: 16
@@ -11,7 +11,7 @@ algorithm: dapo
 
 # -- DAPO params --
 N_updates: 16 # number of rollouts per step
-update_batch_size: 2 # number of rollouts to use for each update
+update_batch_size: 4 # number of rollouts to use for each update
 clip_eps_low: 0.2 # lower bound for clipping value taken from paper
 clip_eps_high: 0.28 # upper bound for clipping value taken from paper
 
@@ -28,8 +28,8 @@ reward:
   output_dir: ${output_dir}
   rmsd_ub: 10.0
   rmsd_lb: 0.0
-  # frag_cfg:
-  #   fragment_bounds: [[0,29],[30,66],[67,102],[103,130],[131,157]]
-  #   sample_size: 64
-  #   min_sample: 2
+  frag_cfg:
+    fragment_bounds: [[0,29],[30,66],[67,102],[103,130],[131,157]]
+    sample_size: 64
+    min_sample: 2
 
