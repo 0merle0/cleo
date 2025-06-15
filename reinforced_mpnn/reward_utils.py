@@ -80,6 +80,7 @@ class AF3RMSDPipelineReward(Reward):
             self, 
             pipeline_config_path, 
             output_dir, 
+            run_name,
             rmsd_ub=10.0, 
             rmsd_lb=0.0, 
             frag_cfg=None, 
@@ -97,13 +98,14 @@ class AF3RMSDPipelineReward(Reward):
         self.run_pipeline = run_pipeline
         self.pipeline_config = OmegaConf.load(pipeline_config_path)
         self.output_dir = output_dir
+        self.run_name = run_name
         self.rmsd_ub = rmsd_ub
         self.rmsd_lb = rmsd_lb
         self.frag_cfg = frag_cfg
         self.max_retries = max_retries
 
         # make subdirectory for pipeline output
-        pipeline_output_dir = os.path.join(self.output_dir, "pipeline_output")
+        pipeline_output_dir = os.path.join(self.output_dir, self.run_name, "pipeline_output")
         os.makedirs(pipeline_output_dir, exist_ok=True)
     
     def get_sequences(self, policy_output, chain_mask=None):
@@ -145,6 +147,7 @@ class AF3RMSDPipelineReward(Reward):
         config = copy.deepcopy(self.pipeline_config)
         config.rundir = os.path.join(
             self.output_dir, 
+            self.run_name,
             "pipeline_output", 
             f"pipeline_output_iter_{step:04}"
         )

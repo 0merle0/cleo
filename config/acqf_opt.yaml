@@ -1,6 +1,6 @@
 # acquition function optimization configuration file
 
-run_name: round1_gamma5
+run_name: round1_gamma40
 
 outdir: /home/jgershon/projects/itopt/super/super_acqf_comparison/acqf_opt_runs
 surrogate_ckpt: /home/jgershon/git/cleo/ckpt/super_surrogate_round0_no_val/super_surrogate_round0_no_val.2025-06-10-09-11-32
@@ -14,5 +14,5 @@ opt_loop:
 
 acqf:
   model_batch_size: 256
-  gamma: 5
+  gamma: 40
   eps: 1e-8

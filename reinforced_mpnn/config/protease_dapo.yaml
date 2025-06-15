@@ -1,9 +1,9 @@
-run_name: protease_dapo # name for the run
+run_name: protease_dapo_fragmented_bigBatch_ub15 # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/protease/promising_24_hojae.cif
-batch_size: 16
+batch_size: 32
 N_steps: 500
-lr: 1e-5 # changed
+lr: 5e-5 # learning rate slowed for protease
 checkpoint_every_n_steps: 10
 eval: false
 checkpoint_path: null
@@ -11,7 +11,7 @@ algorithm: dapo
 
 # -- DAPO params --
 N_updates: 16 # number of rollouts per step
-update_batch_size: 2 # number of rollouts to use for each update
+update_batch_size: 8 # number of rollouts to use for each update
 clip_eps_low: 0.2 # lower bound for clipping value taken from paper
 clip_eps_high: 0.28 # upper bound for clipping value taken from paper
 
@@ -26,7 +26,8 @@ reward:
   _target_: reward_utils.AF3RMSDPipelineReward 
   pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_hojae_protease.yaml
   output_dir: ${output_dir}
-  rmsd_ub: 10.0
+  run_name: ${run_name} # name for the run
+  rmsd_ub: 15.0
   rmsd_lb: 0.0
   frag_cfg:
     # fragment_bounds: [[0,24],[25,49],[50,74],[75,99],[100,124],[125,149],[150,184]] # 7 fragments, diverged
@@ -36,5 +37,5 @@ reward:
     # fragment_bounds: [[0,99],[100,184]] # 2 fragments, 
     # fragment_bounds: [[0,2],[3,184]] # 2 fragments, CONVERGED
     fragment_bounds: [[0,32], [33,52], [53,94], [95,105], [106,133], [134, 150], [151,184]] # 7 fragments, 
-    sample_size: 64
+    sample_size: 128
     min_sample: 2
