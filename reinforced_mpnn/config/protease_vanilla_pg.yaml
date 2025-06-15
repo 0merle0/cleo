@@ -20,6 +20,7 @@ reward:
   _target_: reward_utils.AF3RMSDPipelineReward 
   pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_hojae_protease.yaml
   output_dir: ${output_dir}
+  run_name: ${run_name} # name for the run
   rmsd_ub: 10.0
   rmsd_lb: 0.0
   frag_cfg:
