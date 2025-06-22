@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -p gpu
-#SBATCH --mem=8g
+#SBATCH --mem=48g
 #SBATCH --gres=gpu:a4000:1
-#SBATCH -c 1
+#SBATCH -c 8
 #SBATCH -o logs/ajob_%j_%a.out
 #SBATCH -J ajob
 #SBATCH -t 10:00:00

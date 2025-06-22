@@ -1,0 +1,36 @@
+run_name: super_dapo_frags # name for the run
+output_dir: /home/jgershon/projects/itopt/policy_mpnn
+pdb: /projects/ml/itopt/policy_mpnn/benchmarks/super/super_model.cif
+batch_size: 32
+N_steps: 500
+lr: 1e-4
+checkpoint_every_n_steps: 10
+eval: false
+checkpoint_path: null
+algorithm: dapo
+
+# -- DAPO params --
+N_updates: 32 # number of rollouts per step
+update_batch_size: 8 # number of rollouts to use for each update
+clip_eps_low: 0.2 # lower bound for clipping value taken from paper
+clip_eps_high: 0.28 # upper bound for clipping value taken from paper
+
+# -- MPNN params --
+model_type: ligand_mpnn # protein_mpnn or ligand_mpnn
+temperature: 1.0
+omit_AA: CX
+fixed_residues: "A53 A95 A128"
+
+# -- Reward params --
+reward:
+  _target_: reward_utils.AF3RMSDPipelineReward 
+  pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_super.yaml
+  output_dir: ${output_dir}
+  run_name: ${run_name}
+  rmsd_ub: 10.0
+  rmsd_lb: 0.0
+  frag_cfg:
+    fragment_bounds: [[0,40],[41,80],[81,120],[121,159]]
+    sample_size: 128
+    min_sample: 2
+
