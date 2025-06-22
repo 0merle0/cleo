@@ -203,7 +203,8 @@ class AF3RMSDPipelineReward(Reward):
 
         # make sure reward is properly padded when designing multiple chains
         if len(reward.shape) == 2 and reward.shape[1] != chain_mask.shape[0]:
-            padding = torch.ones(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
+            # should the padding be zero or ones? ( i think zero is better )
+            padding = torch.zeros(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
             reward = torch.cat([reward, padding], dim=1)
 
         metrics = {
