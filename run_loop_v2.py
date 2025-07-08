@@ -68,7 +68,7 @@ def find_last_checkpoint(train_name, surrogate_ckpt_base_dir):
     all_paths.sort()
     return all_paths[-1] # take most recent checkpoint
 
-def greedy_selection(ckpt_path, possible_candidates, num_samples, device):
+def greedy_selection(ckpt_path, possible_candidates, num_samples, device, use_mean=False):
     """
     Greedy selection of sequences based on model predictions.
     """
@@ -101,7 +101,10 @@ def greedy_selection(ckpt_path, possible_candidates, num_samples, device):
     pred_df["UCB"] = pred_df["pred_mean"] + pred_df["pred_var"]
 
     # sort by UCB and return top num_samples
-    pred_df = pred_df.sort_values(by="UCB", ascending=False)
+    if use_mean:
+        pred_df = pred_df.sort_values(by="pred_mean", ascending=False)
+    else:
+        pred_df = pred_df.sort_values(by="UCB", ascending=False)
     return pred_df["sequence"].tolist()[:num_samples]
 
 
@@ -255,6 +258,10 @@ def run_loop(cfg: DictConfig):
         if cfg.candidate_selection == "greedy_batch":
             # predict over all sequences in pool and choose top-k
             proposed_sequences = greedy_selection(ckpt_path, possible_candidates, cfg.num_samples_per_round, DEVICE)
+        
+        elif cfg.candidate_selection == "greedy_batch_mean_only":
+            # predict over all sequences in pool and choose top-k based on mean only
+            proposed_sequences = greedy_selection(ckpt_path, possible_candidates, cfg.num_samples_per_round, DEVICE, use_mean=True)
 
         elif cfg.candidate_selection == "batch_acqf":
             # use batch acquisition function to select next set of sequences to test

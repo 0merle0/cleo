@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH -p gpu-train
+#SBATCH --nodes=1
 #SBATCH --mem=128g
 #SBATCH --gres=gpu:h200:1
 #SBATCH -c 8
