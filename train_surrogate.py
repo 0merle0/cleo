@@ -30,13 +30,13 @@ def train_surrogate(cfg):
         OmegaConf.save(cfg, f"{ckpt_dir}/config.yaml")
 
         loggers = []
-        loggers.append(WandbLogger(
-                name=cfg.run_name,
-                project="itopt",
-                save_dir="./logs/wandb_logs",
-                log_model=False,
-            )
-        )
+        # loggers.append(WandbLogger(
+        #         name=cfg.run_name,
+        #         project="itopt",
+        #         save_dir="./logs/wandb_logs",
+        #         log_model=False,
+        #     )
+        # )
         loggers.append(CSVLogger(
                 save_dir=f"{ckpt_dir}/csv_logs",
                 name=cfg.run_name,

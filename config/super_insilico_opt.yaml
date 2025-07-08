@@ -1,0 +1,21 @@
+run_name: RUN_NAME
+seed: 0 # used to sample initial data and for training
+candidate_selection: batch_acqf # greedy_batch, batch_acqf, random
+acqf_gamma: 15 # gamma for batch_acqf, ignored for greedy_batch
+fragment_dictionary_path: /home/jgershon/projects/itopt/super/super_acqf_comparison/fragment_dictionary.json
+
+num_samples_per_round: 128
+num_rounds: 20
+outdir: /home/jgershon/projects/itopt/super/super_acqf_comparison/insilico/opt_trajectories
+
+# oracle data
+oracle_data_path: /home/jgershon/projects/itopt/super/super_acqf_comparison/insilico/250707_oracle_data.csv
+
+# for surrogate training
+train_script_path: /home/jgershon/git/cleo/train_surrogate.py
+train_config: train_super_seq_surrogate
+surrogate_ckpt_base_dir: /home/jgershon/git/cleo/ckpt
+
+# for acquisition function optimization
+acqf_opt_script_path: /home/jgershon/git/cleo/run_opt.py
+acqf_opt_config: acqf_opt
