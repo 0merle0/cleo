@@ -10,6 +10,7 @@ from omegaconf import OmegaConf
 sys.path.append("/software/lab/mpnn/fused_mpnn")
 from data_utils import featurize, parse_PDB
 from model_utils import ProteinMPNN
+import wandb
 
 PROTEIN_MPNN_CKPT_PATH = "/databases/mpnn/vanilla_model_weights/v_48_020.pt"
 LIGAND_MPNN_CKPT_PATH = "/databases/mpnn/ligand_mpnn_model_weights/s25_r010_t300_p.pt"
@@ -162,7 +163,7 @@ class PolicyMPNN:
         protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
 
         # also from mpnn args
-        omit_AA_list = self.cfg.omit_AA
+        omit_AA_list = self.cfg.omit_AA if self.cfg.omit_AA is not None else []
         omit_AA = torch.tensor(np.array([AA in omit_AA_list for AA in alphabet]).astype(np.float32), device=self.device)
 
         bias_AA_per_residue = torch.zeros([len(encoded_residues),21], device=self.device, dtype=torch.float32)
@@ -402,6 +403,31 @@ class PolicyMPNN:
         to_log["loss"] = loss.detach().cpu().item()
         to_log["reward"] = batched_reward.mean().cpu().item()
         
+        # Add wandb logging for PolicyMPNN specific metrics
+        if wandb.run:
+            wandb_log = {
+                "loss": to_log["loss"],
+                "reward": to_log["reward"],
+                "baseline": baseline.cpu().item(),
+                "baseline_subtracted_reward": baseline_subtracted_reward.mean().cpu().item(),
+                "policy/log_probs_mean": batched_log_probs.mean().cpu().item(),
+                "policy/log_probs_std": batched_log_probs.std().cpu().item(),
+            }
+            
+            # Add reward function metrics if available
+            if metrics:
+                wandb_log.update({f"reward_metrics/{k}": v for k, v in metrics.items()})
+            
+            # Add reward statistics
+            wandb_log.update({
+                "rewards/mean": batched_reward.mean().cpu().item(),
+                "rewards/std": batched_reward.std().cpu().item() if batched_reward.numel() > 1 else 0.0,
+                "rewards/min": batched_reward.min().cpu().item(),
+                "rewards/max": batched_reward.max().cpu().item(),
+            })
+            
+            wandb.log(wandb_log, step=step)
+        
         return to_log
 
     def train(self):
@@ -428,7 +454,10 @@ class PolicyMPNN:
 
             # metric logging
             runtime = time.time() - start_time
-            self.log_metrics(step, runtime, to_log)
+            
+            if wandb.run:
+                # Log runtime and step separately to avoid conflicts with train_step logging
+                wandb.log({"runtime": runtime, "training/step": step}, step=step)
 
             # model checkpointing
             if step > 0 and self.checkpoint_every_n_steps % step == 0:
@@ -437,36 +466,17 @@ class PolicyMPNN:
         print("Training complete.")
         print(f"Best reward seen: {self.best_seen_reward:.4f} at step {self.step_at_best_seen_reward}")
 
-    def log_metrics(self, step, runtime, to_log):
-        """
-        Log training metrics
-        """
-        metrics_to_log = [k for k,v in to_log.items() if isinstance(v, float)]
-        log_path = os.path.join(self.output_dir, f"{self.run_name}_train_metrics.csv")
-        if not os.path.exists(log_path):
-            with open(log_path,'w') as f:
-                f.write("step,runtime,"\
-                        +",".join([f"{m}" for m in metrics_to_log])\
-                        +'\n')
-        with open(log_path,'a') as f:
-            f.write(f"{step},{runtime:.4f},"\
-                    +",".join([f"{to_log[m]:.4f}" for m in metrics_to_log])\
-                    +'\n')
-
     
     def checkpoint_model(self, step, to_log):
         """
-        Checkpoint model
-            - save last model
-            - save best model
+        Checkpoint model locally only
         """
-        
         curr_reward = to_log["reward"]
         ckpt = {
-                "config":dict(self.cfg),
-                "step":step,
-                "reward":curr_reward,
-                "model_state_dict":self.model.state_dict(),
+                "config": dict(self.cfg),
+                "step": step,
+                "reward": curr_reward,
+                "model_state_dict": self.model.state_dict(),
             }
 
         ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_last.pt")
@@ -478,3 +488,7 @@ class PolicyMPNN:
 
             best_ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_best.pt")
             torch.save(ckpt, best_ckpt_path)
+            
+            # Log best reward metrics to wandb without saving the file
+            if wandb.run:
+                wandb.log({"best/reward": curr_reward, "best/step": step})

@@ -114,7 +114,8 @@ def compute_metrics(dir, name):
         dict: Dictionary containing mean and variance for each metric.
     """
     # Glob all JSON files
-    all_jsons = glob.glob(dir + f"*{name}*/*{name}*summary_confidences.json")
+    # pdb_lib.set_trace()
+    all_jsons = glob.glob(dir + f"*/{name}*/*{name}*summary_confidences.json")
 
     # Initialize a dictionary to store aggregated data
     metrics = {
@@ -129,15 +130,15 @@ def compute_metrics(dir, name):
     json_file = all_jsons[0]
     with open(json_file, 'r') as f:
         data = json.load(f)
-    
+    # pdb_lib.set_trace()
     # General metrics
-    metrics['ptm'].append(data.get('ptm', [None])[0])
-    metrics['iptm'].append(data.get('iptm', [None])[0])
-    metrics['aggregate_score'].append(data.get('ranking_score', [None])[0])
-    metrics['substrate_ptm'].append(data.get('chain_ptm', [None])[1])
+    metrics['ptm'].append(data.get('ptm', [None]))
+    metrics['iptm'].append(data.get('iptm', [None]))
+    metrics['aggregate_score'].append(data.get('ranking_score', [None]))
+    metrics['substrate_ptm'].append(data.get('chain_ptm', [None]))
     # Check for chain-specific metrics
     pae = data.get('chain_pair_pae_min')
-
+    # pdb_lib.set_trace()
     if pae and len(pae[0]) == 2:  # Ensure there are at least 2 chains
         metrics['design_substrate_pae'].append((pae[0][1] + pae[1][0]) / 2)
     elif pae and len(pae[0]) > 2:
@@ -726,11 +727,9 @@ def get_metrics(pred_dir, ref_pdb, motif_dict, motif_dict_full, distance_pairs, 
     # Calculate ensemble statistics using the new function
     ensemble_stats = compute_ensemble_statistics(all_stats)
 
-    try:
-        agg_metrics = compute_metrics(pred_dir, enz_name)
-        ensemble_stats.update(agg_metrics)
-    except:
-        pass
+        
+    agg_metrics = compute_metrics(pred_dir, enz_name)
+    ensemble_stats.update(agg_metrics)
 
     # Include chirality stats in ensemble_stats from the best PDB
     if "chirality_best" in best_stats:
