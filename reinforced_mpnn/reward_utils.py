@@ -9,7 +9,7 @@ import os
 import pandas as pd
 from omegaconf import OmegaConf
 
-from fragment_utils import make_fragment_dict, sample_sequences, get_fragment_rewards
+# from fragment_utils import make_fragment_dict, sample_sequences, get_fragment_rewards
 
 
 class Reward(ABC):
@@ -129,6 +129,7 @@ class AF3RMSDPipelineReward(Reward):
 
         return df
 
+
     @torch.no_grad()
     def __call__(self, step, policy_output, feature_dict, device):
 
@@ -191,8 +192,145 @@ class AF3RMSDPipelineReward(Reward):
         return reward.to(device), metrics
 
 
+class LigasePipelineReward(Reward):
+    """
+        Penicillin active site, using af3 RMSD as reward
+    """
 
+    def __init__(self, pipeline_config_path, output_dir, rmsd_ub=10.0, rmsd_lb=0.0, frag_cfg=None):
 
+        # sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
+        # # if we used an apptainer we would could install cifutils and datahub directly
+        # sys.path.append("/projects/ml/itopt/policy_mpnn/software/cifutils/src")
+        # sys.path.append("/projects/ml/itopt/policy_mpnn/software/datahub/src")        
+        sys.path.append("/home/ssalike/git/pipelines")
+        # if we used an apptainer we would could install cifutils and datahub directly
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/cifutils/src")
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/datahub/src")      
+        os.environ["PYTHONPATH"] = ":" # pipeline will freak if this is not set
+
+        from pipelines.pipeline import main as run_pipeline
+
+        self.run_pipeline = run_pipeline
+        self.pipeline_config = OmegaConf.load(pipeline_config_path)
+        self.output_dir = output_dir
+        self.rmsd_ub = rmsd_ub
+        self.rmsd_lb = rmsd_lb
+        self.frag_cfg = frag_cfg
+
+        # make subdirectory for pipeline output
+        pipeline_output_dir = os.path.join(self.output_dir, "pipeline_output")
+        os.makedirs(pipeline_output_dir, exist_ok=True)
+    
+    def get_sequences(self, policy_output, chain_mask=None):
+        """
+            Return list of sampled sequences
+        """
+        sampled_sequences = policy_output["S"]
+
+        if chain_mask is not None:
+            sampled_sequences = sampled_sequences[:, chain_mask]
+
+        B = sampled_sequences.shape[0]
+        
+        sequences = [] 
+        for i in range(B):
+            seq = sampled_sequences[i]
+            seq_str = "".join([alphabet[int(s)] for s in seq])
+            sequences.append(seq_str)
+        return sequences
+
+    def get_input_df(self, sequences):
+        """
+        Convert list of sequences to DataFrame format required by AF3
+        """
+
+        df = pd.DataFrame(
+            {
+                "sequence": sequences,
+                "name": [f"seq_{i:04}" for i in range(len(sequences))],
+                "origin.path": [f"seq_{i:04}.path" for i in range(len(sequences))],
+            }
+        )
+
+        return df
+
+    @torch.no_grad()
+    def __call__(self, step, policy_output, feature_dict, device):
+
+        config = copy.deepcopy(self.pipeline_config)
+        config.rundir = os.path.join(
+            self.output_dir, 
+            "pipeline_output", 
+            f"pipeline_output_iter_{step:04}"
+        )
+
+        # Get the chain mask if available
+        # just take sequences from the first chain
+        chain_mask = feature_dict["chain_labels"]==0 # [1, L]
+        chain_mask = chain_mask[0] # [L,]
+
+        # Get the sequences from policy output
+        sequences = self.get_sequences(policy_output, chain_mask=chain_mask)
+
+        if self.frag_cfg is not None:
+            fragment_dict = make_fragment_dict(sequences, self.frag_cfg.fragment_bounds)
+            samples = sample_sequences(fragment_dict, self.frag_cfg.sample_size, self.frag_cfg.min_sample)
+            names = [x[0] for x in samples]
+            sequences = [x[1] for x in samples]
+        
+        # Create a DataFrame for AF3
+        df_input = self.get_input_df(sequences)
+        
+
+        # Run the pipeline
+        df_out = self.run_pipeline(df_input, config)
+
+        # Reward shaping
+        as_rmsd1 = torch.tensor(df_out["af3_ts2_hyd_alignment.motif_allatom_align.motif_allatom_rmsd"].tolist())
+        as_rmsd2 = torch.tensor(df_out["af3_ts2_amine_alignment.motif_allatom_align.motif_allatom_rmsd"].tolist())
+        
+        # Clamp each RMSD individually
+        as_rmsd1_clamped = torch.clamp(as_rmsd1, min=self.rmsd_lb, max=self.rmsd_ub)
+        as_rmsd2_clamped = torch.clamp(as_rmsd2, min=self.rmsd_lb, max=self.rmsd_ub)
+        
+        # Normalize to [0,1] - higher as_rmsd1 is better, lower as_rmsd2 is better
+        rmsd1_reward = (as_rmsd1_clamped - self.rmsd_lb) / (self.rmsd_ub - self.rmsd_lb)  # Higher is better
+        rmsd2_reward = 1 - (as_rmsd2_clamped - self.rmsd_lb) / (self.rmsd_ub - self.rmsd_lb)  # Lower is better
+        
+        # Combine the rewards (multiply to require both to be good)
+        rmsd_reward = rmsd1_reward * rmsd2_reward
+        
+        ptm = torch.tensor(df_out["af3_ptm"].tolist())
+
+        # Combine rmsd and ptm rewards
+        reward = rmsd_reward * ptm
+
+        if self.frag_cfg is not None:
+            reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
+
+        # make sure reward is properly padded when designing multiple chains
+        if len(reward.shape) == 2 and reward.shape[1] != chain_mask.shape[0]:
+            padding = torch.ones(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
+            reward = torch.cat([reward, padding], dim=1)
+
+        as_rmsd = as_rmsd1 - as_rmsd2  # Keep for metrics
+        metrics = {
+            "rmsd_diff_mean": as_rmsd.mean().cpu().item(),
+            "rmsd_diff_min": as_rmsd.min().cpu().item(),
+            "rmsd_diff_max": as_rmsd.max().cpu().item(),
+            "rmsd1_mean": as_rmsd1.mean().cpu().item(),
+            "rmsd1_min": as_rmsd1.min().cpu().item(),
+            "rmsd1_max": as_rmsd1.max().cpu().item(),
+            "rmsd2_mean": as_rmsd2.mean().cpu().item(),
+            "rmsd2_min": as_rmsd2.min().cpu().item(),
+            "rmsd2_max": as_rmsd2.max().cpu().item(),
+            "ptm_mean": ptm.mean().cpu().item(),
+            "ptm_min": ptm.min().cpu().item(),
+            "ptm_max": ptm.max().cpu().item(),
+        }
+
+        return reward.to(device), metrics
 
 
 

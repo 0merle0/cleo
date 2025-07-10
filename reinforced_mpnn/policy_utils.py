@@ -385,6 +385,31 @@ class PolicyMPNN:
         to_log["loss"] = loss.detach().cpu().item()
         to_log["reward"] = batched_reward.mean().cpu().item()
         
+        # Add wandb logging for PolicyMPNN specific metrics
+        if wandb.run:
+            wandb_log = {
+                "loss": to_log["loss"],
+                "reward": to_log["reward"],
+                "baseline": baseline.cpu().item(),
+                "baseline_subtracted_reward": baseline_subtracted_reward.mean().cpu().item(),
+                "policy/log_probs_mean": batched_log_probs.mean().cpu().item(),
+                "policy/log_probs_std": batched_log_probs.std().cpu().item(),
+            }
+            
+            # Add reward function metrics if available
+            if metrics:
+                wandb_log.update({f"reward_metrics/{k}": v for k, v in metrics.items()})
+            
+            # Add reward statistics
+            wandb_log.update({
+                "rewards/mean": batched_reward.mean().cpu().item(),
+                "rewards/std": batched_reward.std().cpu().item() if batched_reward.numel() > 1 else 0.0,
+                "rewards/min": batched_reward.min().cpu().item(),
+                "rewards/max": batched_reward.max().cpu().item(),
+            })
+            
+            wandb.log(wandb_log, step=step)
+        
         return to_log
 
     def train(self):
@@ -413,8 +438,8 @@ class PolicyMPNN:
             runtime = time.time() - start_time
             
             if wandb.run:
-                # Log runtime separately
-                wandb.log({"runtime": runtime}, step=step)
+                # Log runtime and step separately to avoid conflicts with train_step logging
+                wandb.log({"runtime": runtime, "training/step": step}, step=step)
 
             # model checkpointing
             if step > 0 and self.checkpoint_every_n_steps % step == 0:
