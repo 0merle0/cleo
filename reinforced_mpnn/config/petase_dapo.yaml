@@ -1,0 +1,42 @@
+run_name: petase_dapo_fragmented_8gpu  # name for the run
+output_dir: /home/jgershon/projects/itopt/policy_mpnn
+pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
+
+batch_size: 32
+N_steps: 500
+lr: 1e-4 # learning rate slowed for protease
+checkpoint_every_n_steps: 10
+eval: false
+checkpoint_path: null
+algorithm: dapo
+
+# -- DAPO params --
+N_updates: 16 # number of rollouts per step
+update_batch_size: 8 # number of rollouts to use for each update
+clip_eps_low: 0.2 # lower bound for clipping value taken from paper
+clip_eps_high: 0.28 # upper bound for clipping value taken from paper
+
+# -- MPNN params --
+model_type: ligand_mpnn # protein_mpnn or ligand_mpnn
+temperature: 1.0 # lower temp
+omit_AA: CX
+
+fixed_residues: "A41 A42 A43 A44 A66 A85 A86 A87 A88 A107 A122 A127 A128 A129 A130 A164 A165 A166 A167" # residues to keep fixed cat res = 66, 107, 122
+
+reward:
+  _target_: reward_utils.AF3PETaseReward
+  pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_petase.yaml
+  output_dir: ${output_dir}
+  run_name: ${run_name} # name for the run
+  oxyanion_lb: 2.25
+  oxyanion_ub: 10
+  hisNesterox_lb: 3.5
+  hisNesterox_ub: 10
+  hisNserO_lb: 2.25
+  hisNserO_ub: 10
+  his_ser_angle: 90
+  his_ser_angle_tol: 5
+  frag_cfg:
+    fragment_bounds: [[0,41],[42,85],[86,127],[128,164],[165,208]]
+    sample_size: 128
+    min_sample: 2
