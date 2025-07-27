@@ -3,9 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import torch
 from policy_utils import alphabet
-# from af3_inference.af3_inference import main as af3_main
 import pdb as pdb_lib
-import os 
 import pandas as pd
 from omegaconf import OmegaConf
 import subprocess
@@ -168,20 +166,9 @@ class AF3RMSDPipelineReward(Reward):
         # Create a DataFrame for AF3
         df_input = self.get_input_df(sequences)
 
-        # debugging to see if we are getting memory accum errors
-        # subprocess.run(["nvidia-smi"])
 
         df_out = self.run_pipeline(df_input, config)
 
-        # Run the pipeline with retries
-        # num_retries = 0
-        # while num_retries < self.max_retries:
-        #     try:
-        #         break
-        #     except Exception as e:
-        #         print(f"Pipeline run failed on attempt {num_retries + 1}:\n {e}")
-        #         num_retries += 1
-        #         continue
 
         # add code to delete af3 outputs to save space
         af3_out_dir = os.path.join(config.rundir, "af3/outputs")
@@ -219,7 +206,196 @@ class AF3RMSDPipelineReward(Reward):
         return reward.to(device), metrics
 
 
+class AF3PETaseReward(Reward):
+    """
+        Penicillin active site, using af3 RMSD as reward
+    """
 
+    def __init__(
+            self, 
+            pipeline_config_path, 
+            output_dir, 
+            run_name,
+            oxyanion_lb=2.25,
+            oxyanion_ub=10,
+            hisNesterox_lb=3.5,
+            hisNesterox_ub=10,
+            hisNserO_lb=2.25,
+            hisNserO_ub=10,
+            his_ser_angle=90,
+            his_ser_angle_tol=5,
+            frag_cfg=None, 
+        ):
+
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
+        # if we used an apptainer we would could install cifutils and datahub directly
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/cifutils/src")
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/datahub/src")        
+        os.environ["PYTHONPATH"] = ":" # pipeline will freak if this is not set
+
+        from pipelines.pipeline import main as run_pipeline
+
+        self.run_pipeline = run_pipeline
+        self.pipeline_config = OmegaConf.load(pipeline_config_path)
+        self.output_dir = output_dir
+        self.run_name = run_name
+        self.oxyanion_ub = oxyanion_ub
+        self.oxyanion_lb = oxyanion_lb
+        self.hisNesterox_ub = hisNesterox_ub
+        self.hisNesterox_lb = hisNesterox_lb
+        self.hisNserO_ub = hisNserO_ub
+        self.hisNserO_lb = hisNserO_lb
+        self.his_ser_angle = his_ser_angle
+        self.his_ser_angle_tol = his_ser_angle_tol
+        self.frag_cfg = frag_cfg
+
+        # make subdirectory for pipeline output
+        pipeline_output_dir = os.path.join(self.output_dir, self.run_name, "pipeline_output")
+        os.makedirs(pipeline_output_dir, exist_ok=True)
+    
+    def get_sequences(self, policy_output, chain_mask=None):
+        """
+            Return list of sampled sequences
+        """
+        sampled_sequences = policy_output["S"]
+
+        if chain_mask is not None:
+            sampled_sequences = sampled_sequences[:, chain_mask]
+
+        B = sampled_sequences.shape[0]
+        
+        sequences = [] 
+        for i in range(B):
+            seq = sampled_sequences[i]
+            seq_str = "".join([alphabet[int(s)] for s in seq])
+            sequences.append(seq_str)
+        return sequences
+
+    def get_input_df(self, sequences):
+        """
+        Convert list of sequences to DataFrame format required by AF3
+        """
+
+        df = pd.DataFrame(
+            {
+                "sequence": sequences,
+                "name": [f"seq_{i:04}" for i in range(len(sequences))],
+                "origin.path": [f"seq_{i:04}.path" for i in range(len(sequences))],
+            }
+        )
+
+        return df
+
+    @torch.no_grad()
+    def __call__(self, step, policy_output, feature_dict, device):
+
+        config = copy.deepcopy(self.pipeline_config)
+        config.rundir = os.path.join(
+            self.output_dir, 
+            self.run_name,
+            "pipeline_output", 
+            f"pipeline_output_iter_{step:04}"
+        )
+        
+        # just take sequences from the first chain
+        chain_mask = feature_dict["chain_labels"]==0 # [1, L]
+        chain_mask = chain_mask[0] # [L,]
+
+        # Get the sequences from policy output
+        sequences = self.get_sequences(policy_output, chain_mask=chain_mask)
+
+        if self.frag_cfg is not None:
+            fragment_dict = make_fragment_dict(sequences, self.frag_cfg.fragment_bounds)
+            samples = sample_sequences(fragment_dict, self.frag_cfg.sample_size, self.frag_cfg.min_sample)
+            names = [x[0] for x in samples]
+            sequences = [x[1] for x in samples]
+        
+        # Create a DataFrame for AF3
+        df_input = self.get_input_df(sequences)
+        df_out = self.run_pipeline(df_input, config)
+
+
+        # add code to delete af3 outputs to save space
+        af3_out_dir = os.path.join(config.rundir, "af3/outputs")
+        subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
+
+        # Reward engineering
+        acylox_oxh1bbN = torch.tensor(df_out["petase_metrics.acylox_oxh1bbN.mean"].tolist())
+        acylox_oxh2bbN = torch.tensor(df_out["petase_metrics.acylox_oxh2bbN.mean"].tolist())
+        hisNE2_esterox = torch.tensor(df_out["petase_metrics.hisNE2_esterox.mean"].tolist())
+        hisNE2_serOG = torch.tensor(df_out["petase_metrics.hisNE2_serOG.mean"].tolist())
+
+        # Normalize metrics to [0,1] range
+        acylox_oxh1bbN_clamped = torch.clamp(acylox_oxh1bbN, min=self.oxyanion_lb, max=self.oxyanion_ub)
+        acylox_oxh1bbN_reward = 1 - (acylox_oxh1bbN_clamped - self.oxyanion_lb) / (self.oxyanion_ub - self.oxyanion_lb)
+
+        acylox_oxh2bbN_clamped = torch.clamp(acylox_oxh2bbN, min=self.oxyanion_lb, max=self.oxyanion_ub)
+        acylox_oxh2bbN_reward = 1 - (acylox_oxh2bbN_clamped - self.oxyanion_lb) / (self.oxyanion_ub - self.oxyanion_lb)
+
+        hisNE2_esterox_clamped = torch.clamp(hisNE2_esterox, min=self.hisNesterox_lb, max=self.hisNesterox_ub)
+        hisNE2_esterox_reward = 1 - (hisNE2_esterox_clamped - self.hisNesterox_lb) / (self.hisNesterox_ub - self.hisNesterox_lb)
+
+        hisNE2_serOG_clamped = torch.clamp(hisNE2_serOG, min=self.hisNserO_lb, max=self.hisNserO_ub)
+        hisNE2_serOG_reward = 1 - (hisNE2_serOG_clamped - self.hisNserO_lb) / (self.hisNserO_ub - self.hisNserO_lb)
+
+        # for angle want reward = 1 if within tolerance of target angle, else linear decay
+        his_ser_angle_reward = []
+        for a in df_out["petase_metrics.his_ser_angle.mean"].tolist():
+            if a > self.his_ser_angle - self.his_ser_angle_tol and a < self.his_ser_angle + self.his_ser_angle_tol:
+                his_ser_angle_reward.append(1.0)
+            else:
+                his_ser_angle_reward.append(1 - np.min(
+                    [
+                        np.abs(a - self.his_ser_angle - self.his_ser_angle_tol),
+                        np.abs(a - self.his_ser_angle + self.his_ser_angle_tol)
+                    ]) / 90) # max angle is 90 because we are mostly looking for ideal angle to be 90
+
+        his_ser_angle_reward = torch.tensor(his_ser_angle_reward)
+
+        # get iptm reward
+        iptm = torch.tensor(df_out["petase_metrics.iptm.mean"].tolist())
+
+        # Combine all rewards
+        reward = (
+            acylox_oxh1bbN_reward + 
+            acylox_oxh2bbN_reward + 
+            hisNE2_esterox_reward + 
+            hisNE2_serOG_reward + 
+            his_ser_angle_reward +
+            iptm
+        ) / 6. # take straight average of all the metrics
+
+        if self.frag_cfg is not None:
+            reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
+
+        # make sure reward is properly padded when designing multiple chains
+        if len(reward.shape) == 2 and reward.shape[1] != chain_mask.shape[0]:
+            # should the padding be zero or ones? ( i think zero is better )
+            padding = torch.zeros(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
+            reward = torch.cat([reward, padding], dim=1)
+
+        metrics = {
+            "alcox_oxh1bbN_mean": acylox_oxh1bbN.mean().cpu().item(),
+            "alcox_oxh1bbN_min": acylox_oxh1bbN.min().cpu().item(),
+            "alcox_oxh1bbN_max": acylox_oxh1bbN.max().cpu().item(),
+            "alcox_oxh2bbN_mean": acylox_oxh2bbN.mean().cpu().item(),
+            "alcox_oxh2bbN_min": acylox_oxh2bbN.min().cpu().item(),
+            "alcox_oxh2bbN_max": acylox_oxh2bbN.max().cpu().item(),
+            "hisNE2_esterox_mean": hisNE2_esterox.mean().cpu().item(),
+            "hisNE2_esterox_min": hisNE2_esterox.min().cpu().item(),
+            "hisNE2_esterox_max": hisNE2_esterox.max().cpu().item(),
+            "hisNE2_serOG_mean": hisNE2_serOG.mean().cpu().item(),
+            "hisNE2_serOG_min": hisNE2_serOG.min().cpu().item(),
+            "hisNE2_serOG_max": hisNE2_serOG.max().cpu().item(),
+            "his_ser_angle_mean": his_ser_angle_reward.mean().cpu().item(),
+            "his_ser_angle_min": his_ser_angle_reward.min().cpu().item(),
+            "his_ser_angle_max": his_ser_angle_reward.max().cpu().item(),
+            "iptm_mean": iptm.mean().cpu().item(),
+            "iptm_min": iptm.min().cpu().item(),
+            "iptm_max": iptm.max().cpu().item(),
+        }
+
+        return reward.to(device), metrics
 
 
 # AF3 reward pre-pipeline
