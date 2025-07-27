@@ -6,7 +6,7 @@ pdb: /projects/ml/itopt/policy_mpnn/benchmarks/protease/promising_24_hojae.cif
 
 batch_size: 32
 N_steps: 500
-lr: 5e-5 # learning rate slowed for protease
+lr: 1e-4 # learning rate slowed for protease
 checkpoint_every_n_steps: 10
 eval: false
 checkpoint_path: null

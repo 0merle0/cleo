@@ -431,7 +431,7 @@ class PolicyMPNN:
             self.log_metrics(step, runtime, to_log)
 
             # model checkpointing
-            if step > 0 and self.checkpoint_every_n_steps % step == 0:
+            if step > 0 and  step % self.checkpoint_every_n_steps == 0:
                 self.checkpoint_model(step, to_log)
         
         print("Training complete.")
