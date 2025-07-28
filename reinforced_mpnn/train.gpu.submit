@@ -2,7 +2,7 @@
 #SBATCH -p gpu-train
 #SBATCH --gres=gpu:l40:8
 #SBATCH --nodes=1
-#SBATCH -c 4
+#SBATCH -c 8
 #SBATCH -J itopt
 #SBATCH --mem=64g
 #SBATCH --ntasks=1

@@ -1,4 +1,4 @@
-run_name: petase_dapo_fragmented_8gpu  # name for the run
+run_name: petase_dapo_fragmented_final  # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
