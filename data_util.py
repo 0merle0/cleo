@@ -18,12 +18,16 @@ class FragmentDataset(Dataset):
         super(FragmentDataset, self).__init__()
         self.cfg = cfg
         self.df = df
-        self.fragment_dictionary = fragment_util.get_fragment_dictionary(
-            cfg.fragment_csv
-        )
-        self.max_num_fragments = max(
-            [len(self.fragment_dictionary[x]) for x in self.fragment_dictionary]
-        )
+        
+        self.fragment_dictionary = None
+        self.max_num_fragments = None
+        if self.cfg.input_type == "fragment":
+            self.fragment_dictionary = fragment_util.get_fragment_dictionary(
+                cfg.fragment_csv
+            )
+            self.max_num_fragments = max(
+                [len(self.fragment_dictionary[x]) for x in self.fragment_dictionary]
+            )
 
     def featurize_inputs(self, index):
         """Featurize an index from dataframe."""
