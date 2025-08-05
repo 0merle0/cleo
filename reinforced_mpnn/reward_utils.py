@@ -206,9 +206,198 @@ class AF3RMSDPipelineReward(Reward):
         return reward.to(device), metrics
 
 
-class AF3PETaseReward(Reward):
+class AF3ClickEnzymeReward(Reward):
     """
         Penicillin active site, using af3 RMSD as reward
+    """
+
+    def __init__(
+            self, 
+            pipeline_config_path, 
+            output_dir, 
+            run_name,
+            ptm_lb=0.0,
+            ptm_ub=0.85,
+            iptm_lb=0.0,
+            iptm_ub=0.85,
+            rmsd_3AH_lb=0.0,
+            rmsd_3AH_ub=10.0,
+            rmsd_DEP_lb=0.0,
+            rmsd_DEP_ub=10.0,
+            dist_CR1_NR1_lb=0.5,
+            dist_CR1_NR1_ub=5.0,
+            dist_CR2_NR3_lb=0.5,
+            dist_CR2_NR3_ub=5.0,
+            frag_cfg=None, 
+        ):
+
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
+        # if we used an apptainer we would could install cifutils and datahub directly
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/cifutils/src")
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/datahub/src")        
+        os.environ["PYTHONPATH"] = ":" # pipeline will freak if this is not set
+
+        from pipelines.pipeline import main as run_pipeline
+
+        self.run_pipeline = run_pipeline
+        self.pipeline_config = OmegaConf.load(pipeline_config_path)
+        self.output_dir = output_dir
+        self.run_name = run_name
+        self.ptm_ub = ptm_ub
+        self.ptm_lb = ptm_lb
+        self.iptm_ub = iptm_ub
+        self.iptm_lb = iptm_lb
+        self.rmsd_3AH_ub = rmsd_3AH_ub
+        self.rmsd_3AH_lb = rmsd_3AH_lb
+        self.rmsd_DEP_ub = rmsd_DEP_ub
+        self.rmsd_DEP_lb = rmsd_DEP_lb
+        self.dist_CR1_NR1_ub = dist_CR1_NR1_ub
+        self.dist_CR1_NR1_lb = dist_CR1_NR1_lb
+        self.dist_CR2_NR3_ub = dist_CR2_NR3_ub
+        self.dist_CR2_NR3_lb = dist_CR2_NR3_lb
+        self.frag_cfg = frag_cfg
+
+        # make subdirectory for pipeline output
+        pipeline_output_dir = os.path.join(self.output_dir, self.run_name, "pipeline_output")
+        os.makedirs(pipeline_output_dir, exist_ok=True)
+    
+    def get_sequences(self, policy_output, chain_mask=None):
+        """
+            Return list of sampled sequences
+        """
+        sampled_sequences = policy_output["S"]
+
+        if chain_mask is not None:
+            sampled_sequences = sampled_sequences[:, chain_mask]
+
+        B = sampled_sequences.shape[0]
+        
+        sequences = [] 
+        for i in range(B):
+            seq = sampled_sequences[i]
+            seq_str = "".join([alphabet[int(s)] for s in seq])
+            sequences.append(seq_str)
+        return sequences
+
+    def get_input_df(self, sequences):
+        """
+        Convert list of sequences to DataFrame format required by AF3
+        """
+
+        df = pd.DataFrame(
+            {
+                "sequence": sequences,
+                "name": [f"seq_{i:04}" for i in range(len(sequences))],
+                "origin.path": [f"seq_{i:04}.path" for i in range(len(sequences))],
+            }
+        )
+
+        return df
+
+    @torch.no_grad()
+    def __call__(self, step, policy_output, feature_dict, device):
+
+        config = copy.deepcopy(self.pipeline_config)
+        config.rundir = os.path.join(
+            self.output_dir, 
+            self.run_name,
+            "pipeline_output", 
+            f"pipeline_output_iter_{step:04}"
+        )
+        
+        # just take sequences from the first chain
+        chain_mask = feature_dict["chain_labels"]==0 # [1, L]
+        chain_mask = chain_mask[0] # [L,]
+
+        # Get the sequences from policy output
+        sequences = self.get_sequences(policy_output, chain_mask=chain_mask)
+
+        if self.frag_cfg is not None:
+            fragment_dict = make_fragment_dict(sequences, self.frag_cfg.fragment_bounds)
+            samples = sample_sequences(fragment_dict, self.frag_cfg.sample_size, self.frag_cfg.min_sample)
+            names = [x[0] for x in samples]
+            sequences = [x[1] for x in samples]
+        
+        # Create a DataFrame for AF3
+        df_input = self.get_input_df(sequences)
+        df_out = self.run_pipeline(df_input, config)
+
+
+        # add code to delete af3 outputs to save space
+        af3_out_dir = os.path.join(config.rundir, "click/outputs")
+        subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
+
+
+        # Reward engineering
+        lig_rmsd_3AH_PRD = torch.tensor(df_out["click.lig_rmsd_3AH_PRD"].tolist())
+        lig_rmsd_DEP_PRD = torch.tensor(df_out["click.lig_rmsd_DEP_PRD"].tolist())
+        dist_CR1_NR1 = torch.tensor(df_out["click.dist_CR1_NR1"].tolist())
+        dist_CR2_NR3 = torch.tensor(df_out["click.dist_CR2_NR3"].tolist())
+        
+        # Normalize metrics to [0,1] range
+        def normalize_metric(metric, lb, ub):
+            metric_clamped = torch.clamp(metric, min=lb, max=ub)
+            reward = (metric_clamped - lb) / (ub - lb)
+            return reward
+
+        
+
+        lig_rmsd_3AH_PRD_reward = 1 - normalize_metric(lig_rmsd_3AH_PRD, self.rmsd_3AH_lb, self.rmsd_3AH_ub)
+        lig_rmsd_DEP_PRD_reward = 1 - normalize_metric(lig_rmsd_DEP_PRD, self.rmsd_DEP_lb, self.rmsd_DEP_ub)
+        dist_CR1_NR1_reward = 1 - normalize_metric(dist_CR1_NR1, self.dist_CR1_NR1_lb, self.dist_CR1_NR1_ub)
+        dist_CR2_NR3_reward = 1 - normalize_metric(dist_CR2_NR3, self.dist_CR2_NR3_lb, self.dist_CR2_NR3_ub)
+
+        # get iptm reward
+        iptm = torch.tensor(df_out["click.iptm"].tolist())
+        iptm_reward = normalize_metric(iptm, self.iptm_lb, self.iptm_ub)
+        ptm = torch.tensor(df_out["click.ptm"].tolist())
+        ptm_reward = normalize_metric(ptm, self.ptm_lb, self.ptm_ub)
+
+        # Combine all rewards
+        reward = (
+            lig_rmsd_3AH_PRD_reward + 
+            lig_rmsd_DEP_PRD_reward + 
+            dist_CR1_NR1_reward + 
+            dist_CR2_NR3_reward + 
+            iptm_reward + ptm_reward
+        ) / 6. # take straight average of all the metrics
+
+        if self.frag_cfg is not None:
+            reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
+
+        # make sure reward is properly padded when designing multiple chains
+        if len(reward.shape) == 2 and reward.shape[1] != chain_mask.shape[0]:
+            # should the padding be zero or ones? ( i think zero is better )
+            padding = torch.zeros(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
+            reward = torch.cat([reward, padding], dim=1)
+
+        metrics = {
+            "lig_rmsd_3AH_PRD": lig_rmsd_3AH_PRD.mean().cpu().item(),
+            "lig_rmsd_3AH_PRD_min": lig_rmsd_3AH_PRD.min().cpu().item(),
+            "lig_rmsd_3AH_PRD_max": lig_rmsd_3AH_PRD.max().cpu().item(),
+            "lig_rmsd_DEP_PRD": lig_rmsd_DEP_PRD.mean().cpu().item(),
+            "lig_rmsd_DEP_PRD_min": lig_rmsd_DEP_PRD.min().cpu().item(),
+            "lig_rmsd_DEP_PRD_max": lig_rmsd_DEP_PRD.max().cpu().item(),
+            "dist_CR1_NR1": dist_CR1_NR1.mean().cpu().item(),
+            "dist_CR1_NR1_min": dist_CR1_NR1.min().cpu().item(),
+            "dist_CR1_NR1_max": dist_CR1_NR1.max().cpu().item(),
+            "dist_CR2_NR3": dist_CR2_NR3.mean().cpu().item(),
+            "dist_CR2_NR3_min": dist_CR2_NR3.min().cpu().item(),
+            "dist_CR2_NR3_max": dist_CR2_NR3.max().cpu().item(),
+            "iptm_mean": iptm.mean().cpu().item(),
+            "iptm_min": iptm.min().cpu().item(),
+            "iptm_max": iptm.max().cpu().item(),
+            "ptm_mean": ptm.mean().cpu().item(),
+            "ptm_min": ptm.min().cpu().item(),
+            "ptm_max": ptm.max().cpu().item(),
+        }
+
+        return reward.to(device), metrics
+
+
+class AF3PETaseReward(Reward):
+    """
+        Click enzyme reward using AF3 pipeline
     """
 
     def __init__(
@@ -224,6 +413,10 @@ class AF3PETaseReward(Reward):
             hisNserO_ub=10,
             his_ser_angle=90,
             his_ser_angle_tol=5,
+            iptm_lb=0.0,
+            iptm_ub=0.8,
+            ptm_lb=0.0,
+            ptm_ub=0.8,
             frag_cfg=None, 
         ):
 
@@ -248,6 +441,10 @@ class AF3PETaseReward(Reward):
         self.his_ser_angle = his_ser_angle
         self.his_ser_angle_tol = his_ser_angle_tol
         self.frag_cfg = frag_cfg
+        self.iptm_ub = iptm_ub
+        self.iptm_lb = iptm_lb
+        self.ptm_ub = ptm_ub
+        self.ptm_lb = ptm_lb
 
         # make subdirectory for pipeline output
         pipeline_output_dir = os.path.join(self.output_dir, self.run_name, "pipeline_output")
@@ -354,6 +551,11 @@ class AF3PETaseReward(Reward):
 
         # get iptm reward
         iptm = torch.tensor(df_out["petase_metrics.iptm.mean"].tolist())
+        iptm_clamped = torch.clamp(iptm, min=self.iptm_lb, max=self.iptm_ub)
+        iptm_reward = (iptm_clamped - self.iptm_lb) / (self.iptm_ub - self.iptm_lb)
+        ptm = torch.tensor(df_out["petase_metrics.ptm.mean"].tolist())
+        ptm_clamped = torch.clamp(ptm, min=self.ptm_lb, max=self.ptm_ub)
+        ptm_reward = (ptm_clamped - self.ptm_lb) / (self.ptm_ub - self.ptm_lb)
 
         # Combine all rewards
         reward = (
@@ -362,8 +564,8 @@ class AF3PETaseReward(Reward):
             hisNE2_esterox_reward + 
             hisNE2_serOG_reward + 
             his_ser_angle_reward +
-            iptm
-        ) / 6. # take straight average of all the metrics
+            iptm_reward + ptm_reward
+        ) / 7. # take straight average of all the metrics
 
         if self.frag_cfg is not None:
             reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
@@ -393,120 +595,10 @@ class AF3PETaseReward(Reward):
             "iptm_mean": iptm.mean().cpu().item(),
             "iptm_min": iptm.min().cpu().item(),
             "iptm_max": iptm.max().cpu().item(),
+            "ptm_mean": ptm.mean().cpu().item(),
+            "ptm_min": ptm.min().cpu().item(),
+            "ptm_max": ptm.max().cpu().item(),
         }
 
         return reward.to(device), metrics
-
-
-# AF3 reward pre-pipeline
-class af3_reward(Reward):
-    """
-        Reward based on AlphaFold3 score
-        
-        Uses configurable thresholds to map metric values to the [0,1] range.
-        For metrics like RMSD where lower is better.
-    """
-    def __init__(self, output_dir, af3_config, metric_name="rmsd", lower_threshold=0.25, upper_threshold=3.0, normalization_type="linear"):
-        """
-        Initialize AF3 reward function
-        
-        Args:
-            af3_config: Configuration for AF3 inference
-            metric_name: Column name to use for the reward calculation (default: "rmsd")
-            lower_threshold: Values below this get reward 1.0
-            upper_threshold: Values above this get reward 0.0
-        """
-        self.af3_config = af3_config
-        self.output_dir = output_dir
-        self.metric_name = metric_name
-        self.lower_threshold = lower_threshold
-        self.upper_threshold = upper_threshold
-        self.normalization_type = normalization_type
-
-        if normalization_type == "exponential":
-            print(f"Using exponential reward normalization with lower_threshold: {lower_threshold} and upper_threshold: {upper_threshold}")
-            # Calculate the steepness to achieve min reward at upper_threshold
-            self.exp_steepness = -np.log(lower_threshold)
-        
-    def sequences_to_dataframe(self, sequences):
-        """
-        Convert list of sequences to DataFrame format required by AF3
-        """
-
-        df = pd.DataFrame({
-            'name': [f'seq_{i:04}' for i in range(len(sequences))],
-            'seq': sequences
-        })
-        return df
-        
-    def normalize_metric(self, values):
-        """
-        Normalize metric values to [0,1] range based on thresholds
-        For metrics like RMSD where lower is better
-        """
-        normalized = np.ones_like(values, dtype=np.float32)
-        
-        # Values above upper_threshold get 0.0
-        above_upper = values > self.upper_threshold
-        normalized[above_upper] = 0.0
-        
-        # Values between thresholds get scaled linearly
-        between = (values >= self.lower_threshold) & (values <= self.upper_threshold)
-        if np.any(between):
-            if self.normalization_type == "linear":
-                # Linear scaling - same as before
-                range_size = self.upper_threshold - self.lower_threshold
-                normalized[between] = 1.0 - (values[between] - self.lower_threshold) / range_size
-            elif self.normalization_type == "exponential":
-                # Exponential scaling
-                normalized_values = (values[between] - self.lower_threshold) / (self.upper_threshold - self.lower_threshold)
-                # Apply exponential decay: e^(-k*x) - gives 1.0 at lower and 0 at upper threshold
-                normalized[between] = (np.exp(-self.exp_steepness * normalized_values) - np.exp(-self.exp_steepness)) / (1 - np.exp(-self.exp_steepness))
-            
-        return normalized
-        
-    def __call__(self, step, policy_output, feature_dict, device):
-        # Get the sequences from policy output
-        sequences = self.get_sequences(policy_output)
-        
-        # Create a DataFrame for AF3
-        input_df = self.sequences_to_dataframe(sequences)
-        # need to update the datadir based on the current iteration
-        iter = policy_output["iter"] if "iter" in policy_output else 0
-        self.af3_config.datadir = os.path.join(self.output_dir, f"af3_outputs/iter_{step}")
-        # Create a temporary directory for AF3 outputs if needed
-        os.makedirs(self.af3_config.datadir, exist_ok=True)
-        
-        # Run AF3 inference
-        result_df = af3_main(self.af3_config, input_df=input_df)
-        # Look for the exact metric name in result columns
-        if self.metric_name in result_df.columns:
-            metric_values = result_df[self.metric_name].values
-        else:
-            # If the exact name is not found, look for it with state prefixes
-            state_columns = [col for col in result_df.columns if col.endswith(f"_{self.metric_name}")]
-            if state_columns:
-                metric_values = result_df[state_columns[0]].values
-            else:
-                # If not found at all, return zeros
-                print(f"Warning: Metric '{self.metric_name}' not found in AF3 results")
-                print(f"Available columns: {result_df.columns.tolist()}")
-                metric_values = np.zeros(len(sequences))
-        
-        # Normalize to [0,1] range
-        normalized_scores = self.normalize_metric(metric_values)
-        input_df['reward'] = normalized_scores
-        # save a csv to self.af3_config.datadir
-        input_df.to_csv(os.path.join(self.af3_config.datadir, f"af3_metrics.csv"), index=False)
-        # Convert to tensor and return
-        reward = torch.tensor(normalized_scores, dtype=torch.float32)
-
-        # convert raw rmsds to a dictionary
-        metrics = {
-            f"{self.metric_name}_mean": result_df[self.metric_name].values.mean(),
-        }
-
-        return reward.to(device), metrics
-
-
 

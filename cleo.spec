@@ -32,16 +32,16 @@ bash /opt/miniconda.sh -b -u -p /usr
 
 # install everything
 # lock python version to 3.10.8
-#      cuda version to 12.1
+#      cuda version to 12.4
 #      torch version to 2.2
 conda install \
    -c conda-forge \
-   -c nvidia/label/cuda-12.1.0 \
+   -c nvidia/label/cuda-12.4.0 \
    -c pytorch \
    -c pyg \
-   -c dglteam/label/cu121 \
+   -c dglteam/label/th24_cu124 \
    -c https://conda.rosettacommons.org \
-   python==3.10.8 \
+   python==3.11 \
    openbabel \
    pip \
    ipython \
@@ -53,9 +53,9 @@ conda install \
    jupyterlab \
    pyrosetta \
    pyg \
-   dgl==2.0.0.cu121 \
-   pytorch==2.2 \
-   pytorch-cuda==12.1 \
+   dgl==2.4.0.th24.cu124 \
+   pytorch==2.4 \
+   pytorch-cuda==12.4 \
    cuda
 
 # pip extras
@@ -76,15 +76,12 @@ pip install e3nn \
    submitit \
    biopython \
    botorch \
-   rich
+   rich \
+   pytorch-lightning
 
 # deepspeed
 pip install deepspeed
-#pip install torch-scatter -f https://data.pyg.org/whl/torch-2.2.0+cu121.html
 
-# SE3 transformer
-#pip install /SE3Transformer/
-#pip install /home/jgershon/git/RoseTTAFold-All-Atom/rf2aa/SE3Transformer/
 
 # Clean up
 conda clean -a -y

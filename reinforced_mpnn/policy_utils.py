@@ -38,7 +38,6 @@ class PolicyMPNN:
         OmegaConf.save(config=cfg, f=os.path.join(self.output_dir, f"{self.run_name}_config.yaml"))
 
         # log reward history
-        # self.reward_history = [torch.tensor(0., dtype=torch.float32, device=self.device)]
         self.reward_history = [0]
 
         # load model

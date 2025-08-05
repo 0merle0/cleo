@@ -1,4 +1,4 @@
-run_name: petase_dapo_fragmented_final  # name for the run
+run_name: petase_using_dihedral_selection_conf_clamp  # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
@@ -28,15 +28,27 @@ reward:
   pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_petase.yaml
   output_dir: ${output_dir}
   run_name: ${run_name} # name for the run
-  oxyanion_lb: 2.25
+  oxyanion_lb: 2.5
   oxyanion_ub: 10
   hisNesterox_lb: 3.5
   hisNesterox_ub: 10
-  hisNserO_lb: 2.25
+  hisNserO_lb: 2.5
   hisNserO_ub: 10
+  # serOester_lb: 2.5 # NEWLY ADDED
+  # serOester_ub: 10 # NEWLY ADDED
   his_ser_angle: 90
   his_ser_angle_tol: 5
+  iptm_ub: 0.7
+  iptm_lb: 0.0
+  ptm_ub: 0.8
+  ptm_lb: 0.0
   frag_cfg:
     fragment_bounds: [[0,41],[42,85],[86,127],[128,164],[165,208]]
     sample_size: 128
     min_sample: 2
+
+
+  # from kiera
+  # oxyanion hole distances
+  # ester to nitrogen distance 
+  # distance ser oxygen to ester oxygen
