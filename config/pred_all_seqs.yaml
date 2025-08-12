@@ -1,0 +1,6 @@
+run_name: mlp_dim16_no_val
+model_base_path: /projects/hydrolases/serine_hydrolase/software/cleo/ckpt/test_petase/petase_mlp_dim16_null/test_petase/petase_mlp_dim16_null.2025-07-21-12-13-13
+outdir: /home/jgershon/projects/itopt/kiera/model_predictions/250722_from_round_0_data
+fragment_dictionary: /home/jgershon/projects/itopt/kiera/petase_fragment_dictionary.json
+batch_size: 256
+ckpt_name: "last.ckpt"

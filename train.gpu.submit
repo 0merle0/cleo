@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -p gpu-train
-#SBATCH --gres=gpu:h200:1
+#SBATCH --gres=gpu:a100:1
 #SBATCH --nodes=1
 #SBATCH -c 8
 #SBATCH -J itopt

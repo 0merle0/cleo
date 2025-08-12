@@ -1,17 +1,17 @@
 # acquition function optimization configuration file
-run_name: TEST
+run_name: acqf_opt_mlp_dim16_no_val_gamma_10
 
-outdir: OUTPUTDIR
-surrogate_ckpt: CKPT
+outdir: /home/jgershon/projects/itopt/kiera/model_predictions/250722_from_round_0_data
+surrogate_ckpt: /projects/hydrolases/serine_hydrolase/software/cleo/ckpt/test_petase/petase_mlp_dim16_null/test_petase/petase_mlp_dim16_null.2025-07-21-12-13-13
 
 opt_loop:
   N: 24
-  q: 128
-  fragment_dictionary: /home/jgershon/projects/itopt/super/super_acqf_comparison/fragment_dictionary.json
-  num_iter: 25000
+  q: 384
+  fragment_dictionary: /home/jgershon/projects/itopt/kiera/petase_fragment_dictionary.json
+  num_iter: 50000
   lr: 0.01
 
 acqf:
   model_batch_size: 256
-  gamma: 15
+  gamma: 10
   eps: 1e-8

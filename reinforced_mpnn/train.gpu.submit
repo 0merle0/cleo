@@ -1,18 +1,18 @@
 #!/bin/bash
 #SBATCH -p gpu-train
-#SBATCH --gres=gpu:h200:1
+#SBATCH --gres=gpu:l40:8
 #SBATCH --nodes=1
-#SBATCH -c 4
+#SBATCH -c 8
 #SBATCH -J itopt
 #SBATCH --mem=64g
 #SBATCH --ntasks=1
-#SBATCH --time=4-00:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH -o logs/logs_%j.out
 
 
 ### change 5-digit MASTER_PORT as you wish, slurm will raise Error if duplicated with others
 ### change WORLD_SIZE as gpus/node * num_nodes
-export MASTER_PORT=46700
+export MASTER_PORT=46710
 
 ### get the first node name as master address - customized for vgg slurm
 ### e.g. master(gnodee[2-5],gnoded1) == gnodee2
@@ -24,13 +24,4 @@ export HYDRA_FULL_ERROR=1
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export XLA_FLAGS=--xla_gpu_enable_command_buffer=
 
-source activate newlatent; python train_policy.py -cn protease_dapo
-
-# source activate newlatent; python train_policy.py -cn super_dapo
-
-
-
-# source activate newlatent; python train_policy.py -cn penicillin_vanilla_pg \
-#                                                     temperature=0.5 \
-#                                                     run_name=penicillin_vanilla_pg_fragmented_T0.5 \
-#                                                     output_dir=/home/jgershon/projects/itopt/policy_mpnn/penicillin_vanilla_pg_fragmented_T0.5
+source activate newlatent; python train_policy.py -cn petase_dapo
