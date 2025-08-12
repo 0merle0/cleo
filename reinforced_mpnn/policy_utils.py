@@ -6,6 +6,10 @@ from tqdm import tqdm
 import time
 import hydra
 from omegaconf import OmegaConf
+import pandas as pd  # pandas for CSV fallback logging
+import pickle
+from pathlib import Path
+import torch.nn.functional as F
 
 sys.path.append("/software/lab/mpnn/fused_mpnn")
 from data_utils import featurize, parse_PDB
@@ -25,9 +29,10 @@ alphabet = list(restype_STRtoINT)
 
 
 class PolicyMPNN:
-    def __init__(self, cfg):
+    def __init__(self, cfg, eval_mode=False):
 
         self.cfg = cfg
+        self.eval_mode = eval_mode
         self.device = DEVICE
         self.run_name = cfg.run_name
         self.output_dir = os.path.join(cfg.output_dir, cfg.run_name)
@@ -89,8 +94,21 @@ class PolicyMPNN:
 
         
         # load checkpoint if provided
-        if self.cfg.checkpoint_path:
-            ckpt_path = self.cfg.checkpoint_path
+        if self.eval_mode:
+            if hasattr(self.cfg, 'evaluate') and self.cfg.evaluate.get('chkpt_path'):
+                print(f"Loading evaluation checkpoint from {self.cfg.evaluate.chkpt_path}")
+                ckpt_path = self.cfg.evaluate.chkpt_path
+            else:
+                # Auto-construct path to last checkpoint from training run
+                ckpt_path = os.path.join(self.output_dir, f"{self.cfg.run_name}_last.pt")
+                if not os.path.exists(ckpt_path):
+                    raise FileNotFoundError(f"Checkpoint file {ckpt_path} does not exist")
+        else:
+            if self.cfg.get('checkpoint_path'):
+                print(f"Loading training checkpoint from {self.cfg.checkpoint_path}")
+                ckpt_path = self.cfg.checkpoint_path
+            else:
+                print(f"Using default MPNN checkpoint: {ckpt_path}")
 
         # load model
         model = ProteinMPNN(node_features=128,
@@ -104,7 +122,9 @@ class PolicyMPNN:
                         model_type=model_type,
                         ligand_mpnn_use_side_chain_context=self.ligand_mpnn_use_side_chain_context)
 
-        ckpt = torch.load(ckpt_path, map_location=self.device)
+        # Determine if we're loading a default MPNN checkpoint or a custom checkpoint
+        is_default_checkpoint = ckpt_path in [PROTEIN_MPNN_CKPT_PATH, LIGAND_MPNN_CKPT_PATH]        
+        ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=is_default_checkpoint)
         model.load_state_dict(ckpt["model_state_dict"], strict=False)
         return model.to(self.device)
 
@@ -350,6 +370,7 @@ class PolicyMPNN:
             "log_probs": all_log_probs, 
             "decoding_order": decoding_order, 
             "state_features": h_V_stack[-1].detach(),
+            "chain_mask": chain_mask,
         }
 
         return output_dict
@@ -377,7 +398,7 @@ class PolicyMPNN:
         # apply mask and take sum over each seq in the batch
         batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1))
 
-        batched_reward, metrics = self.reward_fn(step, out, feature_dict, self.device)
+        batched_reward, metrics = self.reward_fn(step, out, feature_dict, self.device, evaluate=False)
         to_log.update(metrics)
 
         # get baseline first
@@ -460,7 +481,8 @@ class PolicyMPNN:
                 wandb.log({"runtime": runtime, "training/step": step}, step=step)
 
             # model checkpointing
-            if step > 0 and self.checkpoint_every_n_steps % step == 0:
+            if step > 0 and step % self.checkpoint_every_n_steps == 0:
+                print(f"Checkpoint at step {step} saved")
                 self.checkpoint_model(step, to_log)
         
         print("Training complete.")
@@ -492,3 +514,176 @@ class PolicyMPNN:
             # Log best reward metrics to wandb without saving the file
             if wandb.run:
                 wandb.log({"best/reward": curr_reward, "best/step": step})
+
+
+    def evaluate(self):
+        """
+        Run evaluation on the trained policy to generate sequences and compute rewards.
+        """
+        # Set model to evaluation mode
+        self.model.eval()
+        print("Starting evaluation...")
+        
+        # Initialize empty lists to store results from each batch
+        all_outputs = []
+        all_metrics = []
+        
+        # Featurize PDB once (same as in training)
+        feature_dict = self.featurize_pdb(self.cfg.pdb)
+        
+        # Encode initial state once (same as in training)
+        h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
+        
+        # Evaluation loop
+        for batch_idx in tqdm(range(self.cfg.evaluate.num_batches), desc="Evaluation batches"):
+            
+            # Set batch size for this evaluation batch
+            feature_dict['batch_size'] = self.cfg.evaluate.batch_size
+            
+            # Clone initial state variables for this batch
+            init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
+            
+            with torch.no_grad():
+                # Perform policy rollout
+                out = self.rollout(feature_dict, *init_state)
+                
+                # Calculate rewards with evaluation flag
+                rewards, metrics = self.reward_fn(batch_idx, out, feature_dict, self.device, evaluate=True)
+                
+                # Store rewards in metrics for easy access later
+                metrics['batch_rewards'] = rewards
+                
+                # Store results
+                all_outputs.append(out)
+                all_metrics.append(metrics)
+        
+        print(f"Evaluation complete. Processed {len(all_outputs)} batches.")
+        
+        # Check if fragment-based reward was used
+        has_fragment_rewards = hasattr(self.cfg.reward, 'frag_cfg') and self.cfg.reward.frag_cfg is not None
+        
+        # Process and save results
+        print("Processing evaluation results...")
+        self._process_evaluation_results(all_outputs, all_metrics, has_fragment_rewards)
+
+    def _process_evaluation_results(self, all_outputs, all_metrics, has_fragment_rewards: bool):
+        """Aggregate evaluation outputs into CSVs under the latest evaluation run directory.
+        Creates: all_sequences.csv and per-fragment CSVs when fragment rewards are enabled."""
+        import re
+
+        # Find latest evaluation run index from existing batch run dirs
+        pipeline_output_dir = Path(self.output_dir) / "pipeline_output"
+        pipeline_output_dir.mkdir(parents=True, exist_ok=True)
+        eval_batch_dirs = [
+            d for d in pipeline_output_dir.glob("pipeline_output_eval_*_batch_*") if d.is_dir()
+        ]
+        eval_idx = "0"
+        if eval_batch_dirs:
+            latest_dir = max(eval_batch_dirs, key=lambda p: p.stat().st_mtime)
+            m = re.match(r"pipeline_output_eval_(\d+)_batch_\d{4}$", latest_dir.name)
+            if m:
+                eval_idx = m.group(1)
+        CSV_DIR = pipeline_output_dir / f"pipeline_output_eval_{eval_idx}" 
+        CSV_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Helpers
+        def _make_pos_mask(L: int, B: int, chain_mask: torch.Tensor, fragment_bounds=None, device=None):
+            if device is None:
+                device = chain_mask.device
+            if chain_mask.dim() > 1:
+                cm = chain_mask[0].bool()
+            else:
+                cm = chain_mask.bool()
+            base = cm.to(device).unsqueeze(0).expand(B, -1)
+            if fragment_bounds is None:
+                frag = torch.ones((1, L), dtype=torch.bool, device=device)
+            else:
+                s, e = int(fragment_bounds[0]), int(fragment_bounds[1])
+                frag = torch.zeros((1, L), dtype=torch.bool, device=device)
+                if e > s:
+                    frag[:, s:e] = True
+            return base & frag.expand(B, -1)
+
+        def _calculate_sequence_log_probs(sequences, sampling_probs, pos_mask):
+            logp = torch.log(sampling_probs.clamp_min(1e-12))
+            oh = F.one_hot(sequences.long(), 21)[:, :, :20].to(logp.dtype)
+            seq_logp = (logp * oh).sum(-1)
+            return (seq_logp * pos_mask.float()).sum(1)
+
+        # Aggregate
+        rows_main = []
+        frag_rows = {}
+
+        for output, metrics in zip(all_outputs, all_metrics):
+            S = output["S"]
+            P = output["sampling_probs"]
+            chain_mask = output.get("chain_mask")
+            if chain_mask is None:
+                continue
+            B, L = S.shape
+
+            pos_mask_main = _make_pos_mask(L, B, chain_mask, fragment_bounds=None, device=S.device)
+            cum_log = _calculate_sequence_log_probs(S, P, pos_mask_main)
+
+            batch_rewards = metrics.get("batch_rewards")
+            if batch_rewards is None:
+                continue
+            pmr = pos_mask_main.to(batch_rewards.device).float()
+            denom = pmr.sum(1).clamp_min(1e-12)
+            if batch_rewards.ndim == 1:
+                rewards = batch_rewards
+            else:
+                rewards = (batch_rewards * pmr).sum(1) / denom
+
+            seq_idx_strs = [" ".join(map(str, row)) for row in S.tolist()]
+            seq_strs = ["".join([alphabet[int(s)] for s in seq]) for seq in S.tolist()]
+
+            for i in range(B):
+                rows_main.append({
+                    "sequence_idx": seq_idx_strs[i],
+                    "sequence_str": seq_strs[i],
+                    "cumulative_log_prob": float(cum_log[i].detach().cpu()),
+                    "reward_mean": float((rewards[i].detach().cpu() if torch.is_tensor(rewards) else rewards[i])),
+                })
+
+            # Per-fragment CSVs
+            if has_fragment_rewards and ("fragment_bounds" in metrics) and ("fragment_dict" in metrics):
+                fragment_bounds = metrics["fragment_bounds"]
+                fragment_dict = metrics["fragment_dict"]
+                for i_fb, (start, end) in enumerate(fragment_bounds):
+                    key = f"fragment_{i_fb+1}"
+                    frag_mask = _make_pos_mask(L, B, chain_mask, fragment_bounds=[start, end], device=S.device)
+                    cum_log_f = _calculate_sequence_log_probs(S, P, frag_mask)
+
+                    fmr = frag_mask.to(batch_rewards.device).float()
+                    denom_f = fmr.sum(1).clamp_min(1e-12)
+                    if batch_rewards.ndim == 1:
+                        rewards_f = batch_rewards
+                    else:
+                        rewards_f = (batch_rewards * fmr).sum(1) / denom_f
+
+                    if key not in frag_rows:
+                        frag_rows[key] = []
+                    for frag_name, frag_seq in fragment_dict.get(key, []):
+                        try:
+                            j = int(str(frag_name).split(".")[0])
+                        except Exception:
+                            continue
+                        frag_rows[key].append({
+                            "fragment": key,
+                            "fragment_name": frag_name,
+                            "fragment_seq": frag_seq,
+                            "cumulative_log_prob_fragment": float(cum_log_f[j].detach().cpu()),
+                            "reward_mean_fragment": float((rewards_f[j].detach().cpu() if torch.is_tensor(rewards_f) else rewards_f[j])),
+                        })
+
+        # Write CSVs
+        df_seqs = pd.DataFrame(rows_main)
+        df_seqs.to_csv(CSV_DIR / "all_sequences.csv", index=False)
+        if has_fragment_rewards and frag_rows:
+            all_frag_rows = []
+            for key, rows in frag_rows.items():
+                all_frag_rows.extend(rows)
+            pd.DataFrame(all_frag_rows).to_csv(CSV_DIR / "fragments.csv", index=False)
+        
+    

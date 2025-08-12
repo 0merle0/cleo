@@ -388,6 +388,8 @@ def calculate_chirality(atom_array, mol, confId, chiral_atom_name):
     str or None
         "R", "S", or None if chirality couldn't be determined
     """
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
     try:
         if isinstance(atom_array, struc.AtomArrayStack):
             atom_array = atom_array[0]
