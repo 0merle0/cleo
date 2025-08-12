@@ -5,3 +5,4 @@ logs/
 ckpt/
 lightning_logs/
 outputs/
+._*.*
