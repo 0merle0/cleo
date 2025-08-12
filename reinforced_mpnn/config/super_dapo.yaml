@@ -10,7 +10,7 @@ checkpoint_path: null
 algorithm: dapo
 
 # -- DAPO params --
-N_updates: 32 # number of rollouts per step
+N_updates: 16 # number of rollouts per step
 update_batch_size: 8 # number of rollouts to use for each update
 clip_eps_low: 0.2 # lower bound for clipping value taken from paper
 clip_eps_high: 0.28 # upper bound for clipping value taken from paper
