@@ -479,6 +479,8 @@ class PolicyMPNN:
             if wandb.run:
                 # Log runtime and step separately to avoid conflicts with train_step logging
                 wandb.log({"runtime": runtime, "training/step": step}, step=step)
+            else:
+                self.log_metrics(step, runtime, to_log)
 
             # model checkpointing
             if step > 0 and  step % self.checkpoint_every_n_steps == 0:
@@ -487,6 +489,21 @@ class PolicyMPNN:
         print("Training complete.")
         print(f"Best reward seen: {self.best_seen_reward:.4f} at step {self.step_at_best_seen_reward}")
 
+    def log_metrics(self, step, runtime, to_log):
+        """
+        Log training metrics
+        """
+        metrics_to_log = [k for k,v in to_log.items() if isinstance(v, float)]
+        log_path = os.path.join(self.output_dir, f"{self.run_name}_train_metrics.csv")
+        if not os.path.exists(log_path):
+            with open(log_path,'w') as f:
+                f.write("step,runtime,"\
+                        +",".join([f"{m}" for m in metrics_to_log])\
+                        +'\n')
+        with open(log_path,'a') as f:
+            f.write(f"{step},{runtime:.4f},"\
+                    +",".join([f"{to_log[m]:.4f}" for m in metrics_to_log])\
+                    +'\n')
     
     def checkpoint_model(self, step, to_log):
         """
