@@ -555,7 +555,9 @@ class AF3PETaseReward(Reward):
             "iptm_max": iptm.max().cpu().item(),
         }
 
-        return reward.to(device), metricsclass LigasePipelineReward(Reward):
+        return reward.to(device), metrics
+
+class LigasePipelineReward(Reward):
     """
         Penicillin active site, using af3 RMSD as reward
     """
