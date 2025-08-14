@@ -16,16 +16,17 @@ def train_policy(cfg):
     Args:
         cfg: Configuration object from hydra
     """
-    # Initialize wandb
-    wandb.init(
-        project="policy_mpnn",
-        entity="bakerlab",
-        config=OmegaConf.to_container(cfg, resolve=True),
-        name=cfg.run_name,
-        dir=cfg.output_dir,
-        # Mode can be set through config (online, offline, disabled)
-        mode="online" if not hasattr(cfg, "wandb_mode") else cfg.wandb_mode
-    )
+    # Initialize wandb only if configured
+    wandb_mode = getattr(cfg, "wandb_mode", None)
+    if wandb_mode in ("online", "offline"):
+        wandb.init(
+            project="policy_mpnn",
+            entity="bakerlab",
+            config=OmegaConf.to_container(cfg, resolve=True),
+            name=cfg.run_name,
+            dir=cfg.output_dir,
+            mode=wandb_mode,
+        )
     
     # Initialize the appropriate policy based on the algorithm specified in config
     if cfg.get('algorithm').lower() == 'ppo':
@@ -55,7 +56,8 @@ def train_policy(cfg):
     policy.train()
     
     # Close wandb
-    wandb.finish()
+    if wandb.run:
+        wandb.finish()
 
 
 if __name__ == "__main__":

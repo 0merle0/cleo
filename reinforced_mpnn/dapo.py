@@ -128,14 +128,14 @@ class PolicyMPNNvDAPO(PolicyMPNN):
             "rewards/max":  all_batched_rewards.max().cpu().item(),
         })
 
-        # ---------- Weights & Biases logging ----------
-        wandb_log = {}
-        if metrics:                       # reward-fn specific metrics
-            wandb_log.update({f"reward_metrics/{k}": v for k, v in metrics.items()})
-        wandb_log.update(to_log)          # include policy + reward stats
-        wandb.log(wandb_log, step=step)   # don't finish the row yet
-        
-
+        if wandb.run:
+            # ---------- Weights & Biases logging ----------
+            wandb_log = {}
+            if metrics:                       # reward-fn specific metrics
+                wandb_log.update({f"reward_metrics/{k}": v for k, v in metrics.items()})
+            wandb_log.update(to_log)          # include policy + reward stats
+            wandb.log(wandb_log, step=step)   # don't finish the row yet
+            
         self._log_metrics_to_csv(step, to_log)
 
         return to_log
