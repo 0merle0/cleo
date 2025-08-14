@@ -53,6 +53,7 @@ class PolicyMPNN:
 
         if self.cfg.eval:
             self.model.eval()
+            self.cfg.reward = self.cfg.evaluate.reward
 
         # load optimizer
         self.optimizer = self.get_optimizer()
@@ -540,19 +541,15 @@ class PolicyMPNN:
         self.model.eval()
         print("Starting evaluation...")
         
-        # Initialize empty lists to store results from each batch
-        all_outputs = []
-        all_metrics = []
-        
         # Featurize PDB once (same as in training)
         feature_dict = self.featurize_pdb(self.cfg.pdb)
         
         # Encode initial state once (same as in training)
         h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
         
-        # Evaluation loop
-        for batch_idx in tqdm(range(self.cfg.evaluate.num_batches), desc="Evaluation batches"):
-            
+        # Collect rollouts for all batches first
+        outs = []
+        for _ in tqdm(range(self.cfg.evaluate.num_batches), desc="Evaluation batches"):
             # Set batch size for this evaluation batch
             feature_dict['batch_size'] = self.cfg.evaluate.batch_size
             
@@ -560,33 +557,40 @@ class PolicyMPNN:
             init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
             
             with torch.no_grad():
-                # Perform policy rollout
-                out = self.rollout(feature_dict, *init_state)
-                
-                # Calculate rewards with evaluation flag
-                rewards, metrics = self.reward_fn(batch_idx, out, feature_dict, self.device, evaluate=True)
-                
-                # Store rewards in metrics for easy access later
-                metrics['batch_rewards'] = rewards
-                
-                # Store results
-                all_outputs.append(out)
-                all_metrics.append(metrics)
+                outs.append(self.rollout(feature_dict, *init_state))
         
-        print(f"Evaluation complete. Processed {len(all_outputs)} batches.")
+        # Concatenate outputs along the batch dimension
+        def _cat(key):
+            return torch.cat([o[key] for o in outs], dim=0)
+        
+        combined_out = {
+            "S": _cat("S"),
+            "sampling_probs": _cat("sampling_probs"),
+            "log_probs": _cat("log_probs"),
+            "decoding_order": _cat("decoding_order"),
+            "state_features": _cat("state_features"),
+            "chain_mask": _cat("chain_mask"),
+        }
+        
+        # Single reward call over all sequences
+        with torch.no_grad():
+            rewards, metrics = self.reward_fn(0, combined_out, feature_dict, self.device, evaluate=True)
+            metrics['batch_rewards'] = rewards
+        
+        print(f"Evaluation complete. Processed {len(outs)} batches.")
         
         # Check if fragment-based reward was used
         has_fragment_rewards = hasattr(self.cfg.reward, 'frag_cfg') and self.cfg.reward.frag_cfg is not None
         
         # Process and save results
         print("Processing evaluation results...")
-        self._process_evaluation_results(all_outputs, all_metrics, has_fragment_rewards)
+        self._process_evaluation_results(combined_out, metrics, has_fragment_rewards)
 
-    def _process_evaluation_results(self, all_outputs, all_metrics, has_fragment_rewards: bool):
+    def _process_evaluation_results(self, output, metrics, has_fragment_rewards: bool):
         """Aggregate evaluation outputs into CSVs under the latest evaluation run directory.
         Creates: all_sequences.csv and per-fragment CSVs when fragment rewards are enabled."""
         import re
-
+        
         # Find latest evaluation run index from existing batch run dirs
         pipeline_output_dir = Path(self.output_dir) / "pipeline_output"
         pipeline_output_dir.mkdir(parents=True, exist_ok=True)
@@ -599,9 +603,9 @@ class PolicyMPNN:
             m = re.match(r"pipeline_output_eval_(\d+)_batch_\d{4}$", latest_dir.name)
             if m:
                 eval_idx = m.group(1)
-        CSV_DIR = pipeline_output_dir / f"pipeline_output_eval_{eval_idx}" 
+        CSV_DIR = pipeline_output_dir / f"pipeline_output_eval_{eval_idx}"
         CSV_DIR.mkdir(parents=True, exist_ok=True)
-
+        
         # Helpers
         def _make_pos_mask(L: int, B: int, chain_mask: torch.Tensor, fragment_bounds=None, device=None):
             if device is None:
@@ -619,80 +623,79 @@ class PolicyMPNN:
                 if e > s:
                     frag[:, s:e] = True
             return base & frag.expand(B, -1)
-
+        
         def _calculate_sequence_log_probs(sequences, sampling_probs, pos_mask):
             logp = torch.log(sampling_probs.clamp_min(1e-12))
             oh = F.one_hot(sequences.long(), 21)[:, :, :20].to(logp.dtype)
             seq_logp = (logp * oh).sum(-1)
             return (seq_logp * pos_mask.float()).sum(1)
-
+        
         # Aggregate
         rows_main = []
         frag_rows = {}
-
-        for output, metrics in zip(all_outputs, all_metrics):
-            S = output["S"]
-            P = output["sampling_probs"]
-            chain_mask = output.get("chain_mask")
-            if chain_mask is None:
-                continue
-            B, L = S.shape
-
-            pos_mask_main = _make_pos_mask(L, B, chain_mask, fragment_bounds=None, device=S.device)
-            cum_log = _calculate_sequence_log_probs(S, P, pos_mask_main)
-
-            batch_rewards = metrics.get("batch_rewards")
-            if batch_rewards is None:
-                continue
-            pmr = pos_mask_main.to(batch_rewards.device).float()
-            denom = pmr.sum(1).clamp_min(1e-12)
-            if batch_rewards.ndim == 1:
-                rewards = batch_rewards
-            else:
-                rewards = (batch_rewards * pmr).sum(1) / denom
-
-            seq_idx_strs = [" ".join(map(str, row)) for row in S.tolist()]
-            seq_strs = ["".join([alphabet[int(s)] for s in seq]) for seq in S.tolist()]
-
-            for i in range(B):
-                rows_main.append({
-                    "sequence_idx": seq_idx_strs[i],
-                    "sequence_str": seq_strs[i],
-                    "cumulative_log_prob": float(cum_log[i].detach().cpu()),
-                    "reward_mean": float((rewards[i].detach().cpu() if torch.is_tensor(rewards) else rewards[i])),
-                })
-
-            # Per-fragment CSVs
-            if has_fragment_rewards and ("fragment_bounds" in metrics) and ("fragment_dict" in metrics):
-                fragment_bounds = metrics["fragment_bounds"]
-                fragment_dict = metrics["fragment_dict"]
-                for i_fb, (start, end) in enumerate(fragment_bounds):
-                    key = f"fragment_{i_fb+1}"
-                    frag_mask = _make_pos_mask(L, B, chain_mask, fragment_bounds=[start, end], device=S.device)
-                    cum_log_f = _calculate_sequence_log_probs(S, P, frag_mask)
-
-                    fmr = frag_mask.to(batch_rewards.device).float()
-                    denom_f = fmr.sum(1).clamp_min(1e-12)
-                    if batch_rewards.ndim == 1:
-                        rewards_f = batch_rewards
-                    else:
-                        rewards_f = (batch_rewards * fmr).sum(1) / denom_f
-
-                    if key not in frag_rows:
-                        frag_rows[key] = []
-                    for frag_name, frag_seq in fragment_dict.get(key, []):
-                        try:
-                            j = int(str(frag_name).split(".")[0])
-                        except Exception:
-                            continue
-                        frag_rows[key].append({
-                            "fragment": key,
-                            "fragment_name": frag_name,
-                            "fragment_seq": frag_seq,
-                            "cumulative_log_prob_fragment": float(cum_log_f[j].detach().cpu()),
-                            "reward_mean_fragment": float((rewards_f[j].detach().cpu() if torch.is_tensor(rewards_f) else rewards_f[j])),
-                        })
-
+        
+        S = output["S"]
+        P = output["sampling_probs"]
+        chain_mask = output.get("chain_mask")
+        if chain_mask is None:
+            return
+        B, L = S.shape
+        
+        pos_mask_main = _make_pos_mask(L, B, chain_mask, fragment_bounds=None, device=S.device)
+        cum_log = _calculate_sequence_log_probs(S, P, pos_mask_main)
+        
+        batch_rewards = metrics.get("batch_rewards")
+        if batch_rewards is None:
+            return
+        pmr = pos_mask_main.to(batch_rewards.device).float()
+        denom = pmr.sum(1).clamp_min(1e-12)
+        if batch_rewards.ndim == 1:
+            rewards = batch_rewards
+        else:
+            rewards = (batch_rewards * pmr).sum(1) / denom
+        
+        seq_idx_strs = [" ".join(map(str, row)) for row in S.tolist()]
+        seq_strs = ["".join([alphabet[int(s)] for s in seq]) for seq in S.tolist()]
+        
+        for i in range(B):
+            rows_main.append({
+                "sequence_idx": seq_idx_strs[i],
+                "sequence_str": seq_strs[i],
+                "cumulative_log_prob": float(cum_log[i].detach().cpu()),
+                "reward_mean": float((rewards[i].detach().cpu() if torch.is_tensor(rewards) else rewards[i])),
+            })
+        
+        # Per-fragment CSVs
+        if has_fragment_rewards and ("fragment_bounds" in metrics) and ("fragment_dict" in metrics):
+            fragment_bounds = metrics["fragment_bounds"]
+            fragment_dict = metrics["fragment_dict"]
+            for i_fb, (start, end) in enumerate(fragment_bounds):
+                key = f"fragment_{i_fb+1}"
+                frag_mask = _make_pos_mask(L, B, chain_mask, fragment_bounds=[start, end], device=S.device)
+                cum_log_f = _calculate_sequence_log_probs(S, P, frag_mask)
+                
+                fmr = frag_mask.to(batch_rewards.device).float()
+                denom_f = fmr.sum(1).clamp_min(1e-12)
+                if batch_rewards.ndim == 1:
+                    rewards_f = batch_rewards
+                else:
+                    rewards_f = (batch_rewards * fmr).sum(1) / denom_f
+                
+                if key not in frag_rows:
+                    frag_rows[key] = []
+                for frag_name, frag_seq in fragment_dict.get(key, []):
+                    try:
+                        j = int(str(frag_name).split(".")[0])
+                    except Exception:
+                        continue
+                    frag_rows[key].append({
+                        "fragment": key,
+                        "fragment_name": frag_name,
+                        "fragment_seq": frag_seq,
+                        "cumulative_log_prob_fragment": float(cum_log_f[j].detach().cpu()),
+                        "reward_mean_fragment": float((rewards_f[j].detach().cpu() if torch.is_tensor(rewards_f) else rewards_f[j])),
+                    })
+        
         # Write CSVs
         df_seqs = pd.DataFrame(rows_main)
         df_seqs.to_csv(CSV_DIR / "all_sequences.csv", index=False)
