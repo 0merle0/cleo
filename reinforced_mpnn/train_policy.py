@@ -1,6 +1,10 @@
 import sys, os
 from omegaconf import OmegaConf
 import hydra
+import wandb
+from policy_utils import PolicyMPNN
+from PPO import PPOPolicy
+from GRPO import GRPO_singleprompt
 
 
 @hydra.main(version_base=None, config_path="./config")
@@ -12,6 +16,18 @@ def train_policy(cfg):
     Args:
         cfg: Configuration object from hydra
     """
+    # Initialize wandb only if configured
+    wandb_mode = getattr(cfg, "wandb_mode", None)
+    if wandb_mode in ("online", "offline"):
+        wandb.init(
+            project="policy_mpnn",
+            entity="bakerlab",
+            config=OmegaConf.to_container(cfg, resolve=True),
+            name=cfg.run_name,
+            dir=cfg.output_dir,
+            mode=wandb_mode,
+        )
+    
     # Initialize the appropriate policy based on the algorithm specified in config
     if cfg.get('algorithm').lower() == 'ppo':
         print(f"Using PPO algorithm for training")
@@ -38,6 +54,10 @@ def train_policy(cfg):
 
     # Train the policy
     policy.train()
+    
+    # Close wandb
+    if wandb.run:
+        wandb.finish()
 
 
 if __name__ == "__main__":
