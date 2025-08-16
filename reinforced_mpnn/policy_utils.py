@@ -226,13 +226,15 @@ class PolicyMPNN:
                 E_idx,
                 decoding_order=None, # B, L
                 sampled_actions=None, # B, L
+                model=None
             ):
         """
         Ripped from fused MPNN decoding, modified to allow grads to flow through this pass
         """
 
         # decode
-        
+        if model is None:
+            model = self.model
 
         if sampled_actions is None:
             B_decoder = feature_dict["batch_size"]
@@ -281,7 +283,7 @@ class PolicyMPNN:
         all_log_probs = torch.zeros((B_decoder, L, 21), device=self.device, dtype=torch.float32)
         h_S = torch.zeros_like(h_V, device=self.device)
         S = 20*torch.ones((B_decoder, L), dtype=torch.int64, device=self.device)
-        h_V_stack = [h_V] + [torch.zeros_like(h_V, device=self.device) for _ in range(len(self.model.decoder_layers))]
+        h_V_stack = [h_V] + [torch.zeros_like(h_V, device=self.device) for _ in range(len(model.decoder_layers))]
 
         h_EX_encoder = self.cat_neighbors_nodes(torch.zeros_like(h_S), h_E, E_idx)
         h_EXV_encoder = self.cat_neighbors_nodes(h_V, h_EX_encoder, E_idx)
@@ -303,7 +305,7 @@ class PolicyMPNN:
 
             mask_bw_t = torch.gather(mask_bw, 1, t[:,None,None,None].repeat(1,1,mask_bw.shape[-2], mask_bw.shape[-1]))
 
-            for l, layer in enumerate(self.model.decoder_layers):
+            for l, layer in enumerate(model.decoder_layers):
                 h_ESV_decoder_t = self.cat_neighbors_nodes(h_V_stack[l], h_ES_t, E_idx_t)
                 h_V_t = torch.gather(h_V_stack[l], 1, t[:,None,None].repeat(1,1,h_V_stack[l].shape[-1]))
                 h_ESV_t = mask_bw_t * h_ESV_decoder_t + h_EXV_encoder_t
@@ -317,7 +319,7 @@ class PolicyMPNN:
             h_V_t = torch.gather(h_V_stack[-1], 1, t[:,None,None].repeat(1,1,h_V_stack[-1].shape[-1]))[:,0]
 
 
-            logits = self.model.W_out(h_V_t) #[B,21]
+            logits = model.W_out(h_V_t) #[B,21]
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1) #[B,21]
 
 
@@ -338,7 +340,7 @@ class PolicyMPNN:
             with torch.no_grad():
                 S_true_t = torch.gather(S_true, 1, t[:,None])[:,0]
                 S_t = (S_t*chain_mask_t+S_true_t*(1.0-chain_mask_t)).long()
-                h_S.scatter_(1, t[:,None,None].repeat(1,1,h_S.shape[-1]), self.model.W_s(S_t)[:,None,:])
+                h_S.scatter_(1, t[:,None,None].repeat(1,1,h_S.shape[-1]), model.W_s(S_t)[:,None,:])
                 S.scatter_(1, t[:,None], S_t[:,None])
 
 

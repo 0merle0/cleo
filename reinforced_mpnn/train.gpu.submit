@@ -12,7 +12,7 @@
 
 ### change 5-digit MASTER_PORT as you wish, slurm will raise Error if duplicated with others
 ### change WORLD_SIZE as gpus/node * num_nodes
-export MASTER_PORT=46771
+export MASTER_PORT=46788
 
 ### get the first node name as master address - customized for vgg slurm
 ### e.g. master(gnodee[2-5],gnoded1) == gnodee2
@@ -24,6 +24,6 @@ export HYDRA_FULL_ERROR=1
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export XLA_FLAGS=--xla_gpu_enable_command_buffer=
 
-source activate newlatent; python train_policy.py -cn clickase_dapo
+# source activate newlatent; python train_policy.py -cn clickase_dapo
 
-# source activate newlatent; python train_policy.py -cn petase_dapo
+source activate newlatent; python train_policy.py -cn petase_dapo

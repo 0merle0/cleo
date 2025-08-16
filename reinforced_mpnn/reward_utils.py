@@ -228,7 +228,14 @@ class AF3ClickEnzymeReward(Reward):
             dist_CR1_NR1_ub=5.0,
             dist_CR2_NR3_lb=0.5,
             dist_CR2_NR3_ub=5.0,
+            ref_seq=None,
+            max_dist_to_ref_seq=100,
+            min_dist_to_ref_seq=0,
             frag_cfg=None, 
+            max_pairwise_diversity=20,
+            min_pairwise_diversity=0,
+            esm_perplexity_ub=15.0,
+            esm_perplexity_lb=6.0,
         ):
 
         sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
@@ -255,6 +262,13 @@ class AF3ClickEnzymeReward(Reward):
         self.dist_CR1_NR1_lb = dist_CR1_NR1_lb
         self.dist_CR2_NR3_ub = dist_CR2_NR3_ub
         self.dist_CR2_NR3_lb = dist_CR2_NR3_lb
+        self.ref_seq = ref_seq
+        self.max_dist_to_ref_seq = max_dist_to_ref_seq
+        self.min_dist_to_ref_seq = min_dist_to_ref_seq
+        self.max_pairwise_diversity = max_pairwise_diversity
+        self.min_pairwise_diversity = min_pairwise_diversity
+        self.esm_perplexity_ub = esm_perplexity_ub
+        self.esm_perplexity_lb = esm_perplexity_lb
         self.frag_cfg = frag_cfg
 
         # make subdirectory for pipeline output
@@ -293,6 +307,28 @@ class AF3ClickEnzymeReward(Reward):
         )
 
         return df
+    
+    def get_dist_to_ref_seq(self, sequences):
+        assert self.ref_seq is not None, "Reference sequence is None"
+        dist_list = []
+        for seq in sequences:
+            dist = sum(1 for a, b in zip(seq, self.ref_seq) if a != b)
+            dist_list.append(float(dist))
+
+        return torch.tensor(dist_list)
+    
+    def get_pairwise_diversity(self, sequences):
+        dist_list = []
+        for i in range(len(sequences)):
+            _list = []
+            for j in range(len(sequences)):
+                if i != j:
+                    dist = sum(1 for a, b in zip(sequences[i], sequences[j]) if a != b)
+                    _list.append(float(dist))
+            dist_list.append(np.mean(_list))
+
+        # return mean pairwise distance
+        return torch.tensor(dist_list)
 
     @torch.no_grad()
     def __call__(self, step, policy_output, feature_dict, device):
@@ -327,6 +363,18 @@ class AF3ClickEnzymeReward(Reward):
         af3_out_dir = os.path.join(config.rundir, "click/outputs")
         subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
 
+        # get distance to reference sequence if provided
+        if self.ref_seq is not None:
+            dist_from_ref_seq = self.get_dist_to_ref_seq(df_out["sequence"].tolist()) 
+            clampled_dist = torch.clamp(dist_from_ref_seq, min=self.min_dist_to_ref_seq, max=self.max_dist_to_ref_seq)
+            norm_dist = (clampled_dist - self.min_dist_to_ref_seq) / (self.max_dist_to_ref_seq - self.min_dist_to_ref_seq + 1e-6)
+            dist_from_ref_seq_reward = 1 - norm_dist
+
+
+        # compute distance to other sequences in the batch to encourage diversity
+        pairwise_diversity = self.get_pairwise_diversity(df_out["sequence"].tolist())
+        clamped_diversity = torch.clamp(pairwise_diversity, min=self.min_pairwise_diversity, max=self.max_pairwise_diversity)
+        pairwise_diversity_reward = (clamped_diversity - self.min_pairwise_diversity) / (self.max_pairwise_diversity - self.min_pairwise_diversity + 1e-6)
 
         # Reward engineering
         lig_rmsd_3AH_PRD = torch.tensor(df_out["click.lig_rmsd_3AH_PRD"].tolist())
@@ -340,8 +388,6 @@ class AF3ClickEnzymeReward(Reward):
             reward = (metric_clamped - lb) / (ub - lb)
             return reward
 
-        
-
         lig_rmsd_3AH_PRD_reward = 1 - normalize_metric(lig_rmsd_3AH_PRD, self.rmsd_3AH_lb, self.rmsd_3AH_ub)
         lig_rmsd_DEP_PRD_reward = 1 - normalize_metric(lig_rmsd_DEP_PRD, self.rmsd_DEP_lb, self.rmsd_DEP_ub)
         dist_CR1_NR1_reward = 1 - normalize_metric(dist_CR1_NR1, self.dist_CR1_NR1_lb, self.dist_CR1_NR1_ub)
@@ -353,15 +399,29 @@ class AF3ClickEnzymeReward(Reward):
         ptm = torch.tensor(df_out["click.ptm"].tolist())
         ptm_reward = normalize_metric(ptm, self.ptm_lb, self.ptm_ub)
 
-        # Combine all rewards
-        reward = (
-            lig_rmsd_3AH_PRD_reward + 
-            lig_rmsd_DEP_PRD_reward + 
-            dist_CR1_NR1_reward + 
-            dist_CR2_NR3_reward + 
-            iptm_reward + ptm_reward
-        ) / 6. # take straight average of all the metrics
+        # get esm perplexity reward
+        esm_perplexity = torch.tensor(df_out["esm_perplexity.perplexity"].tolist())
+        esm_perplexity_clamped = torch.clamp(esm_perplexity, min=self.esm_perplexity_lb, max=self.esm_perplexity_ub)
+        esm_perplexity_reward = 1 - (esm_perplexity_clamped - self.esm_perplexity_lb) / (self.esm_perplexity_ub - self.esm_perplexity_lb)
 
+        # Combine all rewards
+        reward_list = [
+            lig_rmsd_3AH_PRD_reward,
+            lig_rmsd_DEP_PRD_reward,
+            # dist_CR1_NR1_reward,
+            # dist_CR2_NR3_reward,
+            iptm_reward,
+            ptm_reward,
+            pairwise_diversity_reward,
+            esm_perplexity_reward,
+        ]
+
+        # compute distance to reference sequence
+        if self.ref_seq is not None:
+            reward_list.append(dist_from_ref_seq_reward)
+
+        reward = torch.stack(reward_list, dim=1).mean(dim=1)
+        
         if self.frag_cfg is not None:
             reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
 
@@ -390,7 +450,18 @@ class AF3ClickEnzymeReward(Reward):
             "ptm_mean": ptm.mean().cpu().item(),
             "ptm_min": ptm.min().cpu().item(),
             "ptm_max": ptm.max().cpu().item(),
+            "pairwise_diversity_mean": pairwise_diversity.mean().cpu().item(),
+            "pairwise_diversity_min": pairwise_diversity.min().cpu().item(),
+            "pairwise_diversity_max": pairwise_diversity.max().cpu().item(),
+            "esm_perplexity_mean": esm_perplexity.mean().cpu().item(),
+            "esm_perplexity_min": esm_perplexity.min().cpu().item(),
+            "esm_perplexity_max": esm_perplexity.max().cpu().item(),
         }
+
+        if self.ref_seq is not None:
+            metrics["dist_from_ref_seq_mean"] = dist_from_ref_seq.mean().cpu().item()
+            metrics["dist_from_ref_seq_min"] = dist_from_ref_seq.min().cpu().item()
+            metrics["dist_from_ref_seq_max"] = dist_from_ref_seq.max().cpu().item()
 
         return reward.to(device), metrics
 
@@ -417,7 +488,18 @@ class AF3PETaseReward(Reward):
             iptm_ub=0.8,
             ptm_lb=0.0,
             ptm_ub=0.8,
+            ref_seq=None,
+            max_dist_to_ref_seq=100,
+            min_dist_to_ref_seq=0,
             frag_cfg=None, 
+            max_pairwise_diversity=50,
+            min_pairwise_diversity=0,
+            pae_min_ub=10.0,
+            pae_min_lb=0.5,
+            as_plddt_ub=1.0,
+            as_plddt_lb=0.0,
+            esm_perplexity_ub=15.0,
+            esm_perplexity_lb=6.0,
         ):
 
         sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
@@ -445,6 +527,17 @@ class AF3PETaseReward(Reward):
         self.iptm_lb = iptm_lb
         self.ptm_ub = ptm_ub
         self.ptm_lb = ptm_lb
+        self.ref_seq = ref_seq
+        self.max_dist_to_ref_seq = max_dist_to_ref_seq
+        self.min_dist_to_ref_seq = min_dist_to_ref_seq
+        self.max_pairwise_diversity = max_pairwise_diversity
+        self.min_pairwise_diversity = min_pairwise_diversity
+        self.pae_min_ub = pae_min_ub
+        self.pae_min_lb = pae_min_lb
+        self.as_plddt_ub = as_plddt_ub
+        self.as_plddt_lb = as_plddt_lb
+        self.esm_perplexity_ub = esm_perplexity_ub
+        self.esm_perplexity_lb = esm_perplexity_lb
 
         # make subdirectory for pipeline output
         pipeline_output_dir = os.path.join(self.output_dir, self.run_name, "pipeline_output")
@@ -483,6 +576,28 @@ class AF3PETaseReward(Reward):
 
         return df
 
+    def get_dist_to_ref_seq(self, sequences):
+        assert self.ref_seq is not None, "Reference sequence is None"
+        dist_list = []
+        for seq in sequences:
+            dist = sum(1 for a, b in zip(seq, self.ref_seq) if a != b)
+            dist_list.append(float(dist))
+
+        return torch.tensor(dist_list)
+    
+    def get_pairwise_diversity(self, sequences):
+        dist_list = []
+        for i in range(len(sequences)):
+            _list = []
+            for j in range(len(sequences)):
+                if i != j:
+                    dist = sum(1 for a, b in zip(sequences[i], sequences[j]) if a != b)
+                    _list.append(float(dist))
+            dist_list.append(np.mean(_list))
+
+        # return mean pairwise distance
+        return torch.tensor(dist_list)
+    
     @torch.no_grad()
     def __call__(self, step, policy_output, feature_dict, device):
 
@@ -515,6 +630,19 @@ class AF3PETaseReward(Reward):
         # add code to delete af3 outputs to save space
         af3_out_dir = os.path.join(config.rundir, "af3/outputs")
         subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
+        
+        # get distance to reference sequence if provided
+        if self.ref_seq is not None:
+            dist_from_ref_seq = self.get_dist_to_ref_seq(df_out["sequence"].tolist()) 
+            clampled_dist = torch.clamp(dist_from_ref_seq, min=self.min_dist_to_ref_seq, max=self.max_dist_to_ref_seq)
+            norm_dist = (clampled_dist - self.min_dist_to_ref_seq) / (self.max_dist_to_ref_seq - self.min_dist_to_ref_seq + 1e-6)
+            dist_from_ref_seq_reward = 1 - norm_dist
+
+        # compute distance to other sequences in the batch to encourage diversity
+        pairwise_diversity = self.get_pairwise_diversity(df_out["sequence"].tolist())
+        clamped_diversity = torch.clamp(pairwise_diversity, min=0, max=20)
+        pairwise_diversity_reward = (clamped_diversity - self.min_pairwise_diversity) / (self.max_pairwise_diversity - self.min_pairwise_diversity + 1e-6)
+
 
         # Reward engineering
         acylox_oxh1bbN = torch.tensor(df_out["petase_metrics.acylox_oxh1bbN.mean"].tolist())
@@ -553,19 +681,46 @@ class AF3PETaseReward(Reward):
         iptm = torch.tensor(df_out["petase_metrics.iptm.mean"].tolist())
         iptm_clamped = torch.clamp(iptm, min=self.iptm_lb, max=self.iptm_ub)
         iptm_reward = (iptm_clamped - self.iptm_lb) / (self.iptm_ub - self.iptm_lb)
+        
+        # instead use pae min
+        pae_min = torch.tensor(df_out["petase_metrics.pae_min.mean"].tolist())
+        pae_min_clamped = torch.clamp(pae_min, min=self.pae_min_lb, max=self.pae_min_ub)
+        pae_min_reward = 1 - (pae_min_clamped - self.pae_min_lb) / (self.pae_min_ub - self.pae_min_lb)
+
+        # get ptm reward
         ptm = torch.tensor(df_out["petase_metrics.ptm.mean"].tolist())
         ptm_clamped = torch.clamp(ptm, min=self.ptm_lb, max=self.ptm_ub)
         ptm_reward = (ptm_clamped - self.ptm_lb) / (self.ptm_ub - self.ptm_lb)
 
+        # get active site plddt reward
+        as_plddt = torch.tensor(df_out["petase_metrics.as_plddt.mean"].tolist())
+        as_plddt_clamped = torch.clamp(as_plddt, min=self.as_plddt_lb, max=self.as_plddt_ub)
+        as_plddt_reward = (as_plddt_clamped - self.as_plddt_lb) / (self.as_plddt_ub - self.as_plddt_lb)
+
+        # get esm perplexity reward
+        esm_perplexity = torch.tensor(df_out["esm_perplexity.perplexity"].tolist())
+        esm_perplexity_clamped = torch.clamp(esm_perplexity, min=self.esm_perplexity_lb, max=self.esm_perplexity_ub)
+        esm_perplexity_reward = 1 - (esm_perplexity_clamped - self.esm_perplexity_lb) / (self.esm_perplexity_ub - self.esm_perplexity_lb)
+
         # Combine all rewards
-        reward = (
-            acylox_oxh1bbN_reward + 
-            acylox_oxh2bbN_reward + 
-            hisNE2_esterox_reward + 
-            hisNE2_serOG_reward + 
-            his_ser_angle_reward +
-            iptm_reward + ptm_reward
-        ) / 7. # take straight average of all the metrics
+        reward_list = [
+            acylox_oxh1bbN_reward,
+            acylox_oxh2bbN_reward,
+            hisNE2_esterox_reward,
+            hisNE2_serOG_reward,
+            his_ser_angle_reward,
+            iptm_reward,
+            ptm_reward,
+            pae_min_reward,
+            as_plddt_reward,
+            pairwise_diversity_reward,
+            esm_perplexity_reward
+        ]
+        
+        if self.ref_seq is not None:
+            reward_list.append(dist_from_ref_seq_reward)
+
+        reward = torch.stack(reward_list, dim=1).mean(dim=1)
 
         if self.frag_cfg is not None:
             reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
@@ -598,7 +753,24 @@ class AF3PETaseReward(Reward):
             "ptm_mean": ptm.mean().cpu().item(),
             "ptm_min": ptm.min().cpu().item(),
             "ptm_max": ptm.max().cpu().item(),
+            "pae_min_mean": pae_min.mean().cpu().item(),
+            "pae_min_min": pae_min.min().cpu().item(),
+            "pae_min_max": pae_min.max().cpu().item(),
+            "as_plddt_mean": as_plddt.mean().cpu().item(),
+            "as_plddt_min": as_plddt.min().cpu().item(),
+            "as_plddt_max": as_plddt.max().cpu().item(),
+            "pairwise_diversity_mean": pairwise_diversity.mean().cpu().item(),
+            "pairwise_diversity_min": pairwise_diversity.min().cpu().item(),
+            "pairwise_diversity_max": pairwise_diversity.max().cpu().item(),
+            "esm_perplexity_mean": esm_perplexity.mean().cpu().item(),
+            "esm_perplexity_min": esm_perplexity.min().cpu().item(),
+            "esm_perplexity_max": esm_perplexity.max().cpu().item(),
         }
+
+        if self.ref_seq is not None:
+            metrics["dist_from_ref_seq_mean"] = dist_from_ref_seq.mean().cpu().item()
+            metrics["dist_from_ref_seq_min"] = dist_from_ref_seq.min().cpu().item()
+            metrics["dist_from_ref_seq_max"] = dist_from_ref_seq.max().cpu().item()
 
         return reward.to(device), metrics
 
