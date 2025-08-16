@@ -28,6 +28,49 @@ class PolicyMPNNvDAPO(PolicyMPNN):
     def __init__(self, cfg):
         super().__init__(cfg)
 
+        # load reference MPNN model
+        if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
+            self.ref_mpnn = self.load_ref_mpnn_model()
+
+    def load_ref_mpnn_model(self):
+        """
+        Load the MPNN model based on the configuration.
+        """
+
+        model_type = self.cfg.model_type
+
+        if model_type == "protein_mpnn":
+            self.atom_context_num = 1
+            k_neighbors = 48
+            self.ligand_mpnn_use_side_chain_context = 0
+            ckpt_path = PROTEIN_MPNN_CKPT_PATH
+
+        elif model_type == "ligand_mpnn":
+            self.atom_context_num = 25
+            k_neighbors = 32
+            self.ligand_mpnn_use_side_chain_context = 0
+            ckpt_path = LIGAND_MPNN_CKPT_PATH
+
+        else:
+            raise ValueError("Invalid model type specified. Choose 'ligand_mpnn' or 'protein_mpnn'.")
+
+
+        # load model
+        model = ProteinMPNN(node_features=128,
+                        edge_features=128,
+                        hidden_dim=128,
+                        num_encoder_layers=3,
+                        num_decoder_layers=3,
+                        k_neighbors=k_neighbors,
+                        device=self.device,
+                        atom_context_num=self.atom_context_num,
+                        model_type=model_type,
+                        ligand_mpnn_use_side_chain_context=self.ligand_mpnn_use_side_chain_context)
+
+        ckpt = torch.load(ckpt_path, map_location=self.device)
+        model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        return model.to(self.device)
+
     def train_step(self, step, init_state, feature_dict):
         """
         Single training step given featurized example
@@ -75,8 +118,15 @@ class PolicyMPNNvDAPO(PolicyMPNN):
             h_V_in.requires_grad = True
             h_E_in.requires_grad = True
 
+            # add if using KL here then run through the reference model
+            if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
+                with torch.no_grad():
+                    ref_out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in,
+                                           decoding_order=decoding_order, sampled_actions=S, model=self.ref_mpnn)
+                    ref_batched_log_probs = ref_out["log_probs"] #[B, L, 21]
+
             out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in,
-                                    decoding_order=decoding_order, sampled_actions=S)
+                                    decoding_order=decoding_order, sampled_actions=S, model=self.model)
 
             # mask for what was actually decoded in the sequence
             seq_mask = torch.nn.functional.one_hot(out["S"], num_classes=len(alphabet)).float()
@@ -100,10 +150,20 @@ class PolicyMPNNvDAPO(PolicyMPNN):
                 min_term1 = r * A
                 min_term2 = torch.clamp(r, 1-self.cfg.clip_eps_low, 1+self.cfg.clip_eps_high) * A
 
+            # DAPO objective
+            obj = torch.min(min_term1, min_term2).mean()
+
+            if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
+                # add KL penalty between current policy and reference MPNN
+                ref_batched_log_probs = (ref_batched_log_probs * seq_mask).sum(dim=(-1))  # [B]
+                kl_ratio = torch.exp(ref_batched_log_probs - batched_log_probs)  # safe because logp_ref - logp_theta is small-ish
+                kl = kl_ratio - (ref_batched_log_probs - batched_log_probs) - 1
+                obj = obj - self.cfg.kl_weight * kl.mean()
+                to_log["kl_penalty"] = kl.mean().cpu().item()
 
             # DAPO objective
             # want to maximize this objective, so we take the negative
-            dapo_loss = -(torch.min(min_term1, min_term2).mean())
+            dapo_loss = -obj
 
             # optimizer update
             dapo_loss.backward()

@@ -13,7 +13,7 @@ def make_fragment_dict(seq_list, fragment_bounds):
     fragment_dict = {}
     for i in range(len(fragment_bounds)):
         start, end = fragment_bounds[i]
-        fragment_dict[f"fragment_{i+1}"] = [(f"{n}."+secrets.token_hex(4), seq[start:end+1]) for n, seq in enumerate(seq_list)]
+        fragment_dict[f"fragment_{i+1}"] = [(f"{n:04}."+secrets.token_hex(4), seq[start:end+1]) for n, seq in enumerate(seq_list)]
     return fragment_dict
 
 # function to sample sequences
