@@ -32,6 +32,8 @@ class PolicyMPNNvDAPO(PolicyMPNN):
         # load reference MPNN model
         if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
             self.ref_mpnn = self.load_ref_mpnn_model()
+        
+        self.avg_reward_history = []  # for tracking average reward over training
 
     def load_ref_mpnn_model(self):
         """
@@ -139,8 +141,18 @@ class PolicyMPNNvDAPO(PolicyMPNN):
             old_batched_log_probs = (old_batched_log_probs * seq_mask).sum(dim=(-1)) # old
             r = torch.exp(batched_log_probs - old_batched_log_probs) # ratio P_new / P_old
 
+            # save old rewards
+            self.avg_reward_history.append(batched_rewards.mean().cpu().item())
+            
             # compute advantage
-            A = (batched_rewards - torch.mean(batched_rewards)) / (torch.std(batched_rewards) + 1e-8)
+            if "use_avg_reward" in self.cfg and self.cfg.use_avg_reward:
+                reward_history = torch.tensor(self.avg_reward_history[-self.cfg.avg_reward_window:]).to(self.device)
+                mean_history = reward_history.mean()
+                std_history = reward_history.std() if reward_history.numel() > 1 else 1.0
+                A = (batched_rewards - mean_history) / (std_history + 1e-3)
+            else:
+                A = (batched_rewards - torch.mean(batched_rewards)) / (torch.std(batched_rewards) + 1e-3)
+
 
             if A.shape != r.shape:
                 # if reward is not per residue, we need to sum over log probs
@@ -177,7 +189,7 @@ class PolicyMPNNvDAPO(PolicyMPNN):
         # ---------- metric aggregation ----------
         if dapo_losses:                       # policy metrics
             to_log["policy/dapo_loss_mean"] = float(np.mean(dapo_losses))
-            to_log["policy/dapo_loss_last"] = dapo_losses[-1]
+            to_log["policy/dapo_loss_last"] = float(dapo_losses[-1])
 
         # reward statistics (from the original rollout batch)
         to_log.update({
@@ -196,6 +208,6 @@ class PolicyMPNNvDAPO(PolicyMPNN):
             wandb_log.update(to_log)          # include policy + reward stats
             wandb.log(wandb_log, step=step)   # don't finish the row yet
             
-        self._log_metrics_to_csv(step, to_log)
+        # self._log_metrics_to_csv(step, to_log)
 
         return to_log

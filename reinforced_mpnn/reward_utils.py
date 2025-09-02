@@ -491,14 +491,14 @@ class AF3ClickEnzymeReward(Reward):
         return torch.tensor(dist_list)
 
     @torch.no_grad()
-    def __call__(self, step, policy_output, feature_dict, device):
+    def __call__(self, step, policy_output, feature_dict, device, evaluate=False):
 
         config = copy.deepcopy(self.pipeline_config)
         config.rundir = os.path.join(
             self.output_dir, 
             self.run_name,
             "pipeline_output", 
-            f"pipeline_output_iter_{step:04}"
+            f"pipeline_output_iter_{step:04}" if not evaluate else f"pipeline_output_eval_{step:04}"
         )
         
         # just take sequences from the first chain
@@ -581,7 +581,7 @@ class AF3ClickEnzymeReward(Reward):
             reward_list.append(dist_from_ref_seq_reward)
 
         reward = torch.stack(reward_list, dim=1).mean(dim=1)
-        
+
         if self.frag_cfg is not None:
             reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
 
@@ -618,13 +618,22 @@ class AF3ClickEnzymeReward(Reward):
             "esm_perplexity_max": esm_perplexity.max().cpu().item(),
         }
 
+
         if self.ref_seq is not None:
             metrics["dist_from_ref_seq_mean"] = dist_from_ref_seq.mean().cpu().item()
             metrics["dist_from_ref_seq_min"] = dist_from_ref_seq.min().cpu().item()
             metrics["dist_from_ref_seq_max"] = dist_from_ref_seq.max().cpu().item()
 
-        return reward.to(device), metrics
+        # Add evaluation-specific data when in evaluation mode
+        if evaluate:
+            # Store policy log probabilities for evaluation
+            metrics["rundir"] = config.rundir
 
+            if self.frag_cfg is not None:
+                metrics['fragment_dict'] = fragment_dict  # Fragment dictionary
+                metrics['fragment_bounds'] = self.frag_cfg.fragment_bounds  # Fragment bounds used
+
+        return reward.to(device), metrics
 
 class AF3PETaseReward(Reward):
     """
@@ -638,28 +647,46 @@ class AF3PETaseReward(Reward):
             run_name,
             oxyanion_lb=2.25,
             oxyanion_ub=10,
+            oxyanion_weight_1=1.0,
+            oxyanion_weight_2=0.2, # smaller weight for oxh2 seems to help convergence with correct dock
             hisNesterox_lb=3.5,
             hisNesterox_ub=10,
+            hisNesterox_weight=1.0,
             hisNserO_lb=2.25,
             hisNserO_ub=10,
+            hisNserO_weight=1.0,
             his_ser_angle=90,
             his_ser_angle_tol=5,
+            his_ser_angle_weight=1.0,
             iptm_lb=0.0,
             iptm_ub=0.8,
+            iptm_weight=1.0,
             ptm_lb=0.0,
             ptm_ub=0.8,
+            ptm_weight=1.0,
             ref_seq=None,
             max_dist_to_ref_seq=100,
             min_dist_to_ref_seq=0,
+            dist_from_ref_seq_weight=1.0,
             frag_cfg=None, 
             max_pairwise_diversity=50,
             min_pairwise_diversity=0,
+            pairwise_diversity_weight=1.0,
+            pocket_idx_list=None,
+            pocket_diversity_weight=1.0,
             pae_min_ub=10.0,
             pae_min_lb=0.5,
+            pae_min_weight=1.0,
             as_plddt_ub=1.0,
             as_plddt_lb=0.0,
+            as_plddt_weight=1.0,
             esm_perplexity_ub=15.0,
             esm_perplexity_lb=6.0,
+            esm_perplexity_weight=1.0,
+            af2_plddt_ub=80.0,
+            af2_plddt_lb=0.0,
+            af2_plddt_weight=1.0,
+            reward_aggregation_mode="average",
         ):
 
         sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
@@ -676,28 +703,46 @@ class AF3PETaseReward(Reward):
         self.run_name = run_name
         self.oxyanion_ub = oxyanion_ub
         self.oxyanion_lb = oxyanion_lb
+        self.oxyanion_weight_1 = oxyanion_weight_1
+        self.oxyanion_weight_2 = oxyanion_weight_2
         self.hisNesterox_ub = hisNesterox_ub
         self.hisNesterox_lb = hisNesterox_lb
+        self.hisNesterox_weight = hisNesterox_weight
         self.hisNserO_ub = hisNserO_ub
         self.hisNserO_lb = hisNserO_lb
+        self.hisNserO_weight = hisNserO_weight
         self.his_ser_angle = his_ser_angle
         self.his_ser_angle_tol = his_ser_angle_tol
+        self.his_ser_angle_weight = his_ser_angle_weight
         self.frag_cfg = frag_cfg
         self.iptm_ub = iptm_ub
         self.iptm_lb = iptm_lb
+        self.iptm_weight = iptm_weight
         self.ptm_ub = ptm_ub
         self.ptm_lb = ptm_lb
+        self.ptm_weight = ptm_weight
         self.ref_seq = ref_seq
         self.max_dist_to_ref_seq = max_dist_to_ref_seq
         self.min_dist_to_ref_seq = min_dist_to_ref_seq
+        self.dist_from_ref_seq_weight = dist_from_ref_seq_weight
         self.max_pairwise_diversity = max_pairwise_diversity
         self.min_pairwise_diversity = min_pairwise_diversity
+        self.pairwise_diversity_weight = pairwise_diversity_weight
+        self.pocket_idx_list = pocket_idx_list
+        self.pocket_diversity_weight = pocket_diversity_weight
         self.pae_min_ub = pae_min_ub
         self.pae_min_lb = pae_min_lb
+        self.pae_min_weight = pae_min_weight
         self.as_plddt_ub = as_plddt_ub
         self.as_plddt_lb = as_plddt_lb
+        self.as_plddt_weight = as_plddt_weight
         self.esm_perplexity_ub = esm_perplexity_ub
         self.esm_perplexity_lb = esm_perplexity_lb
+        self.esm_perplexity_weight = esm_perplexity_weight
+        self.af2_plddt_ub = af2_plddt_ub
+        self.af2_plddt_lb = af2_plddt_lb
+        self.af2_plddt_weight = af2_plddt_weight
+        self.reward_aggregation_mode = reward_aggregation_mode
 
         # make subdirectory for pipeline output
         pipeline_output_dir = os.path.join(self.output_dir, self.run_name, "pipeline_output")
@@ -745,28 +790,39 @@ class AF3PETaseReward(Reward):
 
         return torch.tensor(dist_list)
     
-    def get_pairwise_diversity(self, sequences):
+    def get_pairwise_diversity(self, sequences, pocket_idx_list=None):
         dist_list = []
+        pocket_dist_list = []
         for i in range(len(sequences)):
             _list = []
+            _pocket_list = []
             for j in range(len(sequences)):
                 if i != j:
                     dist = sum(1 for a, b in zip(sequences[i], sequences[j]) if a != b)
                     _list.append(float(dist))
-            dist_list.append(np.mean(_list))
+                    if pocket_idx_list is not None:
+                        pocket_dist = sum(1 for idx in pocket_idx_list if sequences[i][idx] != sequences[j][idx])
+                        _pocket_list.append(float(pocket_dist))
 
-        # return mean pairwise distance
-        return torch.tensor(dist_list)
+            dist_list.append(np.mean(_list))
+            if pocket_idx_list is not None:
+                pocket_dist_list.append(np.mean(_pocket_list))
+
+        # return mean pairwise distance and pocket residue diversity if pocket_idx_list is provided
+        if pocket_idx_list is not None:
+            return torch.tensor(dist_list), torch.tensor(pocket_dist_list)
+        else:
+            return torch.tensor(dist_list)
     
     @torch.no_grad()
-    def __call__(self, step, policy_output, feature_dict, device):
+    def __call__(self, step, policy_output, feature_dict, device, evaluate=False):
 
         config = copy.deepcopy(self.pipeline_config)
         config.rundir = os.path.join(
             self.output_dir, 
             self.run_name,
             "pipeline_output", 
-            f"pipeline_output_iter_{step:04}"
+            f"pipeline_output_iter_{step:04}" if not evaluate else f"pipeline_output_eval_{step:04}"
         )
         
         # just take sequences from the first chain
@@ -799,7 +855,12 @@ class AF3PETaseReward(Reward):
             dist_from_ref_seq_reward = 1 - norm_dist
 
         # compute distance to other sequences in the batch to encourage diversity
-        pairwise_diversity = self.get_pairwise_diversity(df_out["sequence"].tolist())
+        pairwise_diversity = self.get_pairwise_diversity(df_out["sequence"].tolist(), pocket_idx_list=self.pocket_idx_list)
+        if self.pocket_idx_list is not None:
+            pocket_diversity = pairwise_diversity[1]
+            pairwise_diversity = pairwise_diversity[0]
+            pocket_diversity_reward = pocket_diversity / len(self.pocket_idx_list) # want to maximize the diversity of each pocket to all other pockets
+
         clamped_diversity = torch.clamp(pairwise_diversity, min=0, max=20)
         pairwise_diversity_reward = (clamped_diversity - self.min_pairwise_diversity) / (self.max_pairwise_diversity - self.min_pairwise_diversity + 1e-6)
 
@@ -862,26 +923,68 @@ class AF3PETaseReward(Reward):
         esm_perplexity_clamped = torch.clamp(esm_perplexity, min=self.esm_perplexity_lb, max=self.esm_perplexity_ub)
         esm_perplexity_reward = 1 - (esm_perplexity_clamped - self.esm_perplexity_lb) / (self.esm_perplexity_ub - self.esm_perplexity_lb)
 
+        # get af2 plddt reward
+        af2_plddt = torch.tensor(df_out["af2.af2_plddt"].tolist())
+        af2_plddt_clamped = torch.clamp(af2_plddt, min=self.af2_plddt_lb, max=self.af2_plddt_ub)
+        af2_plddt_reward = (af2_plddt_clamped - self.af2_plddt_lb) / (self.af2_plddt_ub - self.af2_plddt_lb)
+
         # Combine all rewards
-        reward_list = [
-            acylox_oxh1bbN_reward,
-            acylox_oxh2bbN_reward,
-            hisNE2_esterox_reward,
-            hisNE2_serOG_reward,
-            his_ser_angle_reward,
-            iptm_reward,
-            ptm_reward,
-            pae_min_reward,
-            as_plddt_reward,
-            pairwise_diversity_reward,
-            esm_perplexity_reward
-        ]
-        
-        if self.ref_seq is not None:
-            reward_list.append(dist_from_ref_seq_reward)
+        if self.reward_aggregation_mode == "average":
+            reward_list = [
+                acylox_oxh1bbN_reward * self.oxyanion_weight_1,
+                acylox_oxh2bbN_reward * self.oxyanion_weight_2,
+                hisNE2_esterox_reward * self.hisNesterox_weight,
+                hisNE2_serOG_reward * self.hisNserO_weight,
+                his_ser_angle_reward * self.his_ser_angle_weight,
+                iptm_reward * self.iptm_weight,
+                ptm_reward * self.ptm_weight,
+                pae_min_reward * self.pae_min_weight,
+                as_plddt_reward * self.as_plddt_weight,
+                pairwise_diversity_reward * self.pairwise_diversity_weight,
+                esm_perplexity_reward * self.esm_perplexity_weight,
+                af2_plddt_reward * self.af2_plddt_weight,
+            ]
+            
+            denom = sum([
+                self.oxyanion_weight_1, self.oxyanion_weight_2, self.hisNesterox_weight, self.hisNserO_weight,
+                self.his_ser_angle_weight, self.iptm_weight, self.ptm_weight, self.pae_min_weight,
+                self.as_plddt_weight, self.pairwise_diversity_weight, self.esm_perplexity_weight,
+                self.af2_plddt_weight
+            ])
 
-        reward = torch.stack(reward_list, dim=1).mean(dim=1)
+            if self.ref_seq is not None:
+                reward_list.append(dist_from_ref_seq_reward * self.dist_from_ref_seq_weight)
+                denom += self.dist_from_ref_seq_weight
 
+            if self.pocket_idx_list is not None:
+                reward_list.append(pocket_diversity_reward * self.pocket_diversity_weight)
+                denom += self.pocket_diversity_weight
+
+            reward = torch.stack(reward_list, dim=1).sum(dim=1) / denom
+
+        elif self.reward_aggregation_mode == "custom":
+            # trying out segregating metrics into str, conf, library and then multiplying
+            reward_list = [
+                acylox_oxh1bbN_reward * self.oxyanion_weight_1,
+                acylox_oxh2bbN_reward * self.oxyanion_weight_2,
+                iptm_reward * self.iptm_weight,
+                af2_plddt_reward * self.af2_plddt_weight,
+                hisNE2_esterox_reward * self.hisNesterox_weight,
+                esm_perplexity_reward * self.esm_perplexity_weight,
+                his_ser_angle_reward * self.his_ser_angle_weight,
+            ]
+
+            if self.ref_seq is not None:
+                reward_list.append(dist_from_ref_seq_reward * self.dist_from_ref_seq_weight)
+
+            if self.pocket_idx_list is not None:
+                reward_list.append(pocket_diversity_reward * self.pocket_diversity_weight)
+
+            reward = torch.stack(reward_list, dim=1).mean(dim=1)
+
+        else:
+            raise ValueError(f"Unknown reward aggregation mode: {self.reward_aggregation_mode}")
+       
         if self.frag_cfg is not None:
             reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
 
@@ -925,6 +1028,9 @@ class AF3PETaseReward(Reward):
             "esm_perplexity_mean": esm_perplexity.mean().cpu().item(),
             "esm_perplexity_min": esm_perplexity.min().cpu().item(),
             "esm_perplexity_max": esm_perplexity.max().cpu().item(),
+            "af2_plddt_mean": af2_plddt.mean().cpu().item(),
+            "af2_plddt_min": af2_plddt.min().cpu().item(),
+            "af2_plddt_max": af2_plddt.max().cpu().item(),
         }
 
         if self.ref_seq is not None:
@@ -932,10 +1038,22 @@ class AF3PETaseReward(Reward):
             metrics["dist_from_ref_seq_min"] = dist_from_ref_seq.min().cpu().item()
             metrics["dist_from_ref_seq_max"] = dist_from_ref_seq.max().cpu().item()
 
+        if self.pocket_idx_list is not None:
+            metrics["pocket_diversity_mean"] = pocket_diversity.mean().cpu().item()
+            metrics["pocket_diversity_min"] = pocket_diversity.min().cpu().item()
+            metrics["pocket_diversity_max"] = pocket_diversity.max().cpu().item()
+
+        # Add evaluation-specific data when in evaluation mode
+        if evaluate:
+            # Store policy log probabilities for evaluation
+            metrics["rundir"] = config.rundir
+
+            if self.frag_cfg is not None:
+                metrics['fragment_dict'] = fragment_dict  # Fragment dictionary
+                metrics['fragment_bounds'] = self.frag_cfg.fragment_bounds  # Fragment bounds used
+
         return reward.to(device), metrics
 
-<<<<<<< HEAD
-=======
 class LigasePipelineReward(Reward):
     """
         Penicillin active site, using af3 RMSD as reward
@@ -1080,6 +1198,185 @@ class LigasePipelineReward(Reward):
 
         return reward.to(device), metrics
 
+
+class ATPBinder(Reward):
+    """
+        ATP binder, increase num hbonds, and iptm
+    """
+
+    def __init__(
+            self, 
+            pipeline_config_path, 
+            output_dir, 
+            run_name,
+            iptm_lb = 0.0,
+            iptm_ub = 0.9,
+            hbond_lb = 0,
+            hbond_ub = 15,
+            frag_cfg=None, 
+        ):
+
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
+        # if we used an apptainer we would could install cifutils and datahub directly
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/cifutils/src")
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/datahub/src")        
+        os.environ["PYTHONPATH"] = ":" # pipeline will freak if this is not set
+
+        from pipelines.pipeline import main as run_pipeline
+
+        self.run_pipeline = run_pipeline
+        self.pipeline_config = OmegaConf.load(pipeline_config_path)
+        self.output_dir = output_dir
+        self.run_name = run_name
+        self.iptm_ub = iptm_ub
+        self.iptm_lb = iptm_lb
+        self.hbond_ub = hbond_ub
+        self.hbond_lb = hbond_lb
+        self.frag_cfg = frag_cfg
+
+        # make subdirectory for pipeline output
+        pipeline_output_dir = os.path.join(self.output_dir, self.run_name, "pipeline_output")
+        os.makedirs(pipeline_output_dir, exist_ok=True)
+    
+    def get_sequences(self, policy_output, chain_mask=None):
+        """
+            Return list of sampled sequences
+        """
+        sampled_sequences = policy_output["S"]
+
+        if chain_mask is not None:
+            sampled_sequences = sampled_sequences[:, chain_mask]
+
+        B = sampled_sequences.shape[0]
+        
+        sequences = [] 
+        for i in range(B):
+            seq = sampled_sequences[i]
+            seq_str = "".join([alphabet[int(s)] for s in seq])
+            sequences.append(seq_str)
+        return sequences
+
+    def get_input_df(self, sequences):
+        """
+        Convert list of sequences to DataFrame format required by AF3
+        """
+
+        df = pd.DataFrame(
+            {
+                "sequence": sequences,
+                "name": [f"seq_{i:04}" for i in range(len(sequences))],
+                "origin.path": [f"seq_{i:04}.path" for i in range(len(sequences))],
+            }
+        )
+
+        return df
+    
+    def get_dist_to_ref_seq(self, sequences):
+        assert self.ref_seq is not None, "Reference sequence is None"
+        dist_list = []
+        for seq in sequences:
+            dist = sum(1 for a, b in zip(seq, self.ref_seq) if a != b)
+            dist_list.append(float(dist))
+
+        return torch.tensor(dist_list)
+    
+    def get_pairwise_diversity(self, sequences):
+        dist_list = []
+        for i in range(len(sequences)):
+            _list = []
+            for j in range(len(sequences)):
+                if i != j:
+                    dist = sum(1 for a, b in zip(sequences[i], sequences[j]) if a != b)
+                    _list.append(float(dist))
+            dist_list.append(np.mean(_list))
+
+        # return mean pairwise distance
+        return torch.tensor(dist_list)
+
+    @torch.no_grad()
+    def __call__(self, step, policy_output, feature_dict, device, evaluate=False):
+
+        config = copy.deepcopy(self.pipeline_config)
+        config.rundir = os.path.join(
+            self.output_dir, 
+            self.run_name,
+            "pipeline_output", 
+            f"pipeline_output_iter_{step:04}" if not evaluate else f"pipeline_output_eval_{step:04}"
+        )
+        
+        # just take sequences from the first chain
+        chain_mask = feature_dict["chain_labels"]==0 # [1, L]
+        chain_mask = chain_mask[0] # [L,]
+
+        # Get the sequences from policy output
+        sequences = self.get_sequences(policy_output, chain_mask=chain_mask)
+
+        if self.frag_cfg is not None:
+            fragment_dict = make_fragment_dict(sequences, self.frag_cfg.fragment_bounds)
+            samples = sample_sequences(fragment_dict, self.frag_cfg.sample_size, self.frag_cfg.min_sample)
+            names = [x[0] for x in samples]
+            sequences = [x[1] for x in samples]
+        
+        # Create a DataFrame for AF3
+        df_input = self.get_input_df(sequences)
+        df_out = self.run_pipeline(df_input, config)
+
+
+        # add code to delete af3 outputs to save space
+        af3_out_dir = os.path.join(config.rundir, "click/outputs")
+        subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
+        
+        # Normalize metrics to [0,1] range
+        def normalize_metric(metric, lb, ub):
+            metric_clamped = torch.clamp(metric, min=lb, max=ub)
+            reward = (metric_clamped - lb) / (ub - lb)
+            return reward
+
+        # get iptm reward
+        iptm = torch.tensor(df_out["af3_iptm"].tolist())
+        iptm_reward = normalize_metric(iptm, self.iptm_lb, self.iptm_ub)
+
+        # get hbond reward
+        hbond = torch.tensor(df_out["hbond.hbond_count"].tolist()).float()
+        hbond_reward = normalize_metric(hbond, self.hbond_lb, self.hbond_ub)
+
+        # Combine all rewards
+        reward_list = [
+            iptm_reward,
+            hbond_reward,
+        ]
+
+        reward = torch.stack(reward_list, dim=1).mean(dim=1)
+
+        if self.frag_cfg is not None:
+            reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
+
+        # make sure reward is properly padded when designing multiple chains
+        if len(reward.shape) == 2 and reward.shape[1] != chain_mask.shape[0]:
+            # should the padding be zero or ones? ( i think zero is better )
+            padding = torch.zeros(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
+            reward = torch.cat([reward, padding], dim=1)
+
+        metrics = {
+            "iptm_mean": iptm.mean().cpu().item(),
+            "iptm_min": iptm.min().cpu().item(),
+            "iptm_max": iptm.max().cpu().item(),
+            "hbond_mean": hbond.mean().cpu().item(),
+            "hbond_min": hbond.min().cpu().item(),
+            "hbond_max": hbond.max().cpu().item(),
+        }
+
+        # Add evaluation-specific data when in evaluation mode
+        if evaluate:
+            # Store policy log probabilities for evaluation
+            metrics["rundir"] = config.rundir
+
+            if self.frag_cfg is not None:
+                metrics['fragment_dict'] = fragment_dict  # Fragment dictionary
+                metrics['fragment_bounds'] = self.frag_cfg.fragment_bounds  # Fragment bounds used
+
+        return reward.to(device), metrics
+
 # AF3 reward pre-pipeline
 class af3_reward(Reward):
     """
@@ -1209,4 +1506,3 @@ class af3_reward(Reward):
 
 
 
->>>>>>> policy_mpnn

@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, re
 import json
 import torch
 import numpy as np
@@ -457,18 +457,20 @@ class PolicyMPNN:
         """
         Run the main training loop
         """
-        self.model.train()
-
-        # featurize from input pdb (in future maybe policy is trained with a variety of pdbs)
-        feature_dict = self.featurize_pdb(self.cfg.pdb)
-
-        # encode initial state (run mpnn encoder)
-        h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
 
         # train loop
         start_time = time.time()
         for step in tqdm(range(self.cfg.N_steps), desc="Training"):
-            
+
+            # set model to train mode
+            self.model.train()
+
+            # featurize from input pdb (in future maybe policy is trained with a variety of pdbs)
+            feature_dict = self.featurize_pdb(self.cfg.pdb)
+
+            # encode initial state (run mpnn encoder)
+            h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
+
             # clone initial state variables
             init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
             
@@ -487,6 +489,12 @@ class PolicyMPNN:
             # model checkpointing
             if step > 0 and  step % self.checkpoint_every_n_steps == 0:
                 self.checkpoint_model(step, to_log)
+
+            # run eval
+            # as a debug feature evaluate now
+            if step > 0 and step % self.cfg.evaluate_every_n_steps == 0:
+                print(f"Now running eval at temperature {self.cfg.evaluate.temperature} ...")
+                self.evaluate(step=step)
         
         print("Training complete.")
         print(f"Best reward seen: {self.best_seen_reward:.4f} at step {self.step_at_best_seen_reward}")
@@ -519,8 +527,11 @@ class PolicyMPNN:
                 "model_state_dict": self.model.state_dict(),
             }
 
-        ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_last.pt")
-        torch.save(ckpt, ckpt_path)
+        last_ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_last.pt")
+        torch.save(ckpt, last_ckpt_path)
+
+        step_ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_step_{step:04}.pt")
+        torch.save(ckpt, step_ckpt_path)
 
         if curr_reward > self.best_seen_reward:
             self.best_seen_reward = curr_reward
@@ -534,7 +545,7 @@ class PolicyMPNN:
                 wandb.log({"best/reward": curr_reward, "best/step": step})
 
 
-    def evaluate(self):
+    def evaluate(self, step=0):
         """
         Run evaluation on the trained policy to generate sequences and compute rewards.
         """
@@ -545,6 +556,9 @@ class PolicyMPNN:
         # Featurize PDB once (same as in training)
         feature_dict = self.featurize_pdb(self.cfg.pdb)
         
+        # override with custom sampling temp
+        feature_dict["temperature"] = self.cfg.evaluate.temperature
+
         # Encode initial state once (same as in training)
         h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
         
@@ -575,7 +589,7 @@ class PolicyMPNN:
         
         # Single reward call over all sequences
         with torch.no_grad():
-            rewards, metrics = self.reward_fn(0, combined_out, feature_dict, self.device, evaluate=True)
+            rewards, metrics = self.reward_fn(step, combined_out, feature_dict, self.device, evaluate=True)
             metrics['batch_rewards'] = rewards
         
         print(f"Evaluation complete. Processed {len(outs)} batches.")
@@ -585,27 +599,30 @@ class PolicyMPNN:
         
         # Process and save results
         print("Processing evaluation results...")
-        self._process_evaluation_results(combined_out, metrics, has_fragment_rewards)
+        self._process_evaluation_results(combined_out, metrics, has_fragment_rewards, output_dir=metrics["rundir"])
 
-    def _process_evaluation_results(self, output, metrics, has_fragment_rewards: bool):
+    def _process_evaluation_results(self, output, metrics, has_fragment_rewards: bool, output_dir=None):
         """Aggregate evaluation outputs into CSVs under the latest evaluation run directory.
         Creates: all_sequences.csv and per-fragment CSVs when fragment rewards are enabled."""
-        import re
-        
-        # Find latest evaluation run index from existing batch run dirs
-        pipeline_output_dir = Path(self.output_dir) / "pipeline_output"
-        pipeline_output_dir.mkdir(parents=True, exist_ok=True)
-        eval_batch_dirs = [
-            d for d in pipeline_output_dir.glob("pipeline_output_eval_*_batch_*") if d.is_dir()
-        ]
-        eval_idx = "0"
-        if eval_batch_dirs:
-            latest_dir = max(eval_batch_dirs, key=lambda p: p.stat().st_mtime)
-            m = re.match(r"pipeline_output_eval_(\d+)_batch_\d{4}$", latest_dir.name)
-            if m:
-                eval_idx = m.group(1)
-        CSV_DIR = pipeline_output_dir / f"pipeline_output_eval_{eval_idx}"
-        CSV_DIR.mkdir(parents=True, exist_ok=True)
+
+        if output_dir is None:
+            # Find latest evaluation run index from existing batch run dirs
+            pipeline_output_dir = Path(self.output_dir) / "pipeline_output"
+            pipeline_output_dir.mkdir(parents=True, exist_ok=True)
+            eval_batch_dirs = [
+                d for d in pipeline_output_dir.glob("pipeline_output_eval_*_batch_*") if d.is_dir()
+            ]
+            eval_idx = "0"
+            if eval_batch_dirs:
+                latest_dir = max(eval_batch_dirs, key=lambda p: p.stat().st_mtime)
+                m = re.match(r"pipeline_output_eval_(\d+)_batch_\d{4}$", latest_dir.name)
+                if m:
+                    eval_idx = m.group(1)
+            CSV_DIR = pipeline_output_dir / f"pipeline_output_eval_{eval_idx}"
+        else:
+            CSV_DIR = Path(output_dir)
+
+        os.makedirs(CSV_DIR, exist_ok=True)
         
         # Helpers
         def _make_pos_mask(L: int, B: int, chain_mask: torch.Tensor, fragment_bounds=None, device=None):
