@@ -686,6 +686,9 @@ class AF3PETaseReward(Reward):
             af2_plddt_ub=80.0,
             af2_plddt_lb=0.0,
             af2_plddt_weight=1.0,
+            ligand_rmsd_ub=20.0,
+            ligand_rmsd_lb=0.0,
+            ligand_rmsd_weight=1.0,
             reward_aggregation_mode="average",
         ):
 
@@ -742,6 +745,9 @@ class AF3PETaseReward(Reward):
         self.af2_plddt_ub = af2_plddt_ub
         self.af2_plddt_lb = af2_plddt_lb
         self.af2_plddt_weight = af2_plddt_weight
+        self.ligand_rmsd_ub = ligand_rmsd_ub
+        self.ligand_rmsd_lb = ligand_rmsd_lb
+        self.ligand_rmsd_weight = ligand_rmsd_weight
         self.reward_aggregation_mode = reward_aggregation_mode
 
         # make subdirectory for pipeline output
@@ -928,6 +934,11 @@ class AF3PETaseReward(Reward):
         af2_plddt_clamped = torch.clamp(af2_plddt, min=self.af2_plddt_lb, max=self.af2_plddt_ub)
         af2_plddt_reward = (af2_plddt_clamped - self.af2_plddt_lb) / (self.af2_plddt_ub - self.af2_plddt_lb)
 
+        # get ligand rmsd reward
+        ligand_rmsd = torch.tensor(df_out["petase_metrics.protein_aligned_ligand_rmsd"].tolist())
+        ligand_rmsd_clamped = torch.clamp(ligand_rmsd, min=self.ligand_rmsd_lb, max=self.ligand_rmsd_ub)
+        ligand_rmsd_reward = 1 - (ligand_rmsd_clamped - self.ligand_rmsd_lb) / (self.ligand_rmsd_ub - self.ligand_rmsd_lb)
+
         # Combine all rewards
         if self.reward_aggregation_mode == "average":
             reward_list = [
@@ -943,14 +954,15 @@ class AF3PETaseReward(Reward):
                 pairwise_diversity_reward * self.pairwise_diversity_weight,
                 esm_perplexity_reward * self.esm_perplexity_weight,
                 af2_plddt_reward * self.af2_plddt_weight,
+                ligand_rmsd_reward * self.ligand_rmsd_weight,
             ]
             
-            denom = sum([
+            denom = [
                 self.oxyanion_weight_1, self.oxyanion_weight_2, self.hisNesterox_weight, self.hisNserO_weight,
                 self.his_ser_angle_weight, self.iptm_weight, self.ptm_weight, self.pae_min_weight,
                 self.as_plddt_weight, self.pairwise_diversity_weight, self.esm_perplexity_weight,
-                self.af2_plddt_weight
-            ])
+                self.af2_plddt_weight, self.ligand_rmsd_weight,
+            ]
 
             if self.ref_seq is not None:
                 reward_list.append(dist_from_ref_seq_reward * self.dist_from_ref_seq_weight)
@@ -1031,6 +1043,9 @@ class AF3PETaseReward(Reward):
             "af2_plddt_mean": af2_plddt.mean().cpu().item(),
             "af2_plddt_min": af2_plddt.min().cpu().item(),
             "af2_plddt_max": af2_plddt.max().cpu().item(),
+            "ligand_rmsd_mean": ligand_rmsd.mean().cpu().item(),
+            "ligand_rmsd_min": ligand_rmsd.min().cpu().item(),
+            "ligand_rmsd_max": ligand_rmsd.max().cpu().item(),
         }
 
         if self.ref_seq is not None:
@@ -1364,6 +1379,191 @@ class ATPBinder(Reward):
             "hbond_mean": hbond.mean().cpu().item(),
             "hbond_min": hbond.min().cpu().item(),
             "hbond_max": hbond.max().cpu().item(),
+        }
+
+        # Add evaluation-specific data when in evaluation mode
+        if evaluate:
+            # Store policy log probabilities for evaluation
+            metrics["rundir"] = config.rundir
+
+            if self.frag_cfg is not None:
+                metrics['fragment_dict'] = fragment_dict  # Fragment dictionary
+                metrics['fragment_bounds'] = self.frag_cfg.fragment_bounds  # Fragment bounds used
+
+        return reward.to(device), metrics
+
+
+class MetalloPETase(Reward):
+    """
+        MetalloPETase specific reward function
+    """
+
+    def __init__(
+            self, 
+            pipeline_config_path, 
+            output_dir, 
+            run_name,
+            iptm_lb = 0.0,
+            iptm_ub = 0.9,
+            iptm_weight = 1.0,
+            ligand_rmsd_lb = 0,
+            ligand_rmsd_ub = 10,
+            ligand_rmsd_weight = 1.0,
+            frag_cfg=None, 
+        ):
+
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/pipelines")
+        # if we used an apptainer we would could install cifutils and datahub directly
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/cifutils/src")
+        sys.path.append("/projects/ml/itopt/policy_mpnn/software/datahub/src")        
+        os.environ["PYTHONPATH"] = ":" # pipeline will freak if this is not set
+
+        from pipelines.pipeline import main as run_pipeline
+
+        self.run_pipeline = run_pipeline
+        self.pipeline_config = OmegaConf.load(pipeline_config_path)
+        self.output_dir = output_dir
+        self.run_name = run_name
+        self.iptm_ub = iptm_ub
+        self.iptm_lb = iptm_lb
+        self.iptm_weight = iptm_weight
+        self.ligand_rmsd_ub = ligand_rmsd_ub
+        self.ligand_rmsd_lb = ligand_rmsd_lb
+        self.ligand_rmsd_weight = ligand_rmsd_weight
+        self.frag_cfg = frag_cfg
+
+        # make subdirectory for pipeline output
+        pipeline_output_dir = os.path.join(self.output_dir, self.run_name, "pipeline_output")
+        os.makedirs(pipeline_output_dir, exist_ok=True)
+    
+    def get_sequences(self, policy_output, chain_mask=None):
+        """
+            Return list of sampled sequences
+        """
+        sampled_sequences = policy_output["S"]
+
+        if chain_mask is not None:
+            sampled_sequences = sampled_sequences[:, chain_mask]
+
+        B = sampled_sequences.shape[0]
+        
+        sequences = [] 
+        for i in range(B):
+            seq = sampled_sequences[i]
+            seq_str = "".join([alphabet[int(s)] for s in seq])
+            sequences.append(seq_str)
+        return sequences
+
+    def get_input_df(self, sequences):
+        """
+        Convert list of sequences to DataFrame format required by AF3
+        """
+
+        df = pd.DataFrame(
+            {
+                "sequence": sequences,
+                "name": [f"seq_{i:04}" for i in range(len(sequences))],
+                "origin.path": [f"seq_{i:04}.path" for i in range(len(sequences))],
+            }
+        )
+
+        return df
+    
+    def get_dist_to_ref_seq(self, sequences):
+        assert self.ref_seq is not None, "Reference sequence is None"
+        dist_list = []
+        for seq in sequences:
+            dist = sum(1 for a, b in zip(seq, self.ref_seq) if a != b)
+            dist_list.append(float(dist))
+
+        return torch.tensor(dist_list)
+    
+    def get_pairwise_diversity(self, sequences):
+        dist_list = []
+        for i in range(len(sequences)):
+            _list = []
+            for j in range(len(sequences)):
+                if i != j:
+                    dist = sum(1 for a, b in zip(sequences[i], sequences[j]) if a != b)
+                    _list.append(float(dist))
+            dist_list.append(np.mean(_list))
+
+        # return mean pairwise distance
+        return torch.tensor(dist_list)
+
+    @torch.no_grad()
+    def __call__(self, step, policy_output, feature_dict, device, evaluate=False):
+
+        config = copy.deepcopy(self.pipeline_config)
+        config.rundir = os.path.join(
+            self.output_dir, 
+            self.run_name,
+            "pipeline_output", 
+            f"pipeline_output_iter_{step:04}" if not evaluate else f"pipeline_output_eval_{step:04}"
+        )
+        
+        # just take sequences from the first chain
+        chain_mask = feature_dict["chain_labels"]==0 # [1, L]
+        chain_mask = chain_mask[0] # [L,]
+
+        # Get the sequences from policy output
+        sequences = self.get_sequences(policy_output, chain_mask=chain_mask)
+
+        if self.frag_cfg is not None:
+            fragment_dict = make_fragment_dict(sequences, self.frag_cfg.fragment_bounds)
+            samples = sample_sequences(fragment_dict, self.frag_cfg.sample_size, self.frag_cfg.min_sample)
+            names = [x[0] for x in samples]
+            sequences = [x[1] for x in samples]
+        
+        # Create a DataFrame for AF3
+        df_input = self.get_input_df(sequences)
+        df_out = self.run_pipeline(df_input, config)
+
+
+        # add code to delete af3 outputs to save space
+        af3_out_dir = os.path.join(config.rundir, "click/outputs")
+        subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
+        
+        # Normalize metrics to [0,1] range
+        def normalize_metric(metric, lb, ub):
+            metric_clamped = torch.clamp(metric, min=lb, max=ub)
+            reward = (metric_clamped - lb) / (ub - lb)
+            return reward
+
+        # get iptm reward
+        iptm = torch.tensor(df_out["af3_iptm"].tolist())
+        iptm_reward = normalize_metric(iptm, self.iptm_lb, self.iptm_ub)
+
+        # get ligand_rmsd reward
+        ligand_rmsd = torch.tensor(df_out["alignment.ligand_rmsd"].tolist()).float()
+        ligand_rmsd_reward = 1 - normalize_metric(ligand_rmsd, self.ligand_rmsd_lb, self.ligand_rmsd_ub)
+
+        # Combine all rewards
+        reward_list = [
+            iptm_reward * self.iptm_weight,
+            ligand_rmsd_reward * self.ligand_rmsd_weight,
+        ]
+
+        denom = sum([self.iptm_weight, self.ligand_rmsd_weight])
+
+        reward = torch.stack(reward_list, dim=1) / denom
+
+        if self.frag_cfg is not None:
+            reward = get_fragment_rewards(sequences, reward, fragment_dict, self.frag_cfg.fragment_bounds)
+
+        # make sure reward is properly padded when designing multiple chains
+        if len(reward.shape) == 2 and reward.shape[1] != chain_mask.shape[0]:
+            # should the padding be zero or ones? ( i think zero is better )
+            padding = torch.zeros(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
+            reward = torch.cat([reward, padding], dim=1)
+
+        metrics = {
+            "iptm_mean": iptm.mean().cpu().item(),
+            "iptm_min": iptm.min().cpu().item(),
+            "iptm_max": iptm.max().cpu().item(),
+            "ligand_rmsd_mean": ligand_rmsd.mean().cpu().item(),
+            "ligand_rmsd_min": ligand_rmsd.min().cpu().item(),
+            "ligand_rmsd_max": ligand_rmsd.max().cpu().item(),
         }
 
         # Add evaluation-specific data when in evaluation mode

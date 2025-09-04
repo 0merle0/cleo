@@ -1,4 +1,4 @@
-run_name: petase_v12_custom_agg # name for the run
+run_name: petase_v13_ligand_rmsd_plus_diversity_very_lowoxh2 # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
@@ -50,7 +50,7 @@ reward: &default_reward
   oxyanion_lb: 2.5
   oxyanion_ub: 10
   oxyanion_weight_1: 1.0
-  oxyanion_weight_2: 0.2 # smaller weight for oxh2 seems to help with convergence to correct docking
+  oxyanion_weight_2: 0.01 # smaller weight for oxh2 seems to help with convergence to correct docking
   hisNesterox_lb: 3.5
   hisNesterox_ub: 10
   hisNesterox_weight: 1.0
@@ -87,6 +87,9 @@ reward: &default_reward
   af2_plddt_ub: 80.0
   af2_plddt_lb: 00.0
   af2_plddt_weight: 1.0
+  ligand_rmsd_ub: 10.0
+  ligand_rmsd_lb: 0.0
+  ligand_rmsd_weight: 2.0
   frag_cfg:
     fragment_bounds: [[0,41],[42,85],[86,127],[128,164],[165,208]]
     sample_size: 128

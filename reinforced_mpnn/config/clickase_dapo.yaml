@@ -1,0 +1,54 @@
+run_name: clickase_v6_more_diversity # name for the run
+output_dir: /home/jgershon/projects/itopt/policy_mpnn
+pdb: /projects/ml/itopt/policy_mpnn/benchmarks/click_enzyme/H5-JC_model.pdb
+
+batch_size: 32
+N_steps: 500
+lr: 1e-4 # learning rate slowed for protease
+checkpoint_every_n_steps: 10
+eval: false
+checkpoint_path: null
+algorithm: dapo
+
+# -- DAPO params --
+N_updates: 16 # number of rollouts per step
+update_batch_size: 8 # number of rollouts to use for each update
+clip_eps_low: 0.2 # lower bound for clipping value taken from paper
+clip_eps_high: 0.28 # upper bound for clipping value taken from paper
+
+# -- MPNN params --
+model_type: ligand_mpnn # protein_mpnn or ligand_mpnn
+temperature: 1.0 # lower temp
+omit_AA: CX
+
+fixed_residues: "A29 A30 A31 A32 A60 A61 A62 A63 A100 A101 A102 A103"
+
+reward:
+  _target_: reward_utils.AF3ClickEnzymeReward
+  pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_clickase.yaml
+  output_dir: ${output_dir}
+  run_name: ${run_name} # name for the run
+  ptm_lb: 0.
+  ptm_ub: 0.8
+  iptm_lb: 0.
+  iptm_ub: 0.8
+  rmsd_3AH_lb: 0.
+  rmsd_3AH_ub: 10.
+  rmsd_DEP_lb: 0.
+  rmsd_DEP_ub: 10.
+  dist_CR1_NR1_lb: 0.5
+  dist_CR1_NR1_ub: 5.
+  dist_CR2_NR3_lb: 0.5
+  dist_CR2_NR3_ub: 5.
+  frag_cfg:
+    fragment_bounds: [[0,29],[30,60],[61,101],[102,134]]
+    sample_size: 128
+    min_sample: 2
+  ref_seq: SVSSRTVTVTLPVTAETAALFRAATAPATIATLADPDHPRRAEAVVDFLRAAIALVRARVPALAADVAQLNAATGIDLTTATVTLTPDPATGTAAVTVTQGDKRLVGSVTAAQALAWLQPGATVTITGTLETPLA
+  max_dist_to_ref_seq: 60
+  min_dist_to_ref_seq: 10
+  max_pairwise_diversity: 40
+  min_pairwise_diversity: 5
+  esm_perplexity_ub: 15.0
+  esm_perplexity_lb: 6.0
+  
