@@ -8,12 +8,12 @@
 #SBATCH --ntasks=1
 #SBATCH --time=2-00:00:00
 #SBATCH -o logs/logs_%j.out
-#SBATCH --exclude g2521,g2536
+#SBATCH --exclude g2521,g2536,g2541
 
 
 ### change 5-digit MASTER_PORT as you wish, slurm will raise Error if duplicated with others
 ### change WORLD_SIZE as gpus/node * num_nodes
-export MASTER_PORT=36799
+export MASTER_PORT=36788
 
 ### get the first node name as master address - customized for vgg slurm
 ### e.g. master(gnodee[2-5],gnoded1) == gnodee2
