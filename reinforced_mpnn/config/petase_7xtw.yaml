@@ -1,0 +1,98 @@
+run_name: petase_7xtw_test # name for the run
+output_dir: /home/jgershon/projects/itopt/policy_mpnn
+pdb: /projects/ml/itopt/policy_mpnn/benchmarks/wt_petase/pred_wt_petase_7xtw_model.cif
+
+batch_size: 2
+N_steps: 500
+lr: 1e-4 # learning rate slowed for protease
+checkpoint_every_n_steps: 10
+evaluate_every_n_steps: 500 # dont want eval for now
+eval: false
+checkpoint_path: null
+algorithm: dapo
+
+use_avg_reward: false
+avg_reward_window: 5 # number of steps to use for average reward
+
+# USE KL ref
+use_ref_kl: true
+kl_weight: 1e-2
+
+# -- DAPO params --
+N_updates: 16 # number of rollouts per step
+update_batch_size: 8 # number of rollouts to use for each update
+clip_eps_low: 0.2 # lower bound for clipping value taken from paper
+clip_eps_high: 0.28 # upper bound for clipping value taken from paper
+
+# -- MPNN params --
+model_type: ligand_mpnn # protein_mpnn or ligand_mpnn
+temperature: 1.0 # default temperature
+omit_AA: CX
+
+fixed_residues: "A48 A49 A50 A51 A98 A99 A100 A101 A148 A149 A150 A151 A198 A199 A200 A201" 
+
+reward: &default_reward
+  _target_: reward_utils.AF3PETaseReward
+  reward_aggregation_mode: custom 
+  pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_wt_petase.yaml
+  output_dir: ${output_dir}
+  run_name: ${run_name} # name for the run
+  oxyanion_lb: 2.5
+  oxyanion_ub: 10
+  oxyanion_weight_1: 1
+  oxyanion_weight_2: 0.01 # smaller weight for oxh2 seems to help with convergence to correct docking
+  hisNesterox_lb: 3.5
+  hisNesterox_ub: 10
+  hisNesterox_weight: 1.0
+  hisNserO_lb: 2.5
+  hisNserO_ub: 10
+  hisNserO_weight: 1.0
+  his_ser_angle: 90
+  his_ser_angle_tol: 5
+  his_ser_angle_weight: 1.0
+  iptm_ub: 0.7
+  iptm_lb: 0.0
+  iptm_weight: 1.0
+  ptm_ub: 0.8
+  ptm_lb: 0.0
+  ptm_weight: 0.0
+  pae_min_ub: 5.0
+  pae_min_lb: 0.0
+  pae_min_weight: 0.0
+  as_plddt_ub: 70.0
+  as_plddt_lb: 0.0
+  as_plddt_weight: 0.0
+  ref_seq: NPYARGPNPTAASLEASAGPFTVRSFTVSRPSGYGAGTVYYPTNAGGTVGAIAIVPGYTARQSSIKWWGPRLASHGFVVITIDTNSTLDQPSSRSSQQMAALRQVASLNGTSSSPIYGKVDTARMGVMGWSMGGGGSLISAANNPSLKAAAPQAPWDSSTNFSSVTVPTLIFACENDSIAPVNSSALPIYDSMSRNAKQFLEINGGSHSCANSGNSNQALIGKKGVAWMKRFMDNDTRYSTFACENPNSTRVSDFRTANCS
+  max_dist_to_ref_seq: 100
+  min_dist_to_ref_seq: 0
+  dist_from_ref_seq_weight: 2.0
+  max_pairwise_diversity: 100
+  min_pairwise_diversity: 0
+  pairwise_diversity_weight: 1.0
+  pocket_idx_list: [56,57,58,129,131,155,178,179] # 0-indexed residues in the pocket
+  pocket_diversity_weight: 1.0
+  esm_perplexity_ub: 15.0
+  esm_perplexity_lb: 6.0
+  esm_perplexity_weight: 0.0
+  af2_plddt_ub: 80.0
+  af2_plddt_lb: 00.0
+  af2_plddt_weight: 0.0
+  ligand_rmsd_ub: 10.0
+  ligand_rmsd_lb: 0.0
+  ligand_rmsd_weight: 2.0
+  frag_cfg:
+    fragment_bounds: [[0,50],[51,100],[101,150],[151,200],[201,260]]
+    sample_size: 2
+    min_sample: 0
+  # from kiera
+  # oxyanion hole distances
+  # ester to nitrogen distance 
+  # distance ser oxygen to ester oxygen
+
+evaluate:
+  chkpt_path: null # Can be overridden
+  temperature: 0.5
+  batch_size: 32   # Number of sequences per rollout batch
+  num_batches: 1  # Number of batches to run
+  reward: 
+    <<: *default_reward  # Inherit all default reward settings

@@ -924,21 +924,31 @@ class AF3PETaseReward(Reward):
         as_plddt_clamped = torch.clamp(as_plddt, min=self.as_plddt_lb, max=self.as_plddt_ub)
         as_plddt_reward = (as_plddt_clamped - self.as_plddt_lb) / (self.as_plddt_ub - self.as_plddt_lb)
 
-        # get esm perplexity reward
-        esm_perplexity = torch.tensor(df_out["esm_perplexity.perplexity"].tolist())
-        esm_perplexity_clamped = torch.clamp(esm_perplexity, min=self.esm_perplexity_lb, max=self.esm_perplexity_ub)
-        esm_perplexity_reward = 1 - (esm_perplexity_clamped - self.esm_perplexity_lb) / (self.esm_perplexity_ub - self.esm_perplexity_lb)
-
-        # get af2 plddt reward
-        af2_plddt = torch.tensor(df_out["af2.af2_plddt"].tolist())
-        af2_plddt_clamped = torch.clamp(af2_plddt, min=self.af2_plddt_lb, max=self.af2_plddt_ub)
-        af2_plddt_reward = (af2_plddt_clamped - self.af2_plddt_lb) / (self.af2_plddt_ub - self.af2_plddt_lb)
-
         # get ligand rmsd reward
         ligand_rmsd = torch.tensor(df_out["petase_metrics.protein_aligned_ligand_rmsd"].tolist())
         ligand_rmsd_clamped = torch.clamp(ligand_rmsd, min=self.ligand_rmsd_lb, max=self.ligand_rmsd_ub)
         ligand_rmsd_reward = 1 - (ligand_rmsd_clamped - self.ligand_rmsd_lb) / (self.ligand_rmsd_ub - self.ligand_rmsd_lb)
 
+
+        # get esm perplexity reward
+        if "esm_perplexity.perplexity" in df_out.columns:
+            esm_perplexity = torch.tensor(df_out["esm_perplexity.perplexity"].tolist())
+            esm_perplexity_clamped = torch.clamp(esm_perplexity, min=self.esm_perplexity_lb, max=self.esm_perplexity_ub)
+            esm_perplexity_reward = 1 - (esm_perplexity_clamped - self.esm_perplexity_lb) / (self.esm_perplexity_ub - self.esm_perplexity_lb)
+        else:
+            esm_perplexity = torch.ones(len(sequences))
+            esm_perplexity_reward = torch.ones(len(sequences))
+
+        # get af2 plddt reward
+        if "af2.af2_plddt" in df_out.columns:
+            af2_plddt = torch.tensor(df_out["af2.af2_plddt"].tolist())
+            af2_plddt_clamped = torch.clamp(af2_plddt, min=self.af2_plddt_lb, max=self.af2_plddt_ub)
+            af2_plddt_reward = (af2_plddt_clamped - self.af2_plddt_lb) / (self.af2_plddt_ub - self.af2_plddt_lb)
+        else:
+            af2_plddt = torch.ones(len(sequences))
+            af2_plddt_reward = torch.ones(len(sequences))
+
+        
         # Combine all rewards
         if self.reward_aggregation_mode == "average":
             reward_list = [
