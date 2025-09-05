@@ -1,4 +1,4 @@
-run_name: petase_v14_ref_w2 # name for the run
+run_name: petase_v14_ref_w3 # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
@@ -50,16 +50,16 @@ reward: &default_reward
   oxyanion_lb: 2.5
   oxyanion_ub: 10
   oxyanion_weight_1: 1
-  oxyanion_weight_2: 0.01 # smaller weight for oxh2 seems to help with convergence to correct docking
+  oxyanion_weight_2: 0.001 # smaller weight for oxh2 seems to help with convergence to correct docking
   hisNesterox_lb: 3.5
   hisNesterox_ub: 10
-  hisNesterox_weight: 0.0
+  hisNesterox_weight: 1.0
   hisNserO_lb: 2.5
   hisNserO_ub: 10
-  hisNserO_weight: 0.0
+  hisNserO_weight: 1.0
   his_ser_angle: 90
   his_ser_angle_tol: 5
-  his_ser_angle_weight: 0.0
+  his_ser_angle_weight: 1.0
   iptm_ub: 0.7
   iptm_lb: 0.0
   iptm_weight: 1.0
@@ -75,7 +75,7 @@ reward: &default_reward
   ref_seq: MGEEEELELERPSGERTPVRRHRFPARKANNFEEAVANVERLIEEIRAAGVDFSARKERAVVVGYSLGVVTGMIMFATGTDFIEALRKALEIGKKVVEEDPEFMERHRKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGEAGEAVVEVLTAAGVDVLLMGGLGSGYPVTIYQA
   max_dist_to_ref_seq: 100
   min_dist_to_ref_seq: 0
-  dist_from_ref_seq_weight: 2.0
+  dist_from_ref_seq_weight: 3.0
   max_pairwise_diversity: 100
   min_pairwise_diversity: 0
   pairwise_diversity_weight: 1.0

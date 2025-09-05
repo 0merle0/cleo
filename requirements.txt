@@ -12,8 +12,14 @@ scipy
 scikit-learn
 gpytorch
 tqdm
+ipython
 rich
 icecream
 colorama
 executing
 asttokens
+biotite
+toolz
+prody
+einops
+rdkit
