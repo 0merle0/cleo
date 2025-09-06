@@ -1,4 +1,4 @@
-run_name: petase_v14_ref_w3 # name for the run
+run_name: petase_v14_ref_adj_Wref # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
@@ -49,7 +49,7 @@ reward: &default_reward
   run_name: ${run_name} # name for the run
   oxyanion_lb: 2.5
   oxyanion_ub: 10
-  oxyanion_weight_1: 1
+  oxyanion_weight_1: 2
   oxyanion_weight_2: 0.001 # smaller weight for oxh2 seems to help with convergence to correct docking
   hisNesterox_lb: 3.5
   hisNesterox_ub: 10
@@ -74,16 +74,16 @@ reward: &default_reward
   as_plddt_weight: 0.0
   ref_seq: MGEEEELELERPSGERTPVRRHRFPARKANNFEEAVANVERLIEEIRAAGVDFSARKERAVVVGYSLGVVTGMIMFATGTDFIEALRKALEIGKKVVEEDPEFMERHRKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGEAGEAVVEVLTAAGVDVLLMGGLGSGYPVTIYQA
   max_dist_to_ref_seq: 100
-  min_dist_to_ref_seq: 0
+  min_dist_to_ref_seq: 15
   dist_from_ref_seq_weight: 3.0
   max_pairwise_diversity: 100
-  min_pairwise_diversity: 0
-  pairwise_diversity_weight: 1.0
+  min_pairwise_diversity: 25
+  pairwise_diversity_weight: 5.0
   pocket_idx_list: [31,34,35,64,66,67,88,89,92,93,95,96,102,103,107,108,110,111,125,170,196,197,199] # 0-indexed residues in the pocket
   pocket_diversity_weight: 2.0
   esm_perplexity_ub: 15.0
   esm_perplexity_lb: 6.0
-  esm_perplexity_weight: 1.0
+  esm_perplexity_weight: 3.0
   af2_plddt_ub: 80.0
   af2_plddt_lb: 00.0
   af2_plddt_weight: 1.0
