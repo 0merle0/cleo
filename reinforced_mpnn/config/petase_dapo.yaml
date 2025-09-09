@@ -75,10 +75,10 @@ reward: &default_reward
   ref_seq: MGEEEELELERPSGERTPVRRHRFPARKANNFEEAVANVERLIEEIRAAGVDFSARKERAVVVGYSLGVVTGMIMFATGTDFIEALRKALEIGKKVVEEDPEFMERHRKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGEAGEAVVEVLTAAGVDVLLMGGLGSGYPVTIYQA
   max_dist_to_ref_seq: 100
   min_dist_to_ref_seq: 15
-  dist_from_ref_seq_weight: 5.0
+  dist_from_ref_seq_weight: 8.0
   max_pairwise_diversity: 100
   min_pairwise_diversity: 25
-  pairwise_diversity_weight: 8.0
+  pairwise_diversity_weight: 5.0
   pocket_idx_list: [31,34,35,64,66,67,88,89,92,93,95,96,102,103,107,108,110,111,125,170,196,197,199] # 0-indexed residues in the pocket
   pocket_diversity_weight: 2.0
   esm_perplexity_ub: 15.0

@@ -33,7 +33,7 @@ fixed_residues: "A48 A49 A50 A51 A98 A99 A100 A101 A148 A149 A150 A151 A198 A199
 
 reward: &default_reward
   _target_: reward_utils.AF3PETaseReward
-  reward_aggregation_mode: custom 
+  reward_aggregation_mode: average 
   pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_wt_petase.yaml
   output_dir: ${output_dir}
   run_name: ${run_name} # name for the run
