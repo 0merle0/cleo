@@ -1,4 +1,4 @@
-run_name: petase_v14_ref_adj_Wref # name for the run
+run_name: petase_v16_refw8 # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
@@ -43,13 +43,13 @@ fixed_residues: "A41 A42 A43 A44 A66 A85 A86 A87 A88 A107 A122 A127 A128 A129 A1
 
 reward: &default_reward
   _target_: reward_utils.AF3PETaseReward
-  reward_aggregation_mode: custom 
+  reward_aggregation_mode: average 
   pipeline_config_path: /projects/ml/itopt/policy_mpnn/software/pipelines/pipelines/configs/reward_petase.yaml
   output_dir: ${output_dir}
   run_name: ${run_name} # name for the run
   oxyanion_lb: 2.5
   oxyanion_ub: 10
-  oxyanion_weight_1: 2
+  oxyanion_weight_1: 1
   oxyanion_weight_2: 0.001 # smaller weight for oxh2 seems to help with convergence to correct docking
   hisNesterox_lb: 3.5
   hisNesterox_ub: 10
@@ -75,10 +75,10 @@ reward: &default_reward
   ref_seq: MGEEEELELERPSGERTPVRRHRFPARKANNFEEAVANVERLIEEIRAAGVDFSARKERAVVVGYSLGVVTGMIMFATGTDFIEALRKALEIGKKVVEEDPEFMERHRKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGEAGEAVVEVLTAAGVDVLLMGGLGSGYPVTIYQA
   max_dist_to_ref_seq: 100
   min_dist_to_ref_seq: 15
-  dist_from_ref_seq_weight: 3.0
+  dist_from_ref_seq_weight: 5.0
   max_pairwise_diversity: 100
   min_pairwise_diversity: 25
-  pairwise_diversity_weight: 5.0
+  pairwise_diversity_weight: 8.0
   pocket_idx_list: [31,34,35,64,66,67,88,89,92,93,95,96,102,103,107,108,110,111,125,170,196,197,199] # 0-indexed residues in the pocket
   pocket_diversity_weight: 2.0
   esm_perplexity_ub: 15.0
@@ -89,7 +89,7 @@ reward: &default_reward
   af2_plddt_weight: 1.0
   ligand_rmsd_ub: 10.0
   ligand_rmsd_lb: 0.0
-  ligand_rmsd_weight: 2.0
+  ligand_rmsd_weight: 5.0
   frag_cfg:
     fragment_bounds: [[0,41],[42,85],[86,127],[128,164],[165,208]]
     sample_size: 128

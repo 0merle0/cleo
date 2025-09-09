@@ -967,12 +967,12 @@ class AF3PETaseReward(Reward):
                 ligand_rmsd_reward * self.ligand_rmsd_weight,
             ]
             
-            denom = [
+            denom = sum([
                 self.oxyanion_weight_1, self.oxyanion_weight_2, self.hisNesterox_weight, self.hisNserO_weight,
                 self.his_ser_angle_weight, self.iptm_weight, self.ptm_weight, self.pae_min_weight,
                 self.as_plddt_weight, self.pairwise_diversity_weight, self.esm_perplexity_weight,
                 self.af2_plddt_weight, self.ligand_rmsd_weight,
-            ]
+            ])
 
             if self.ref_seq is not None:
                 reward_list.append(dist_from_ref_seq_reward * self.dist_from_ref_seq_weight)
