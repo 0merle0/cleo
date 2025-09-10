@@ -23,3 +23,5 @@ toolz
 prody
 einops
 rdkit
+dotenv
+assertpy
