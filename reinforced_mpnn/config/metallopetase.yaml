@@ -49,7 +49,10 @@ reward: &default_reward
   as_plddt_lb: 50.0
   as_plddt_ub: 90.0
   as_plddt_weight: 1.0
-
+  ref_seq: KSPVEIFQEIVETVERTLEEVRAETDPERLEYLRAVLEHEQLHARAVLGLVTPEEIEEEFRRLFATPAGRRLFRQAARQFGYDPSRPEVYLETHLQTVKNQYYNRDKYSEEVKELARRVLEISEEGLEAYREKRREIERERRR
+  dist_from_ref_seq_weight: 1.0
+  min_dist_to_ref_seq: 5
+  max_dist_to_ref_seq: 100
   frag_cfg:
     fragment_bounds: [[0,35],[36,70],[71,108],[109,142]]
     sample_size: 128
