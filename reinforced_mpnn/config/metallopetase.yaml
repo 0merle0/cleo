@@ -2,7 +2,7 @@ run_name: metallopetase_test # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/metallo_petase/reference_str.pdb
 
-batch_size: 2
+batch_size: 32
 N_steps: 500
 lr: 1e-4 # learning rate slowed for protease
 checkpoint_every_n_steps: 10
@@ -52,8 +52,8 @@ reward: &default_reward
 
   frag_cfg:
     fragment_bounds: [[0,35],[36,70],[71,108],[109,142]]
-    sample_size: 2
-    min_sample: 0
+    sample_size: 128
+    min_sample: 2
 
 
 evaluate:
