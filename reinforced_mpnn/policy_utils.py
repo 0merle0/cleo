@@ -10,11 +10,11 @@ import pandas as pd  # pandas for CSV fallback logging
 import pickle
 from pathlib import Path
 import torch.nn.functional as F
+import wandb
 
 sys.path.append("/software/lab/mpnn/fused_mpnn")
 from data_utils import featurize, parse_PDB
 from model_utils import ProteinMPNN
-import wandb
 
 PROTEIN_MPNN_CKPT_PATH = "/databases/mpnn/vanilla_model_weights/v_48_020.pt"
 LIGAND_MPNN_CKPT_PATH = "/databases/mpnn/ligand_mpnn_model_weights/s25_r010_t300_p.pt"
@@ -376,6 +376,24 @@ class PolicyMPNN:
         }
 
         return output_dict
+    
+    def get_sequences(self, policy_output, chain_mask=None):
+        """
+            Return list of sampled sequences
+        """
+        sampled_sequences = policy_output["S"]
+
+        if chain_mask is not None:
+            sampled_sequences = sampled_sequences[:, chain_mask]
+
+        B = sampled_sequences.shape[0]
+        
+        sequences = [] 
+        for i in range(B):
+            seq = sampled_sequences[i]
+            seq_str = "".join([alphabet[int(s)] for s in seq])
+            sequences.append(seq_str)
+        return sequences
 
     def train_step(self, step, init_state, feature_dict):
         """
@@ -562,7 +580,7 @@ class PolicyMPNN:
         # Encode initial state once (same as in training)
         h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
         
-        # Collect rollouts for all batches first
+        # Collect rollouts for all batches firstfragment_bounds
         outs = []
         for _ in tqdm(range(self.cfg.evaluate.num_batches), desc="Evaluation batches"):
             # Set batch size for this evaluation batch
@@ -722,5 +740,26 @@ class PolicyMPNN:
             for key, rows in frag_rows.items():
                 all_frag_rows.extend(rows)
             pd.DataFrame(all_frag_rows).to_csv(CSV_DIR / "fragments.csv", index=False)
-        
+
+    def sample_from_policy(self, num_batches):
+        """
+            Sample sequences from the policy
+        """
     
+        with torch.no_grad():
+            output_list = []
+            for _ in tqdm(range(num_batches)):
+                feature_dict = self.featurize_pdb(self.cfg.pdb)
+                h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
+                out = self.rollout(feature_dict, h_V, h_E, E_idx)
+                output_list.append(out)
+
+        # get all sequences
+        chain_mask = feature_dict["chain_labels"] == 0 # [1, L]
+        chain_mask = chain_mask[0] # [L,]
+
+        sequences = []
+        for out in output_list:
+            sequences.extend(self.get_sequences(out, chain_mask))
+
+        return sequences

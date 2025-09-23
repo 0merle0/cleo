@@ -1,17 +1,17 @@
 # acquition function optimization configuration file
-run_name: acqf_opt_mlp_dim16_no_val_gamma_10
+run_name: bingxu_g9_opt_no_val_acqf_gamma1
 
-outdir: /home/jgershon/projects/itopt/kiera/model_predictions/250722_from_round_0_data
-surrogate_ckpt: /projects/hydrolases/serine_hydrolase/software/cleo/ckpt/test_petase/petase_mlp_dim16_null/test_petase/petase_mlp_dim16_null.2025-07-21-12-13-13
+outdir: /home/jgershon/projects/itopt/bingxu/round_2
+surrogate_ckpt: /home/jgershon/git/cleo/ckpt/bingxu_g9_opt_no_val/bingxu_g9_opt_no_val.2025-09-19-09-38-06
 
 opt_loop:
-  N: 24
+  N: 12
   q: 384
-  fragment_dictionary: /home/jgershon/projects/itopt/kiera/petase_fragment_dictionary.json
-  num_iter: 50000
+  fragment_dictionary: /home/jgershon/projects/itopt/bingxu/g9_fragment_dict.json
+  num_iter: 25000
   lr: 0.01
 
 acqf:
-  model_batch_size: 256
-  gamma: 10
+  model_batch_size: 1024
+  gamma: 1
   eps: 1e-8

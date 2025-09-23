@@ -25,6 +25,7 @@ restype_INTtoSTR = {0: 'A', 1: 'C', 2: 'D', 3: 'E', 4: 'F', 5: 'G', 6: 'H', 7: '
 alphabet = list(restype_STRtoINT)
 
 
+# IT SAYS DAPO BUT THIS IS REALLY GRPO
 class PolicyMPNNvDAPO(PolicyMPNN):
     def __init__(self, cfg):
         super().__init__(cfg)

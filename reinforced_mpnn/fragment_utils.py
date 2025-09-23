@@ -17,7 +17,7 @@ def make_fragment_dict(seq_list, fragment_bounds):
     return fragment_dict
 
 # function to sample sequences
-def sample_sequences(fragment_dict, num_samples, min_sample, max_iter=10000):
+def sample_sequences(fragment_dict, num_samples, min_sample, max_iter=10000, join_char="_"):
     """
     Sample sequences from the fragments in the dictionary.
     """
@@ -54,8 +54,8 @@ def sample_sequences(fragment_dict, num_samples, min_sample, max_iter=10000):
                 frag_weights[f"fragment_{i+1}"][w_index] += 1
                 _name.append(frag_name)
                 _seq.append(frag_seq)
-            
-            samples.append(("_".join(_name), "".join(_seq)))
+
+            samples.append((join_char.join(_name), "".join(_seq)))
 
         # check if all fragments are sampled
         valid_num = sum([1 for x in sampled_counts if x >= min_sample])
@@ -82,7 +82,7 @@ def get_fragment_rewards(seq_list, rewards, fragment_dict, fragment_bounds):
     """
 
     # should be (B,L)
-    fragmented_rewards = torch.zeros(len(fragment_dict[f'fragment_1']), len(seq_list[0]))
+    fragmented_rewards = torch.zeros(max([len(fragment_dict[x]) for x in fragment_dict]), len(seq_list[0]))
 
     for i in range(len(fragment_dict)):
         start, end = fragment_bounds[i]

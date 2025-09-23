@@ -1,6 +1,7 @@
-run_name: mlp_dim16_no_val
-model_base_path: /projects/hydrolases/serine_hydrolase/software/cleo/ckpt/test_petase/petase_mlp_dim16_null/test_petase/petase_mlp_dim16_null.2025-07-21-12-13-13
-outdir: /home/jgershon/projects/itopt/kiera/model_predictions/250722_from_round_0_data
-fragment_dictionary: /home/jgershon/projects/itopt/kiera/petase_fragment_dictionary.json
+run_name: bingxu_g9_opt_no_val
+model_base_path: /home/jgershon/git/cleo/ckpt/bingxu_g9_opt_no_val/bingxu_g9_opt_no_val.2025-09-19-09-38-06
+outdir: /home/jgershon/projects/itopt/bingxu/round_2
+fragment_dictionary: /home/jgershon/projects/itopt/bingxu/g9_fragment_dict.json
 batch_size: 256
 ckpt_name: "last.ckpt"
+top_k: 1e5

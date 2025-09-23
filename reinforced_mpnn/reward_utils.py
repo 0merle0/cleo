@@ -1419,6 +1419,16 @@ class MetalloPETase(Reward):
             ligand_rmsd_lb = 0,
             ligand_rmsd_ub = 10,
             ligand_rmsd_weight = 1.0,
+            as_rmsd_lb = 0,
+            as_rmsd_ub = 10,
+            as_rmsd_weight = 1.0,
+            as_plddt_lb = 50,
+            as_plddt_ub = 90,
+            as_plddt_weight = 1.0,
+            ref_seq = None,
+            dist_from_ref_seq_weight = 0.0,
+            min_dist_to_ref_seq = 5,
+            max_dist_to_ref_seq = 100,
             frag_cfg=None, 
         ):
 
@@ -1440,6 +1450,16 @@ class MetalloPETase(Reward):
         self.ligand_rmsd_ub = ligand_rmsd_ub
         self.ligand_rmsd_lb = ligand_rmsd_lb
         self.ligand_rmsd_weight = ligand_rmsd_weight
+        self.as_rmsd_ub = as_rmsd_ub
+        self.as_rmsd_lb = as_rmsd_lb
+        self.as_rmsd_weight = as_rmsd_weight
+        self.as_plddt_ub = as_plddt_ub
+        self.as_plddt_lb = as_plddt_lb
+        self.as_plddt_weight = as_plddt_weight
+        self.ref_seq = ref_seq
+        self.dist_from_ref_seq_weight = dist_from_ref_seq_weight
+        self.min_dist_to_ref_seq = min_dist_to_ref_seq
+        self.max_dist_to_ref_seq = max_dist_to_ref_seq
         self.frag_cfg = frag_cfg
 
         # make subdirectory for pipeline output
@@ -1529,9 +1549,11 @@ class MetalloPETase(Reward):
         df_input = self.get_input_df(sequences)
         df_out = self.run_pipeline(df_input, config)
 
+        print("Pipeline output df columns:", df_out.columns)
+
 
         # add code to delete af3 outputs to save space
-        af3_out_dir = os.path.join(config.rundir, "click/outputs")
+        af3_out_dir = os.path.join(config.rundir, "af3*/outputs")
         subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
         
         # Normalize metrics to [0,1] range
@@ -1540,21 +1562,65 @@ class MetalloPETase(Reward):
             reward = (metric_clamped - lb) / (ub - lb)
             return reward
 
+        # for SUBSTRATE
         # get iptm reward
-        iptm = torch.tensor(df_out["af3_iptm"].tolist())
-        iptm_reward = normalize_metric(iptm, self.iptm_lb, self.iptm_ub)
+        sub_iptm = torch.tensor(df_out["af3_sub_metrics.iptm"].tolist())
+        sub_iptm_reward = normalize_metric(sub_iptm, self.iptm_lb, self.iptm_ub)
 
         # get ligand_rmsd reward
-        ligand_rmsd = torch.tensor(df_out["alignment.ligand_rmsd"].tolist()).float()
-        ligand_rmsd_reward = 1 - normalize_metric(ligand_rmsd, self.ligand_rmsd_lb, self.ligand_rmsd_ub)
+        sub_ligand_rmsd = torch.tensor(df_out["af3_sub_metrics.ligand_rmsd"].tolist()).float()
+        sub_ligand_rmsd_reward = 1 - normalize_metric(sub_ligand_rmsd, self.ligand_rmsd_lb, self.ligand_rmsd_ub)
+
+        # get as_plddt reward
+        sub_as_plddt = torch.tensor(df_out["af3_sub_metrics.as_plddt"].tolist()).float()
+        sub_as_plddt_reward = normalize_metric(sub_as_plddt, self.as_plddt_lb, self.as_plddt_ub)
+
+        # get as_rmsd reward
+        sub_as_rmsd = torch.tensor(df_out["af3_sub_metrics.as_rmsd"].tolist()).float()
+        sub_as_rmsd_reward = 1 - normalize_metric(sub_as_rmsd, self.as_rmsd_lb, self.as_rmsd_ub)
+
+        # for TSA
+        # get iptm reward
+        tsa_iptm = torch.tensor(df_out["af3_tsa_metrics.iptm"].tolist())
+        tsa_iptm_reward = normalize_metric(tsa_iptm, self.iptm_lb, self.iptm_ub)
+
+        # get ligand_rmsd reward
+        tsa_ligand_rmsd = torch.tensor(df_out["af3_tsa_metrics.ligand_rmsd"].tolist()).float()
+        tsa_ligand_rmsd_reward = 1 - normalize_metric(tsa_ligand_rmsd, self.ligand_rmsd_lb, self.ligand_rmsd_ub)
+
+        # get as_plddt reward
+        tsa_as_plddt = torch.tensor(df_out["af3_tsa_metrics.as_plddt"].tolist()).float()
+        tsa_as_plddt_reward = normalize_metric(tsa_as_plddt, self.as_plddt_lb, self.as_plddt_ub)
+
+        # get as_rmsd reward
+        tsa_as_rmsd = torch.tensor(df_out["af3_tsa_metrics.as_rmsd"].tolist()).float()
+        tsa_as_rmsd_reward = 1 - normalize_metric(tsa_as_rmsd, self.as_rmsd_lb, self.as_rmsd_ub)
+
+        # get distance to reference sequence
+        if self.ref_seq is not None:
+            dist_from_ref_seq = self.get_dist_to_ref_seq(df_out["sequence"].tolist()) 
+            clampled_dist = torch.clamp(dist_from_ref_seq, min=self.min_dist_to_ref_seq, max=self.max_dist_to_ref_seq)
+            norm_dist = (clampled_dist - self.min_dist_to_ref_seq) / (self.max_dist_to_ref_seq - self.min_dist_to_ref_seq + 1e-6)
+            dist_from_ref_seq_reward = 1 - norm_dist
+
 
         # Combine all rewards
         reward_list = [
-            iptm_reward * self.iptm_weight,
-            ligand_rmsd_reward * self.ligand_rmsd_weight,
+            sub_iptm_reward * self.iptm_weight,
+            sub_ligand_rmsd_reward * self.ligand_rmsd_weight,
+            sub_as_plddt_reward * self.as_plddt_weight,
+            sub_as_rmsd_reward * self.as_rmsd_weight,
+            tsa_iptm_reward * self.iptm_weight,
+            tsa_ligand_rmsd_reward * self.ligand_rmsd_weight,
+            tsa_as_plddt_reward * self.as_plddt_weight,
+            tsa_as_rmsd_reward * self.as_rmsd_weight,
         ]
 
-        denom = sum([self.iptm_weight, self.ligand_rmsd_weight])
+        denom = sum([self.iptm_weight, self.ligand_rmsd_weight, self.as_plddt_weight, self.as_rmsd_weight]) * 2  # times 2 for sub and tsa
+
+        if self.ref_seq is not None:
+            reward_list.append(dist_from_ref_seq_reward * self.dist_from_ref_seq_weight)
+            denom += self.dist_from_ref_seq_weight
 
         reward = torch.stack(reward_list, dim=1) / denom
 
@@ -1568,12 +1634,51 @@ class MetalloPETase(Reward):
             reward = torch.cat([reward, padding], dim=1)
 
         metrics = {
-            "iptm_mean": iptm.mean().cpu().item(),
-            "iptm_min": iptm.min().cpu().item(),
-            "iptm_max": iptm.max().cpu().item(),
-            "ligand_rmsd_mean": ligand_rmsd.mean().cpu().item(),
-            "ligand_rmsd_min": ligand_rmsd.min().cpu().item(),
-            "ligand_rmsd_max": ligand_rmsd.max().cpu().item(),
+            # for SUBSTRATE
+            "sub_iptm_mean": sub_iptm.mean().cpu().item(),
+            "sub_iptm_min": sub_iptm.min().cpu().item(),
+            "sub_iptm_max": sub_iptm.max().cpu().item(),
+            "sub_ligand_rmsd_mean": sub_ligand_rmsd.mean().cpu().item(),
+            "sub_ligand_rmsd_min": sub_ligand_rmsd.min().cpu().item(),
+            "sub_ligand_rmsd_max": sub_ligand_rmsd.max().cpu().item(),
+            "sub_as_plddt_mean": sub_as_plddt.mean().cpu().item(),
+            "sub_as_plddt_min": sub_as_plddt.min().cpu().item(),
+            "sub_as_plddt_max": sub_as_plddt.max().cpu().item(),
+            "sub_as_rmsd_mean": sub_as_rmsd.mean().cpu().item(),
+            "sub_as_rmsd_min": sub_as_rmsd.min().cpu().item(),
+            "sub_as_rmsd_max": sub_as_rmsd.max().cpu().item(),
+            "sub_prot_iptm": np.mean(df_out["af3_sub_metrics.prot_iptm"].tolist()),
+            "sub_prot_iptm_min": np.min(df_out["af3_sub_metrics.prot_iptm"].tolist()),
+            "sub_prot_iptm_max": np.max(df_out["af3_sub_metrics.prot_iptm"].tolist()),
+            "sub_zn_iptm": np.mean(df_out["af3_sub_metrics.zn_iptm"].tolist()),
+            "sub_zn_iptm_min": np.min(df_out["af3_sub_metrics.zn_iptm"].tolist()),
+            "sub_zn_iptm_max": np.max(df_out["af3_sub_metrics.zn_iptm"].tolist()),
+            "sub_ligand_iptm": np.mean(df_out["af3_sub_metrics.ligand_iptm"].tolist()),
+            "sub_ligand_iptm_min": np.min(df_out["af3_sub_metrics.ligand_iptm"].tolist()),
+            "sub_ligand_iptm_max": np.max(df_out["af3_sub_metrics.ligand_iptm"].tolist()),
+
+            # for TSA
+            "tsa_iptm_mean": tsa_iptm.mean().cpu().item(),
+            "tsa_iptm_min": tsa_iptm.min().cpu().item(),
+            "tsa_iptm_max": tsa_iptm.max().cpu().item(),
+            "tsa_ligand_rmsd_mean": tsa_ligand_rmsd.mean().cpu().item(),
+            "tsa_ligand_rmsd_min": tsa_ligand_rmsd.min().cpu().item(),
+            "tsa_ligand_rmsd_max": tsa_ligand_rmsd.max().cpu().item(),
+            "tsa_as_plddt_mean": tsa_as_plddt.mean().cpu().item(),
+            "tsa_as_plddt_min": tsa_as_plddt.min().cpu().item(),
+            "tsa_as_plddt_max": tsa_as_plddt.max().cpu().item(),
+            "tsa_as_rmsd_mean": tsa_as_rmsd.mean().cpu().item(),
+            "tsa_as_rmsd_min": tsa_as_rmsd.min().cpu().item(),
+            "tsa_as_rmsd_max": tsa_as_rmsd.max().cpu().item(),
+            "tsa_prot_iptm": np.mean(df_out["af3_tsa_metrics.prot_iptm"].tolist()),
+            "tsa_prot_iptm_min": np.min(df_out["af3_tsa_metrics.prot_iptm"].tolist()),
+            "tsa_prot_iptm_max": np.max(df_out["af3_tsa_metrics.prot_iptm"].tolist()),
+            "tsa_zn_iptm": np.mean(df_out["af3_tsa_metrics.zn_iptm"].tolist()),
+            "tsa_zn_iptm_min": np.min(df_out["af3_tsa_metrics.zn_iptm"].tolist()),
+            "tsa_zn_iptm_max": np.max(df_out["af3_tsa_metrics.zn_iptm"].tolist()),
+            "tsa_ligand_iptm": np.mean(df_out["af3_tsa_metrics.ligand_iptm"].tolist()),
+            "tsa_ligand_iptm_min": np.min(df_out["af3_tsa_metrics.ligand_iptm"].tolist()),
+            "tsa_ligand_iptm_max": np.max(df_out["af3_tsa_metrics.ligand_iptm"].tolist()),
         }
 
         # Add evaluation-specific data when in evaluation mode

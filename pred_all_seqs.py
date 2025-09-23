@@ -63,6 +63,12 @@ def main(cfg):
             pred_data["pred_mean"].extend(out['mu'].tolist())
             pred_data["pred_var"].extend(out['sigma'].tolist())
 
+        
+            # subset to top k predictions
+            if cfg.top_k is not None:
+                sorted_indices = np.argsort(pred_data["pred_mean"])[-cfg.top_k:]
+                pred_data = {k: [v[i] for i in sorted_indices] for k, v in pred_data.items()}
+
     pred_df = pd.DataFrame(pred_data)
     
 
