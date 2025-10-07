@@ -6,3 +6,6 @@ ckpt/
 lightning_logs/
 outputs/
 ._*
+*heme*
+*chorismate_mutase*
+
