@@ -1,0 +1,19 @@
+# acquition function optimization configuration file
+run_name: momi_mlp_acqf_round2_gamma0
+
+outdir: /home/jgershon/projects/itopt/kiera/g20_optimization/round2_opt
+surrogate_ckpt: /home/jgershon/git/cleo/ckpt/momi_mlp_no_val/momi_mlp_no_val.2025-12-15-22-18-23
+
+write_fasta: false
+
+opt_loop:
+  N: 12
+  q: 384
+  fragment_dictionary: /home/jgershon/projects/itopt/kiera/g20_optimization/g20_opt_fragment_dictionary.json
+  num_iter: 25000
+  lr: 0.01
+
+acqf:
+  model_batch_size: 1024
+  gamma: 1
+  eps: 1e-8

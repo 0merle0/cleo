@@ -1681,6 +1681,12 @@ class MetalloPETase(Reward):
             "tsa_ligand_iptm_max": np.max(df_out["af3_tsa_metrics.ligand_iptm"].tolist()),
         }
 
+        if self.ref_seq is not None:
+            metrics["dist_from_ref_seq_mean"] = dist_from_ref_seq.mean().cpu().item()
+            metrics["dist_from_ref_seq_min"] = dist_from_ref_seq.min().cpu().item()
+            metrics["dist_from_ref_seq_max"] = dist_from_ref_seq.max().cpu().item()
+
+
         # Add evaluation-specific data when in evaluation mode
         if evaluate:
             # Store policy log probabilities for evaluation

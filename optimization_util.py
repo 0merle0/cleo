@@ -5,8 +5,10 @@ import pdb_util
 import numpy as np
 import random
 import fragment_util
+import pandas as pd
+import os
 
-def get_candidates_from_policy(policy, fragment_dictionary):
+def get_candidates_from_policy(policy, fragment_dictionary, connector='_'):
     '''
         take in policy (torch.distributions.Categorical) and sample batch
     '''
@@ -23,7 +25,7 @@ def get_candidates_from_policy(policy, fragment_dictionary):
             name_list.append(fragment_dictionary[f+1][frag_id][0])
             aa_seq_list.append(fragment_dictionary[f+1][frag_id][1])
 
-        candidate_seqs.append(('_'.join(name_list), ''.join(aa_seq_list)))
+        candidate_seqs.append((connector.join(name_list), ''.join(aa_seq_list)))
 
             
     return candidate_seqs
@@ -356,12 +358,12 @@ class BatchUCBwithEntropy:
         return reward, metrics
     
 
-def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, device):
+def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, out_path, device):
 
     feasible_mask = get_feasible_mask(fragment_dictionary)
 
     # initialize policy
-    policy = torch.randn(q,feasible_mask.shape[0],feasible_mask.shape[1])*0.01 #scaling factor
+    policy = torch.randn(q, feasible_mask.shape[0], feasible_mask.shape[1])*0.001 #scaling factor
     feasible_mask = (feasible_mask[None]).repeat(q,1,1)
 
     # set non fragments to << 0 so they do not get sampled
@@ -369,7 +371,6 @@ def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, device):
     policy = policy.to(device)
     policy = torch.nan_to_num(policy)
     policy = policy.requires_grad_(True)
-
 
 
     optimizer = torch.optim.Adam([policy], lr=lr)
@@ -418,6 +419,12 @@ def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, device):
             metric_logs["step"].append(i)
             metric_logs["reward"].append(float(reward.mean().detach()))
 
+            # save logs
+            if i % 50 == 0:
+                metrics_df = pd.DataFrame(metric_logs)
+                metrics_path = os.path.join(out_path, "metrics.csv")
+                metrics_df.to_csv(metrics_path, index=False)
+
             # substract beta term "moving average"
             beta_term = 0
             if i > 0:
@@ -441,8 +448,7 @@ def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, device):
     # get candidates from policy
     candidates = get_candidates_from_policy(m, fragment_dictionary)
 
-    return candidates, metric_logs, m
-        
+    return candidates, m
 
 
 

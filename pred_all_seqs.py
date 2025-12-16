@@ -17,7 +17,7 @@ def featurize_sequences(seqs):
     ret = torch.nn.functional.one_hot(ret, num_classes=20).float()
     return ret.reshape(ret.shape[0], ret.shape[1] * ret.shape[2])
 
-@hydra.main(version_base=None, config_path="./config")
+@hydra.main(version_base=None, config_path="./config", config_name="pred_all_seqs")
 def main(cfg):
 
     # load all sequences
@@ -31,6 +31,9 @@ def main(cfg):
     # load ckpt and config
     ckpt = torch.load(os.path.join(cfg.model_base_path, cfg.ckpt_name), map_location=torch.device('cpu'))
     model_config = OmegaConf.load(os.path.join(cfg.model_base_path,'config.yaml'))
+
+    if cfg.top_k is not None:
+        cfg.top_k = int(cfg.top_k)
 
     # load model
     model = Ensemble(model_config)

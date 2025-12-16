@@ -1,9 +1,9 @@
-run_name: metallopetase_test # name for the run
+run_name: metallopetase_full_seq_4updates # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/metallo_petase/reference_str.pdb
 
 batch_size: 32
-N_steps: 500
+N_steps: 300
 lr: 1e-4 # learning rate slowed for protease
 checkpoint_every_n_steps: 10
 evaluate_every_n_steps: 500 # dont want eval for now
@@ -19,7 +19,7 @@ use_ref_kl: true
 kl_weight: 1e-2
 
 # -- DAPO params --
-N_updates: 16 # number of rollouts per step
+N_updates: 4 # number of rollouts per step  ## DEFAULT 16 (for fragments) ## 
 update_batch_size: 8 # number of rollouts to use for each update
 clip_eps_low: 0.2 # lower bound for clipping value taken from paper
 clip_eps_high: 0.28 # upper bound for clipping value taken from paper
@@ -50,13 +50,13 @@ reward: &default_reward
   as_plddt_ub: 90.0
   as_plddt_weight: 1.0
   ref_seq: KSPVEIFQEIVETVERTLEEVRAETDPERLEYLRAVLEHEQLHARAVLGLVTPEEIEEEFRRLFATPAGRRLFRQAARQFGYDPSRPEVYLETHLQTVKNQYYNRDKYSEEVKELARRVLEISEEGLEAYREKRREIERERRR
-  dist_from_ref_seq_weight: 1.0
+  dist_from_ref_seq_weight: 2.0
   min_dist_to_ref_seq: 5
   max_dist_to_ref_seq: 100
-  frag_cfg:
-    fragment_bounds: [[0,35],[36,70],[71,108],[109,142]]
-    sample_size: 128
-    min_sample: 2
+  # frag_cfg:
+  #   fragment_bounds: [[0,35],[36,70],[71,108],[109,142]]
+  #   sample_size: 128
+  #   min_sample: 2
 
 
 evaluate:

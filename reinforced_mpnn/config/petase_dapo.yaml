@@ -1,4 +1,4 @@
-run_name: petase_v16_refw8_with_oxh2_w0.1 # name for the run
+run_name: petase_bench_no_ref_seq_weight_full_seq # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
@@ -75,7 +75,7 @@ reward: &default_reward
   ref_seq: MGEEEELELERPSGERTPVRRHRFPARKANNFEEAVANVERLIEEIRAAGVDFSARKERAVVVGYSLGVVTGMIMFATGTDFIEALRKALEIGKKVVEEDPEFMERHRKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGEAGEAVVEVLTAAGVDVLLMGGLGSGYPVTIYQA
   max_dist_to_ref_seq: 100
   min_dist_to_ref_seq: 15
-  dist_from_ref_seq_weight: 8.0
+  dist_from_ref_seq_weight: 0.0
   max_pairwise_diversity: 100
   min_pairwise_diversity: 25
   pairwise_diversity_weight: 5.0
@@ -90,10 +90,10 @@ reward: &default_reward
   ligand_rmsd_ub: 10.0
   ligand_rmsd_lb: 0.0
   ligand_rmsd_weight: 5.0
-  frag_cfg:
-    fragment_bounds: [[0,41],[42,85],[86,127],[128,164],[165,208]]
-    sample_size: 128
-    min_sample: 2
+  # frag_cfg:
+  #   fragment_bounds: [[0,41],[42,85],[86,127],[128,164],[165,208]]
+  #   sample_size: 128
+  #   min_sample: 2
   # from kiera
   # oxyanion hole distances
   # ester to nitrogen distance 

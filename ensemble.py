@@ -15,6 +15,48 @@ from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import parameters_to_vector
 
 
+class PottsModel(nn.Module):
+    # Simple model using one and two body terms
+    # D is the flattened sequence dimention, IE L*20
+    def __init__(self, D, use_two_body=True):
+        super().__init__()
+        self.D = D
+        self.use_two_body = use_two_body
+
+        # One-body fields
+        self.h = nn.Parameter(torch.zeros(self.D))
+        nn.init.normal_(self.h, mean=0.0, std=0.01) # init with small values close to zero
+
+        if self.use_two_body:
+            # Two-body couplings
+            self.J = nn.Parameter(torch.zeros(self.D, self.D))
+            nn.init.normal_(self.J, mean=0.0, std=0.01) # init with small values close to zero
+
+
+
+    def forward(self, x):
+        """
+        x: [B, D] already flattened one-hot encoded sequences
+        returns: [B, 1] predicted activity (energy)
+        """
+        B = x.shape[0]
+
+        # One-body term: [B]
+        energy = torch.sum(x * self.h, dim=1)
+
+
+        if not self.use_two_body:
+            # Two-body term:
+            #
+            # compute x^T J x for each batch
+            # (B, D) @ (D, D) -> (B, D) -> elementwise mul and sum over D
+            xJ = x @ self.J            # [B, D]
+            energy += torch.sum(xJ * x, dim=1)
+
+        # Output [B, 1]
+        return energy.unsqueeze(1)
+
+
 class AttentionPooling(nn.Module):
     def __init__(self, input_dim, embed_dim):
         super(AttentionPooling, self).__init__()
@@ -52,62 +94,71 @@ class BaseModel(nn.Module):
         super(BaseModel, self).__init__()
         self.cfg = cfg
 
-        activation = nn.ReLU()
-        dropout = nn.Dropout(self.cfg.p_drop)
-
-        def build_output_head(hidden_dim, output_dim, head_type):
-            if head_type == "mlp":
-                out_head = nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim),
-                    activation,
-                    nn.Linear(hidden_dim, hidden_dim),
-                    activation,
-                    nn.Linear(hidden_dim, output_dim),
-                )
-            elif head_type == "linear":
-                out_head = nn.Linear(hidden_dim, output_dim)
-            else:
-                raise ValueError(f"Output head type {head_type} not supported.")
-            return out_head
-
-
-        if self.cfg.model_type == "linear":
-            self.cfg.hidden_dim = self.cfg.input_dim
-
-        elif self.cfg.model_type == "mlp":
-            self.trunk = nn.Sequential(
-                nn.Linear(self.cfg.input_dim, self.cfg.hidden_dim),
-                activation,
-                dropout,
-                nn.Linear(self.cfg.hidden_dim, self.cfg.hidden_dim),
-                activation,
-                dropout,
-                nn.Linear(self.cfg.hidden_dim, self.cfg.hidden_dim),
+        if self.cfg.model_type == "potts":
+            self.mean_head = PottsModel(
+                D=self.cfg.input_dim, use_two_body=self.cfg.use_two_body
+            )
+            self.var_head = PottsModel(
+                D=self.cfg.input_dim, use_two_body=self.cfg.use_two_body
             )
 
-        elif self.cfg.model_type == "conv1d":
-            self.trunk = nn.Sequential(
-                nn.Conv1d(
-                    self.cfg.input_dim, self.cfg.hidden_dim, self.cfg.kernel_size
-                ),
-                dropout,
-                activation,
-                nn.Conv1d(
-                    self.cfg.hidden_dim, self.cfg.hidden_dim, self.cfg.kernel_size
-                ),
-                activation,
-                dropout,
-            )
-            self.attn_pool = AttentionPooling(self.cfg.hidden_dim, self.cfg.hidden_dim)
         else:
-            raise ValueError(f"Model type {self.cfg.model_type} not supported.")
+            activation = nn.ReLU()
+            dropout = nn.Dropout(self.cfg.p_drop)
 
-        self.mean_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
-        if self.cfg.predict_variance:
-            if "concat_mean_pred" in self.cfg and self.cfg.concat_mean_pred:
-                self.var_head = build_output_head(self.cfg.hidden_dim+1, self.cfg.output_dim, self.cfg.output_head_type)
+            def build_output_head(hidden_dim, output_dim, head_type):
+                if head_type == "mlp":
+                    out_head = nn.Sequential(
+                        nn.Linear(hidden_dim, hidden_dim),
+                        activation,
+                        nn.Linear(hidden_dim, hidden_dim),
+                        activation,
+                        nn.Linear(hidden_dim, output_dim),
+                    )
+                elif head_type == "linear":
+                    out_head = nn.Linear(hidden_dim, output_dim)
+                else:
+                    raise ValueError(f"Output head type {head_type} not supported.")
+                return out_head
+
+
+            if self.cfg.model_type == "linear":
+                self.cfg.hidden_dim = self.cfg.input_dim
+
+            elif self.cfg.model_type == "mlp":
+                self.trunk = nn.Sequential(
+                    nn.Linear(self.cfg.input_dim, self.cfg.hidden_dim),
+                    activation,
+                    dropout,
+                    nn.Linear(self.cfg.hidden_dim, self.cfg.hidden_dim),
+                    activation,
+                    dropout,
+                    nn.Linear(self.cfg.hidden_dim, self.cfg.hidden_dim),
+                )
+
+            elif self.cfg.model_type == "conv1d":
+                self.trunk = nn.Sequential(
+                    nn.Conv1d(
+                        self.cfg.input_dim, self.cfg.hidden_dim, self.cfg.kernel_size
+                    ),
+                    dropout,
+                    activation,
+                    nn.Conv1d(
+                        self.cfg.hidden_dim, self.cfg.hidden_dim, self.cfg.kernel_size
+                    ),
+                    activation,
+                    dropout,
+                )
+                self.attn_pool = AttentionPooling(self.cfg.hidden_dim, self.cfg.hidden_dim)
             else:
-                self.var_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
+                raise ValueError(f"Model type {self.cfg.model_type} not supported.")
+
+            self.mean_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
+            if self.cfg.predict_variance:
+                if "concat_mean_pred" in self.cfg and self.cfg.concat_mean_pred:
+                    self.var_head = build_output_head(self.cfg.hidden_dim+1, self.cfg.output_dim, self.cfg.output_head_type)
+                else:
+                    self.var_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
 
     def forward(self, x):
         if self.cfg.model_type == "conv1d":
@@ -125,6 +176,7 @@ class BaseModel(nn.Module):
                 x = x.detach()
             if "concat_mean_pred" in self.cfg and self.cfg.concat_mean_pred:
                 x = torch.cat([x, mean.detach()],dim=-1)
+
             # transform output with softplus to ensure positive variance
             # taken from https://arxiv.org/pdf/1612.01474
             var = self.var_head(x)
