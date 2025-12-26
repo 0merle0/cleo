@@ -99,14 +99,14 @@ reward: &default_reward
   # ester to nitrogen distance 
   # distance ser oxygen to ester oxygen
 
-evaluate:
-  chkpt_path: null # Can be overridden
-  temperature: 0.5
-  batch_size: 32   # Number of sequences per rollout batch
-  num_batches: 1  # Number of batches to run
-  reward: 
-    <<: *default_reward  # Inherit all default reward settings
-    frag_cfg:
-      fragment_bounds: [[0,41],[42,85],[86,127],[128,164],[165,208]]
-      sample_size: 128
-      min_sample: 2
+evaluate: null
+  # chkpt_path: null # Can be overridden
+  # temperature: 0.5
+  # batch_size: 32   # Number of sequences per rollout batch
+  # num_batches: 1  # Number of batches to run
+  # reward: 
+  #   <<: *default_reward  # Inherit all default reward settings
+  #   frag_cfg:
+  #     fragment_bounds: [[0,41],[42,85],[86,127],[128,164],[165,208]]
+  #     sample_size: 128
+  #     min_sample: 2

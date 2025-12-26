@@ -221,7 +221,7 @@ class PolicyMPNN:
 
     def gather_nodes(self, nodes, neighbor_idx):
         """
-        Copy from MPNN Utils
+        Copy from proteinMPNN Utils
         """
         # Features [B,N,C] at Neighbor indices [B,N,K] => [B,N,K,C]
         # Flatten and expand indices per batch [B,N,K] => [B,NK] => [B,NK,C]
@@ -234,7 +234,7 @@ class PolicyMPNN:
 
     def cat_neighbors_nodes(self, h_nodes, h_neighbors, E_idx):
         """
-        Copy from MPNN Utils
+        Copy from proteinMPNN Utils
         """
         h_nodes = self.gather_nodes(h_nodes, E_idx)
         h_nn = torch.cat([h_neighbors, h_nodes], -1)
@@ -251,7 +251,7 @@ class PolicyMPNN:
                 model=None
             ):
         """
-        Ripped from fused MPNN decoding, modified to allow grads to flow through this pass
+        Ripped from fused proteinMPNN decoding, modified to allow grads to flow through this pass
         """
 
         # decode

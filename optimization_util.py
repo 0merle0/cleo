@@ -298,7 +298,7 @@ def get_candidate_acquisition_values(candidate_seqs,
 
 # 250611 - adding new features
 class BatchUCBwithEntropy:
-    def __init__(self, model, model_batch_size=64, gamma=0.1, eps=1e-8):
+    def __init__(self, model, model_batch_size=64, gamma=0.1, eps=1e-8, sequence_wise=True):
         """
         Args:
             model (Ensemble): The ensemble model to use for predictions.
@@ -309,6 +309,7 @@ class BatchUCBwithEntropy:
         self.model_batch_size = model_batch_size # batch size for model inference
         self.gamma = gamma # entropy weight
         self.eps = eps # small value to avoid log(0)
+        self.sequence_wise = sequence_wise
 
     @torch.no_grad()
     def __call__(self, X):
@@ -335,30 +336,49 @@ class BatchUCBwithEntropy:
             ucb_list.append(ucb)
 
 
-        # rebatch the outputs so N, q
-        batched_ucb = torch.cat(ucb_list, dim=0).reshape(N, q).mean(dim=1)  # Average over q dim so just (N,)
+
+        if self.sequence_wise:
+            ucb_per_seq = torch.cat(ucb_list, dim=0).reshape(N, q)
+
+            # calculate how unique each sequence is
+            X_seq_view = X.view(N, q, -1, 20)
+            L = X_seq_view.shape[2]
+            seq_flat = X_seq_view.view(N, q, L*20).float()
+            seq_similiarities = torch.matmul(seq_flat, seq_flat.transpose(-1, -2)) / L
+            seq_similiarities = seq_similiarities.mean(dim=-1) # mean over final dim 
+
+            reward = ucb_per_seq + self.gamma * (1-seq_similiarities)
+
+            metrics = {
+                'ucb': ucb_per_seq.mean().item(),
+                'seq_similarity': seq_similiarities.mean().item()
+            }
+
+        else:
+            # rebatch the outputs so N, q
+            batched_ucb = torch.cat(ucb_list, dim=0).reshape(N, q).mean(dim=1)  # Average over q dim so just (N,)
 
 
-        # compute entropy of each batch
-        # X_norm  = (X.sum(dim=1)/(q*d/20)) # normalize final dim to sum to 1
-        # entropy = -torch.sum(X_norm * torch.log(X_norm + self.eps), dim=-1)  # Entropy calculation
+            # compute entropy of each batch
+            # X_norm  = (X.sum(dim=1)/(q*d/20)) # normalize final dim to sum to 1
+            # entropy = -torch.sum(X_norm * torch.log(X_norm + self.eps), dim=-1)  # Entropy calculation
 
-        # compute residue wise entropy
-        X_seq_view = X.view(N, q, -1, 20)
-        X_freqs = X_seq_view.sum(dim=1)/q # sum over batch to get frequencies at each position
-        entropy = (-torch.sum(X_freqs * torch.log(X_freqs + self.eps), dim=-1)).mean(dim=-1)  # Entropy calculation over the sequence length
+            # compute residue wise entropy
+            X_seq_view = X.view(N, q, -1, 20)
+            X_freqs = X_seq_view.sum(dim=1)/q # sum over batch to get frequencies at each position
+            entropy = (-torch.sum(X_freqs * torch.log(X_freqs + self.eps), dim=-1)).mean(dim=-1)  # Entropy calculation over the sequence length
 
-        reward = batched_ucb + self.gamma * entropy # (N,)
+            reward = batched_ucb + self.gamma * entropy # (N,)
 
-        metrics = {
-            'ucb': batched_ucb.mean().item(),
-            'entropy': entropy.mean().item(),
-        }
+            metrics = {
+                'ucb': batched_ucb.mean().item(),
+                'entropy': entropy.mean().item(),
+            }
 
         return reward, metrics
     
 
-def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, out_path, device):
+def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, out_path, connector, device):
 
     feasible_mask = get_feasible_mask(fragment_dictionary)
 
@@ -411,31 +431,41 @@ def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, out_path, device):
             # get reward
             reward, metrics = acqf(sampled_seqs.to(device))
 
-            # log metrics
-            for k, v in metrics.items():
-                if k not in metric_logs:
-                    metric_logs[k] = []
-                metric_logs[k].append(v)
-            metric_logs["step"].append(i)
-            metric_logs["reward"].append(float(reward.mean().detach()))
+
 
             # save logs
-            if i % 50 == 0:
+            if i % 100 == 0:
+                # log metrics
+                for k, v in metrics.items():
+                    if k not in metric_logs:
+                        metric_logs[k] = []
+                    metric_logs[k].append(v)
+                metric_logs["step"].append(i)
+                metric_logs["reward"].append(float(reward.mean().detach()))
+
                 metrics_df = pd.DataFrame(metric_logs)
                 metrics_path = os.path.join(out_path, "metrics.csv")
                 metrics_df.to_csv(metrics_path, index=False)
 
-            # substract beta term "moving average"
-            beta_term = 0
-            if i > 0:
-                beta_term = np.mean(collected_rewards)
+            if reward.shape[0] == N and reward.shape[1] == q:
+                # reward is provided at sequence level
+                # compute group relative advantage estimate (GRPO style)
+                adv = (reward - reward.mean(dim=1).unsqueeze(-1))/(reward.std(dim=1).unsqueeze(-1))
 
-            collected_rewards.append(float(reward.mean().detach()))
+                loss = (-log_probs.sum(dim=2) * adv).sum(dim=1).mean()
 
-            beta_subtract_reward = reward - beta_term
+            else:
+                # substract beta term "moving average"
+                beta_term = 0
+                if i > 0:
+                    beta_term = np.mean(collected_rewards)
 
-            # calculate policy loss
-            loss = (-log_probs * beta_subtract_reward[...,None,None].repeat(1,q,actions.shape[-1])).sum(dim=(1,2)).mean()
+                collected_rewards.append(float(reward.mean().detach()))
+
+                beta_subtract_reward = reward - beta_term
+
+                # calculate policy loss
+                loss = (-log_probs * beta_subtract_reward[...,None,None].repeat(1,q,actions.shape[-1])).sum(dim=(1,2)).mean()
 
             # opt
             loss.backward()
@@ -446,7 +476,7 @@ def opt_loop(acqf, fragment_dictionary, N, q, num_iter, lr, out_path, device):
 
 
     # get candidates from policy
-    candidates = get_candidates_from_policy(m, fragment_dictionary)
+    candidates = get_candidates_from_policy(m, fragment_dictionary, connector=connector)
 
     return candidates, m
 

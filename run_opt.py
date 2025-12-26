@@ -6,8 +6,50 @@ from omegaconf import OmegaConf
 import hydra
 from optimization_util import BatchUCBwithEntropy, opt_loop
 from ensemble import Ensemble
+from data_util import FragmentDataset
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# create df with results from candidate seqs
+def create_results_df(candidate_seqs, model, dataset_cfg):
+
+
+    seqs = [s for n,s in candidate_seqs]
+    names = [n for n,s in candidate_seqs]
+
+    data = pd.DataFrame({
+        "name": names,
+        "sequence": seqs,
+    })
+
+    # placeholder column for dataframe
+    label_col = dataset_cfg.label_col
+    data[label_col] = 0.
+
+    # make dataset
+    dataset = FragmentDataset(dataset_cfg, data)
+
+    model.eval()
+
+    # run through the dataset
+    mu = []
+    sigma = []
+
+    for x, y in dataset:
+        
+        with torch.no_grad():
+            output = model(x[None].to(DEVICE))
+            mu.append(output["mu"].item())
+            sigma.append(output["sigma"].item())
+
+    data["mu"] = mu
+    data["sigma"] = sigma
+
+
+    # drop label column
+    data = data.drop(columns=[label_col])
+
+    return data
 
 
 @hydra.main(version_base=None, config_path="./config")
@@ -51,10 +93,9 @@ def main(cfg):
         cfg.opt_loop.num_iter, 
         cfg.opt_loop.lr,
         out_path,
+        cfg.connector,
         DEVICE,
     )
-
-
 
     # save config
     cfg_path = os.path.join(out_path, "config.yaml")
@@ -66,6 +107,13 @@ def main(cfg):
         fasta_lines = [f">{n}\n{s}\n" for n,s in candidate_seqs]
         with open(fasta_path, "w") as f:
             f.writelines(fasta_lines)
+
+    # create results dataframe
+    results_df = create_results_df(candidate_seqs, model, surrogate_config.data.dataset_cfg)
+
+    # save to csv
+    csv_path = os.path.join(out_path, "candidates.csv")
+    results_df.to_csv(csv_path, index=False)
 
     # save policy
     policy_path = os.path.join(out_path, "policy.pt")

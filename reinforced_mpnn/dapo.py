@@ -5,7 +5,6 @@ import numpy as np
 from tqdm import tqdm
 import time
 import hydra
-import wandb
 from omegaconf import OmegaConf
 from policy_utils import PolicyMPNN
 
@@ -185,30 +184,5 @@ class PolicyMPNNvDAPO(PolicyMPNN):
             self.optimizer.step()
 
             dapo_losses.append(dapo_loss.detach().cpu().item())
-
-
-        # ---------- metric aggregation ----------
-        if dapo_losses:                       # policy metrics
-            to_log["policy/dapo_loss_mean"] = float(np.mean(dapo_losses))
-            to_log["policy/dapo_loss_last"] = float(dapo_losses[-1])
-
-        # reward statistics (from the original rollout batch)
-        to_log.update({
-            "rewards/mean": all_batched_rewards.mean().cpu().item(),
-            "rewards/std":  all_batched_rewards.std().cpu().item() \
-                             if all_batched_rewards.numel() > 1 else 0.0,
-            "rewards/min":  all_batched_rewards.min().cpu().item(),
-            "rewards/max":  all_batched_rewards.max().cpu().item(),
-        })
-
-        if wandb.run:
-            # ---------- Weights & Biases logging ----------
-            wandb_log = {}
-            if metrics:                       # reward-fn specific metrics
-                wandb_log.update({f"reward_metrics/{k}": v for k, v in metrics.items()})
-            wandb_log.update(to_log)          # include policy + reward stats
-            wandb.log(wandb_log, step=step)   # don't finish the row yet
-            
-        # self._log_metrics_to_csv(step, to_log)
 
         return to_log

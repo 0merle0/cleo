@@ -3,7 +3,7 @@ from omegaconf import OmegaConf
 import hydra
 import wandb
 from policy_utils import PolicyMPNN
-from PPO import PPOPolicy
+# from PPO import PPOPolicy
 from GRPO import GRPO_singleprompt
 
 
@@ -29,12 +29,12 @@ def train_policy(cfg):
         )
     
     # Initialize the appropriate policy based on the algorithm specified in config
-    if cfg.get('algorithm').lower() == 'ppo':
-        print(f"Using PPO algorithm for training")
-        from PPO import PPOPolicy
-        policy = PPOPolicy(cfg)
+    # if cfg.get('algorithm').lower() == 'ppo':
+    #     print(f"Using PPO algorithm for training")
+    #     from PPO import PPOPolicy
+    #     policy = PPOPolicy(cfg)
 
-    elif cfg.get('algorithm').lower() == 'grpo':
+    if cfg.get('algorithm').lower() == 'grpo':
         print(f"Using GRPO algorithm for training")
         from GRPO import GRPO_singleprompt
         policy = GRPO_singleprompt(cfg)
