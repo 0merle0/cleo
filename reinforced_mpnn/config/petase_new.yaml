@@ -1,4 +1,4 @@
-run_name: new_petase_predictor_w5 # name for the run
+run_name: new_petase_predictor_w10_seq_w8 # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
@@ -143,11 +143,11 @@ reward:
     - metric: dist_to_ref_seqs_min
       lower_bound: 0
       upper_bound: 100
-      weight: 5.0
+      weight: 8.0
       mode: min
 
     - metric: experimental_predictor_mu
       lower_bound: -1.0
       upper_bound: 2.0
-      weight: 5.0
+      weight: 10.0
       mode: max
