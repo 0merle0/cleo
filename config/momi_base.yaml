@@ -1,5 +1,5 @@
 debug: false
-run_name: momi_mlp_no_val
+run_name: momi_mlp_round3_no_val
 trainer:
   max_epochs: 200
   log_every_n_steps: 1000
@@ -8,7 +8,7 @@ checkpointer:
   monitor: val/nll
   mode: min
 data:
-  dataset: data/momi/251218_processed_filtered_data_round0_round1_round2_with_val.csv # combined round0 and round1 data
+  dataset: data/momi/251225_processed_filtered_data_round0_round1_round2_round3_with_val.csv # combined round0 and round1 data
   train_batch_size: 64
   val_batch_size: 32
   num_workers: 1

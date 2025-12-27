@@ -1972,7 +1972,9 @@ class UniversalReward(Reward):
             padding = torch.zeros(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
             reward = torch.cat([reward, padding], dim=1)
 
-        
+        # save df to output dir
+        df.to_csv(os.path.join(rundir, f"metrics.csv"), index=False)
+
         to_log = {}
         for col in df.columns:
 
