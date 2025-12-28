@@ -1,17 +1,14 @@
-run_name: petase_new_expdataW10_seqW5_continued.1 # name for the run
+run_name: petase_new_expdataW5_seqW5_exp_bounds.run1 # name for the run
 output_dir: /home/jgershon/projects/itopt/policy_mpnn
-
-# template pdb for proteinmpnn
 pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
 
 batch_size: 32
 N_steps: 500
 lr: 1e-4 # learning rate slowed for protease
 checkpoint_every_n_steps: 50
-evaluate_every_n_steps: 5e5 # dont want eval for now
+evaluate_every_n_steps: 500 # dont want eval for now
 eval: false
-# checkpoint_path: null
-checkpoint_path: /home/jgershon/projects/itopt/policy_mpnn/petase_new_expdataW10_seqW5/petase_new_expdataW10_seqW5_last.pt
+checkpoint_path: null
 algorithm: dapo
 
 use_avg_reward: false
@@ -113,19 +110,19 @@ reward:
       mode: max 
 
     - metric: petase_metrics_acylox_oxh1bbN
-      lower_bound: 2.5
+      lower_bound: 6 # prev 2.5
       upper_bound: 10.0
       weight: 1.0
       mode: min 
 
     - metric: petase_metrics_acylox_oxh2bbN
-      lower_bound: 2.5
+      lower_bound: 6 # prev 2.5
       upper_bound: 10.0
       weight: 1.0
       mode: min
 
     - metric: petase_metrics_hisNE2_esterox
-      lower_bound: 3.5
+      lower_bound: 5 # prev 3.5
       upper_bound: 10.0
       weight: 1.0
       mode: min 
@@ -137,10 +134,10 @@ reward:
       mode: min
 
     - metric: petase_metrics_his_ser_angle
-      lower_bound: 60
-      upper_bound: 120
+      lower_bound: 20 # prev 60
+      upper_bound: 90 # prev 120
       weight: 1.0
-      mode: avg
+      mode: max # prev avg, but exp data says > 90 is good
 
     - metric: dist_to_ref_seqs_min
       lower_bound: 0

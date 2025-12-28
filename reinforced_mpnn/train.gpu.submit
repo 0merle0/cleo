@@ -24,6 +24,6 @@ export HYDRA_FULL_ERROR=1
 
 
 
-source activate newlatent; python train_policy.py -cn petase_new
+# source activate newlatent; python train_policy.py -cn petase_new
 
-# source activate newlatent; python train_policy.py -cn petase_new_exp_bounds
+source activate newlatent; python train_policy.py -cn petase_new_exp_bounds
