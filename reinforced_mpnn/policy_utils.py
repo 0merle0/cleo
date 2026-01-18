@@ -16,6 +16,8 @@ from data_utils import featurize, parse_PDB
 from model_utils import ProteinMPNN
 import wandb
 
+import pdb as pdbtools
+
 PROTEIN_MPNN_CKPT_PATH = "/databases/mpnn/vanilla_model_weights/v_48_020.pt"
 LIGAND_MPNN_CKPT_PATH = "/databases/mpnn/ligand_mpnn_model_weights/s25_r010_t300_p.pt"
 
@@ -62,7 +64,10 @@ class PolicyMPNN:
         self.ligand_mpnn_cutoff_for_score = 8.0
 
         # get reward function
-        self.reward_fn = hydra.utils.instantiate(cfg.reward)
+        self.reward_fn = hydra.utils.instantiate(
+            self.cfg.evaluate.reward if self.eval_mode and hasattr(self.cfg, "evaluate") and hasattr(self.cfg.evaluate, "reward")
+            else self.cfg.reward
+        )
 
         # checkpointing utils
         self.checkpoint_every_n_steps = self.cfg.checkpoint_every_n_steps
@@ -481,6 +486,7 @@ class PolicyMPNN:
             if wandb.run:
                 # Log runtime and step separately to avoid conflicts with train_step logging
                 wandb.log({"runtime": runtime, "training/step": step}, step=step)
+                self.log_metrics(step, runtime, to_log)
             else:
                 self.log_metrics(step, runtime, to_log)
 
@@ -518,6 +524,12 @@ class PolicyMPNN:
                 "reward": curr_reward,
                 "model_state_dict": self.model.state_dict(),
             }
+
+        # Create checkpoints directory on demand and save a per-step checkpoint
+        checkpoints_dir = os.path.join(self.output_dir, "checkpoints")
+        os.makedirs(checkpoints_dir, exist_ok=True)
+        per_step_ckpt_path = os.path.join(checkpoints_dir, f"{self.run_name}_step_{step:06d}.pt")
+        torch.save(ckpt, per_step_ckpt_path)
 
         ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_last.pt")
         torch.save(ckpt, ckpt_path)
@@ -582,30 +594,20 @@ class PolicyMPNN:
         
         # Check if fragment-based reward was used
         has_fragment_rewards = hasattr(self.cfg.reward, 'frag_cfg') and self.cfg.reward.frag_cfg is not None
-        
         # Process and save results
+        # save the metrics as a pickle fie
+        
         print("Processing evaluation results...")
         self._process_evaluation_results(combined_out, metrics, has_fragment_rewards)
+
+        return combined_out, metrics
 
     def _process_evaluation_results(self, output, metrics, has_fragment_rewards: bool):
         """Aggregate evaluation outputs into CSVs under the latest evaluation run directory.
         Creates: all_sequences.csv and per-fragment CSVs when fragment rewards are enabled."""
-        import re
-        
+
         # Find latest evaluation run index from existing batch run dirs
-        pipeline_output_dir = Path(self.output_dir) / "pipeline_output"
-        pipeline_output_dir.mkdir(parents=True, exist_ok=True)
-        eval_batch_dirs = [
-            d for d in pipeline_output_dir.glob("pipeline_output_eval_*_batch_*") if d.is_dir()
-        ]
-        eval_idx = "0"
-        if eval_batch_dirs:
-            latest_dir = max(eval_batch_dirs, key=lambda p: p.stat().st_mtime)
-            m = re.match(r"pipeline_output_eval_(\d+)_batch_\d{4}$", latest_dir.name)
-            if m:
-                eval_idx = m.group(1)
-        CSV_DIR = pipeline_output_dir / f"pipeline_output_eval_{eval_idx}"
-        CSV_DIR.mkdir(parents=True, exist_ok=True)
+        CSV_DIR = Path(metrics['pipeline_output_dir'])
         
         # Helpers
         def _make_pos_mask(L: int, B: int, chain_mask: torch.Tensor, fragment_bounds=None, device=None):
@@ -646,8 +648,11 @@ class PolicyMPNN:
         cum_log = _calculate_sequence_log_probs(S, P, pos_mask_main)
         
         batch_rewards = metrics.get("batch_rewards")
+        
         if batch_rewards is None:
-            return
+            # throw an error
+            raise ValueError("batch_rewards is None")
+        
         pmr = pos_mask_main.to(batch_rewards.device).float()
         denom = pmr.sum(1).clamp_min(1e-12)
         if batch_rewards.ndim == 1:
@@ -705,5 +710,13 @@ class PolicyMPNN:
             for key, rows in frag_rows.items():
                 all_frag_rows.extend(rows)
             pd.DataFrame(all_frag_rows).to_csv(CSV_DIR / "fragments.csv", index=False)
+        
+        # also save output as a pickle file
+        with open(CSV_DIR / "mpnn_output.pkl", "wb") as f:
+            pickle.dump(output, f)
+        
+        # save metrics as a pickle file
+        with open(CSV_DIR / "metrics.pkl", "wb") as f:
+            pickle.dump(metrics, f)
         
     

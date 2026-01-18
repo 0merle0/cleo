@@ -1,0 +1,61 @@
+run_name: lysine_ligase_dapo_run2 # name for the run
+output_dir: /net/scratch/ssalike/projects/p3_bioconjugation/d2_rl_seqopt/itopt_run2_bs64_lr1e-4_fixed/
+pdb: /home/ssalike/projects/p3_bioconjugation/d2_rl_seqopt/data/rl_opt_input2.pdb
+
+batch_size: 64
+N_steps: 500
+lr: 1e-4 
+checkpoint_every_n_steps: 5
+eval: false
+checkpoint_path: null
+algorithm: dapo
+wandb_mode: online 
+
+# -- DAPO params --
+N_updates: 16 # number of rollouts per step
+update_batch_size: 8 # number of rollouts to use for each update
+clip_eps_low: 0.2 # lower bound for clipping value taken from paper
+clip_eps_high: 0.28 # upper bound for clipping value taken from paper
+
+# -- MPNN params --
+model_type: ligand_mpnn # protein_mpnn or ligand_mpnn
+temperature: 1.0 # lower temp
+omit_AA: CX
+
+fixed_residues: "A44 A58 A64 A157 B10"
+
+
+reward: &default_reward
+  _target_: reward_utils.lysine_ligase_pipeline_reward 
+  pipeline_config_path: /home/ssalike/git/pipelines/pipelines/configs/reward_lysine_ligase.yaml
+
+  output_dir: ${output_dir}
+  run_name: ${run_name} # name for the run
+  rmsd_ub: 10.0 
+  rmsd_lb: 0.0
+  max_pairwise_diversity: 120
+  min_pairwise_diversity: 0
+  esm_perplexity_ub: 25
+  esm_perplexity_lb: 6.0
+  apo_motif_aa_rmsd_lb: 1.0
+  apo_motif_aa_rmsd_ub: 30
+  apo_ca_rmsd_lb: 1.0
+  apo_ca_rmsd_ub: 30
+  aei_motif_aa_rmsd_lb: 1.0
+  aei_motif_aa_rmsd_ub: 30
+  aei_ca_rmsd_lb: 1.0
+  aei_ca_rmsd_ub: 30
+  nu_his_dist_lb: 3.0
+  nu_his_dist_ub: 30
+  nu_cys_dist_lb: 3.0
+  nu_cys_dist_ub: 30
+
+
+evaluate:
+  # output_dir: ${output_dir}/evaluate
+  # run_name: ${run_name}
+  chkpt_path: null # Can be overridden
+  batch_size: 32   # Number of sequences per rollout batch
+  num_batches: 1  # Number of batches to run
+  reward: 
+    <<: *default_reward  # Inherit all default reward settings

@@ -1,0 +1,30 @@
+#!/bin/bash
+#SBATCH -p gpu-train
+#SBATCH --gres=gpu:l40:8
+#SBATCH --nodes=1
+#SBATCH -c 8
+#SBATCH -J itopt
+#SBATCH --mem=256g
+#SBATCH --ntasks=1
+#SBATCH --time=2-00:00:00
+#SBATCH -o logs/logs_%j.out
+#SBATCH --exclude=g2701,g2702,g2703,g2704,g2705,g2706,g2707,g2708,g1103,g1104,g1105,g1106,g1107,g1108,g1109,g1110,g1111,g1112,g1113,g1114,g1115,g1116,g1117,g1118,g1119,g1120,g1121,g1122,g1123,g1124,g2131,g2301,g2513,g2521,g2552,g2536,g2541
+
+
+### change 5-digit MASTER_PORT as you wish, slurm will raise Error if duplicated with others
+### change WORLD_SIZE as gpus/node * num_nodes
+export MASTER_PORT=46788
+
+### get the first node name as master address - customized for vgg slurm
+### e.g. master(gnodee[2-5],gnoded1) == gnodee2
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+
+export PYTHONPATH=$PYTHONPATH:/home/ssalike/git/cleo_policy/reinforced_mpnn/:/home/ssalike/git/cleo_policy/
+export HYDRA_FULL_ERROR=1
+
+export XLA_PYTHON_CLIENT_PREALLOCATE=false
+export XLA_FLAGS=--xla_gpu_enable_command_buffer=
+
+# source activate newlatent; python train_policy.py -cn clickase_dapo
+
+source activate cleo_new; python train_policy.py -cn lysine_ligase_dapo

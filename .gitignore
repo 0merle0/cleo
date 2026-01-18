@@ -2,6 +2,7 @@ experiments/*
 *.swp
 __pycache__/
 logs/
+reinforced_mpnn/logs/
 ckpt/
 lightning_logs/
 outputs/

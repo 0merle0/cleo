@@ -196,6 +196,6 @@ class PolicyMPNNvDAPO(PolicyMPNN):
             wandb_log.update(to_log)          # include policy + reward stats
             wandb.log(wandb_log, step=step)   # don't finish the row yet
             
-        self._log_metrics_to_csv(step, to_log)
+        # self._log_metrics_to_csv(step, to_log)
 
         return to_log

@@ -1,0 +1,59 @@
+run_name: granzyme_dapo_frags_constrained_chai_bs32_run1_lr1e-4_nupdates32_full_reward_mult # name for the run
+output_dir: /net/scratch/ssalike/itopt/policy_mpnn_training/granzyme_dapo_frags_constrained_chai_bs32_run1_lr1e-4_nupdates32_full_reward_mult_rerun
+pdb: /projects/ml/itopt/policy_mpnn/benchmarks/granzyme_b/G9.pdb
+
+batch_size: 32
+N_steps: 100
+lr: 1e-4 
+checkpoint_every_n_steps: 5
+eval: false
+checkpoint_path: null
+algorithm: dapo
+wandb_mode: online
+
+# -- DAPO params --
+N_updates: 32 # number of rollouts per step
+update_batch_size: 16 # number of rollouts to use for each update
+clip_eps_low: 0.2 # lower bound for clipping value taken from paper
+clip_eps_high: 0.28 # upper bound for clipping value taken from paper
+
+# -- MPNN params --
+model_type: protein_mpnn # protein_mpnn or ligand_mpnn
+temperature: 1.0 # lower temp
+omit_AA: CX
+
+fixed_residues: "A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 A15 A16 A17 A18 A21 A22 A23 A24 A25 A30 A31 A32 A33 A34 A35 A36 A37 A38 A39 A40 A41 A42 A43 A44 A45 A46 A47 A48 A49 A50 A51 A52 A53 A54 A55 A56 A57 A58 A59 A60 A61 A62 A63 A64 A65 A66 A67 A68 A69 A70 A71 A72 A73 A74 A75 A76 A77 A78 A79 A80 A81 A82 A83 A84 A85 A87 A88 A89 A90 A91 A92 A93 A94 A95 A96 A97 A98 A99 A100 A101 A102 A103 A104 A105 A106 A107 A108 A109 A110 A111 A112 A113 A114 A115 A116 A117 A118 A119 A120 A121 A122 A123 A124 A125 A126 A127 A128 A129 A131 A135 A138 A139 A140 A141 A142 A143 A144 A145 A146 A147 A148 A149 A150 A151 A152 A153 A154 A155 A156 A157 A159 A160 A162 A163 A164 A165 A166 A168 A169 A170 A171 A172 A173 A174 A175 A176 A177 A178 A182 A183 A184 A185 A186 A187 A188 A189 A190 A191 A192 A193 A194 A195 A196 A197 A204 A205 A206 A207 A208 A209 A211 A212 A213 A214 A215 A216 A217 A218 A219 A220 A221 A222 A223 A224 A225 A226 A227 A228 B1 B2 B3 B4 B5 B6 B7"
+
+
+reward: &default_reward
+  _target_: reward_utils.granzyme_chai_reward_constrained 
+  pipeline_config_path: /home/ssalike/git/pipelines/pipelines/configs/reward_granzyme_b_chai.yaml
+
+  output_dir: ${output_dir}
+  run_name: ${run_name} # name for the run
+  rmsd_ub: 1 # anything above 1 you are cooked
+  rmsd_lb: 0.5
+  pae_ub: 10
+  pae_lb: 0
+  ref_seq: IIGGHEAKPHSRPYMAYLQIMDEYSGSKKCGGFLIREDFVLTAAHCSGSKIQVTLGAHNIKEQEKMQQIIPVVKIIPHPAYNSKTYSNDIMLLKLKSKAKRSSAVKPLNLPRRNVKVKPGDVCYVAGWGKLGPMGKLSDTLQEVELTVQEDQKCESYYKNYFDKANDICAGDPKIKRAPYQGDSGGPLVCKKVAAGIVKGGNPDGSTPRVFTKVSTFLSWIKKTMKKS
+  max_dist_to_ref_seq: 20
+  min_dist_to_ref_seq: 0
+  max_pairwise_diversity: 20
+  min_pairwise_diversity: 0
+  frag_cfg:
+    fragment_bounds: [[0,34],[35,69],[70,104],[105,140],[141,170],[171,192],[193,227]] # 7 fragments, diverged
+    sample_size: 64
+    min_sample: 2
+
+evaluate:
+  # output_dir: ${output_dir}/evaluate
+  # run_name: ${run_name}
+  chkpt_path: null # Can be overridden
+  batch_size: 32   # Number of sequences per rollout batch
+  num_batches: 1  # Number of batches to run
+  reward: 
+    <<: *default_reward  # Inherit all default reward settings
+    frag_cfg:
+      fragment_bounds: [[0,34],[35,69],[70,104],[105,140],[141,170],[171,192],[193,227]]
+      sample_size: 64
+      min_sample: 2

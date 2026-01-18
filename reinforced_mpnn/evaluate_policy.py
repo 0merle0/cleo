@@ -18,7 +18,7 @@ def evaluate_policy(cfg):
     policy = PolicyMPNN(cfg, eval_mode=True)
 
     # Evaluate the policy
-    policy.evaluate()
+    _, _ = policy.evaluate()
 
 
 if __name__ == "__main__":
