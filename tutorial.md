@@ -2,7 +2,7 @@
 
 Welcome to this tutorial for **Combinatorial Libraries to Explore and Optimize (CLEO)**! This guide will walk you through the process of designing protein libraries and using experimental data to guide exploration and optimization. The framework focuses on enhancing an already functional protein construct using experimental feedback.
 
-## 🌐 Key Concepts
+## 🌐 Overview
 
 The two main themes of this workflow are:
 
@@ -24,11 +24,14 @@ The two main themes of this workflow are:
 
 # 💻 Library Design
 
-Library design is the foundation of creating effective protein constructs. While this tutorial uses PETase (a plastic-degrading enzyme) as an example, the workflow can apply widely to other proteins.
+![library gif](frag_animation_v3.gif)
 
-🔑 **Note**: The libraries we design focus on a single fold space. Within the library, there may be variations in conformations predicted by structure oracles.
+Changes in protein sequence space can lead to major jumps in function. To explore the surrounding sequence of a particular protein, this workflow will act as a guide to designing large scale libaries. To generate such libraries we will split a protein into fragments, propose many options for each fragment, and ordering the fragments independently will allow us to stitch the DNA together *in vitro* to create unique variants to test. This tutorial uses PETase (a plastic-degrading enzyme) as an example, however the workflow can apply widely to other proteins.
+
+📌 **Note**: The libraries designed here focus on a single fold space, each variant will adopt a unique atomic constellation but retain a consistent topology. 
 
 ## 📐 Library constraints
+
 
 ## 🛠 Defining reward functions
 
