@@ -7,8 +7,8 @@ Welcome to this tutorial for **Combinatorial Libraries to Explore and Optimize (
 The two main themes of this workflow are:
 
 1. [**Library Design**](#-library-design)  
-   - [Defining library constraints](#defining-library-constraints)  
-   - [Building reward functions](#-setup-and-reward-design)  
+   - [Library constraints](#-library-constraints)  
+   - [Defining reward functions](#-defining-reward-functions)  
    - [Aligning proteinMPNN to rewards](#aligning-proteinmpnn-to-rewards)  
    - [Sampling and filtering sequence fragments](#sampling-and-filtering-sequence-fragments)  
    - [Reverse translating sequences to prepare for experimental assembly](#reverse-translating-sequences-to-prepare-for-experimental-assembly)  
@@ -16,20 +16,21 @@ The two main themes of this workflow are:
 2. [**Multi-Round Experimental Optimization**](#-multi-round-experimental-optimization)  
    - [Data collection philosophy and assay design](#data-collection-philosophy-and-assay-design)  
    - [Strategies for early rounds of testing](#strategies-for-early-rounds-of-testing)  
-   - [Training sequence-to-function predictive models](#training-sequence-to-function-predictive-models)  
-   - [Proposing batches of sequences for the next round](#proposing-batches-of-sequences-for-the-next-round)  
+   - [Training sequence-to-function models](#training-sequence-to-function-models)  
+   - [Proposing batch of sequences to test next](#proposing-batch-of-sequences-to-test-next)  
+   - [Looping it all together](#-looping-it-all-together)
 
 ---
 
-# Library Design
+# 💻 Library Design
 
 Library design is the foundation of creating effective protein constructs. While this tutorial uses PETase (a plastic-degrading enzyme) as an example, the workflow can apply widely to other proteins.
 
 🔑 **Note**: The libraries we design focus on a single fold space. Within the library, there may be variations in conformations predicted by structure oracles.
 
-## Defining the library constraints
+## 📐 Library constraints
 
-## 📐 Setup and Reward Design
+## 🛠 Defining reward functions
 
 First, define the **reward metrics** predictive of protein function. If no experimental data exists yet:
 - Use structural prediction confidence, atomic distances, and hamming distances to the parent sequence.
@@ -37,7 +38,7 @@ First, define the **reward metrics** predictive of protein function. If no exper
 If experimental data is already available (e.g., from a first round of testing):
 - Train a custom predictor on the experimental results and incorporate its scores into the reward.
 
-### 🔧 Finetuning ProteinMPNN:
+## 🔧 Aligning ProteinMPNN to rewards:
 1. Fix **2 amino acids** at the start and end of each fragment (e.g., for Golden Gate Assembly compatibility 🧬).
 2. Use a **structure prediction oracle** to assess sequences and calculate rewards.  
    - Example reward metrics: catalytic distances, confidence scores, mutational distances.
@@ -55,7 +56,7 @@ executetraining config.yaml
 
 📝 **Tip**: Use the <path-to-notebook> to visualize metrics during training and track convergence.
 
-## 🎲 Sampling Sequences
+## 🎲 Sampling and Filtering Sequence Fragments
 
 After the model converges, you'll want to **sample sequences** for testing:
 - Example: Sample 5,000 sequences if aiming to order 384 to allow for filtering.  
@@ -81,20 +82,20 @@ Positive controls: Split the original, active sequence into the same fragments t
 
 # 🔬 Multi-Round Experimental Optimization
 
-## Assay Development 🧪
+## 🧪 Data Collection Philosophy and Assay Design
 Establish a robust assay that demonstrates clear, reproducible signal for your **positive control** over background noise. For PETase:
 - Use Golden Gate Assembly to create DNA constructs.
 - Express protein in a cell-free system and measure activity (e.g., using a fluorescent product signal).
 - Normalize measurements (e.g., divide activity rates by protein concentration).
 
-### Data Quality
+### Data filtering
 - Use **thresholds**: e.g., protein expression ≥ 0.1 µM and CoV < 1 for replicates.  
 - Provide metadata and plate maps in your dataset for improved reproducibility.  
 📓 Refer to <link-to-data-processing-folder> for scripts and an example notebook.
 
 ---
 
-## 📊 Early Rounds of Testing
+## 🦠 Early Rounds of Testing
 
 Decide how to screen your library. Two possible scenarios:
 1. **Random Sampling**: Works best if ~10% of the variants show measurable activity.  
@@ -104,7 +105,7 @@ Example figure from PETase **independent testing** (to be added).
 
 ---
 
-## 🤖 Training Sequence-to-Function Surrogates
+## 🤖 Training Sequence-to-Function Models
 
 Once experimental data is collected:
 - Train a **predictive model** to map sequences to fitness.  
@@ -118,7 +119,7 @@ Normalization is key:
 
 ---
 
-## 🧠 Proposing Next Batches
+## 🧠 Proposing Batch of Sequences to Test Next
 
 With a trained model, propose new sequences for experimentation:
 - Small libraries (<1 billion): Predict activity for all sequences.  
@@ -132,7 +133,7 @@ Notebook guide for batch optimization here: <link-to-batch-optimization-notebook
 
 ---
 
-## 🔄 Iterative Optimization
+## 🔄 Looping it all together
 
 Repeat the process (test → train → propose) until the activity metric plateaus. Satisfied with the results? 🎉 Congratulations, you’ve optimized your protein construct!
 
