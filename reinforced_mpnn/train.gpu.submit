@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH -c 8
 #SBATCH -J itopt
-#SBATCH --mem=64g
+#SBATCH --mem=128g
 #SBATCH --ntasks=1
 #SBATCH --time=2-00:00:00
 #SBATCH -o logs/logs_%j.out
@@ -13,7 +13,7 @@
 
 ### change 5-digit MASTER_PORT as you wish, slurm will raise Error if duplicated with others
 ### change WORLD_SIZE as gpus/node * num_nodes
-export MASTER_PORT=31124
+export MASTER_PORT=37422
 
 ### get the first node name as master address - customized for vgg slurm
 ### e.g. master(gnodee[2-5],gnoded1) == gnodee2

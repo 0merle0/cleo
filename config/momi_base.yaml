@@ -12,7 +12,7 @@ data:
   train_batch_size: 64
   val_batch_size: 32
   num_workers: 1
-  validation_mode: null # random, top-k, label, or null
+  validation_mode: label # random, top-k, label, or null
   top_k_validation: 384
   val_label: val
   val_size: 0.1

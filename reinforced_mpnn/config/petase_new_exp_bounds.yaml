@@ -1,6 +1,6 @@
-run_name: petase_new_expdataW5_seqW5_exp_bounds.run1 # name for the run
-output_dir: /home/jgershon/projects/itopt/policy_mpnn
-pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb
+run_name: petase_expW5_ub1.0_seqW5.run7 # name of the directory where run information will be saved
+output_dir: /home/jgershon/projects/itopt/policy_mpnn # output directory where run folder will be created
+pdb: /projects/ml/itopt/policy_mpnn/benchmarks/petase/rd3_11_pet.pdb # pdb of input structure for proteinMPNN to embed
 
 batch_size: 32
 N_steps: 500
@@ -148,5 +148,5 @@ reward:
     - metric: experimental_predictor_mu
       lower_bound: -1.0
       upper_bound: 2.0
-      weight: 10.0
+      weight: 5.0
       mode: max
