@@ -9,15 +9,15 @@ The two main themes of this workflow are:
 1. [**Library Design**](#-library-design)  
    - [Library constraints](#-library-constraints)  
    - [Defining reward functions](#-defining-reward-functions)  
-   - [Aligning proteinMPNN to rewards](#aligning-proteinmpnn-to-rewards)  
-   - [Sampling and filtering sequence fragments](#sampling-and-filtering-sequence-fragments)  
-   - [Reverse translating sequences to prepare for experimental assembly](#reverse-translating-sequences-to-prepare-for-experimental-assembly)  
+   - [Aligning proteinMPNN to rewards](#-aligning-proteinmpnn-to-rewards)  
+   - [Sampling and filtering sequence fragments](#-sampling-and-filtering-sequence-fragments)  
+   - [Reverse translating sequences to prepare for experimental assembly](#-reverse-translating-sequences-to-prepare-for-experimental-assembly)  
 
 2. [**Multi-Round Experimental Optimization**](#-multi-round-experimental-optimization)  
-   - [Data collection philosophy and assay design](#data-collection-philosophy-and-assay-design)  
-   - [Strategies for early rounds of testing](#strategies-for-early-rounds-of-testing)  
-   - [Training sequence-to-function models](#training-sequence-to-function-models)  
-   - [Proposing batch of sequences to test next](#proposing-batch-of-sequences-to-test-next)  
+   - [Data collection philosophy and assay design](#-data-collection-philosophy-and-assay-design)  
+   - [Strategies for early rounds of testing](#-strategies-for-early-rounds-of-testing)  
+   - [Training sequence-to-function models](#-training-sequence-to-function-models)  
+   - [Proposing batch of sequences to test next](#-proposing-batch-of-sequences-to-test-next)  
    - [Looping it all together](#-looping-it-all-together)
 
 ---
