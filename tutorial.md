@@ -24,14 +24,20 @@ The two main themes of this workflow are:
 
 # 💻 Library Design
 
-![library gif](frag_animation_v3.gif)
+![library gif](figs/frag_animation_v3.gif)
 
-Changes in protein sequence space can lead to major jumps in function. To explore the surrounding sequence of a particular protein, this workflow will act as a guide to designing large scale libaries. To generate such libraries we will split a protein into fragments, propose many options for each fragment, and ordering the fragments independently will allow us to stitch the DNA together *in vitro* to create unique variants to test. This tutorial uses PETase (a plastic-degrading enzyme) as an example, however the workflow can apply widely to other proteins.
+Changes in protein sequence space can lead to major jumps in function. To explore the surrounding sequence of a particular protein, this workflow will act as a guide to designing large scale libaries. To generate such libraries we will split a protein into fragments, propose many options for each fragment, and ordering the fragments independently will allow us to stitch the DNA together *in vitro* to create unique variants to test. This tutorial uses PETase (a plastic-degrading enzyme) as an example, however the workflow can apply widely to other proteins. The following steps will serve as a guide for first aligning proteinMPNN to custom reward functions and then sampling sequence fragments to create a library for experimental testing.
 
 📌 **Note**: The libraries designed here focus on a single fold space, each variant will adopt a unique atomic constellation but retain a consistent topology. 
 
 ## 📐 Library constraints
+One of the first steps to consider is how to split your protein into fragments. We recommend splitting the protein into equal length fragments of ~30-50 amino acids for a total of 4-6 fragments. Splitting into equal size fragments helps ensure the *in vitro* assembly process is robust. Aiming for 4-6 fragments balances library size and experimental feasibility.
 
+We have found that it does not matter too much where the splits occur, even splitting in the middle of secondary structure elements is fine. For designing an enzyme or binding protein it can be helpful to have multiple fragments in the active/binding site to allow for more combinatorial diversity in these key regions.
+
+Assembling the fragments *in vitro* requires orhtogonal overhangs. [NEB Golden Gate Assembly](https://www.neb.com/en-us/nebinspired-blog/getting-started-with-golden-gate) requires designing 4 base pair overhangs that are unique to each junction. To facilitate this we recommend fixing 2 amino acids at the start and end of each fragment (which correspond to 12 base pair stretch to search for compatible overhangs within).
+
+Fixing other residues which may be critical for function is easy to do in the config file. We provide an example [config](library_design/config/denovo_petase.yaml) file for PETase here with more details on how to setup your own run.
 
 ## 🛠 Defining reward functions
 
