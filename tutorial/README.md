@@ -93,8 +93,7 @@ Once your config file is setup, you can launch the training run with the followi
 ```bash
 # Placeholder for training command
 ```
-
-[**Checkout this notebook to see what tracking an example training run looks like.**](notebooks/library_design_track_training.ipynb)
+Checkout this [**notebook**](notebooks/library_design_track_training.ipynb) to see what tracking an example training run looks like.
 
 ## 🎲 Sampling and Filtering Sequence Fragments
 Once you have a few training runs that have converged you can sample sequences from them. Let's say you are interested in ordering **384** options per fragment, it would be good to sample well above **384** sequences so that we can filter down later. For example it might be good to sample **5,000** sequences and split them up into the fragment bounds previously defined so that you have **5,000** options per fragment. Some of these fragments will be duplicates, but this should provide plenty of sequences for which you can filter down. 
@@ -103,8 +102,6 @@ To filter the options down to a final set to be ordered, new combinations of fra
 
 Follow this [**notebook**](notebooks/library_design_sampling_filtering.ipynb) for example code to sample sequences from the optimized proteinMPNN model, split sequences into fragments, resampling a list of new sequences to evaluation, and aggregating metrics from sequence to fragment level.
 
-
-### Considerations for choosing final set of fragments to order:
 In addition to ranking the final fragments by filters, it is important to think through other constraints at this stage including:
 - Sampling a uniform range of mutations **(1-8)** per fragment from the parent fragment.
 - Maximizing the number of unique mutations present in the fragments to ensure better sequence space coverage. 
