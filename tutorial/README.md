@@ -30,13 +30,13 @@ Changes in protein sequence space can lead to major jumps in function. To explor
 📌 **Note**: The libraries designed here focus on a single fold space, each variant will adopt a unique atomic constellation but retain a consistent topology. 
 
 ## 📐 Library constraints
-One of the first steps to consider is how to split your protein into fragments. We recommend splitting the protein into equal length fragments of 20-50 amino acids for a total of 4-6 fragments. Splitting into equal size fragments helps ensure the *in vitro* assembly process is robust. Aiming for 4-6 fragments balances library size and experimental feasibility.
+One of the first steps to consider is how to split your protein into fragments. We recommend splitting the protein into equal length fragments of **20-50** amino acids for a total of **4-6** fragments. Splitting into equal size fragments helps ensure the *in vitro* assembly process is robust. Aiming for **4-6** fragments balances library size and experimental feasibility.
 
 We have found that it does not matter too much where the splits occur, even splitting in the middle of secondary structure elements is fine. For designing an enzyme or binding protein it can be helpful to have multiple fragments in the active/binding site to allow for more combinatorial diversity in these key regions.
 
 Assembling the fragments *in vitro* requires orhtogonal overhangs. [NEB Golden Gate Assembly](https://www.neb.com/en-us/nebinspired-blog/getting-started-with-golden-gate) requires designing 4 base pair overhangs that are unique to each junction. To facilitate this we recommend fixing 2 amino acids at the start and end of each fragment (which correspond to 12 base pair stretch to search for compatible overhangs within).
 
-Fixing other residues which may be critical for function is easy to do in the config file. We provide an example [config](../library_design/config/denovo_petase.yaml) file for PETase here with more details on how to setup your own run.
+Fixing other residues which may be critical for function is easy to do in the config file. We provide an example [**config**](../library_design/config/denovo_petase.yaml) file for PETase here with more details on how to setup your own run.
 
 ## 🎯 Aligning proteinMPNN to rewards:
 
@@ -44,13 +44,13 @@ Fixing other residues which may be critical for function is easy to do in the co
 
 [Group relative policy optimization (GRPO)](https://arxiv.org/pdf/2402.03300) is the finetuning framework we use to align proteinMPNN to custom reward functions. Given a backbone, proteinMPNN will propose sequences, these sequences will then be evaluated by reward functions (including: structure prediction oracle, distance to reference, etc.), and finally the model is updated to increase the likelihood of sampling sequences with good rewards.
 
-The [config](../library_design/config/denovo_petase.yaml) should serve as a template for how to setup your own run. Below we will break down some of the key components to consider, but please refer to the config file for more details.
+The [**config**](../library_design/config/denovo_petase.yaml) should serve as a template for how to setup your own run. Below we will break down some of the key components to consider, but please refer to the config file for more details.
 
 
-### Defining the steps for reward function
+### Defining steps for reward function
 To evaluate sequences we will need to define a series of steps to analyze the sequences proposed by proteinMPNN. These steps will be defined in the `reward.steps` section of the config. Each step is configured with the following fields:
 - `name`: A unique name for the step.
-- `target_fn`: The function to call to perform the analysis (should live in [library_design/utils](../library_design/utils/) folder).
+- `target_fn`: The function to call to perform the analysis (should live in [**library_design/utils**](../library_design/utils/) folder).
 - `cfg`: Parameters needed for the function.
 
 Each step function will have the following structure:
@@ -62,68 +62,53 @@ def step_fn(df_input: pd.DataFrame, cfg: Dict, step_name="step") -> pd.DataFrame
          cfg (Dict): Configuration parameters for the step.
          step_name (str, optional): Name of the step. Defaults to "step".
     """
+
    # perform analysis
    analysis_df = ...
 
-   # merge results back into input dataframe
-   df_output = pd.merge(df_input, analysis_df, on="name", how="inner")
-
-   return df_output
+   # return results merged back into input dataframe
+   return pd.merge(df_input, analysis_df)
+   
 ```
 
+For the PETase optimization we folded the sequences with a structure prediction oracle, measured a variety of distances between atoms involved with catalytic activity, and computed hamming distance of the sampled sequence to reference sequences (this can all be found in the example [**config**](../library_design/config/denovo_petase.yaml)).
 
-For the work with PETase optimization we folded the sequences with a structure prediction oracle and measured a variety of distances between atoms involved with catalytic activity. In addition we also considered confidence metrics from the structure prediction oracles as well as hamming distance to the parent sequence. (ideally we want a range of mutations present for each fragment, in practice we can weight the reward for hamming distance to reference to control how many mutations away from the reference we converge to).
+The list of steps will be run consecutively, with the output of one step being passed as the input to the next step. Each step will add new columns to the dataframe containing the results of the analysis. Be sure to order your step functions in such a way that you can access the results of previous steps in later steps if needed.
 
-Once you are finished running through the steps in your analysis pipeline the reward can then be calculated. To compute the overall reward ( a scalar value for each sequence in the batch ) we will normalize the metrics to the range [0,1] and linearly combine all of the rewards using a weighted sum with weight W_i for each reward. These will need to be tailored for each run depending on your problem, as a basis it is most simple to start by setting all weights equal to 1.
+### Aggregating metrics to compute overall reward
+Once the steps have finished running, an overall reward will need to be computed. To do this the `reward.reward_aggregation` section of the config will define a list of metrics to aggregate. Each item will have the following fields:
+- `metric`: The name of the metric to aggregate (should correspond to a column in the final dataframe).
+- `lower_bound`: The lower bound for normalizing the metric.
+- `upper_bound`: The upper bound for normalizing the metric.
+- `weight`: The weight to assign to the metric when computing the overall reward.
+- `mode`: The mode of optimization for the metric, either 'max' or 'min'.
 
-Once all of the configs have been set, you can launch your run by running:
+For each metrics you wish to optimize, we first normalize it to the range `[0,1]` using the provided lower and upper bounds. If the mode is **max** then the normalized metric is used as is, if the mode is **min** then we use `(1 - normalized metric)`. Finally, the overall reward is computed as a weighted sum of all the normalized metrics using the provided weights.
 
+📌 **Note**: If a particular metric is not being optimized, make sure that the bounds encompass the output distribution of the metric. If the metric's output distribution sits mostly outside the bounds provided then the reward will appear static.
 
-<<<placeholder for command to launch training run>>>
+### Launching a training run
+Once your config file is setup, you can launch the training run with the following command:
 
-To track the training run you can plot the various metrics from a training run to see how the metrics are converging. You can take a look through the notebook (path to notebook) to see an example of how it might look to track the training)
-
-
-
-## 🛠 Defining reward functions
-
-First, define the **reward metrics** predictive of protein function. If no experimental data exists yet:
-- Use structural prediction confidence, atomic distances, and hamming distances to the parent sequence.
-
-If experimental data is already available (e.g., from a first round of testing):
-- Train a custom predictor on the experimental results and incorporate its scores into the reward.
-
-
-1. Fix **2 amino acids** at the start and end of each fragment (e.g., for Golden Gate Assembly compatibility 🧬).
-2. Use a **structure prediction oracle** to assess sequences and calculate rewards.  
-   - Example reward metrics: catalytic distances, confidence scores, mutational distances.
-
-3. Normalize metrics to [0, 1] and compute the **overall scalar reward** as a weighted sum. Starting with equal weights is a good default.  
-
-   Example code snippets for fine-tuning and reward functions are available in the <add link to config file>.  
-
-### Launching Runs
-Once your run setup is configured:
 ```bash
 # Placeholder for training command
-executetraining config.yaml
 ```
 
-📝 **Tip**: Use the <path-to-notebook> to visualize metrics during training and track convergence.
+[**Checkout this notebook to see what tracking an example training run looks like.**](notebooks/library_design_track_training.ipynb)
 
 ## 🎲 Sampling and Filtering Sequence Fragments
+Once you have a few training runs that have converged you can sample sequences from them. Let's say you are interested in ordering **384** options per fragment, it would be good to sample well above **384** sequences so that we can filter down later. For example it might be good to sample **5,000** sequences and split them up into the fragment bounds previously defined so that you have **5,000** options per fragment. Some of these fragments will be duplicates, but this should provide plenty of sequences for which you can filter down. 
 
-After the model converges, you'll want to **sample sequences** for testing:
-- Example: Sample 5,000 sequences if aiming to order 384 to allow for filtering.  
-- The **goal** is to analyze fragment compatibility in silico and eliminate incompatible ones.
+To filter the options down to a final set to be ordered, new combinations of fragments can be sampled *in silico*. The goal of sampling and filtering in silico here is to find the set of fragments which appear to be most compatible with one another. By sampling a large set of new sequences where each fragment is used **~10** times, we can get an estimate of how valuable each fragment is. Once these seqeuences are assessed for a variety of metrics important to the problem, we can then aggregate the metrics from sequence level to fragment level. This can be done by finding all these full length sequences which contain a particular fragment and averaging the metrics for those full length sequences.
 
-### Filtering and Constraints:
-1. Rank fragments based on aggregated metrics.  
-2. Apply constraints:
-   - Diversity in mutation space (avoid over-optimization for a single point).  
-   - Ensuring uniform distance from the parent sequence.  
+Follow this [**notebook**](notebooks/library_design_sampling_filtering.ipynb) for example code to sample sequences from the optimized proteinMPNN model, split sequences into fragments, resampling a list of new sequences to evaluation, and aggregating metrics from sequence to fragment level.
 
-A detailed example notebook demonstrating sequence filtering is available at <link-to-notebook>.
+
+### Considerations for choosing final set of fragments to order:
+In addition to ranking the final fragments by filters, it is important to think through other constraints at this stage including:
+- Sampling a uniform range of mutations **(1-8)** per fragment from the parent fragment.
+- Maximizing the number of unique mutations present in the fragments to ensure better sequence space coverage. 
+
 
 ## 🧬 Reverse Translation and Order Preparation
 
