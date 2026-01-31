@@ -10,9 +10,9 @@ The two main themes of this workflow are:
    - [Library constraints](#-library-constraints)
    - [Aligning proteinMPNN to rewards](#-aligning-proteinmpnn-to-rewards)
    - [Sampling and filtering sequence fragments](#-sampling-and-filtering-sequence-fragments)
-   - [Reverse translating sequences to prepare for experimental assembly](#-reverse-translating-sequences-to-prepare-for-experimental-assembly)
+   - [Reverse Translation and Order Preparation](#-reverse-translation-and-order-preparation)
 
-2. [**Multi-Round Experimental Optimization**](#-multi-round-experimental-optimization)  
+2. [**Multi Round Experimental Optimization**](#-multi-round-experimental-optimization)  
    - [Data collection philosophy and assay design](#-data-collection-philosophy-and-assay-design)  
    - [Strategies for early rounds of testing](#-strategies-for-early-rounds-of-testing)  
    - [Training sequence-to-function models](#-training-sequence-to-function-models)  
@@ -20,6 +20,7 @@ The two main themes of this workflow are:
    - [Looping it all together](#-looping-it-all-together)
 
 ---
+<br><br>
 
 # ⚙️ Library Design
 
@@ -109,15 +110,16 @@ In addition to ranking the final fragments by filters, it is important to think 
 
 ## 🧬 Reverse Translation and Order Preparation
 
-Reverse translating protein sequences into DNA sequences is the final step before ordering. Key considerations:
-- Use orthogonal codon pairs to ensure compatibility for assembly methods (e.g., ⛓️ NEB Golden Gate Assembly).  
-- Validate assembly methods using tools like [Benchling](https://www.benchling.com/) or NEB's assembly wizard.
+Reverse translating protein sequences into DNA sequences is the final step before ordering. As discussed earlier in the [library constraints](#-library-constraints) section, it is important to have 2 fixed amino acids at the start and end of each fragment to allow for orthogonal overhang design. The following [**notebook**](notebooks/library_design_reverse_translation.ipynb) will guide you through the process of reverse translating your final fragments into DNA sequences ready for ordering.
 
-Positive controls: Split the original, active sequence into the same fragments to benchmark your experimental data.
+After reverse translation, it is important to do some spot checks to ensure that the fragments will assemble as expected. Tools such as [Benchling assembly wizard](https://help.benchling.com/hc/en-us/articles/39656605989901-Create-assemblies-with-the-assembly-wizard#h_01K5CNZJ7W0BTTE21S5R7V851Y) and [NEB golden gate assembly tool](https://goldengate.neb.com/#!/) are  helpful for this.
+
+When ordering the DNA fragments, 
 
 ---
+<br><br>
 
-# 🔬 Multi-Round Experimental Optimization
+# 🔬 Multi Round Experimental Optimization
 
 ## 🧪 Data collection philosophy and assay design
 Establish a robust assay that demonstrates clear, reproducible signal for your **positive control** over background noise. For PETase:
