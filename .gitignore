@@ -7,4 +7,4 @@ lightning_logs/
 outputs/
 ._*
 uv*
-*.egg-info*
+cleo.egg-info/
