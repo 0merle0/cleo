@@ -1,7 +1,0 @@
-run_name: clickase_train_r0_r1_r2_r3_no_val
-model_base_path: /home/jgershon/git/cleo/ckpt/clickase_train_r0_r1_r2_r3_no_val/clickase_train_r0_r1_r2_r3_no_val.2025-10-14-09-47-24
-outdir: /home/jgershon/projects/itopt/declan/round_4
-fragment_dictionary: /home/jgershon/projects/itopt/declan/clickase_fragment_dictionary.json
-batch_size: 256
-ckpt_name: "last.ckpt"
-top_k: 1e5

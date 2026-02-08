@@ -1,0 +1,160 @@
+# Config file for running finetuning of proteinMPNN 
+# to generate sequences aligned to custom defined rewards
+
+run_name: test_run # name of the directory where run information will be saved
+output_dir: ${hydra:runtime.cwd}/policy_mpnn_out # output directory where run folder will be created
+pdb: ${hydra:runtime.cwd}/reference_structures/momi_petase_reference_structure.pdb # pdb of input structure for proteinMPNN to embed
+checkpoint_path: null # checkpoint path to continue finetuning from (default is null and will just use base proteinMPNN weights)
+checkpoint_every_n_steps: 50 # save model checkpoint every n steps
+
+algorithm: grpo # algorithm to use for finetuning
+
+batch_size: 2 # number of sequences proteinMPNN will sample during rollout
+N_steps: 500 # number of finetuning steps
+lr: 1e-4 # learning rate for finetuning
+
+
+# -- GRPO params --
+kl_weight: 1e-2 # weight for KL penalty 
+N_updates: 16 # number of updates to perform per rollout batch
+update_batch_size: 8 # batch size for individual updates
+clip_eps_low: 0.2 # lower bound for clipping value, from dapo paper (https://arxiv.org/pdf/2503.14476)
+clip_eps_high: 0.28 # upper bound for clipping value, from dapo paper (https://arxiv.org/pdf/2503.14476)
+
+# -- MPNN params --
+model_type: ligand_mpnn # version of proteinMPNN to use ( protein_mpnn or ligand_mpnn )
+temperature: 1.0 # temperature used for sampling, it is recomended to keep at 1.0 or else you get mode collapse
+omit_AA: CX # amino acids to omit during sampling
+fixed_residues: "A41 A42 A43 A44 A66 A85 A86 A87 A88 A107 A122 A127 A128 A129 A130 A164 A165 A166 A167" # residues to keep fixed cat res = 66, 107, 122
+
+
+# Defining the reward function
+reward:
+  _target_: cleo.design.utils.reward.UniversalReward # base class for reward function building using the config
+  output_dir: ${output_dir} # output directory where run folder will be created (should be same as up top)
+  run_name: ${run_name} # name for the run (should be same as up top) 
+
+
+  # Running the steps for calculating various
+  # metrics on the sampled sequences.
+  steps:
+
+    # list of steps each with the following parameters
+    #   name: name of the step, will be used to reference outputs in later steps
+    #   target_fn: function to call for the step (takes in dataframe and cfg, and outputs dataframe with new columns added)
+    #   cfg: config dictionary to pass to the target function
+
+
+    # predict the structure of the sequences sampled
+    - name: boltz
+      target_fn: cleo.design.utils.oracle.boltz_from_df
+      cfg: 
+        run_dir: null # this will be set dynamically
+        template_path: ${hydra:runtime.cwd}/oracle_templates/boltz_template_for_petase_with_pet_dimer.yaml # path to template config for running boltz on petase
+
+    # measure and collect metrics from the structure prediction
+    - name: petase_metrics
+      target_fn: cleo.design.utils.petase.add_petase_metrics_to_df
+      cfg:
+        ref_step: boltz
+        cat_res_ser: 66 # catalytic serine residue
+        cat_res_his: 107 # catalytic histidine residue
+        cat_res_asp: 122 # catalytic aspartate residue
+        oxhres1: 198 # backbone oxyanion hole residue 1
+        oxhres2: 67 # backbone oxyanion hole residue 2
+        ester_atom_list: [["C35","O25","O31"], ["C36","O26","O32"]] # carbon, acyl oxygen, ester oxygen (multiple possible orientations)
+        dihedrals: [[["A",107,"NE2"], ["A",66,"OG"], ["B",1,"C35"], ["B",1,"O31"]], [["A",107,"NE2"], ["A",66,"OG"], ["B",1,"C36"], ["B",1,"O32"]]]
+        ref_str: ${hydra:runtime.cwd}/reference_structures/momi_petase_reference_structure.pdb # path to reference structure to calculate RMSDS with respect to
+        ref_protein_chain_id: A
+        ref_ligand_chain_id: X
+        des_protein_chain_id: A
+        des_ligand_chain_id: B
+        ref_ligand_atom_names: ["C13","O2","C1","O1","C10","C8","C7","C9","C11","C6","C5","O4","O3","C4","C3","O6","C14","O7","C15","O8","C16","C21","C20","C17","C18","C19","C22","O9","O10","C23","C24","O11"]
+        design_ligand_atom_name_orders: [
+          ["C53","O31","C35","O25","C47","C42","C38","C41","C37","C45","C33","O23","O29","C51","C49","O27","C54","O32","C36","O26","C48","C43","C39","C44","C40","C46","C34","O24","O30","C52","C50","O28"],
+          ["C54","O32","C36","O26","C48","C43","C39","C44","C40","C46","C34","O24","O30","C52","C50","O28","C53","O31","C35","O25","C47","C42","C38","C41","C37","C45","C33","O23","O29","C51","C49","O27"]
+        ]
+
+    # compute distances to reference sequence
+    - name: dist_to_ref_seqs
+      target_fn: cleo.design.utils.sequence.compute_dist_to_ref_seqs_from_df
+      cfg:
+        ref_seqs: # list of reference sequences to compute hamming distance to (in the example below these are 3 sequences we know to be active)
+          - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDNARIFIATTVEEAVELARRAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+          - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIQKETGHKVDKSRIFIAETVEEAIELARQAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+          - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDRSRIFIAETVEEAVELAARAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+         
+
+    # # USING EXPERIMENTAL PREDICTOR
+    # # use predictor trained on experimental data to 
+    # # generate activity predictions for the sampled sequences
+    # - name: experimental_predictor
+    #   target_fn: cleo.design.utils.experimental_predictor.experimental_predictor_from_df
+    #   cfg:
+    #     ckpt_path: /home/jgershon/git/cleo/ckpt/momi_mlp_round3_no_val/momi_mlp_round3_no_val.2025-12-25-19-36-51 # path to checkpoint folder
+    #     ckpt_name: last.ckpt # checkpoint name to use (usually last.ckpt)
+
+
+  # Normalizing metrics and aggregating to a single scalar reward
+  reward_aggregation:
+    # list of metrics to normalize and sum together
+    #   mertric: name of the metric column in the df
+    #   lower_bound: lower bound for normalization
+    #   upper_bound: upper bound for normalization
+    #   weight: weight for the metric in the final reward aggregation
+    #   mode: max (for optimizing toward the upper bound) or min (for optimizing toward the lower bound)
+
+    - metric: boltz_iptm
+      lower_bound: 0.0
+      upper_bound: 0.8
+      weight: 1.0
+      mode: max
+
+    - metric: boltz_ptm
+      lower_bound: 0.0
+      upper_bound: 0.8
+      weight: 1.0
+      mode: max 
+
+    - metric: petase_metrics_acylox_oxh1bbN
+      lower_bound: 6
+      upper_bound: 10.0
+      weight: 1.0
+      mode: min 
+
+    - metric: petase_metrics_acylox_oxh2bbN
+      lower_bound: 6
+      upper_bound: 10.0
+      weight: 1.0
+      mode: min
+
+    - metric: petase_metrics_hisNE2_esterox
+      lower_bound: 5
+      upper_bound: 10.0
+      weight: 1.0
+      mode: min 
+
+    - metric: petase_metrics_hisNE2_serOG
+      lower_bound: 2.5
+      upper_bound: 10.0
+      weight: 1.0
+      mode: min
+
+    - metric: petase_metrics_his_ser_angle
+      lower_bound: 20
+      upper_bound: 90
+      weight: 1.0
+      mode: max
+
+    - metric: dist_to_ref_seqs_min
+      lower_bound: 0
+      upper_bound: 100
+      weight: 5.0
+      mode: min
+
+    # EXPERIMENTAL PREDICTOR REWARD
+    # - metric: experimental_predictor_mu
+    #   lower_bound: -1.0
+    #   upper_bound: 2.0
+    #   weight: 5.0
+    #   mode: max
