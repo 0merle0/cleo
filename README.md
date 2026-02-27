@@ -115,9 +115,11 @@ Reverse translating protein sequences into DNA sequences is the final step befor
 To reverse translate protein fragments to DNA, run [`dna_fragment_design.py`](src/cleo/design/dna_utils/dna_fragment_design.py). As inputs, you may use either a csv or fasta file. 
 
 Example csv input file: [`input_example.csv`](src/cleo/design/dna_utils/input_example.csv)
+
 Example fasta input file: [`input_example.fa`](src/cleo/design/dna_utils/input_example.fa)
 
 Script usage for csv input: `dna_fragment_design.py --csv input_example.csv`
+
 Script usage for fasta input: `dna_fragment_design.py --fasta input_example.fa`
 
 After reverse translation, it is important to do some spot checks to ensure that the fragments will assemble as expected. Tools such as [Benchling assembly wizard](https://help.benchling.com/hc/en-us/articles/39656605989901-Create-assemblies-with-the-assembly-wizard#h_01K5CNZJ7W0BTTE21S5R7V851Y) and [NEB golden gate assembly tool](https://goldengate.neb.com/#!/) are  helpful for this.
