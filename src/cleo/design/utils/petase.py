@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 import biotite.structure.io as strucio
 
-from cleo.design.utils.geom_utils import torch_get_rmsd, angle_between_three_points, compute_dihedral
+from cleo.design.utils.geom import torch_get_rmsd, angle_between_three_points, compute_dihedral
 
 
 def compute_petase_metrics(cif_path, cfg, ref):

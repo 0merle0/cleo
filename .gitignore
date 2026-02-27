@@ -6,5 +6,5 @@ ckpt/
 lightning_logs/
 outputs/
 ._*
-uv*
 cleo.egg-info/
+policy_mpnn_out/

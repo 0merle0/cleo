@@ -6,7 +6,7 @@ from tqdm import tqdm
 import time
 import hydra
 from omegaconf import OmegaConf
-from cleo.design.utils.policy_utils import PolicyMPNN
+from cleo.design.utils.policy import PolicyMPNN
 
 from cleo.design.protein_mpnn_utils.data_utils import featurize, parse_PDB
 from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN

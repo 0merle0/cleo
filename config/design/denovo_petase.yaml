@@ -1,15 +1,15 @@
 # Config file for running finetuning of proteinMPNN 
 # to generate sequences aligned to custom defined rewards
 
-run_name: test_run # name of the directory where run information will be saved
+run_name: test_run_1_w10 # name of the directory where run information will be saved
 output_dir: ${hydra:runtime.cwd}/policy_mpnn_out # output directory where run folder will be created
-pdb: ${hydra:runtime.cwd}/reference_structures/momi_petase_reference_structure.pdb # pdb of input structure for proteinMPNN to embed
+pdb: ${hydra:runtime.cwd}/templates/structure/momi_petase_reference_structure.pdb # pdb of input structure for proteinMPNN to embed
 checkpoint_path: null # checkpoint path to continue finetuning from (default is null and will just use base proteinMPNN weights)
 checkpoint_every_n_steps: 50 # save model checkpoint every n steps
 
 algorithm: grpo # algorithm to use for finetuning
 
-batch_size: 2 # number of sequences proteinMPNN will sample during rollout
+batch_size: 32 # number of sequences proteinMPNN will sample during rollout
 N_steps: 500 # number of finetuning steps
 lr: 1e-4 # learning rate for finetuning
 
@@ -18,8 +18,8 @@ lr: 1e-4 # learning rate for finetuning
 kl_weight: 1e-2 # weight for KL penalty 
 N_updates: 16 # number of updates to perform per rollout batch
 update_batch_size: 8 # batch size for individual updates
-clip_eps_low: 0.2 # lower bound for clipping value, from dapo paper (https://arxiv.org/pdf/2503.14476)
-clip_eps_high: 0.28 # upper bound for clipping value, from dapo paper (https://arxiv.org/pdf/2503.14476)
+clip_eps_low: 0.2 # lower bound for clipping value, from dapo (https://arxiv.org/pdf/2503.14476)
+clip_eps_high: 0.28 # upper bound for clipping value, from dapo (https://arxiv.org/pdf/2503.14476)
 
 # -- MPNN params --
 model_type: ligand_mpnn # version of proteinMPNN to use ( protein_mpnn or ligand_mpnn )
@@ -50,7 +50,7 @@ reward:
       target_fn: cleo.design.utils.oracle.boltz_from_df
       cfg: 
         run_dir: null # this will be set dynamically
-        template_path: ${hydra:runtime.cwd}/oracle_templates/boltz_template_for_petase_with_pet_dimer.yaml # path to template config for running boltz on petase
+        template_path: ${hydra:runtime.cwd}/templates/oracle/boltz_template_for_petase_with_pet_dimer.yaml # path to template config for running boltz on petase
 
     # measure and collect metrics from the structure prediction
     - name: petase_metrics
@@ -64,7 +64,7 @@ reward:
         oxhres2: 67 # backbone oxyanion hole residue 2
         ester_atom_list: [["C35","O25","O31"], ["C36","O26","O32"]] # carbon, acyl oxygen, ester oxygen (multiple possible orientations)
         dihedrals: [[["A",107,"NE2"], ["A",66,"OG"], ["B",1,"C35"], ["B",1,"O31"]], [["A",107,"NE2"], ["A",66,"OG"], ["B",1,"C36"], ["B",1,"O32"]]]
-        ref_str: ${hydra:runtime.cwd}/reference_structures/momi_petase_reference_structure.pdb # path to reference structure to calculate RMSDS with respect to
+        ref_str: ${hydra:runtime.cwd}/templates/structure/momi_petase_reference_structure.pdb # path to reference structure to calculate RMSDS with respect to
         ref_protein_chain_id: A
         ref_ligand_chain_id: X
         des_protein_chain_id: A
@@ -85,7 +85,7 @@ reward:
           - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDRSRIFIAETVEEAVELAARAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
          
 
-    # # USING EXPERIMENTAL PREDICTOR
+    # !! USING EXPERIMENTAL PREDICTOR !!
     # # use predictor trained on experimental data to 
     # # generate activity predictions for the sampled sequences
     # - name: experimental_predictor
@@ -149,10 +149,10 @@ reward:
     - metric: dist_to_ref_seqs_min
       lower_bound: 0
       upper_bound: 100
-      weight: 5.0
+      weight: 10.0
       mode: min
 
-    # EXPERIMENTAL PREDICTOR REWARD
+    # !! EXPERIMENTAL PREDICTOR REWARD !!
     # - metric: experimental_predictor_mu
     #   lower_bound: -1.0
     #   upper_bound: 2.0

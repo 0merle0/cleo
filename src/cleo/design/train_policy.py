@@ -1,8 +1,6 @@
 import sys, os
 from omegaconf import OmegaConf
 import hydra
-from cleo.design.utils.policy_utils import PolicyMPNN
-
 
 @hydra.main(version_base=None, config_path="../../../config/design")
 def train_policy(cfg):
@@ -16,12 +14,12 @@ def train_policy(cfg):
     
     if cfg.get('algorithm').lower() == 'vanillapg':
         print(f"Using vanilla REINFORCE algorithm for training")
-        from cleo.design.utils.policy_utils import PolicyMPNN
+        from cleo.design.utils.policy import PolicyMPNN
         policy = PolicyMPNN(cfg)
 
     elif cfg.get('algorithm').lower() == 'grpo':
         print(f"Using GRPO algorithm for training")
-        from cleo.design.utils.grpo_utils import PolicyMPNNvGRPO
+        from cleo.design.utils.grpo import PolicyMPNNvGRPO
         policy = PolicyMPNNvGRPO(cfg)
     
     else:
