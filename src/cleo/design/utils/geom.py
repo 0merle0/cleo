@@ -1,11 +1,16 @@
+"""
+Geometric utilities: RMSD alignment, angle and dihedral calculations.
+"""
+
 import numpy as np
 import torch
 
+
 def torch_get_rmsd(a, b, eps=1e-6):
-    '''
-    align crds b to a : always use all alphas
-    expexted tensor of shape (L,3)
-    '''
+    """Align coordinates *b* onto *a* via SVD and return (RMSD, rotation matrix U).
+
+    Both inputs should be tensors of shape ``(L, 3)``.
+    """
     assert a.shape == b.shape, 'make sure tensors are the same size'
     L = a.shape[0]
     assert a.shape == torch.Size([L,3]), 'make sure tensors are in format [L,3]'

@@ -1,4 +1,13 @@
-import sys, os
+"""
+PETase-specific structural metrics for the reward pipeline.
+
+Measures catalytic triad geometry (distances, angles, dihedrals between
+Ser/His/Asp and substrate ester atoms), oxyanion hole distances, and
+ligand RMSD relative to a reference structure. These metrics are
+designed for evaluating PETase variants but can serve as a template for
+other enzyme active-site metrics.
+"""
+
 import numpy as np
 import pandas as pd
 import torch

@@ -1,5 +1,10 @@
-import sys, os
-import numpy as np
+"""
+Sequence distance utilities for the reward pipeline.
+
+Computes Hamming distances between sampled sequences and a set of
+reference sequences, providing min/avg/max distance metrics.
+"""
+
 import pandas as pd
 
 def get_dist_from_seqs(seq, ref_list):

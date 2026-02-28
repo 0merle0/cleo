@@ -1,4 +1,13 @@
-import os, sys
+"""
+Structure prediction oracle using Boltz (https://github.com/jwohlwend/boltz).
+
+Provides :func:`boltz_from_df`, a reward-pipeline step that writes Boltz
+input YAML files, runs predictions across available GPUs in parallel, and
+collects confidence metrics (pTM, ipTM, pLDDT, etc.) back into the
+sequence DataFrame.
+"""
+
+import os
 import json
 import copy
 import subprocess

@@ -1,10 +1,18 @@
-import sys, os, copy
+"""
+Universal reward function for RL fine-tuning of ProteinMPNN.
+
+:class:`UniversalReward` runs a configurable pipeline of metric steps
+(e.g. structure prediction, distance calculations) on sampled sequences
+and aggregates the results into a scalar reward via normalised
+weighted summation. Steps and aggregation weights are defined in the
+training config under ``reward.steps`` and ``reward.reward_aggregation``.
+"""
+
+import os
+import shutil
 import numpy as np
 import torch
-import pdb as pdb_lib
 import pandas as pd
-from omegaconf import OmegaConf
-import subprocess
 from hydra.utils import get_method
 
 from cleo.design.utils.policy import alphabet
@@ -49,19 +57,12 @@ class UniversalReward():
         return sequences
 
     def get_input_df(self, sequences):
-        """
-        Convert list of sequences to DataFrame format required by AF3
-        """
-
-        df = pd.DataFrame(
-            {
-                "sequence": sequences,
-                "name": [f"seq_{i:04}" for i in range(len(sequences))],
-                "origin.path": [f"seq_{i:04}.path" for i in range(len(sequences))],
-            }
-        )
-
-        return df
+        """Build a DataFrame with sequence names for the metric pipeline."""
+        return pd.DataFrame({
+            "sequence": sequences,
+            "name": [f"seq_{i:04}" for i in range(len(sequences))],
+            "origin.path": [f"seq_{i:04}.path" for i in range(len(sequences))],
+        })
     
     
     @torch.no_grad()
@@ -74,22 +75,16 @@ class UniversalReward():
             f"step_{step:04}"
         )
 
-        # path exists, delete it
         if os.path.exists(rundir):
-            subprocess.run(f'rm -rf {rundir}', shell=True, check=True)  # Clean up outputs to retry
-        
-        # just take sequences from the first chain
-        chain_mask = feature_dict["chain_labels"]==0 # [1, L]
-        chain_mask = chain_mask[0] # [L,]
+            shutil.rmtree(rundir, ignore_errors=True)
+        os.makedirs(rundir, exist_ok=True)
 
-        # Get the sequences from policy output
+        chain_mask = feature_dict["chain_labels"] == 0
+        chain_mask = chain_mask[0]
+
         sequences = self.get_sequences(policy_output, chain_mask=chain_mask)
-        
-        # Create a DataFrame for AF3
         df = self.get_input_df(sequences)
-        
-        # iterate through list of steps here and 
-        # run each step of the oracle and filtering pipeline
+
         print("********* running metric steps *********")
         for _s in self.steps:
             fn = get_method(_s.target_fn)
@@ -100,13 +95,11 @@ class UniversalReward():
             df = fn(df, _s.cfg, step_name=_name)
 
 
-        # add code to delete af3 outputs to save space
-        # DOING AF3 CLEANUP
+        # Clean up structure prediction outputs to save disk space
         af3_out_dir = os.path.join(rundir, "af3/outputs")
-        subprocess.run(f'rm -rf {af3_out_dir}/*', shell=True, check=True)  # Clean up outputs to retry
+        if os.path.exists(af3_out_dir):
+            shutil.rmtree(af3_out_dir, ignore_errors=True)
 
-
-        # iterate through each metric and normalize
         rewards = []
         weights = []
         print("********* aggregating rewards *********")

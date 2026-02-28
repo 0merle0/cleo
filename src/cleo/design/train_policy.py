@@ -1,36 +1,41 @@
-import sys, os
-from omegaconf import OmegaConf
+"""
+Entrypoint for fine-tuning ProteinMPNN with reinforcement learning.
+
+Supports two algorithms selected via the ``algorithm`` config key:
+  - ``vanillapg``: Vanilla REINFORCE with a running-mean baseline.
+  - ``grpo``: Group Relative Policy Optimization (clipped surrogate
+    objective with optional KL penalty to a frozen reference model).
+
+Usage:
+    python -m cleo.design.train_policy --config-name denovo_petase
+"""
+
 import hydra
+
 
 @hydra.main(version_base=None, config_path="../../../config/design")
 def train_policy(cfg):
-    """
-    Train a policy network using either vanilla REINFORCE or PPO algorithm.
-    The algorithm is determined by the 'algorithm' setting in the config.
-    
-    Args:
-        cfg: Configuration object from hydra
-    """
-    
-    if cfg.get('algorithm').lower() == 'vanillapg':
-        print(f"Using vanilla REINFORCE algorithm for training")
+    """Launch a training run using the algorithm specified in *cfg*."""
+
+    algorithm = cfg.get("algorithm", "").lower()
+
+    if algorithm == "vanillapg":
+        print("Using vanilla REINFORCE algorithm for training")
         from cleo.design.utils.policy import PolicyMPNN
         policy = PolicyMPNN(cfg)
 
-    elif cfg.get('algorithm').lower() == 'grpo':
-        print(f"Using GRPO algorithm for training")
+    elif algorithm == "grpo":
+        print("Using GRPO algorithm for training")
         from cleo.design.utils.grpo import PolicyMPNNvGRPO
         policy = PolicyMPNNvGRPO(cfg)
-    
-    else:
-        raise ValueError(f"Unsupported algorithm: {cfg.get('algorithm')}. Supported algorithms are 'grpo' and 'vanillaPG'.")
 
-    # Train the policy
+    else:
+        raise ValueError(
+            f"Unsupported algorithm: {cfg.get('algorithm')}. "
+            "Supported algorithms are 'grpo' and 'vanillaPG'."
+        )
+
     policy.train()
-    
-    # Close wandb
-    if wandb.run:
-        wandb.finish()
 
 
 if __name__ == "__main__":

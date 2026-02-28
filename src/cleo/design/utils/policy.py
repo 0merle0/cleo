@@ -1,16 +1,23 @@
-import sys, os, re
-import json
+"""
+Vanilla REINFORCE (policy gradient) fine-tuning of ProteinMPNN.
+
+Provides :class:`PolicyMPNN`, which wraps a ProteinMPNN model with an
+autoregressive rollout that keeps gradients through the decoder so that
+the REINFORCE loss can flow back. A running-mean baseline is subtracted
+from the reward to reduce variance.
+
+Amino-acid encoding constants used across the codebase (``alphabet``,
+``restype_STRtoINT``, etc.) are defined here and should be imported from
+this module rather than duplicated elsewhere.
+"""
+
+import os
 import torch
 import numpy as np
 from tqdm import tqdm
 import time
 import hydra
 from omegaconf import OmegaConf
-import pandas as pd  # pandas for CSV fallback logging
-import pickle
-from pathlib import Path
-import torch.nn.functional as F
-
 
 from cleo.design.protein_mpnn_utils.data_utils import featurize, parse_PDB
 from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN
@@ -20,10 +27,9 @@ PROTEIN_MPNN_UTILS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__))
 PROTEIN_MPNN_CKPT_PATH = os.path.join(PROTEIN_MPNN_UTILS_DIR, "vanilla_protein_mpnn_weights.pt")
 LIGAND_MPNN_CKPT_PATH = os.path.join(PROTEIN_MPNN_UTILS_DIR, "ligand_protein_mpnn_weights.pt")
 
-
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# define mpnn constants
+# ProteinMPNN amino-acid encoding tables
 restype_1to3 = {'A': 'ALA', 'R': 'ARG', 'N': 'ASN', 'D': 'ASP', 'C': 'CYS', 'Q': 'GLN', 'E': 'GLU', 'G': 'GLY', 'H': 'HIS', 'I': 'ILE', 'L': 'LEU', 'K': 'LYS', 'M': 'MET', 'F': 'PHE', 'P': 'PRO', 'S': 'SER', 'T': 'THR', 'W': 'TRP', 'Y': 'TYR', 'V': 'VAL', 'X': 'UNK'}
 restype_STRtoINT = {'A': 0, 'C': 1, 'D': 2, 'E': 3, 'F': 4, 'G': 5, 'H': 6, 'I': 7, 'K': 8, 'L': 9, 'M': 10, 'N': 11, 'P': 12, 'Q': 13, 'R': 14, 'S': 15, 'T': 16, 'V': 17, 'W': 18, 'Y': 19, 'X': 20}
 restype_INTtoSTR = {0: 'A', 1: 'C', 2: 'D', 3: 'E', 4: 'F', 5: 'G', 6: 'H', 7: 'I', 8: 'K', 9: 'L', 10: 'M', 11: 'N', 12: 'P', 13: 'Q', 14: 'R', 15: 'S', 16: 'T', 17: 'V', 18: 'W', 19: 'Y', 20: 'X'}
@@ -31,46 +37,35 @@ alphabet = list(restype_STRtoINT)
 
 
 class PolicyMPNN:
-    def __init__(self, cfg):
+    """ProteinMPNN wrapper for RL fine-tuning with vanilla REINFORCE."""
 
+    def __init__(self, cfg):
         self.cfg = cfg
         self.device = DEVICE
         self.run_name = cfg.run_name
         self.output_dir = os.path.join(cfg.output_dir, cfg.run_name)
-        
-        # create output directory if it does not exist
-        os.makedirs(self.output_dir, exist_ok=True)
 
-        # save config in output directory
+        os.makedirs(self.output_dir, exist_ok=True)
         OmegaConf.save(config=cfg, f=os.path.join(self.output_dir, f"{self.run_name}_config.yaml"))
 
-        # log reward history
         self.reward_history = [0]
 
-        # load model
         self.model = self.load_mpnn_model()
         self.model.to(self.device)
-
-        # load optimizer
         self.optimizer = self.get_optimizer()
 
-        # defaults from mpnn
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
 
-        # get reward function
         self.reward_fn = hydra.utils.instantiate(cfg.reward)
 
-        # checkpointing utils
         self.checkpoint_every_n_steps = self.cfg.checkpoint_every_n_steps
         self.best_seen_reward = 0
         self.step_at_best_seen_reward = 0
 
 
     def load_mpnn_model(self):
-        """
-        Load the MPNN model based on the configuration.
-        """
+        """Load and return a ProteinMPNN model initialised from checkpoint weights."""
 
         model_type = self.cfg.model_type
 
@@ -79,122 +74,118 @@ class PolicyMPNN:
             k_neighbors = 48
             self.ligand_mpnn_use_side_chain_context = 0
             ckpt_path = PROTEIN_MPNN_CKPT_PATH
-
         elif model_type == "ligand_mpnn":
             self.atom_context_num = 25
             k_neighbors = 32
             self.ligand_mpnn_use_side_chain_context = 0
             ckpt_path = LIGAND_MPNN_CKPT_PATH
-
         else:
             raise ValueError("Invalid model type specified. Choose 'ligand_mpnn' or 'protein_mpnn'.")
 
-        
-        # load checkpoint if provided
         if self.cfg.get('checkpoint_path'):
             print(f"Loading training checkpoint from {self.cfg.checkpoint_path}")
             ckpt_path = self.cfg.checkpoint_path
         else:
             print(f"Using default MPNN checkpoint: {ckpt_path}")
 
-        # load model
-        model = ProteinMPNN(node_features=128,
-                        edge_features=128,
-                        hidden_dim=128,
-                        num_encoder_layers=3,
-                        num_decoder_layers=3,
-                        k_neighbors=k_neighbors,
-                        device=self.device,
-                        atom_context_num=self.atom_context_num,
-                        model_type=model_type,
-                        ligand_mpnn_use_side_chain_context=self.ligand_mpnn_use_side_chain_context)
+        model = ProteinMPNN(
+            node_features=128,
+            edge_features=128,
+            hidden_dim=128,
+            num_encoder_layers=3,
+            num_decoder_layers=3,
+            k_neighbors=k_neighbors,
+            device=self.device,
+            atom_context_num=self.atom_context_num,
+            model_type=model_type,
+            ligand_mpnn_use_side_chain_context=self.ligand_mpnn_use_side_chain_context,
+        )
 
-        # Determine if we're loading a default MPNN checkpoint or a custom checkpoint
-        is_default_checkpoint = ckpt_path in [PROTEIN_MPNN_CKPT_PATH, LIGAND_MPNN_CKPT_PATH]        
+        is_default_checkpoint = ckpt_path in [PROTEIN_MPNN_CKPT_PATH, LIGAND_MPNN_CKPT_PATH]
         ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=is_default_checkpoint)
         model.load_state_dict(ckpt["model_state_dict"], strict=False)
         return model.to(self.device)
 
     def get_optimizer(self):
-        """
-        Define optimizer over decoder params
-        """
-        
-        # turn off encoder weights
+        """Freeze encoder parameters and return an Adam optimizer over the decoder."""
+
         for name, param in self.model.named_parameters():
-            if "decoder_layers" in name or "W_out" in name:
-                continue
-            else:
+            if "decoder_layers" not in name and "W_out" not in name:
                 param.requires_grad = False
 
-
-        # only provide optimizer with unfrozen params
         optimizer = torch.optim.Adam(
             filter(lambda p: p.requires_grad, self.model.parameters()),
-            lr=self.cfg.lr
+            lr=self.cfg.lr,
         )
         return optimizer
 
     def featurize_pdb(self, pdb):
-        """
-        Get MPNN features from PDB file.
-        """
+        """Parse a PDB file and build the feature dictionary consumed by :meth:`rollout`."""
 
-        #parse PDB file
-        protein_dict, backbone, other_atoms, icodes, water_atoms = parse_PDB(pdb,
-                                                                            device=self.device, 
-                                                                            atom_context_num=self.atom_context_num, 
-                                                                            chains="",
-                                                                            parse_all_atoms=self.ligand_mpnn_use_side_chain_context)
+        protein_dict, backbone, other_atoms, icodes, water_atoms = parse_PDB(
+            pdb,
+            device=self.device,
+            atom_context_num=self.atom_context_num,
+            chains="",
+            parse_all_atoms=self.ligand_mpnn_use_side_chain_context,
+        )
 
         R_idx_list = list(protein_dict["R_idx"].cpu().numpy())
         chain_letters_list = list(protein_dict["chain_letters"])
-        encoded_residues = []
-        for i in range(len(R_idx_list)):
-            tmp = str(chain_letters_list[i]) + str(R_idx_list[i]) + icodes[i]
-            encoded_residues.append(tmp)
-        encoded_residue_dict = dict(zip(encoded_residues, range(len(encoded_residues))))
-        encoded_residue_dict_rev = dict(zip(list(range(len(encoded_residues))), encoded_residues))
+        encoded_residues = [
+            str(chain_letters_list[i]) + str(R_idx_list[i]) + icodes[i]
+            for i in range(len(R_idx_list))
+        ]
 
-
-        chain_mask = torch.tensor(np.array([True for item in protein_dict["chain_letters"]],dtype=np.int32), device=self.device)
+        chain_mask = torch.tensor(
+            np.array([True for _ in protein_dict["chain_letters"]], dtype=np.int32),
+            device=self.device,
+        )
         protein_dict["chain_mask"] = chain_mask
 
-        # fixed residues
         fixed_residues = [item for item in self.cfg.fixed_residues.split()]
-        fixed_positions = torch.tensor([int(item not in fixed_residues) for item in encoded_residues], device=self.device)
+        fixed_positions = torch.tensor(
+            [int(item not in fixed_residues) for item in encoded_residues],
+            device=self.device,
+        )
         if fixed_residues:
             protein_dict["chain_mask"] = protein_dict["chain_mask"] * fixed_positions
 
-            
         protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
 
-        # also from mpnn args
         omit_AA_list = self.cfg.omit_AA if self.cfg.omit_AA is not None else []
-        omit_AA = torch.tensor(np.array([AA in omit_AA_list for AA in alphabet]).astype(np.float32), device=self.device)
+        omit_AA = torch.tensor(
+            np.array([AA in omit_AA_list for AA in alphabet]).astype(np.float32),
+            device=self.device,
+        )
 
-        bias_AA_per_residue = torch.zeros([len(encoded_residues),21], device=self.device, dtype=torch.float32)
-        omit_AA_per_residue = torch.zeros([len(encoded_residues),21], device=self.device, dtype=torch.float32)
+        bias_AA_per_residue = torch.zeros([len(encoded_residues), 21], device=self.device, dtype=torch.float32)
+        omit_AA_per_residue = torch.zeros([len(encoded_residues), 21], device=self.device, dtype=torch.float32)
 
-        feature_dict = featurize(protein_dict,
-                                cutoff_for_score=self.ligand_mpnn_cutoff_for_score, 
-                                use_atom_context=self.ligand_mpnn_use_atom_context,
-                                number_of_ligand_atoms=self.atom_context_num,
-                                model_type=self.cfg.model_type)
+        feature_dict = featurize(
+            protein_dict,
+            cutoff_for_score=self.ligand_mpnn_cutoff_for_score,
+            use_atom_context=self.ligand_mpnn_use_atom_context,
+            number_of_ligand_atoms=self.atom_context_num,
+            model_type=self.cfg.model_type,
+        )
         feature_dict["batch_size"] = self.cfg.batch_size
-        B, L, _, _ = feature_dict["X"].shape #batch size should be 1 for now.
-        #----
+        B, L, _, _ = feature_dict["X"].shape
 
-        #add additional keys to the feature dictionary
         feature_dict["temperature"] = self.cfg.temperature
         bias_AA = torch.zeros([21], device=self.device, dtype=torch.float32)
-        feature_dict["bias"] = (-1e8*omit_AA[None,None,:]+bias_AA).repeat([1,L,1])+bias_AA_per_residue[None]-1e8*omit_AA_per_residue[None]
+        feature_dict["bias"] = (
+            (-1e8 * omit_AA[None, None, :] + bias_AA).repeat([1, L, 1])
+            + bias_AA_per_residue[None]
+            - 1e8 * omit_AA_per_residue[None]
+        )
 
         feature_dict["symmetry_residues"] = [[]]
         feature_dict["symmetry_weights"] = [[]]
-        #----
-
-        feature_dict["randn"] = torch.randn([feature_dict["batch_size"], feature_dict["mask"].shape[1]], device=self.device)
+        feature_dict["randn"] = torch.randn(
+            [feature_dict["batch_size"], feature_dict["mask"].shape[1]],
+            device=self.device,
+        )
 
         return feature_dict
 
@@ -227,57 +218,78 @@ class PolicyMPNN:
         h_nn = torch.cat([h_neighbors, h_nodes], -1)
         return h_nn
 
-    def rollout(self, 
-                feature_dict, 
-                h_V, 
-                h_E, 
-                E_idx,
-                decoding_order=None, # B, L
-                sampled_actions=None, # B, L
-                model=None
-            ):
-        """
-        Taken from fused proteinMPNN decoding, modified to allow grads to flow through this pass
+    def rollout(
+        self,
+        feature_dict,
+        h_V,
+        h_E,
+        E_idx,
+        decoding_order=None,
+        sampled_actions=None,
+        model=None,
+    ):
+        """Autoregressive decoding with gradients through the decoder.
+
+        Adapted from the fused ProteinMPNN decoding loop. Gradients flow
+        through the decoder layers so the RL loss can update decoder weights.
+        ``scatter`` is used instead of in-place indexing to keep the
+        computation graph intact.
+
+        Args:
+            feature_dict: Feature dictionary from :meth:`featurize_pdb`.
+            h_V: Node features from encoder [1, L, C].
+            h_E: Edge features from encoder [1, L, K, C].
+            E_idx: Edge indices [1, L, K].
+            decoding_order: Optional pre-defined decoding order [B, L].
+            sampled_actions: Optional pre-sampled sequence integers [B, L].
+                When provided, log-probs are computed for these actions
+                instead of sampling new ones (used by GRPO for importance
+                ratio computation).
+            model: Model to decode with (defaults to ``self.model``).
+
+        Returns:
+            dict with keys ``S``, ``sampling_probs``, ``log_probs``,
+            ``decoding_order``, ``state_features``, ``chain_mask``.
         """
 
-        # decode
         if model is None:
             model = self.model
 
         if sampled_actions is None:
             B_decoder = feature_dict["batch_size"]
-            S_true = feature_dict["S"] #[B,L] - integer proitein sequence encoded using "restype_STRtoINT
-            mask = feature_dict["mask"] #[B,L] - mask for missing regions - should be removed! all ones most of the time
-            chain_mask = feature_dict["chain_mask"] #[B,L] - mask for which residues need to be fixed; 0.0 - fixed; 1.0 - will be designed
-            bias = feature_dict["bias"] #[B,L,21] - amino acid bias per position
-            randn = feature_dict["randn"] #[B,L] - random numbers for decoding order; only the first entry is used since decoding within a batch needs to match for symmetry
-            temperature = feature_dict["temperature"] #float - sampling temperature; prob = softmax(logits/temperature)
-        
+            S_true = feature_dict["S"]
+            mask = feature_dict["mask"]
+            chain_mask = feature_dict["chain_mask"]
+            bias = feature_dict["bias"]
+            randn = feature_dict["randn"]
+            temperature = feature_dict["temperature"]
         else:
-            # when providing sampled actions, they may not be the same size as the featurized batch
             B_decoder = sampled_actions.shape[0]
-            S_true = sampled_actions #[B,L] - sampled sequence
-            mask = feature_dict["mask"][:1].repeat(B_decoder, 1) #[B_decoder,L]
-            chain_mask = feature_dict["chain_mask"][:1].repeat(B_decoder, 1) #[B_decoder,L]
-            bias = feature_dict["bias"][:1].repeat(B_decoder, 1, 1) #[B_decoder,L,21]
-            randn = feature_dict["randn"][:1].repeat(B_decoder, 1) #[B_decoder,L]
-            temperature = feature_dict["temperature"] #float - sampling temperature; prob = softmax(logits/temperature)
+            S_true = sampled_actions
+            mask = feature_dict["mask"][:1].repeat(B_decoder, 1)
+            chain_mask = feature_dict["chain_mask"][:1].repeat(B_decoder, 1)
+            bias = feature_dict["bias"][:1].repeat(B_decoder, 1, 1)
+            randn = feature_dict["randn"][:1].repeat(B_decoder, 1)
+            temperature = feature_dict["temperature"]
 
         B, L = S_true.shape
 
-        # else use the provided decoding order
         if decoding_order is None:
-            decoding_order = torch.argsort((chain_mask+0.0001)*(torch.abs(randn))) #[numbers will be smaller for places where chain_M = 0.0 and higher for places where chain_M = 1.0]
+            decoding_order = torch.argsort((chain_mask + 0.0001) * (torch.abs(randn)))
 
         E_idx = E_idx.repeat(B_decoder, 1, 1)
         permutation_matrix_reverse = torch.nn.functional.one_hot(decoding_order, num_classes=L).float()
-        order_mask_backward = torch.einsum('ij, biq, bjp->bqp',(1-torch.triu(torch.ones(L,L, device=self.device))), permutation_matrix_reverse, permutation_matrix_reverse)
+        order_mask_backward = torch.einsum(
+            'ij, biq, bjp->bqp',
+            (1 - torch.triu(torch.ones(L, L, device=self.device))),
+            permutation_matrix_reverse,
+            permutation_matrix_reverse,
+        )
         mask_attend = torch.gather(order_mask_backward, 2, E_idx).unsqueeze(-1)
         mask_1D = mask.view([B, L, 1, 1])
         mask_bw = mask_1D * mask_attend
         mask_fw = mask_1D * (1. - mask_attend)
 
-        #repeat for decoding
         S_true = S_true.repeat(B_decoder, 1)
         h_V = h_V.repeat(B_decoder, 1, 1)
         h_E = h_E.repeat(B_decoder, 1, 1, 1)
@@ -285,78 +297,66 @@ class PolicyMPNN:
         mask = mask.repeat(B_decoder, 1)
         bias = bias.repeat(B_decoder, 1, 1)
 
-        #-----
-
         all_probs = torch.zeros((B_decoder, L, 20), device=self.device, dtype=torch.float32)
         all_log_probs = torch.zeros((B_decoder, L, 21), device=self.device, dtype=torch.float32)
         h_S = torch.zeros_like(h_V, device=self.device)
-        S = 20*torch.ones((B_decoder, L), dtype=torch.int64, device=self.device)
+        S = 20 * torch.ones((B_decoder, L), dtype=torch.int64, device=self.device)
         h_V_stack = [h_V] + [torch.zeros_like(h_V, device=self.device) for _ in range(len(model.decoder_layers))]
 
         h_EX_encoder = self.cat_neighbors_nodes(torch.zeros_like(h_S), h_E, E_idx)
         h_EXV_encoder = self.cat_neighbors_nodes(h_V, h_EX_encoder, E_idx)
         h_EXV_encoder_fw = mask_fw * h_EXV_encoder
 
-
         for t_ in range(L):
+            t = decoding_order[:, t_]
+            chain_mask_t = torch.gather(chain_mask, 1, t[:, None])[:, 0]
+            mask_t = torch.gather(mask, 1, t[:, None])[:, 0]
+            bias_t = torch.gather(bias, 1, t[:, None, None].repeat(1, 1, 21))[:, 0, :]
 
-            t = decoding_order[:,t_] #[B]
-            chain_mask_t = torch.gather(chain_mask, 1, t[:,None])[:,0] #[B]
-            mask_t = torch.gather(mask, 1, t[:,None])[:,0] #[B]
-            bias_t = torch.gather(bias, 1, t[:,None,None].repeat(1,1,21))[:,0,:] #[B,21]
-
-
-            E_idx_t = torch.gather(E_idx, 1, t[:,None,None].repeat(1,1,E_idx.shape[-1]))
-            h_E_t = torch.gather(h_E, 1, t[:,None,None,None].repeat(1,1,h_E.shape[-2], h_E.shape[-1]))
+            E_idx_t = torch.gather(E_idx, 1, t[:, None, None].repeat(1, 1, E_idx.shape[-1]))
+            h_E_t = torch.gather(h_E, 1, t[:, None, None, None].repeat(1, 1, h_E.shape[-2], h_E.shape[-1]))
             h_ES_t = self.cat_neighbors_nodes(h_S, h_E_t, E_idx_t)
-            h_EXV_encoder_t = torch.gather(h_EXV_encoder_fw, 1, t[:,None,None,None].repeat(1,1,h_EXV_encoder_fw.shape[-2], h_EXV_encoder_fw.shape[-1]))
-
-            mask_bw_t = torch.gather(mask_bw, 1, t[:,None,None,None].repeat(1,1,mask_bw.shape[-2], mask_bw.shape[-1]))
+            h_EXV_encoder_t = torch.gather(h_EXV_encoder_fw, 1, t[:, None, None, None].repeat(1, 1, h_EXV_encoder_fw.shape[-2], h_EXV_encoder_fw.shape[-1]))
+            mask_bw_t = torch.gather(mask_bw, 1, t[:, None, None, None].repeat(1, 1, mask_bw.shape[-2], mask_bw.shape[-1]))
 
             for l, layer in enumerate(model.decoder_layers):
                 h_ESV_decoder_t = self.cat_neighbors_nodes(h_V_stack[l], h_ES_t, E_idx_t)
-                h_V_t = torch.gather(h_V_stack[l], 1, t[:,None,None].repeat(1,1,h_V_stack[l].shape[-1]))
+                h_V_t = torch.gather(h_V_stack[l], 1, t[:, None, None].repeat(1, 1, h_V_stack[l].shape[-1]))
                 h_ESV_t = mask_bw_t * h_ESV_decoder_t + h_EXV_encoder_t
-            
 
-                # JG: replaced mask_V with None, could be mask_t
-                # This line is causing issues with backprop because was an in-place operation
-                h_V_stack[l+1] = h_V_stack[l+1].scatter(1, t[:,None,None].repeat(1,1,h_V.shape[-1]), layer(h_V_t, h_ESV_t, mask_V=None))
+                # Uses scatter (not in-place indexing) so gradients flow through the decoder
+                h_V_stack[l+1] = h_V_stack[l+1].scatter(
+                    1, t[:, None, None].repeat(1, 1, h_V.shape[-1]),
+                    layer(h_V_t, h_ESV_t, mask_V=None),
+                )
 
+            h_V_t = torch.gather(h_V_stack[-1], 1, t[:, None, None].repeat(1, 1, h_V_stack[-1].shape[-1]))[:, 0]
 
-            h_V_t = torch.gather(h_V_stack[-1], 1, t[:,None,None].repeat(1,1,h_V_stack[-1].shape[-1]))[:,0]
+            logits = model.W_out(h_V_t)
+            log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
 
+            probs = torch.nn.functional.softmax((logits.detach() + bias_t) / temperature, dim=-1)
+            probs_sample = probs[:, :20] / torch.sum(probs[:, :20], dim=-1, keepdim=True)
 
-            logits = model.W_out(h_V_t) #[B,21]
-            log_probs = torch.nn.functional.log_softmax(logits, dim=-1) #[B,21]
-
-
-            # JG need to add code here to pick out specific samples
-            probs = torch.nn.functional.softmax((logits.detach()+bias_t) / temperature, dim=-1) #[B,21]
-
-            probs_sample = probs[:,:20]/torch.sum(probs[:,:20], dim=-1, keepdim=True) #hard omit X #[B,20]
-            
-            # if you are already provided with sampled sequence just grab what you need
             if sampled_actions is None:
-                S_t = torch.multinomial(probs_sample, 1)[:,0] #[B]
+                S_t = torch.multinomial(probs_sample, 1)[:, 0]
             else:
                 S_t = sampled_actions[torch.arange(B), t]
 
-            all_probs.scatter_(1, t[:,None,None].repeat(1,1,20), (chain_mask_t[:,None,None]*probs_sample[:,None,:]).float())
-            all_log_probs.scatter_(1, t[:,None,None].repeat(1,1,21), (chain_mask_t[:,None,None]*log_probs[:,None,:]).float())
+            all_probs.scatter_(1, t[:, None, None].repeat(1, 1, 20), (chain_mask_t[:, None, None] * probs_sample[:, None, :]).float())
+            all_log_probs.scatter_(1, t[:, None, None].repeat(1, 1, 21), (chain_mask_t[:, None, None] * log_probs[:, None, :]).float())
 
             with torch.no_grad():
-                S_true_t = torch.gather(S_true, 1, t[:,None])[:,0]
-                S_t = (S_t*chain_mask_t+S_true_t*(1.0-chain_mask_t)).long()
-                h_S.scatter_(1, t[:,None,None].repeat(1,1,h_S.shape[-1]), model.W_s(S_t)[:,None,:])
-                S.scatter_(1, t[:,None], S_t[:,None])
-
+                S_true_t = torch.gather(S_true, 1, t[:, None])[:, 0]
+                S_t = (S_t * chain_mask_t + S_true_t * (1.0 - chain_mask_t)).long()
+                h_S.scatter_(1, t[:, None, None].repeat(1, 1, h_S.shape[-1]), model.W_s(S_t)[:, None, :])
+                S.scatter_(1, t[:, None], S_t[:, None])
 
         output_dict = {
-            "S": S, 
-            "sampling_probs": all_probs, 
-            "log_probs": all_log_probs, 
-            "decoding_order": decoding_order, 
+            "S": S,
+            "sampling_probs": all_probs,
+            "log_probs": all_log_probs,
+            "decoding_order": decoding_order,
             "state_features": h_V_stack[-1].detach(),
             "chain_mask": chain_mask,
         }
@@ -364,159 +364,104 @@ class PolicyMPNN:
         return output_dict
     
     def get_sequences(self, policy_output, chain_mask=None):
-        """
-            Return list of sampled sequences
-        """
+        """Decode integer sequences from a rollout output into amino-acid strings."""
         sampled_sequences = policy_output["S"]
-
         if chain_mask is not None:
             sampled_sequences = sampled_sequences[:, chain_mask]
 
-        B = sampled_sequences.shape[0]
-        
-        sequences = [] 
-        for i in range(B):
-            seq = sampled_sequences[i]
-            seq_str = "".join([alphabet[int(s)] for s in seq])
+        sequences = []
+        for i in range(sampled_sequences.shape[0]):
+            seq_str = "".join([alphabet[int(s)] for s in sampled_sequences[i]])
             sequences.append(seq_str)
         return sequences
 
     def train_step(self, step, init_state, feature_dict):
-        """
-        Single training step given featurized example
-        """
+        """Run one REINFORCE update: rollout -> reward -> policy gradient."""
 
         to_log = {}
         self.optimizer.zero_grad()
 
         h_V_in, h_E_in, E_idx_in = init_state
-
-        # turn on grads for state features
         h_V_in.requires_grad = True
         h_E_in.requires_grad = True
 
-        # run the policy
         out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in)
 
-        # mask for what was actually decoded in the sequence
         seq_mask = torch.nn.functional.one_hot(out["S"], num_classes=len(alphabet)).float()
-
-        # apply mask and take sum over each seq in the batch
         batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1))
 
         batched_reward, metrics = self.reward_fn(step, out, feature_dict, self.device)
         to_log.update(metrics)
 
-        # get baseline first
-        # baseline = torch.stack(self.reward_history).mean()
         baseline = torch.tensor(self.reward_history, dtype=torch.float32, device=self.device).mean()
         self.reward_history.append(batched_reward.mean().item())
-
-        # baseline subtracted reward
         baseline_subtracted_reward = batched_reward - baseline
 
-        # batched_log_probs [B, L]
         if baseline_subtracted_reward.shape != batched_log_probs.shape:
-            # if reward is not per residue, we need to sum over log probs
             loss = -(batched_log_probs.sum(dim=-1) * baseline_subtracted_reward).mean()
         else:
-            # else reward is per residue, so apply per residue reward and then sum
             loss = -(batched_log_probs * baseline_subtracted_reward).sum(dim=-1).mean()
 
-        # optimizer update
         loss.backward()
         self.optimizer.step()
 
         to_log["loss"] = loss.detach().cpu().item()
         to_log["reward"] = batched_reward.mean().cpu().item()
-            
-        
+
         return to_log
 
     def train(self):
-        """
-        Run the main training loop
-        """
+        """Run the main training loop for ``N_steps`` iterations."""
 
-        # train loop
         start_time = time.time()
         for step in tqdm(range(self.cfg.N_steps), desc="Training"):
-
-            # set model to train mode
             self.model.train()
-
-            # featurize from input pdb (in future maybe policy is trained with a variety of pdbs)
             feature_dict = self.featurize_pdb(self.cfg.pdb)
-
-            # encode initial state (run mpnn encoder)
             h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
-
-            # clone initial state variables
             init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
-            
-            # train step
+
             to_log = self.train_step(step, init_state, feature_dict)
 
-            # metric logging
             runtime = time.time() - start_time
             self.log_metrics(step, runtime, to_log)
 
-            # model checkpointing
-            if step > 0 and  step % self.checkpoint_every_n_steps == 0:
+            if step > 0 and step % self.checkpoint_every_n_steps == 0:
                 self.checkpoint_model(step, to_log)
 
-        
         print("Training complete.")
         print(f"Best reward seen: {self.best_seen_reward:.4f} at step {self.step_at_best_seen_reward}")
 
     def log_metrics(self, step, runtime, to_log):
-        """
-        Log training metrics
-        """
-        metrics_to_log = [k for k,v in to_log.items() if isinstance(v, float)]
+        """Append one row to the CSV training log."""
+        metrics_to_log = [k for k, v in to_log.items() if isinstance(v, float)]
         log_path = os.path.join(self.output_dir, f"{self.run_name}_train_metrics.csv")
         if not os.path.exists(log_path):
-            with open(log_path,'w') as f:
-                f.write("step,runtime,"\
-                        +",".join([f"{m}" for m in metrics_to_log])\
-                        +'\n')
-        with open(log_path,'a') as f:
-            f.write(f"{step},{runtime:.4f},"\
-                    +",".join([f"{to_log[m]:.4f}" for m in metrics_to_log])\
-                    +'\n')
+            with open(log_path, 'w') as f:
+                f.write("step,runtime," + ",".join(metrics_to_log) + '\n')
+        with open(log_path, 'a') as f:
+            f.write(f"{step},{runtime:.4f}," + ",".join([f"{to_log[m]:.4f}" for m in metrics_to_log]) + '\n')
     
     def checkpoint_model(self, step, to_log):
-        """
-        Checkpoint model locally only
-        """
+        """Save ``_last``, ``_step_NNNN``, and (if improved) ``_best`` checkpoints."""
         curr_reward = to_log["reward"]
         ckpt = {
-                "config": dict(self.cfg),
-                "step": step,
-                "reward": curr_reward,
-                "model_state_dict": self.model.state_dict(),
-            }
+            "config": dict(self.cfg),
+            "step": step,
+            "reward": curr_reward,
+            "model_state_dict": self.model.state_dict(),
+        }
 
-        last_ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_last.pt")
-        torch.save(ckpt, last_ckpt_path)
-
-        step_ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_step_{step:04}.pt")
-        torch.save(ckpt, step_ckpt_path)
+        torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_last.pt"))
+        torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_step_{step:04}.pt"))
 
         if curr_reward > self.best_seen_reward:
             self.best_seen_reward = curr_reward
             self.step_at_best_seen_reward = step
-
-            best_ckpt_path = os.path.join(self.output_dir, f"{self.run_name}_best.pt")
-            torch.save(ckpt, best_ckpt_path)
-
-
+            torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_best.pt"))
 
     def sample_from_policy(self, num_batches):
-        """
-            Sample sequences from the policy
-        """
-    
+        """Sample sequences from the current policy without gradients."""
+
         with torch.no_grad():
             output_list = []
             for _ in tqdm(range(num_batches)):
@@ -525,9 +470,8 @@ class PolicyMPNN:
                 out = self.rollout(feature_dict, h_V, h_E, E_idx)
                 output_list.append(out)
 
-        # get all sequences
-        chain_mask = feature_dict["chain_labels"] == 0 # [1, L]
-        chain_mask = chain_mask[0] # [L,]
+        chain_mask = feature_dict["chain_labels"] == 0
+        chain_mask = chain_mask[0]
 
         sequences = []
         for out in output_list:

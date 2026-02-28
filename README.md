@@ -2,11 +2,36 @@
 
 Welcome to this tutorial for **Combinatorial Libraries to Explore and Optimize (CLEO)**! This guide will walk you through the process of designing protein libraries and using experimental data to guide exploration and optimization. The framework focuses on enhancing an already functional protein construct using experimental feedback.
 
+## 🛠️ Installation
+
+CLEO uses [uv](https://docs.astral.sh/uv/) for fast, reproducible Python environment management. Requires **Python ≥ 3.10**.
+
+```bash
+# 1. Install uv (if you don't have it already)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. Clone the repository
+git clone <repo-url> && cd cleo
+
+# 3. Create the virtual environment and install all dependencies
+uv sync              # CPU-only (includes Boltz for CPU inference)
+uv sync --extra cuda # GPU — adds CUDA acceleration for Boltz
+
+# 4. Activate the environment
+source .venv/bin/activate
+```
+
+After activation, all `python -m cleo.design.*` commands in this tutorial will work. The full pipeline (training, sampling, resampling, evaluation, DNA design) runs on CPU. GPU acceleration is only needed for faster Boltz structure predictions during training or evaluation.
+
+---
+<br><br>
+
 ## 🌐 Overview
 
 The two main themes of this workflow are:
 
 1. [**Library Design**](#-library-design)
+   - [Example data](#-example-data)
    - [Library constraints](#-library-constraints)
    - [Aligning proteinMPNN to rewards](#-aligning-proteinmpnn-to-rewards)
    - [Sampling and filtering sequence fragments](#-sampling-and-filtering-sequence-fragments)
@@ -18,6 +43,62 @@ The two main themes of this workflow are:
    - [Training sequence-to-function models](#-training-sequence-to-function-models)  
    - [Proposing batch of sequences to test next](#-proposing-batch-of-sequences-to-test-next)  
    - [Looping it all together](#-looping-it-all-together)
+
+---
+<br><br>
+
+## 📝 Naming Conventions
+
+Throughout the CLEO workflow, fragments and sequences follow consistent naming conventions. Adhering to these conventions ensures compatibility across all scripts.
+
+**Fragment names** follow the format: `{frag_num}.{unique_id}`
+- The first dot-delimited token is **always** the 1-indexed integer fragment number.
+- Everything after the first dot is a unique identifier (e.g. a zero-padded index, a hex hash, a descriptive label, or a combination).
+- Examples: `1.0003.a7b2c8d1`, `2.dist1.05ff28c9`, `3.topk.00`
+
+**Fragment dictionaries** (JSON) use the integer fragment number as the key:
+```json
+{
+  "1": [["1.0000.a1b2c3d4", "MGEEE..."], ["1.0001.e5f6a7b8", "MGEEE..."]],
+  "2": [["2.0000.c9d0e1f2", "IEEIR..."], ["2.0001.a3b4c5d6", "IEEIR..."]],
+  "3": [["3.0000.f7a8b9c0", "RKALE..."], ["3.0001.d1e2f3a4", "RKALE..."]]
+}
+```
+
+**Resampled sequence names** join the constituent fragment names with a connector string (default `___`):
+`1.0003.a7b2c8d1___2.0010.b5c6d7e8___3.0001.f9a0b1c2`
+
+These conventions are enforced by `sample_from_policy.py` (output), `resample_fragments.py` (input/output), `evaluate_sequences.py` (input), the analysis notebook (parsing), and `dna_fragment_design.py` (input parsing).
+
+---
+<br><br>
+
+## 📁 Example Data
+
+The `example_data/library_design/` folder contains template inputs and outputs for every pipeline step, so you can run any step independently without running the preceding ones:
+
+```
+example_data/library_design/
+├── test_run_1_w1/                   # Training outputs (weight=1 run)
+│   ├── test_run_1_w1_config.yaml
+│   ├── test_run_1_w1_train_metrics.csv
+│   ├── test_run_1_w1_best.pt
+│   └── test_run_1_w1_step_*.pt
+├── test_run_1_w10/                  # Training outputs (weight=10 run)
+│   └── ...
+├── sampled_sequences/               # Output of sample_from_policy
+│   ├── example.fasta                #   Full-length sampled sequences
+│   ├── example_fragments.json       #   Fragment dictionary
+│   └── example_{1..5}.fasta         #   Per-region fragment FASTAs
+├── resampled_sequences/             # Output of resample_fragments
+│   └── example_resampled.fasta      #   Combinatorial resampled sequences
+├── evaluation_results/              # Output of evaluate_sequences
+│   ├── example_evaluation.csv       #   Per-sequence metrics CSV
+│   └── example_fragments.json       #   Fragment dict (for analysis notebook)
+└── dna_utils/                       # Input for dna_fragment_design
+    ├── input_example.fa             #   Example protein fragment FASTA
+    └── input_example.csv            #   Example protein fragment CSV
+```
 
 ---
 <br><br>
@@ -37,7 +118,7 @@ We have found that it does not matter too much where the splits occur, even spli
 
 Assembling the fragments *in vitro* requires orhtogonal overhangs. [NEB Golden Gate Assembly](https://www.neb.com/en-us/nebinspired-blog/getting-started-with-golden-gate) requires designing 4 base pair overhangs that are unique to each junction. To facilitate this we recommend fixing 2 amino acids at the start and end of each fragment (which correspond to 12 base pair stretch to search for compatible overhangs within).
 
-Fixing other residues which may be critical for function is easy to do in the config file. We provide an example config file: [`denovo_petase.yaml`](../library_design/config/denovo_petase.yaml) for PETase here with more details on how to setup your own run.
+Fixing other residues which may be critical for function is easy to do in the config file. We provide an example config file: [`denovo_petase.yaml`](config/design/denovo_petase.yaml) for PETase here with more details on how to setup your own run.
 
 ## 🎯 Aligning proteinMPNN to rewards:
 
@@ -45,13 +126,13 @@ Fixing other residues which may be critical for function is easy to do in the co
 
 [Group relative policy optimization (GRPO)](https://arxiv.org/pdf/2402.03300) is the finetuning framework we use to align proteinMPNN to custom reward functions. Given a backbone, proteinMPNN will propose sequences, these sequences will then be evaluated by reward functions (including: structure prediction oracle, distance to reference, etc.), and finally the model is updated to increase the likelihood of sampling sequences with good rewards.
 
-The [**config**](../library_design/config/denovo_petase.yaml) should serve as a template for how to setup your own run. Below we will break down some of the key components to consider, but please refer to the config file for more details.
+The [**config**](config/design/denovo_petase.yaml) should serve as a template for how to setup your own run. Below we will break down some of the key components to consider, but please refer to the config file for more details.
 
 
 ### Defining steps for reward function
 To evaluate sequences we will need to define a series of steps to analyze the sequences proposed by proteinMPNN. These steps will be defined in the `reward.steps` section of the config. Each step is configured with the following fields:
 - `name`: A unique name for the step.
-- `target_fn`: The function to call to perform the analysis (should live in [`library_design/utils`](../library_design/utils/) folder).
+- `target_fn`: The function to call to perform the analysis (should live in [`cleo/design/utils`](src/cleo/design/utils/) folder).
 - `cfg`: Parameters needed for the function.
 
 Each step function will have the following structure:
@@ -72,7 +153,7 @@ def step_fn(df_input: pd.DataFrame, cfg: Dict, step_name="step") -> pd.DataFrame
    
 ```
 
-For the PETase optimization we folded the sequences with a structure prediction oracle, measured a variety of distances between atoms involved with catalytic activity, and computed hamming distance of the sampled sequence to reference sequences (this can all be found in the example config: [`denovo_petase.yaml`](../library_design/config/denovo_petase.yaml)).
+For the PETase optimization we folded the sequences with a structure prediction oracle, measured a variety of distances between atoms involved with catalytic activity, and computed hamming distance of the sampled sequence to reference sequences (this can all be found in the example config: [`denovo_petase.yaml`](config/design/denovo_petase.yaml)).
 
 The list of steps will be run consecutively, with the output of one step being passed as the input to the next step. Each step will add new columns to the dataframe containing the results of the analysis. Be sure to order your step functions in such a way that you can access the results of previous steps in later steps if needed.
 
@@ -92,39 +173,90 @@ For each metrics you wish to optimize, we first normalize it to the range `[0,1]
 Once your config file is setup, you can launch the training run with the following command:
 
 ```bash
-# Placeholder for training command
+python -m cleo.design.train_policy --config-name denovo_petase
 ```
-Checkout the notebook [`library_design_track_training.ipynb`](notebooks/library_design_track_training.ipynb) to see what tracking an example training run looks like.
+
+The training script will create an output directory (configured by `output_dir` and `run_name`) containing:
+- `{run_name}_train_metrics.csv` — per-step training metrics
+- `{run_name}_config.yaml` — a copy of the config used
+- `{run_name}_step_NNNN.pt` — periodic checkpoints
+- `{run_name}_best.pt` / `{run_name}_last.pt` — best and final checkpoints
+
+Example training output from two runs with different distance-to-reference weights can be found in [`example_data/library_design/test_run_1_w1/`](example_data/library_design/test_run_1_w1/) and [`example_data/library_design/test_run_1_w10/`](example_data/library_design/test_run_1_w10/).
+
+Checkout the notebook [`library_design_monitor_training.ipynb`](notebooks/library_design_monitor_training.ipynb) to see what tracking an example training run looks like.
 
 ## 🎲 Sampling and Filtering Sequence Fragments
-Once you have a few training runs that have converged you can sample sequences from them. Let's say you are interested in ordering **384** options per fragment, it would be good to sample well above **384** sequences so that we can filter down later. For example it might be good to sample **5,000** sequences and split them up into the fragment bounds previously defined so that you have **5,000** options per fragment. Some of these fragments will be duplicates, but this should provide plenty of sequences for which you can filter down. 
 
-To filter the options down to a final set to be ordered, new combinations of fragments can be sampled *in silico*. The goal of sampling and filtering in silico here is to find the set of fragments which appear to be most compatible with one another. By sampling a large set of new sequences where each fragment is used **~10** times, we can get an estimate of how valuable each fragment is. Once these seqeuences are assessed for a variety of metrics important to the problem, we can then aggregate the metrics from sequence level to fragment level. This can be done by finding all these full length sequences which contain a particular fragment and averaging the metrics for those full length sequences.
+Once you have a few training runs that have converged you can sample sequences from them. The pipeline has three steps: **sample** fragments from trained checkpoints, **resample** new combinatorial sequences, and **evaluate** them with metrics.
 
-Follow the notebook [`library_design_sampling_filtering.ipynb`](notebooks/library_design_sampling_filtering.ipynb) for example code to sample sequences from the optimized proteinMPNN model, split sequences into fragments, resampling a list of new sequences to evaluation, and aggregating metrics from sequence to fragment level.
+Each step can be run independently using the provided example data — you do not need to run the full pipeline sequentially.
 
-In addition to ranking the final fragments by filters, it is important to think through other constraints at this stage including:
+### Step 1: Sample sequences from trained checkpoints
+
+```bash
+python -m cleo.design.sample_from_policy --config-name sample
+```
+
+This loads one or more checkpoints (configured in [`config/design/sample.yaml`](config/design/sample.yaml)), samples sequences from the policy, splits them into fragments, and writes:
+- `{output_name}.fasta` — full-length sequences
+- `{output_name}_fragments.json` — fragment dictionary (keyed by fragment number)
+- `{output_name}_{N}.fasta` — per-region fragment FASTA files
+
+Example output: [`example_data/library_design/sampled_sequences/`](example_data/library_design/sampled_sequences/)
+
+### Step 2: Resample combinatorial sequences from fragments
+
+```bash
+python -m cleo.design.resample_fragments --config-name resample_fragments
+```
+
+Takes the fragment dictionary JSON and generates new full-length sequences by sampling one fragment per region with inverse-count weighting for uniform coverage. See [`config/design/resample_fragments.yaml`](config/design/resample_fragments.yaml) for configuration.
+
+Example output: [`example_data/library_design/resampled_sequences/example_resampled.fasta`](example_data/library_design/resampled_sequences/example_resampled.fasta)
+
+### Step 3: Evaluate resampled sequences
+
+```bash
+python -m cleo.design.evaluate_sequences --config-name evaluate
+```
+
+Runs the resampled sequences through the same metric pipeline used during training and outputs a CSV with all computed metrics. The steps are configured in [`config/design/evaluate.yaml`](config/design/evaluate.yaml) using the same format as `reward.steps` in the training config.
+
+Example output: [`example_data/library_design/evaluation_results/example_evaluation.csv`](example_data/library_design/evaluation_results/example_evaluation.csv)
+
+### Step 4: Fragment-level analysis
+
+Open the notebook [`library_design_fragment_analysis.ipynb`](notebooks/library_design_fragment_analysis.ipynb) to aggregate the evaluation metrics from sequence level to fragment level, rank the top-k fragments per region, and export them to FASTA for ordering. The notebook requires the evaluation CSV and fragment dictionary JSON as inputs — examples of both are in [`example_data/library_design/evaluation_results/`](example_data/library_design/evaluation_results/).
+
+### Filtering considerations
+
+In addition to ranking the final fragments by metrics, it is important to think through other constraints at this stage including:
 - Sampling a uniform range of mutations **(1-8)** per fragment from the parent fragment.
-- Maximizing the number of unique mutations present in the fragments to ensure better sequence space coverage. 
+- Maximizing the number of unique mutations present in the fragments to ensure better sequence space coverage.
 
 
 ## 🧬 Reverse Translation and Order Preparation
 
-Reverse translating protein sequences into DNA sequences is the final step before ordering. As discussed earlier in the [library constraints](#-library-constraints) section, it is important to have 2 fixed amino acids at the start and end of each fragment to allow for orthogonal overhang design. 
+Reverse translating protein sequences into DNA sequences is the final step before ordering. As discussed earlier in the [library constraints](#-library-constraints) section, it is important to have 2 fixed amino acids at the start and end of each fragment to allow for orthogonal overhang design.
 
-To reverse translate protein fragments to DNA, run [`dna_fragment_design.py`](src/cleo/design/dna_utils/dna_fragment_design.py). As inputs, you may use either a csv or fasta file. 
+### Step 5: Reverse translate fragments to DNA
 
-Example csv input file: [`input_example.csv`](src/cleo/design/dna_utils/input_example.csv)
+```bash
+python -m cleo.design.dna_utils.dna_fragment_design --config-name dna_fragment_design
+```
 
-Example fasta input file: [`input_example.fa`](src/cleo/design/dna_utils/input_example.fa)
+Takes amino acid fragment sequences (FASTA and/or CSV) and produces codon-optimized DNA with Golden Gate assembly adapters. See [`config/design/dna_fragment_design.yaml`](config/design/dna_fragment_design.yaml) for configuration including vector and enzyme settings.
 
-Script usage for csv input: `dna_fragment_design.py --csv input_example.csv`
+Example input files:
+- FASTA: [`example_data/library_design/dna_utils/input_example.fa`](example_data/library_design/dna_utils/input_example.fa)
+- CSV: [`example_data/library_design/dna_utils/input_example.csv`](example_data/library_design/dna_utils/input_example.csv)
 
-Script usage for fasta input: `dna_fragment_design.py --fasta input_example.fa`
+The script outputs a CSV and FASTA of the final DNA fragments with adapters attached.
 
-After reverse translation, it is important to do some spot checks to ensure that the fragments will assemble as expected. Tools such as [Benchling assembly wizard](https://help.benchling.com/hc/en-us/articles/39656605989901-Create-assemblies-with-the-assembly-wizard#h_01K5CNZJ7W0BTTE21S5R7V851Y) and [NEB golden gate assembly tool](https://goldengate.neb.com/#!/) are  helpful for this.
+After reverse translation, it is important to do some spot checks to ensure that the fragments will assemble as expected. Tools such as [Benchling assembly wizard](https://help.benchling.com/hc/en-us/articles/39656605989901-Create-assemblies-with-the-assembly-wizard#h_01K5CNZJ7W0BTTE21S5R7V851Y) and [NEB golden gate assembly tool](https://goldengate.neb.com/#!/) are helpful for this.
 
-When ordering the DNA fragments it is possible to order as a pool with unique primer pairs for each fragment, or ordering individual oligos on a plate. Having each fragment in a seperate well will make it easy to assembly any construct of your choice.
+When ordering the DNA fragments it is possible to order as a pool with unique primer pairs for each fragment, or ordering individual oligos on a plate. Having each fragment in a separate well will make it easy to assemble any construct of your choice.
 
 ---
 <br><br>
@@ -192,37 +324,37 @@ Now that you have a model trained on all of the data available, it is time to pr
 
 For larger libraries where it may be computationally intractable to make a prediction for every variant, we follow [Daulton et. al.](https://arxiv.org/abs/2210.10199) who propose a framework to optimize an acquisition function over discrete space. We have modified their original implementation to operte over the fragment space. As they discuss in the paper, traditional gradient optimization through the acquisition function will not work as the space we are able to draw samples from is discrete (and in our case not just amino acid level discrete but fragment level). Running this optimization procedure requires that you have a JSON file saved of all the fragment options available to you (see the expected format of the JSON below). 
 
-In some of the provided notebooks you will often see `fragment_dictionary` which refers to a dictionary with the following format where the keys correspond to the number fragment and the values are a list of tuples with the name and seqeuence for each fragment.
+In some of the provided notebooks you will often see `fragment_dictionary` which refers to a dictionary with the following format where the keys are the integer fragment number (as a string) and the values are a list of `[name, sequence]` pairs. Fragment names follow the convention `{frag_num}.{unique_id}` — the first dot-delimited token is always the fragment number.
 
 ```json
 {
   "1": [
       [
-          "fragment_one_0000",
+          "1.0000.a1b2c3d4",
           "MGEEEELELERPSGERTPVRRHRFPARKANNFEEAVANVERL"
       ],
       [
-          "fragment_one_00001",
+          "1.0001.e5f6a7b8",
           "MGEEEELELTRPSGERTPVRRFTVPARKANNFEDAVANHERL"
       ]
   ],
   "2": [
       [
-          "fragment_two_0000",
+          "2.0000.c9d0e1f2",
           "IEEIRAAGVDFSARKERAVVVGYSLGVVTGMIMFATGTDFIEAL"
       ],
       [
-          "fragment_two_0001",
+          "2.0001.a3b4c5d6",
           "IEQIRAAGVDFSARKERAVVVGYSLGTITGMIMFATGTDYIEAL"
       ]
   ],
   "3": [
       [
-          "fragment_three_0000",
+          "3.0000.f7a8b9c0",
           "RKALEIGKKVVEEDPEFMERHRKIVTDGNRAEIREDIDYWIE"
       ],
       [
-          "fragment_three_0001",
+          "3.0001.d1e2f3a4",
           "RKALEIGKKVDEEDPDYMERHKKIYRDGNMAEIRKDIDYYIE"
       ]
   ]
@@ -236,7 +368,7 @@ The optimizer uses a simple acquisition function which rewards both upper confid
 
 Now you can run the loop: test → train → propose !
 
-We often see that the measured activity can plateau after 4 or 5 rounds of optimization. At this point you can use the data collected to design another library if desired. A template for this is provided in the config file [`denovo_petase_with_predictor.yaml`](../library_design/config/denovo_petase_round2.yaml).
+We often see that the measured activity can plateau after 4 or 5 rounds of optimization. At this point you can use the data collected to design another library if desired. A template for this is provided in the config file [`denovo_petase_with_predictor.yaml`](config/design/denovo_petase.yaml).
 
 
 <br>
