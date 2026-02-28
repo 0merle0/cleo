@@ -1,4 +1,4 @@
-# CLEO 🦠🚀
+# CLEO 🦠 🚀
 
 **Combinatorial Libraries to Explore and Optimize (CLEO)** is a framework for designing protein libraries and using experimental data to guide exploration and optimization. It focuses on enhancing an already functional protein construct using experimental feedback. See the [Workflow Tutorial](#-overview) below for a full walkthrough.
 
@@ -26,7 +26,7 @@ After activation, all `python -m cleo.design.*` commands in this tutorial will w
 ---
 <br><br>
 
-## 🌐 Overview
+## 🌐 Workflow Tutorial
 
 The two main themes of this workflow are:
 
