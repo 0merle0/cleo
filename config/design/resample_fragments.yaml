@@ -1,0 +1,19 @@
+# Config for resampling combinatorial sequences from a fragment dictionary
+#
+# Usage:
+#   python -m cleo.design.resample_fragments --config-name resample_fragments
+#
+# Takes a fragment dictionary JSON (output of sample_from_policy.py) and generates
+# new full-length sequences by combinatorially sampling one fragment per region.
+# Fragments are sampled with inverse-count weighting to ensure uniform coverage.
+
+fragment_dict_path: ${hydra:runtime.cwd}/example_data/library_design/sampled_sequences/example_fragments.json
+
+num_sequences: 100000  # number of combinatorial sequences to generate
+
+# Connector string used to join fragment names in the FASTA header.
+# e.g. "frag1___frag2___frag3___frag4___frag5"
+connector: "___"
+
+output_dir: ${hydra:runtime.cwd}/resampled_sequences
+output_name: resampled

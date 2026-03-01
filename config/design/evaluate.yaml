@@ -1,0 +1,54 @@
+# Config for evaluating sampled sequences through the metric pipeline
+#
+# Usage:
+#   python -m cleo.design.evaluate_sequences --config-name evaluate
+#
+# Takes a FASTA file of sequences and runs them through the same step-based
+# pipeline used during training (e.g. Boltz folding, petase metrics, distance
+# to reference sequences, etc.). Outputs a CSV with all computed metrics.
+
+input_fasta: ${hydra:runtime.cwd}/example_data/library_design/resampled_sequences/example_resampled.fasta
+
+output_dir: ${hydra:runtime.cwd}/evaluation_results
+output_name: evaluation_results
+
+# Metric pipeline steps — same format as reward.steps in the training config.
+# Each step has a name, a target function, and a cfg dict.
+# Steps run in order, each augmenting the DataFrame with new columns.
+steps:
+
+  - name: boltz
+    target_fn: cleo.design.utils.oracle.boltz_from_df
+    cfg:
+      run_dir: null  # set automatically by the script
+      template_path: ${hydra:runtime.cwd}/templates/oracle/boltz_template_for_petase_with_pet_dimer.yaml
+
+  - name: petase_metrics
+    target_fn: cleo.design.utils.petase.add_petase_metrics_to_df
+    cfg:
+      ref_step: boltz
+      cat_res_ser: 66
+      cat_res_his: 107
+      cat_res_asp: 122
+      oxhres1: 198
+      oxhres2: 67
+      ester_atom_list: [["C35","O25","O31"], ["C36","O26","O32"]]
+      dihedrals: [[["A",107,"NE2"], ["A",66,"OG"], ["B",1,"C35"], ["B",1,"O31"]], [["A",107,"NE2"], ["A",66,"OG"], ["B",1,"C36"], ["B",1,"O32"]]]
+      ref_str: ${hydra:runtime.cwd}/templates/structure/momi_petase_reference_structure.pdb
+      ref_protein_chain_id: A
+      ref_ligand_chain_id: X
+      des_protein_chain_id: A
+      des_ligand_chain_id: B
+      ref_ligand_atom_names: ["C13","O2","C1","O1","C10","C8","C7","C9","C11","C6","C5","O4","O3","C4","C3","O6","C14","O7","C15","O8","C16","C21","C20","C17","C18","C19","C22","O9","O10","C23","C24","O11"]
+      design_ligand_atom_name_orders: [
+        ["C53","O31","C35","O25","C47","C42","C38","C41","C37","C45","C33","O23","O29","C51","C49","O27","C54","O32","C36","O26","C48","C43","C39","C44","C40","C46","C34","O24","O30","C52","C50","O28"],
+        ["C54","O32","C36","O26","C48","C43","C39","C44","C40","C46","C34","O24","O30","C52","C50","O28","C53","O31","C35","O25","C47","C42","C38","C41","C37","C45","C33","O23","O29","C51","C49","O27"]
+      ]
+
+  - name: dist_to_ref_seqs
+    target_fn: cleo.design.utils.sequence.compute_dist_to_ref_seqs_from_df
+    cfg:
+      ref_seqs:
+        - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDNARIFIATTVEEAVELARRAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+        - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIQKETGHKVDKSRIFIAETVEEAIELARQAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+        - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDRSRIFIAETVEEAVELAARAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA

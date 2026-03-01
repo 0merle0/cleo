@@ -1,0 +1,51 @@
+# Config for reverse-translating protein fragments to DNA for ordering
+#
+# Usage:
+#   python -m cleo.design.dna_utils.dna_fragment_design --config-name dna_fragment_design
+#
+# Takes amino acid fragment sequences (FASTA and/or CSV) and produces codon-optimized
+# DNA sequences with Golden Gate assembly adapters ready for ordering.
+#
+# IMPORTANT:
+#   - This script assumes Golden Gate assembly using BsaI (Type IIS restriction enzyme).
+#     The included overhang fidelity matrix is specific to BsaI-HFv2. If you are using
+#     a different enzyme (e.g. BbsI, SapI), you will need to provide a matching fidelity
+#     matrix and update the enzyme entry in your vector JSON file.
+#
+#   - The vector JSON file defines your expression vector's sticky ends, N/C-terminal
+#     tags, and which enzyme it uses. You MUST edit vector_json_path (or create your own
+#     JSON file) to match the vector system in your lab. The included example is a
+#     placeholder — see the full lab vector library for real entries.
+#
+#   - The fidelity CSV is a 256x256 overhang compatibility matrix. The default is for
+#     BsaI-HFv2 at 37°C with 16-cycle ligation. Replace it if your assembly conditions
+#     differ.
+
+# Input fragment files — provide one or both.
+# FASTA headers MUST follow the convention: {frag_num}.{unique_id}
+# where frag_num is a 1-indexed integer (e.g. "1.0003.a7b2c8d1").
+# The first dot-delimited token is parsed as the fragment number.
+# CSV should have columns: fragment_name, fragment_sequence, fragment_number
+fasta:
+  - ${hydra:runtime.cwd}/example_data/library_design/dna_utils/input_example.fa
+csv: null
+# csv:
+#   - ${hydra:runtime.cwd}/example_data/library_design/dna_utils/input_example.csv
+
+# Vector and enzyme configuration
+# Edit this to point to your lab's vector JSON file with your specific vector entries.
+vector_json_path: ${hydra:runtime.cwd}/src/cleo/design/dna_utils/vectors_enzymes_example.json
+vector: example_vector_1  # name of the vector plasmid — must match a key in the JSON
+
+# BsaI-HFv2 overhang fidelity matrix (37°C, 16-cycle ligation).
+# Replace if using a different enzyme or ligation protocol.
+fidelity_csv: ${hydra:runtime.cwd}/src/cleo/design/dna_utils/bsai_overhang_fidelity.csv
+
+# Number of overlapping amino acids between adjacent fragments
+overlap_len: 4
+
+# Target organism for codon optimization
+species: e_coli  # e_coli or h_sapiens
+
+output_dir: ${hydra:runtime.cwd}/dna_fragment_output
+output_name: frag_dna_output

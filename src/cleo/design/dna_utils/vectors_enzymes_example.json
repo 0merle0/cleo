@@ -1,0 +1,9 @@
+{
+"enzymes":{
+"BsaI":["ggtctc", "gagacc", 1, 4]
+},
+
+"vectors":{
+"example_vector_1":{"Enzyme":"BsaI","Nterm-tag":"MSG","Cterm-tag":"GSGSHHWGSTHHHHHH","5'-sticky":"agga","3'-sticky":"ggttcc","description":"C-term SNAC-His"}
+}
+}

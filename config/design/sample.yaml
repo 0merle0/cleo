@@ -1,0 +1,39 @@
+# Config for sampling sequences from trained policy checkpoints
+#
+# Usage:
+#   python -m cleo.design.sample_from_policy --config-name sample
+#
+# The script loads model configuration (model_type, temperature, fixed_residues, etc.)
+# directly from each checkpoint file. You only need to specify what to sample and where
+# to save the results.
+
+output_dir: ${hydra:runtime.cwd}/sampled_sequences
+output_name: sampled  # prefix for output files
+
+# List of checkpoint .pt files to sample from.
+# Each entry is a path to a checkpoint file saved during training.
+# The script will load the training config from the checkpoint automatically.
+checkpoints:
+  - ${hydra:runtime.cwd}/example_data/library_design/test_run_1_w1/test_run_1_w1_step_0100.pt
+  - ${hydra:runtime.cwd}/example_data/library_design/test_run_1_w10/test_run_1_w10_step_0100.pt
+
+num_batches: 8  # number of sampling batches per checkpoint to sample
+batch_size: null  # override batch size from checkpoint config (null = use checkpoint's value)
+temperature: null  # override sampling temperature (null = use checkpoint's value)
+
+# Override the PDB path stored in the checkpoint config.
+# NOTE: checkpoint files store the absolute PDB path from the machine where training ran.
+# If you are running on a different machine or the path has changed, you MUST set this
+# to the correct path. If null, the script will use whatever path is in the checkpoint.
+pdb: ${hydra:runtime.cwd}/templates/structure/momi_petase_reference_structure.pdb
+
+# Fragment bounds for splitting sampled sequences into fragments.
+# Each entry is [start_index, end_index] (inclusive, 0-indexed).
+# If null, only full sequences are saved (no fragment splitting).
+# Example for petase with 5 fragments:
+fragment_bounds:
+  - [0, 41]
+  - [42, 85]
+  - [86, 127]
+  - [128, 164]
+  - [165, 208]
