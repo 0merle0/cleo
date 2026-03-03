@@ -1,0 +1,21 @@
+# Config for running ensemble predictions on a FASTA file
+#
+# Usage:
+#   python -m cleo.optimize.predict_fasta --config-name pred_fasta
+#
+# Loads a trained ensemble checkpoint, runs batched inference on all sequences
+# in the FASTA file, and saves per-sequence mean and variance predictions to CSV.
+
+run_name: predictions
+
+# Path to the directory containing the checkpoint and config.yaml
+model_base_path: null     # e.g. ./ckpt/my_run/my_run.2025-12-15/
+
+# Output directory for predictions CSV
+outdir: ${hydra:runtime.cwd}/predictions
+
+# Path to input FASTA file
+fasta_path: null          # e.g. ./resampled_sequences/resampled.fasta
+
+batch_size: 256
+ckpt_name: "last.ckpt"

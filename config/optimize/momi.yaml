@@ -1,0 +1,20 @@
+# MoMI surrogate training config
+#
+# Usage:
+#   python -m cleo.optimize.train_surrogate --config-name momi
+#
+# Inherits shared defaults from base_surrogate.yaml and sets MoMI-specific
+# dataset path and input dimension (209 residues * 20 = 4180).
+
+defaults:
+  - base_surrogate
+  - _self_
+
+run_name: momi_surrogate
+
+data:
+  dataset: data/momi/251225_processed_filtered_data_round0_round1_round2_round3_with_val.csv
+
+model:
+  base_model:
+    input_dim: 4180          # 209 residues * 20 amino acids

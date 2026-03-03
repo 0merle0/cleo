@@ -1,0 +1,62 @@
+# Base config for training ensemble surrogate models
+#
+# This file defines shared defaults. Do not use directly — instead create a
+# config that inherits from it:
+#
+#   defaults:
+#     - base_surrogate
+#
+# Then override dataset-specific fields (data.dataset, input_dim, etc.).
+#
+# Key parameters to customize per dataset:
+#   - data.dataset: path to your CSV dataset
+#   - data.dataset_cfg.label_col: name of the activity column to predict
+#   - data.dataset_cfg.seq_col: name of the sequence column
+#   - model.base_model.input_dim: seq_length * 20 (one-hot encoded)
+#   - model.base_model.hidden_dim: hidden layer size (sweep [4, 128])
+
+debug: false
+run_name: RUN_NAME
+
+trainer:
+  max_epochs: 200
+  log_every_n_steps: 10
+  check_val_every_n_epoch: 1
+
+checkpointer:
+  monitor: val/nll
+  mode: min
+
+data:
+  dataset: null              # path to CSV dataset (required)
+  train_batch_size: 64
+  val_batch_size: 32
+  num_workers: 1
+  validation_mode: label     # label (boolean column), or null (no validation)
+  val_label: val             # name of the boolean validation column
+  dataset_cfg:
+    input_type: sequence     # only "sequence" (one-hot) is supported
+    label_col: z_score_norm_rate
+    seq_col: sequence
+
+model:
+  lr: 1e-4
+  num_models: 10
+  base_model:
+    model_type: mlp              # mlp, linear, or potts
+    input_dim: null              # seq_length * 20 (required)
+    hidden_dim: 16               # hidden layer size — sweep [4, 128]
+    output_dim: 1
+    kernel_size: 5               # only used for conv1d
+    p_drop: 0.2
+    predict_variance: true
+    variance_transform: softplus # softplus, sigmoid, or clamp
+    fixed_variance: 1.0          # used when predict_variance is false
+    output_head_type: mlp        # mlp or linear
+    stop_grad_variance: false
+    use_two_body: true           # only used for potts model
+  loss:
+    mse_weight: 0
+    nll_weight: 1
+    regularization_order: 2
+    regularization_lambda: 0.0

@@ -1,0 +1,58 @@
+debug: false
+run_name: momi_mlp_round3
+trainer:
+  max_epochs: 200
+  log_every_n_steps: 1000
+  check_val_every_n_epoch: 1
+checkpointer:
+  monitor: val/nll
+  mode: min
+data:
+  dataset: data/momi/251225_processed_filtered_data_round0_round1_round2_round3_with_val.csv
+  train_batch_size: 64
+  val_batch_size: 32
+  num_workers: 1
+  validation_mode: label
+  top_k_validation: 384
+  val_label: val
+  val_size: 0.1
+  seed: 123
+  dataset_cfg:
+    input_type: sequence
+    label_col: z_score_norm_rate
+    name_col: name
+    seq_col: sequence
+    input_shape: BD
+    split_fragments_on: null
+    path_connecting_variable: null
+    num_fragments_in_subfolder: null
+    num_fragments: null
+    fragment_csv: null
+    path_to_embeddings: null
+    embedding_key: null
+model:
+  lr: 0.0001
+  num_models: 10
+  base_model:
+    model_type: mlp
+    input_dim: 4180
+    hidden_dim: 16
+    output_dim: 1
+    kernel_size: 5
+    p_drop: 0.2
+    predict_variance: true
+    variance_transform: softplus
+    fixed_variance: 1.0
+    output_head_type: mlp
+    stop_grad_variance: false
+    use_two_body: true
+  loss:
+    mse_weight: 0
+    nll_weight: 1
+    regularization_order: 2
+    regularization_lambda: 0.0
+  top_k_accuracy:
+  - 10
+  - 20
+  - 40
+  ckpt_dir: ./ckpt/momi_mlp_round3/momi_mlp_round3.2025-12-25-19-18-59

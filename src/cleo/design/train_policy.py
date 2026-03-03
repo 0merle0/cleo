@@ -10,10 +10,14 @@ Usage:
     python -m cleo.design.train_policy --config-name denovo_petase
 """
 
+from pathlib import Path
+
 import hydra
 
+_CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/design")
 
-@hydra.main(version_base=None, config_path="../../../config/design")
+
+@hydra.main(version_base=None, config_path=_CONFIG_DIR)
 def train_policy(cfg):
     """Launch a training run using the algorithm specified in *cfg*."""
 

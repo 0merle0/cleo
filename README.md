@@ -1,6 +1,6 @@
 # CLEO 🦠 🚀
 
-**Combinatorial Libraries to Explore and Optimize (CLEO)** is a framework for designing protein libraries and using experimental data to guide exploration and optimization. It focuses on enhancing an already functional protein construct using experimental feedback. See the [Workflow Tutorial](#-overview) below for a full walkthrough.
+**Combinatorial Libraries to Explore and Optimize (CLEO)** is a framework for designing protein libraries and using experimental data to guide exploration and optimization. It focuses on enhancing an already functional protein construct using experimental feedback. See the [tutorial](#-tutorial) below for a full walkthrough.
 
 ## 🛠️ Installation
 
@@ -26,7 +26,7 @@ After activation, all `python -m cleo.design.*` commands in this tutorial will w
 ---
 <br><br>
 
-## 🌐 Workflow Tutorial
+## 🌐 Tutorial
 
 The two main themes of this workflow are:
 
@@ -278,7 +278,7 @@ Since we are interested in optimizing Kcat, we will run the reaction under exces
 
 To process the data we generate a plate map csv file prior to testing with information about each well on the plate including what construct is being expressed, the sequence, sample type (i.e. positive control, negative control, sample), replicate number and any other metadata which could be helpful for data processing. 
 
-The following [`data_processing.ipynb`](notebooks/data_processing.ipynb) serves as a guide for processing the raw data collected from the plate reader as described above. Additionally you can checkout what the raw data and plate maps look like here.
+The following [`data_processing_example.ipynb`](notebooks/data_processing_example.ipynb) serves as a guide for processing the raw data collected from the plate reader as described above. The notebook walks through parsing raw instrument files, applying standard curves, fitting kinetics, normalizing by expression, and filtering — using real example data from a single round of the PETase campaign. All input files (raw plate-reader exports, plate maps, standard curves) and expected output are provided in [`example_data/data_processing/`](example_data/data_processing/).
 
 ## 🦠 Early Rounds of Testing
 
@@ -374,4 +374,17 @@ We often see that the measured activity can plateau after 4 or 5 rounds of optim
 <br>
 
 ---
-Thanks for following this tutorial, please reach create a github issue if you need any help or have suggestions for improving the workflow!
+
+## 📬 Help & Contributing
+
+If you run into issues, have questions, or want to suggest improvements:
+
+- **Bug reports & feature requests**: [Open a GitHub issue](../../issues)
+- **Questions & discussion**: [Start a GitHub discussion](../../discussions)
+- **Contributing**: Pull requests are welcome. Please open an issue first to discuss what you'd like to change.
+
+If you use CLEO in your research, please cite this repository.
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).

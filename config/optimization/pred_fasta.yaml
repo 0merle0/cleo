@@ -1,6 +1,0 @@
-run_name: mutant_library_pred
-model_base_path: /home/jgershon/git/cleo/ckpt/clickase_train_r0_r1_r2_r3/clickase_train_r0_r1_r2_r3.2025-10-14-09-19-31
-outdir: /home/jgershon/projects/itopt/declan/pred_declan_mutants
-fasta_path: /home/jgershon/projects/itopt/declan/pred_declan_mutants/mutant_library.fasta
-batch_size: 256
-ckpt_name: "last.ckpt"

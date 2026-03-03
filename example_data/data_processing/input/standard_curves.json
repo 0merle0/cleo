@@ -1,0 +1,42 @@
+{
+    "21062324": {
+        "4MU": {
+            "slope": 33.707,
+            "y_intercept": 249.5
+        },
+        "mscarlett": {
+            "slope": 1020.8,
+            "y_intercept": 6.83
+        }
+    },
+    "23062123": {
+        "4MU": {
+            "slope": 26.006,
+            "y_intercept": 206
+        },
+        "mscarlett": {
+            "slope": 857.1,
+            "y_intercept": 4.83
+        }
+    },
+    "21060423_dep": {
+        "4MU": {
+            "slope": 54.1,
+            "y_intercept": 225
+        },
+        "mscarlett": {
+            "slope": 235,
+            "y_intercept": 7.53
+        }
+    },
+    "21060423": {
+        "4MU": {
+            "slope": 109.01,
+            "y_intercept": 14.37
+        },
+        "mscarlett": {
+            "slope": 208.63,
+            "y_intercept": 10.241
+        }
+    }
+}

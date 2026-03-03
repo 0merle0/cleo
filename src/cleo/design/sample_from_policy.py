@@ -1,6 +1,8 @@
 import os
 import json
 import secrets
+from pathlib import Path
+
 import torch
 import hydra
 from omegaconf import OmegaConf
@@ -85,7 +87,10 @@ def write_fragment_fasta(fragment_dict, output_dir, prefix):
                 f.write(f">{name}\n{seq}\n")
 
 
-@hydra.main(version_base=None, config_path="../../../config/design", config_name="sample")
+_CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/design")
+
+
+@hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="sample")
 def sample_from_policy(cfg):
 
     os.makedirs(cfg.output_dir, exist_ok=True)

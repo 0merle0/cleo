@@ -1,0 +1,39 @@
+# Acquisition function optimization config
+#
+# Usage:
+#   python -m cleo.optimize.batch_optimize --config-name momi_acqf_opt
+#
+# Loads a trained ensemble surrogate, constructs a BatchUCB + diversity
+# acquisition function, and runs REINFORCE optimization over the combinatorial
+# fragment space to propose candidate sequences.
+#
+# Key parameters:
+#   - surrogate_ckpt: path to the surrogate checkpoint directory
+#   - opt_loop.fragment_dictionary: JSON file mapping fragment numbers to (name, seq) lists
+#   - opt_loop.q: number of candidate sequences to propose
+#   - opt_loop.num_iter: REINFORCE iterations (more = better convergence)
+#   - acqf.gamma: diversity weight (0 = pure UCB, higher = more diverse batches)
+#   - acqf.sequence_wise: if true, rewards per-sequence UCB + pairwise diversity;
+#     if false, rewards batch-mean UCB + per-position entropy
+
+run_name: acqf_optimization
+
+outdir: ${hydra:runtime.cwd}/acqf_output
+surrogate_ckpt: null      # e.g. ./ckpt/my_run/my_run.2025-12-18/
+
+write_fasta: false
+
+connector: "___"
+
+opt_loop:
+  N: 1                    # number of restarts
+  q: 5000                 # number of candidate sequences per restart
+  fragment_dictionary: null  # path to fragment dictionary JSON
+  num_iter: 75000
+  lr: 0.01
+
+acqf:
+  model_batch_size: 20000
+  gamma: 1                # diversity weight
+  eps: 1e-8
+  sequence_wise: true     # per-sequence rewards (true) or batch-level (false)

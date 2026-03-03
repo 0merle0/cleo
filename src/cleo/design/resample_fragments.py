@@ -1,6 +1,8 @@
 import os
 import json
 import random
+from pathlib import Path
+
 import numpy as np
 import hydra
 from tqdm import tqdm
@@ -73,7 +75,10 @@ def write_fasta(names, sequences, path):
             f.write(f">{name}\n{seq}\n")
 
 
-@hydra.main(version_base=None, config_path="../../../config/design", config_name="resample_fragments")
+_CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/design")
+
+
+@hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="resample_fragments")
 def resample_fragments(cfg):
 
     assert cfg.fragment_dict_path is not None, "fragment_dict_path is required"

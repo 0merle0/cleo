@@ -18,6 +18,7 @@ import json
 import math
 import copy
 import getpass
+from pathlib import Path
 from datetime import date
 from multiprocessing import Pool, cpu_count
 from collections import Counter
@@ -335,7 +336,10 @@ def to_fasta(df, filepath):
 # Hydra entrypoint
 # ============================================
 
-@hydra.main(version_base=None, config_path="../../../../config/design", config_name="dna_fragment_design")
+_CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../../config/design")
+
+
+@hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="dna_fragment_design")
 def main(cfg):
 
     today_str = date.today().strftime("%Y%m%d")[2:]

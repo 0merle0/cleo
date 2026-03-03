@@ -11,8 +11,8 @@ import pandas as pd
 from tqdm import tqdm
 from omegaconf import OmegaConf
 
-from cleo.optimization.utils.ensemble import Ensemble
-from cleo.optimization.utils.train_data import SequenceFunctionDataset
+from cleo.optimize.utils.ensemble import Ensemble
+from cleo.optimize.utils.train_data import SequenceFunctionDataset
 
 
 @torch.no_grad()

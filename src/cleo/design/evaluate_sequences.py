@@ -11,6 +11,8 @@ Usage:
 """
 
 import os
+from pathlib import Path
+
 import pandas as pd
 import hydra
 from omegaconf import OmegaConf, open_dict
@@ -43,7 +45,10 @@ def read_fasta(path):
     return names, sequences
 
 
-@hydra.main(version_base=None, config_path="../../../config/design", config_name="evaluate")
+_CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/design")
+
+
+@hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="evaluate")
 def evaluate_sequences(cfg):
 
     assert cfg.input_fasta is not None, "input_fasta is required"

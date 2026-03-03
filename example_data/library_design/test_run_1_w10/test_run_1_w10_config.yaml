@@ -1,0 +1,221 @@
+run_name: test_run_1_w10
+output_dir: ${hydra:runtime.cwd}/policy_mpnn_out
+pdb: ${hydra:runtime.cwd}/templates/structure/momi_petase_reference_structure.pdb
+checkpoint_path: null
+checkpoint_every_n_steps: 50
+algorithm: grpo
+batch_size: 32
+N_steps: 500
+lr: 0.0001
+kl_weight: 0.01
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+model_type: ligand_mpnn
+temperature: 1.0
+omit_AA: CX
+fixed_residues: A41 A42 A43 A44 A66 A85 A86 A87 A88 A107 A122 A127 A128 A129 A130
+  A164 A165 A166 A167
+reward:
+  _target_: cleo.design.utils.reward.UniversalReward
+  output_dir: ${output_dir}
+  run_name: ${run_name}
+  steps:
+  - name: boltz
+    target_fn: cleo.design.utils.oracle.boltz_from_df
+    cfg:
+      run_dir: null
+      template_path: ${hydra:runtime.cwd}/templates/oracle/boltz_template_for_petase_with_pet_dimer.yaml
+  - name: petase_metrics
+    target_fn: cleo.design.utils.petase.add_petase_metrics_to_df
+    cfg:
+      ref_step: boltz
+      cat_res_ser: 66
+      cat_res_his: 107
+      cat_res_asp: 122
+      oxhres1: 198
+      oxhres2: 67
+      ester_atom_list:
+      - - C35
+        - O25
+        - O31
+      - - C36
+        - O26
+        - O32
+      dihedrals:
+      - - - A
+          - 107
+          - NE2
+        - - A
+          - 66
+          - OG
+        - - B
+          - 1
+          - C35
+        - - B
+          - 1
+          - O31
+      - - - A
+          - 107
+          - NE2
+        - - A
+          - 66
+          - OG
+        - - B
+          - 1
+          - C36
+        - - B
+          - 1
+          - O32
+      ref_str: ${hydra:runtime.cwd}/templates/structure/momi_petase_reference_structure.pdb
+      ref_protein_chain_id: A
+      ref_ligand_chain_id: X
+      des_protein_chain_id: A
+      des_ligand_chain_id: B
+      ref_ligand_atom_names:
+      - C13
+      - O2
+      - C1
+      - O1
+      - C10
+      - C8
+      - C7
+      - C9
+      - C11
+      - C6
+      - C5
+      - O4
+      - O3
+      - C4
+      - C3
+      - O6
+      - C14
+      - O7
+      - C15
+      - O8
+      - C16
+      - C21
+      - C20
+      - C17
+      - C18
+      - C19
+      - C22
+      - O9
+      - O10
+      - C23
+      - C24
+      - O11
+      design_ligand_atom_name_orders:
+      - - C53
+        - O31
+        - C35
+        - O25
+        - C47
+        - C42
+        - C38
+        - C41
+        - C37
+        - C45
+        - C33
+        - O23
+        - O29
+        - C51
+        - C49
+        - O27
+        - C54
+        - O32
+        - C36
+        - O26
+        - C48
+        - C43
+        - C39
+        - C44
+        - C40
+        - C46
+        - C34
+        - O24
+        - O30
+        - C52
+        - C50
+        - O28
+      - - C54
+        - O32
+        - C36
+        - O26
+        - C48
+        - C43
+        - C39
+        - C44
+        - C40
+        - C46
+        - C34
+        - O24
+        - O30
+        - C52
+        - C50
+        - O28
+        - C53
+        - O31
+        - C35
+        - O25
+        - C47
+        - C42
+        - C38
+        - C41
+        - C37
+        - C45
+        - C33
+        - O23
+        - O29
+        - C51
+        - C49
+        - O27
+  - name: dist_to_ref_seqs
+    target_fn: cleo.design.utils.sequence.compute_dist_to_ref_seqs_from_df
+    cfg:
+      ref_seqs:
+      - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDNARIFIATTVEEAVELARRAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+      - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIQKETGHKVDKSRIFIAETVEEAIELARQAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+      - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDRSRIFIAETVEEAVELAARAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+  reward_aggregation:
+  - metric: boltz_iptm
+    lower_bound: 0.0
+    upper_bound: 0.8
+    weight: 1.0
+    mode: max
+  - metric: boltz_ptm
+    lower_bound: 0.0
+    upper_bound: 0.8
+    weight: 1.0
+    mode: max
+  - metric: petase_metrics_acylox_oxh1bbN
+    lower_bound: 6
+    upper_bound: 10.0
+    weight: 1.0
+    mode: min
+  - metric: petase_metrics_acylox_oxh2bbN
+    lower_bound: 6
+    upper_bound: 10.0
+    weight: 1.0
+    mode: min
+  - metric: petase_metrics_hisNE2_esterox
+    lower_bound: 5
+    upper_bound: 10.0
+    weight: 1.0
+    mode: min
+  - metric: petase_metrics_hisNE2_serOG
+    lower_bound: 2.5
+    upper_bound: 10.0
+    weight: 1.0
+    mode: min
+  - metric: petase_metrics_his_ser_angle
+    lower_bound: 20
+    upper_bound: 90
+    weight: 1.0
+    mode: max
+  - metric: dist_to_ref_seqs_min
+    lower_bound: 0
+    upper_bound: 100
+    weight: 10.0
+    mode: min

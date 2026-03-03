@@ -1,0 +1,28 @@
+# Super surrogate training config
+#
+# Usage:
+#   python -m cleo.optimize.train_surrogate --config-name super
+#
+# Inherits shared defaults from base_surrogate.yaml and overrides for the
+# super dataset (160 residues * 20 = 3200, linear output head, 500 epochs).
+
+defaults:
+  - base_surrogate
+  - _self_
+
+run_name: super_surrogate
+
+trainer:
+  max_epochs: 500
+  log_every_n_steps: 1000
+
+data:
+  dataset: data/super/241204_super_random_purified_data.csv
+  dataset_cfg:
+    name_col: name
+
+model:
+  base_model:
+    input_dim: 3200          # 160 residues * 20 amino acids
+    output_head_type: linear
+  top_k_accuracy: [10, 20, 40]

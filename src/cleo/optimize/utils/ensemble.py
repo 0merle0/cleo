@@ -1,0 +1,429 @@
+"""Ensemble of surrogate models with Gaussian NLL training and mixture-of-Gaussians inference.
+
+Implements an ensemble of BaseModel instances (MLP, linear, conv1d, or Potts)
+trained with manual optimization in PyTorch Lightning. Each model predicts a
+mean and variance; the ensemble mixes predictions using the method from
+Lakshminarayanan et al. (https://arxiv.org/pdf/1612.01474). Validation metrics
+include Pearson/Spearman correlation, top-k accuracy, and calibration plots.
+"""
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import pytorch_lightning as pl
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+from torch.distributions.normal import Normal
+import logging
+from omegaconf import OmegaConf
+from torch.nn.utils import parameters_to_vector
+
+
+class PottsModel(nn.Module):
+    """Statistical energy model using one-body fields and optional two-body couplings.
+
+    D is the flattened sequence dimension (L * 20 for one-hot encoded sequences).
+    """
+    def __init__(self, D, use_two_body=True):
+        super().__init__()
+        self.D = D
+        self.use_two_body = use_two_body
+
+        self.h = nn.Parameter(torch.zeros(self.D))
+        nn.init.normal_(self.h, mean=0.0, std=0.01)
+
+        if self.use_two_body:
+            self.J = nn.Parameter(torch.zeros(self.D, self.D))
+            nn.init.normal_(self.J, mean=0.0, std=0.01)
+
+    def forward(self, x):
+        """
+        Args:
+            x: [B, D] flattened one-hot encoded sequences.
+        Returns:
+            [B, 1] predicted energy.
+        """
+        energy = torch.sum(x * self.h, dim=1)
+
+        if self.use_two_body:
+            xJ = x @ self.J
+            energy += torch.sum(xJ * x, dim=1)
+
+        return energy.unsqueeze(1)
+
+
+class AttentionPooling(nn.Module):
+    """Learnable attention pooling that reduces (B, L, D) -> (B, D)."""
+    def __init__(self, input_dim, embed_dim):
+        super(AttentionPooling, self).__init__()
+        self.query_vector = nn.Parameter(torch.randn(1, embed_dim))
+        self.key_proj = nn.Linear(input_dim, embed_dim)
+        self.value_proj = nn.Linear(input_dim, embed_dim)
+        self.scale = embed_dim**0.5
+
+    def forward(self, x, mask=None):
+        K = self.key_proj(x)
+        if mask is not None:
+            K = K * mask.unsqueeze(-1)
+        V = self.value_proj(x)
+        Q_cls = self.query_vector.expand(x.size(0), -1, -1)
+
+        attention_scores = torch.bmm(Q_cls, K.transpose(1, 2)) / self.scale
+        attention_weights = F.softmax(attention_scores, dim=-1)
+        context_vector = torch.bmm(attention_weights, V)
+        context_vector += Q_cls
+
+        return context_vector.squeeze(1)
+
+
+class BaseModel(nn.Module):
+    """Single surrogate model supporting MLP, linear, conv1d, and Potts architectures.
+
+    Predicts a mean and variance (or uses a fixed variance) for Gaussian NLL training.
+    """
+
+    def __init__(self, cfg):
+        super(BaseModel, self).__init__()
+        self.cfg = cfg
+
+        if self.cfg.model_type == "potts":
+            self.mean_head = PottsModel(
+                D=self.cfg.input_dim, use_two_body=self.cfg.use_two_body
+            )
+            self.var_head = PottsModel(
+                D=self.cfg.input_dim, use_two_body=self.cfg.use_two_body
+            )
+
+        else:
+            activation = nn.ReLU()
+            dropout = nn.Dropout(self.cfg.p_drop)
+
+            def build_output_head(hidden_dim, output_dim, head_type):
+                if head_type == "mlp":
+                    out_head = nn.Sequential(
+                        nn.Linear(hidden_dim, hidden_dim),
+                        activation,
+                        nn.Linear(hidden_dim, hidden_dim),
+                        activation,
+                        nn.Linear(hidden_dim, output_dim),
+                    )
+                elif head_type == "linear":
+                    out_head = nn.Linear(hidden_dim, output_dim)
+                else:
+                    raise ValueError(f"Output head type {head_type} not supported.")
+                return out_head
+
+            if self.cfg.model_type == "linear":
+                self.cfg.hidden_dim = self.cfg.input_dim
+
+            elif self.cfg.model_type == "mlp":
+                self.trunk = nn.Sequential(
+                    nn.Linear(self.cfg.input_dim, self.cfg.hidden_dim),
+                    activation,
+                    dropout,
+                    nn.Linear(self.cfg.hidden_dim, self.cfg.hidden_dim),
+                    activation,
+                    dropout,
+                    nn.Linear(self.cfg.hidden_dim, self.cfg.hidden_dim),
+                )
+
+            elif self.cfg.model_type == "conv1d":
+                self.trunk = nn.Sequential(
+                    nn.Conv1d(
+                        self.cfg.input_dim, self.cfg.hidden_dim, self.cfg.kernel_size
+                    ),
+                    dropout,
+                    activation,
+                    nn.Conv1d(
+                        self.cfg.hidden_dim, self.cfg.hidden_dim, self.cfg.kernel_size
+                    ),
+                    activation,
+                    dropout,
+                )
+                self.attn_pool = AttentionPooling(self.cfg.hidden_dim, self.cfg.hidden_dim)
+            else:
+                raise ValueError(f"Model type {self.cfg.model_type} not supported.")
+
+            self.mean_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
+            if self.cfg.predict_variance:
+                if "concat_mean_pred" in self.cfg and self.cfg.concat_mean_pred:
+                    self.var_head = build_output_head(self.cfg.hidden_dim+1, self.cfg.output_dim, self.cfg.output_head_type)
+                else:
+                    self.var_head = build_output_head(self.cfg.hidden_dim, self.cfg.output_dim, self.cfg.output_head_type)
+
+    def forward(self, x):
+        if self.cfg.model_type == "conv1d":
+            x = x.permute(0, 2, 1)
+            x = self.trunk(x)
+            x = x.permute(0, 2, 1)
+            x = self.attn_pool(x)
+        elif self.cfg.model_type == "mlp":
+            x = self.trunk(x)
+
+        mean = self.mean_head(x)
+
+        if self.cfg.predict_variance:
+            if self.cfg.stop_grad_variance:
+                x = x.detach()
+            if "concat_mean_pred" in self.cfg and self.cfg.concat_mean_pred:
+                x = torch.cat([x, mean.detach()], dim=-1)
+
+            var = self.var_head(x)
+            if self.cfg.variance_transform == "softplus":
+                var = torch.log(1 + torch.exp(var))
+                var = torch.clamp(var, min=1e-6)
+            elif self.cfg.variance_transform == "sigmoid":
+                var = torch.sigmoid(var)
+                var = torch.clamp(var, min=1e-6)
+            elif self.cfg.variance_transform == "clamp":
+                var = torch.clamp(var, min=1e-6)
+            else:
+                raise ValueError(
+                    f"Variance transform {self.cfg.variance_transform} not supported."
+                )
+        else:
+            var = torch.ones_like(mean) * self.cfg.fixed_variance
+
+        return {"mean": mean, "var": var}
+
+
+class Ensemble(pl.LightningModule):
+    """Ensemble of BaseModel instances with manual optimization.
+
+    Trains each model independently on the same data, mixes their Gaussian
+    predictions at inference time using the method from Lakshminarayanan et al.
+    """
+    def __init__(self, cfg):
+        super(Ensemble, self).__init__()
+        self.full_cfg = cfg
+        self.cfg = cfg.model
+
+        self.automatic_optimization = False
+
+        model_list = [
+            BaseModel(self.cfg.base_model) for _ in range(self.cfg.num_models)
+        ]
+        self.models = nn.ModuleList(model_list)
+
+        self.val_y = []
+        self.val_mean = []
+        self.val_var = []
+
+    def configure_optimizers(self):
+        optimizers = [
+            torch.optim.Adam(model.parameters(), lr=self.cfg.lr)
+            for model in self.models
+        ]
+        return optimizers
+
+    def gaussNLL(self, mean, var, gt, reduction="mean", var_clip=1e-6):
+        """Gaussian negative log likelihood loss (Lakshminarayanan et al.)."""
+        var = torch.clamp(var, min=var_clip)
+        loss = torch.log(var) + ((gt - mean) ** 2) / var
+
+        if reduction == "mean":
+            loss = loss.mean()
+        elif reduction == "sum":
+            loss = loss.sum()
+
+        return loss
+
+    def parameter_regularization(self, model, reg_order, reg_lambda):
+        """L-p norm regularization on all model parameters."""
+        all_params = parameters_to_vector(model.parameters())
+        norm = (torch.abs(all_params)**reg_order).sum()
+        return norm * reg_lambda
+
+    def calc_loss(self, gt, output, model):
+        """Compute combined MSE + NLL + regularization loss."""
+        mean = output["mean"]
+        var = output["var"]
+
+        mse_weight = self.cfg.loss.mse_weight
+        mse_loss = F.mse_loss(mean, gt, reduction="mean")
+
+        nll_weight = self.cfg.loss.nll_weight
+        nll_loss = self.gaussNLL(mean, var, gt, reduction="mean")
+
+        reg_order = self.cfg.loss.regularization_order
+        reg_lambda = self.cfg.loss.regularization_lambda
+        reg_loss = self.parameter_regularization(model, reg_order, reg_lambda)
+
+        loss = mse_loss*mse_weight + nll_loss*nll_weight + reg_loss
+
+        loss_dict = {
+            "mse": mse_loss,
+            "nll": nll_loss,
+            f"regularization_l{reg_order}": reg_loss,
+            "loss": loss,
+        }
+
+        return loss, loss_dict
+
+    def mix_gaussians(self, mean, var):
+        """Mix ensemble Gaussian predictions into a single mean and std.
+
+        Uses the mixture-of-Gaussians formula from Lakshminarayanan et al.
+
+        Args:
+            mean: (batch, num_models, out_dim)
+            var: (batch, num_models, out_dim)
+        Returns:
+            (mu, sigma) each of shape (batch, out_dim)
+        """
+        mixed_mean = mean.mean(dim=1).squeeze()
+        mixed_var = (var + mean**2).mean(dim=1).squeeze() - mixed_mean**2
+        return mixed_mean, torch.sqrt(mixed_var)
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        optimizers = self.optimizers()
+
+        to_log = {}
+        mean_loss = 0
+        for n in range(self.cfg.num_models):
+            model = self.models[n]
+            opt = optimizers[n]
+            opt.zero_grad()
+            output = model(x.float())
+            loss, loss_dict = self.calc_loss(y, output, model)
+            self.manual_backward(loss)
+            opt.step()
+
+            to_log.update({f"train/{k}_model_{n+1}": v for k, v in loss_dict.items()})
+            mean_loss += loss.item() / len(self.models)
+
+        to_log["train/mean_loss"] = mean_loss
+        self.log_dict(to_log)
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+
+        to_log = {}
+        output_list = []
+        mean_loss = 0
+        for n, model in enumerate(self.models):
+            output = model(x.float())
+            loss, loss_dict = self.calc_loss(y, output, model)
+
+            output_list.append(output)
+            to_log.update({f"val/{k}_model_{n+1}": v for k, v in loss_dict.items()})
+            mean_loss += loss.item() / len(self.models)
+
+        to_log["val/mean_loss"] = mean_loss
+
+        self.val_y.append(y.cpu())
+
+        mean_stack = torch.stack([o["mean"].cpu() for o in output_list])
+        self.val_mean.append(mean_stack.permute(1, 0, 2))
+
+        var_stack = torch.stack([o["var"].cpu() for o in output_list])
+        self.val_var.append(var_stack.permute(1, 0, 2))
+
+        self.log_dict(to_log)
+
+    def on_validation_epoch_end(self):
+        """Compute ensemble-level metrics: correlation, calibration, top-k accuracy."""
+        gt = torch.cat(self.val_y, dim=0).squeeze()
+        mean_stack = torch.cat(self.val_mean, dim=0)
+        var_stack = torch.cat(self.val_var, dim=0)
+        mean_pred, std_pred = self.mix_gaussians(mean_stack, var_stack)
+
+        to_log = {}
+        to_log["val/std_mean"] = std_pred.mean().item()
+        to_log["val/std_min"] = std_pred.min().item()
+        to_log["val/std_max"] = std_pred.max().item()
+
+        to_log["val/nll"] = self.gaussNLL(
+            mean_pred, std_pred**2, gt, reduction="mean"
+        )
+
+        pearsonr_corr, _ = stats.pearsonr(gt, mean_pred)
+        to_log["val/pearsonr"] = pearsonr_corr
+
+        if not self.full_cfg.debug:
+            plt.figure(dpi=150)
+            sns.scatterplot(x=gt, y=mean_pred, alpha=0.5)
+            plt.xlabel("Ground Truth")
+            plt.ylabel("Predicted Mean")
+            plt.title(f"Ground Truth vs. Prediction | pearsonR {pearsonr_corr:.3f}")
+            plt.savefig(f"{self.cfg.ckpt_dir}/val_gt_pred_scatter.png")
+            plt.close()
+
+        spearmanr_corr, _ = stats.spearmanr(gt, mean_pred)
+        to_log["val/spearmanr"] = spearmanr_corr
+
+        se = (gt - mean_pred) ** 2
+        se_var_corr, _ = stats.pearsonr(se, std_pred**2)
+        to_log["val/se_var_corr"] = se_var_corr
+
+        if not self.full_cfg.debug:
+            plt.figure(dpi=150)
+            sns.scatterplot(x=se, y=std_pred**2, alpha=0.5)
+            plt.xlabel("Squared Error")
+            plt.ylabel("Predicted Variance")
+            plt.title(
+                f"Squared Error vs. Predicted Variance | pearsonR {se_var_corr:.3f}"
+            )
+            plt.savefig(f"{self.cfg.ckpt_dir}/val_se_var_scatter.png")
+            plt.close()
+
+        if not self.full_cfg.debug:
+            plt.figure(dpi=150)
+            sns.scatterplot(x=mean_pred, y=std_pred, alpha=0.5)
+            plt.xlabel("Mu pred")
+            plt.ylabel("Sigma pred")
+            plt.title("Correlation between mu and sigma")
+            plt.savefig(f"{self.cfg.ckpt_dir}/val_mu_sigma_scatter.png")
+            plt.close()
+
+        to_log["val/mse"] = se.mean().item()
+
+        k_list = self.cfg.top_k_accuracy
+        for k in k_list:
+            if k > gt.size(0):
+                break
+            gt_topk_values, gt_topk_indices = gt.topk(
+                k, dim=0, largest=True, sorted=True
+            )
+            pred_topk_values, pred_topk_indices = mean_pred.topk(
+                k, dim=0, largest=True, sorted=True
+            )
+            correct_topk = torch.isin(pred_topk_indices, gt_topk_indices)
+            topk_accuracy = correct_topk.sum().float() / gt_topk_indices.size(0)
+
+            to_log[f"val/top{k}_accuracy"] = topk_accuracy.item()
+
+        self.log_dict(to_log)
+
+        self.val_mean.clear()
+        self.val_var.clear()
+        self.val_y.clear()
+
+    def posterior(self, x):
+        """Return a Normal distribution from ensemble predictions."""
+        out = self.forward(x)
+        return Normal(out["mu"], out["sigma"])
+
+    def forward(self, x):
+        """Run all ensemble members and mix their Gaussian predictions."""
+        output_list = []
+        for model in self.models:
+            output = model(x.float())
+            output_list.append(output)
+
+        mean_stack = torch.stack([o["mean"] for o in output_list]).permute(1, 0, 2)
+        var_stack = None
+        if self.cfg.base_model.predict_variance:
+            var_stack = torch.stack([o["var"] for o in output_list]).permute(1, 0, 2)
+            mu, sigma = self.mix_gaussians(mean_stack, var_stack)
+        else:
+            mu = mean_stack.mean(dim=1).squeeze()
+            sigma = mean_stack.std(dim=1).squeeze()
+
+        return {
+            "mu": mu,
+            "sigma": sigma,
+            "mean": mean_stack,
+            "var": var_stack,
+        }

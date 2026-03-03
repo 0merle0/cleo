@@ -2,6 +2,7 @@
 name = "cleo"
 version = "0.1.0"
 description = "Combinatorial Libraries for Exploration and Optimization"
+license = "MIT"
 requires-python = ">=3.10"
 
 dependencies = [
@@ -32,7 +33,20 @@ dependencies = [
     "prody",
     "biotite",
     "dnachisel",
+    "matplotlib",
+    "seaborn",
+    "jupyter",
 ]
+
+[project.scripts]
+cleo-design-train = "cleo.design.train_policy:train_policy"
+cleo-design-sample = "cleo.design.sample_from_policy:sample_from_policy"
+cleo-design-resample = "cleo.design.resample_fragments:resample_fragments"
+cleo-design-evaluate = "cleo.design.evaluate_sequences:evaluate_sequences"
+cleo-design-dna = "cleo.design.dna_utils.dna_fragment_design:main"
+cleo-optimize-train = "cleo.optimize.train_surrogate:train_surrogate"
+cleo-optimize-batch = "cleo.optimize.batch_optimize:main"
+cleo-optimize-predict = "cleo.optimize.predict_fasta:main"
 
 [project.optional-dependencies]
 cuda = ["boltz[cuda]"]
