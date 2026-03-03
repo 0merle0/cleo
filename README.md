@@ -21,7 +21,7 @@ uv sync --extra cuda # GPU — adds CUDA acceleration for Boltz
 source .venv/bin/activate
 ```
 
-After activation, all `python -m cleo.design.*` commands in this tutorial will work. The full pipeline (training, sampling, resampling, evaluation, DNA design) runs on CPU. GPU acceleration is only needed for faster Boltz structure predictions during training or evaluation.
+After activation, all `cleo-design-*` and `cleo-optimize-*` CLI commands in this tutorial will work. The full pipeline (training, sampling, resampling, evaluation, DNA design) runs on CPU. GPU acceleration is only needed for faster Boltz structure predictions during training or evaluation.
 
 ---
 <br><br>
@@ -69,36 +69,6 @@ Throughout the CLEO workflow, fragments and sequences follow consistent naming c
 `1.0003.a7b2c8d1___2.0010.b5c6d7e8___3.0001.f9a0b1c2`
 
 These conventions are enforced by `sample_from_policy.py` (output), `resample_fragments.py` (input/output), `evaluate_sequences.py` (input), the analysis notebook (parsing), and `dna_fragment_design.py` (input parsing).
-
----
-<br><br>
-
-## 📁 Example Data
-
-The `example_data/library_design/` folder contains template inputs and outputs for every pipeline step, so you can run any step independently without running the preceding ones:
-
-```
-example_data/library_design/
-├── test_run_1_w1/                   # Training outputs (weight=1 run)
-│   ├── test_run_1_w1_config.yaml
-│   ├── test_run_1_w1_train_metrics.csv
-│   ├── test_run_1_w1_best.pt
-│   └── test_run_1_w1_step_*.pt
-├── test_run_1_w10/                  # Training outputs (weight=10 run)
-│   └── ...
-├── sampled_sequences/               # Output of sample_from_policy
-│   ├── example.fasta                #   Full-length sampled sequences
-│   ├── example_fragments.json       #   Fragment dictionary
-│   └── example_{1..5}.fasta         #   Per-region fragment FASTAs
-├── resampled_sequences/             # Output of resample_fragments
-│   └── example_resampled.fasta      #   Combinatorial resampled sequences
-├── evaluation_results/              # Output of evaluate_sequences
-│   ├── example_evaluation.csv       #   Per-sequence metrics CSV
-│   └── example_fragments.json       #   Fragment dict (for analysis notebook)
-└── dna_utils/                       # Input for dna_fragment_design
-    ├── input_example.fa             #   Example protein fragment FASTA
-    └── input_example.csv            #   Example protein fragment CSV
-```
 
 ---
 <br><br>
@@ -173,7 +143,7 @@ For each metrics you wish to optimize, we first normalize it to the range `[0,1]
 Once your config file is setup, you can launch the training run with the following command:
 
 ```bash
-python -m cleo.design.train_policy --config-name denovo_petase
+cleo-design-train --config-name denovo_petase
 ```
 
 The training script will create an output directory (configured by `output_dir` and `run_name`) containing:
@@ -195,7 +165,7 @@ Each step can be run independently using the provided example data — you do no
 ### Step 1: Sample sequences from trained checkpoints
 
 ```bash
-python -m cleo.design.sample_from_policy --config-name sample
+cleo-design-sample --config-name sample
 ```
 
 This loads one or more checkpoints (configured in [`config/design/sample.yaml`](config/design/sample.yaml)), samples sequences from the policy, splits them into fragments, and writes:
@@ -208,7 +178,7 @@ Example output: [`example_data/library_design/sampled_sequences/`](example_data/
 ### Step 2: Resample combinatorial sequences from fragments
 
 ```bash
-python -m cleo.design.resample_fragments --config-name resample_fragments
+cleo-design-resample --config-name resample_fragments
 ```
 
 Takes the fragment dictionary JSON and generates new full-length sequences by sampling one fragment per region with inverse-count weighting for uniform coverage. See [`config/design/resample_fragments.yaml`](config/design/resample_fragments.yaml) for configuration.
@@ -218,7 +188,7 @@ Example output: [`example_data/library_design/resampled_sequences/example_resamp
 ### Step 3: Evaluate resampled sequences
 
 ```bash
-python -m cleo.design.evaluate_sequences --config-name evaluate
+cleo-design-evaluate --config-name evaluate
 ```
 
 Runs the resampled sequences through the same metric pipeline used during training and outputs a CSV with all computed metrics. The steps are configured in [`config/design/evaluate.yaml`](config/design/evaluate.yaml) using the same format as `reward.steps` in the training config.
@@ -243,7 +213,7 @@ Reverse translating protein sequences into DNA sequences is the final step befor
 ### Step 5: Reverse translate fragments to DNA
 
 ```bash
-python -m cleo.design.dna_utils.dna_fragment_design --config-name dna_fragment_design
+cleo-design-dna --config-name dna_fragment_design
 ```
 
 Takes amino acid fragment sequences (FASTA and/or CSV) and produces codon-optimized DNA with Golden Gate assembly adapters. See [`config/design/dna_fragment_design.yaml`](config/design/dna_fragment_design.yaml) for configuration including vector and enzyme settings.
@@ -307,9 +277,11 @@ The best performing models across different datasets we have collected are simpl
 Before training the model we recommend applying z-score normalization to the activity values you wish to train on. Additionally, we suggest sampling an validation set approximately 10-20% of the training data to assess hyperparameters of the model. The input dataset for training the predictor should be a csv file (most easily exported from pandas) with columns including sequence, activity, and validation. See this [`model_data_preparation.ipynb`](notebooks/model_data_preparation.ipynb) we provide an example of how such a dataset should be formatted for training.
 
 
-To train the model you will need to create a config using the template [`config_template.yaml`](configs/config_template.yaml), please see the template to understand what parameters are important to change for training. A training run can be launched with the following command:
+To train the model you will need to create a config. We provide [`momi.yaml`](config/optimize/momi.yaml) which inherits from [`base_surrogate.yaml`](config/optimize/base_surrogate.yaml) as a reference — please see the config files to understand what parameters are important to change for training. A training run can be launched with the following command:
 
-<< insert link to config file and command for launching training run here >>
+```bash
+cleo-optimize-train --config-name momi data_path=<path_to_training_csv> use_validation=true
+```
 
 📌 **Note**: For the most part these models are relatively small and training on a cpu is feasible.
 
@@ -320,7 +292,7 @@ Strong convergence on the validation set will indicate the hyperparameters are w
 
 ## 🧠 Proposing Batch of Sequences to Test Next
 
-Now that you have a model trained on all of the data available, it is time to predict the next set of variants to test. Depending on the size of your library there are two ways we recommend going about this. If your library is smaller than a billion unique variants, it should be feasible to greedily assess every variant. See the [`INSERT SCRIPT NAME HERE`]() with config [`INSERT CONFIG HERE`]() that will allow you to predict the activity for a sequences listed in a fasta file. This script can also be used generally to evaluate the trained model with a set of sequences you provide in a fasta file.
+Now that you have a model trained on all of the data available, it is time to predict the next set of variants to test. Depending on the size of your library there are two ways we recommend going about this. If your library is smaller than a billion unique variants, it should be feasible to greedily assess every variant. See `cleo-optimize-predict` with config [`pred_fasta.yaml`](config/optimize/pred_fasta.yaml) that will allow you to predict the activity for sequences listed in a fasta file. This script can also be used generally to evaluate the trained model with a set of sequences you provide in a fasta file.
 
 For larger libraries where it may be computationally intractable to make a prediction for every variant, we follow [Daulton et. al.](https://arxiv.org/abs/2210.10199) who propose a framework to optimize an acquisition function over discrete space. We have modified their original implementation to operte over the fragment space. As they discuss in the paper, traditional gradient optimization through the acquisition function will not work as the space we are able to draw samples from is discrete (and in our case not just amino acid level discrete but fragment level). Running this optimization procedure requires that you have a JSON file saved of all the fragment options available to you (see the expected format of the JSON below). 
 
