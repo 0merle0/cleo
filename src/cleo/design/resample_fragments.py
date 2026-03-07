@@ -1,3 +1,13 @@
+"""Resample combinatorial sequences from a fragment dictionary.
+
+Given a JSON fragment dictionary (one list of unique fragments per region),
+combinatorially samples full-length sequences with inverse-count weighting
+for uniform fragment coverage. Useful for constructing diverse libraries
+from a fixed set of fragment variants.
+
+Usage:
+    python -m cleo.design.resample_fragments --config-name resample_fragments
+"""
 import os
 import json
 import random
@@ -70,6 +80,13 @@ def resample_sequences(fragments, num_sequences, connector):
 
 
 def write_fasta(names, sequences, path):
+    """Write name/sequence pairs to a FASTA file.
+
+    Args:
+        names: List of sequence identifiers.
+        sequences: List of amino acid strings.
+        path: Output FASTA file path.
+    """
     with open(path, "w") as f:
         for name, seq in zip(names, sequences):
             f.write(f">{name}\n{seq}\n")
@@ -80,7 +97,7 @@ _CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/design")
 
 @hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="resample_fragments")
 def resample_fragments(cfg):
-
+    """Hydra entrypoint: load a fragment dictionary and resample combinatorial sequences."""
     assert cfg.fragment_dict_path is not None, "fragment_dict_path is required"
     assert os.path.exists(cfg.fragment_dict_path), f"Fragment dict not found: {cfg.fragment_dict_path}"
 

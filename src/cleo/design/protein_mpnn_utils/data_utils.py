@@ -1,4 +1,10 @@
-# COPIED FROM PROTEIN MPNN UTILS (https://github.com/dauparas/ProteinMPNN/blob/main/protein_mpnn_utils.py)
+"""Data utilities for ProteinMPNN inference.
+
+Adapted from the official ProteinMPNN repository
+(https://github.com/dauparas/ProteinMPNN/blob/main/protein_mpnn_utils.py).
+Provides PDB parsing, featurization, sequence scoring helpers, and
+nearest-neighbour ligand context construction for LigandMPNN.
+"""
 from __future__ import print_function
 import numpy as np
 import torch
@@ -13,6 +19,20 @@ confProDy(verbosity='none')
 
 
 def make_pair_bias(chain_labels, R_idx, pair_bias_AA):
+    """Build pairwise amino acid bias from adjacent residue pairs.
+
+    Constructs a ``[1, L, 21, L, 21]`` tensor that biases the decoder logits
+    toward or away from specific amino acid pairs at neighbouring sequence
+    positions within the same chain.
+
+    Args:
+        chain_labels: ``(L,)`` integer chain assignment per residue.
+        R_idx: ``(L,)`` residue index array.
+        pair_bias_AA: ``(21, 21)`` pairwise amino acid bias matrix.
+
+    Returns:
+        Pair bias tensor of shape ``(1, L, 21, L, 21)``.
+    """
     d_chains = ((chain_labels[:, None] - chain_labels[None,:])==0).long()
     upper_diag = (R_idx[1:]-R_idx[:-1]==1).long()
     lower_diag = (R_idx[:-1]-R_idx[1:]==-1).long()
@@ -153,6 +173,20 @@ def write_full_PDB(save_path: str,
         writePDB(save_path, protein)
 
 def parse_a3m(filename, maxseq=101):
+    """Parse an A3M multiple sequence alignment file into numeric arrays.
+
+    Lowercase (insert) characters are stripped; the resulting MSA is encoded
+    as integers (0–20 for standard amino acids plus gap). Insertion counts
+    are tracked in a parallel matrix.
+
+    Args:
+        filename: Path to ``.a3m`` or ``.a3m.gz`` file.
+        maxseq: Maximum number of sequences to read.
+
+    Returns:
+        Tuple of (msa, ins) as uint8 numpy arrays, both of shape
+        ``(N, L)`` where N ≤ maxseq and L is the alignment length.
+    """
     msa = []
     ins = []
 
@@ -218,7 +252,17 @@ def parse_a3m(filename, maxseq=101):
 
 
 def subsample_msa(msa, ins, maxseq, sub_type="UNI"):
+    """Randomly subsample rows from an MSA, always keeping the query sequence.
 
+    Args:
+        msa: Integer-encoded MSA array of shape ``(N, L)``.
+        ins: Insertion count array of shape ``(N, L)``.
+        maxseq: Maximum number of sequences to retain.
+        sub_type: ``"UNI"`` for uniform or ``"LOG"`` for log-uniform depth.
+
+    Returns:
+        Tuple of (subsampled_msa, subsampled_ins) as uint8 arrays.
+    """
     nr, nc = msa.shape
 
     # trim if too many sequences
@@ -482,6 +526,21 @@ def parse_PDB(input_path: str,
 
 
 def get_nearest_neighbours(CB, mask, Y, Y_t, Y_m, number_of_ligand_atoms):
+    """Select the closest ligand/context atoms to each residue's CB position.
+
+    Args:
+        CB: ``(L, 3)`` virtual CB coordinates.
+        mask: ``(L,)`` residue mask.
+        Y: ``(M, 3)`` ligand/context atom coordinates.
+        Y_t: ``(M,)`` atom type integers.
+        Y_m: ``(M,)`` atom mask.
+        number_of_ligand_atoms: Number of nearest atoms to keep per residue.
+
+    Returns:
+        Tuple of (Y, Y_t, Y_m, D_AB_closest) where the first three have
+        shape ``(L, number_of_ligand_atoms, ...)`` and D_AB_closest is
+        ``(L,)`` with the distance to the single nearest atom.
+    """
     device=CB.device
     mask_CBY = mask[:,None]*Y_m[None,:] #[A,B]
     L2_AB = torch.sum((CB[:,None,:]-Y[None,:,:])**2,-1)
@@ -512,6 +571,24 @@ def get_nearest_neighbours(CB, mask, Y, Y_t, Y_m, number_of_ligand_atoms):
 
 
 def featurize(input_dict, cutoff_for_score=8.0, use_atom_context=True, number_of_ligand_atoms=16, model_type="protein_mpnn"):
+    """Prepare a parsed PDB dict for ProteinMPNN forward pass.
+
+    Adds a batch dimension, renumbers residues to handle insertion codes,
+    and for ``ligand_mpnn`` builds the nearest-neighbour ligand context.
+
+    Args:
+        input_dict: Dict from :func:`parse_PDB`.
+        cutoff_for_score: Distance cutoff (Å) for ligand scoring mask.
+        use_atom_context: If ``False``, zero out ligand atom masks.
+        number_of_ligand_atoms: Number of nearest context atoms per residue.
+        model_type: One of ``protein_mpnn``, ``ligand_mpnn``, ``msa_mpnn``,
+            ``per_residue_label_membrane_mpnn``, ``global_label_membrane_mpnn``,
+            or ``pssm_mpnn``.
+
+    Returns:
+        Batched feature dict ready for the model's ``encode`` / ``sample`` /
+        ``score`` methods.
+    """
     output_dict = {}
     if model_type == "msa_mpnn":
         output_dict["MSA"] = input_dict["MSA"][None,]

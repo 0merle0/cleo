@@ -10,7 +10,27 @@ import torch
 
 
 def parse_pdb(filename, parse_hetatom=False, ignore_het_h=True):
-    
+    """Parse a PDB file into coordinate arrays, sequence, and masks.
+
+    Reads backbone + sidechain atoms (up to 27 per residue following the
+    ``aa2long`` atom ordering), deduplicates residues, and optionally
+    collects HETATM records for ligand atoms.
+
+    Args:
+        filename: Path to the PDB file.
+        parse_hetatom: If ``True``, also return heteroatom coordinates and
+            metadata (ligands, cofactors, etc.).
+        ignore_het_h: If ``True``, skip hydrogen HETATM records.
+
+    Returns:
+        Dict with keys:
+            - ``xyz``: ``(L, 27, 3)`` float32 coordinates.
+            - ``mask``: ``(L, 27)`` bool indicating which atoms are present.
+            - ``idx``: ``(L,)`` residue numbers from the PDB file.
+            - ``seq``: ``(L,)`` integer-encoded sequence (see ``aa2num``).
+            - ``pdb_idx``: List of ``(chain_letter, residue_number)`` tuples.
+            - ``xyz_het``, ``info_het`` (only if *parse_hetatom* is True).
+    """
     lines = open(filename,'r').readlines()
     
     # indices of residues observed in the structure
@@ -72,8 +92,21 @@ def parse_pdb(filename, parse_hetatom=False, ignore_het_h=True):
 
     return out
 
-# writepdb
 def writepdb(filename, atoms, seq, idx_pdb=None, bfacts=None):
+    """Write atom coordinates to a PDB file.
+
+    Supports CA-only, backbone (N/CA/C), and full all-atom (14 or 27 atoms)
+    representations depending on the shape of *atoms*.
+
+    Args:
+        filename: Output PDB path.
+        atoms: Coordinate tensor/array, shape ``(L, 3)`` for CA-only,
+            ``(L, 3, 3)`` for backbone, or ``(L, 14|27, 3)`` for all-atom.
+        seq: Integer-encoded sequence (indices into ``num2aa``).
+        idx_pdb: Residue numbering. Either a 1D array of ints or a list of
+            ``(chain_letter, residue_number)`` tuples.
+        bfacts: Optional per-residue B-factors (clamped to [0, 1]).
+    """
     f = open(filename,"w")
     ctr = 1
     scpu = seq.squeeze()
@@ -128,6 +161,12 @@ def writepdb(filename, atoms, seq, idx_pdb=None, bfacts=None):
                     ctr += 1
                     
                     
+
+# ---------------------------------------------------------------------------
+# Amino acid lookup tables
+# ---------------------------------------------------------------------------
+
+# 3-letter residue codes indexed by integer encoding (0–21).
 num2aa=[
     'ALA','ARG','ASN','ASP','CYS',
     'GLN','GLU','GLY','HIS','ILE',
@@ -136,14 +175,17 @@ num2aa=[
     'UNK','MAS',
     ]
 
+# Reverse mapping: 3-letter code → integer.
 aa2num= {x:i for i,x in enumerate(num2aa)}
 
+# 3-letter → 1-letter amino acid conversion.
 aa3to1= {'ALA':'A','ARG':'R','ASN':'N','ASP':'D',
         'CYS':'C','GLN':'Q','GLU':'E','GLY':'G','HIS':'H',
         'ILE':'I','LEU':'L','LYS':'K','MET':'M','PHE':'F',
         'PRO':'P','SER':'S','THR':'T','TRP':'W','TYR':'Y','VAL':'V'}
 aa1to3= {v:k for k,v in aa3to1.items()}
 
+# 1-letter codes indexed by integer encoding (0–19).
 num2aa1=[
         'A','R','N','D',
         'C','Q','E','G',
@@ -154,8 +196,8 @@ num2aa1=[
 
 aa12num= {x:i for i,x in enumerate(num2aa1)}
 
-
-# full sc atom representation (Nx14)
+# Full sidechain atom names per residue type (27 slots: 14 heavy + 13 H).
+# ``None`` marks absent atoms. Indexed by integer residue encoding.
 aa2long=[
     (" N  "," CA "," C  "," O  "," CB ",  None,  None,  None,  None,  None,  None,  None,  None,  None," H  "," HA ","1HB ","2HB ","3HB ",  None,  None,  None,  None,  None,  None,  None,  None), # ala
     (" N  "," CA "," C  "," O  "," CB "," CG "," CD "," NE "," CZ "," NH1"," NH2",  None,  None,  None," H  "," HA ","1HB ","2HB ","1HG ","2HG ","1HD ","2HD "," HE ","1HH1","2HH1","1HH2","2HH2"), # arg
@@ -183,10 +225,19 @@ aa2long=[
 
 
 def get_rmsd(a, b, eps=1e-6):
-    '''
-    align crds b to a : always use all c-alphas
-    expected tensor of shape (L,3)
-    '''
+    """Align coordinates *b* onto *a* via SVD and return (RMSD, rotation matrix U).
+
+    Uses all C-alpha positions for alignment. Both inputs should be tensors
+    of shape ``(L, 3)``.
+
+    Args:
+        a: Reference coordinates, shape ``(L, 3)``.
+        b: Mobile coordinates, shape ``(L, 3)``.
+        eps: Small constant added inside sqrt to avoid zero gradients.
+
+    Returns:
+        Tuple of (rmsd_scalar, rotation_matrix_U).
+    """
     assert a.shape == b.shape, 'make sure tensors are the same size'
     L = a.shape[0]
     assert a.shape == torch.Size([L,3]), 'make sure tensors are in format [L,3]'

@@ -30,45 +30,23 @@ After activation, all `cleo-design-*` and `cleo-optimize-*` CLI commands in this
 
 The two main themes of this workflow are:
 
-1. [**Library Design**](#-library-design)
+[**Library Design**](#-library-design)
    - [Example data](#-example-data)
    - [Library constraints](#-library-constraints)
    - [Aligning proteinMPNN to rewards](#-aligning-proteinmpnn-to-rewards)
    - [Sampling and filtering sequence fragments](#-sampling-and-filtering-sequence-fragments)
    - [Reverse Translation and Order Preparation](#-reverse-translation-and-order-preparation)
 
-2. [**Multi Round Experimental Optimization**](#-multi-round-experimental-optimization)  
+[**Multi Round Experimental Optimization**](#-multi-round-experimental-optimization)  
    - [Data collection philosophy and assay design](#-data-collection-philosophy-and-assay-design)  
    - [Strategies for early rounds of testing](#-strategies-for-early-rounds-of-testing)  
    - [Training sequence-to-function models](#-training-sequence-to-function-models)  
    - [Proposing batch of sequences to test next](#-proposing-batch-of-sequences-to-test-next)  
    - [Looping it all together](#-looping-it-all-together)
 
----
-<br><br>
-
-## 📝 Naming Conventions
-
-Throughout the CLEO workflow, fragments and sequences follow consistent naming conventions. Adhering to these conventions ensures compatibility across all scripts.
-
-**Fragment names** follow the format: `{frag_num}.{unique_id}`
-- The first dot-delimited token is **always** the 1-indexed integer fragment number.
-- Everything after the first dot is a unique identifier (e.g. a zero-padded index, a hex hash, a descriptive label, or a combination).
-- Examples: `1.0003.a7b2c8d1`, `2.dist1.05ff28c9`, `3.topk.00`
-
-**Fragment dictionaries** (JSON) use the integer fragment number as the key:
-```json
-{
-  "1": [["1.0000.a1b2c3d4", "MGEEE..."], ["1.0001.e5f6a7b8", "MGEEE..."]],
-  "2": [["2.0000.c9d0e1f2", "IEEIR..."], ["2.0001.a3b4c5d6", "IEEIR..."]],
-  "3": [["3.0000.f7a8b9c0", "RKALE..."], ["3.0001.d1e2f3a4", "RKALE..."]]
-}
-```
-
-**Resampled sequence names** join the constituent fragment names with a connector string (default `___`):
-`1.0003.a7b2c8d1___2.0010.b5c6d7e8___3.0001.f9a0b1c2`
-
-These conventions are enforced by `sample_from_policy.py` (output), `resample_fragments.py` (input/output), `evaluate_sequences.py` (input), the analysis notebook (parsing), and `dna_fragment_design.py` (input parsing).
+[**Naming Conventions**](#-naming-conventions)
+[**Help & Contributing**](#-help--contributing)
+[**License**](#-license)
 
 ---
 <br><br>
@@ -260,11 +238,9 @@ For libraries where function is more rare to find, it will be helpful to first e
 
 Since the vast majority of variants in the library appeared dead, we proceeded with independent fragment testing for PETase. In the figure below you can see the results of testing each fragment indepedently, overlayed with the pooled testing results for comparison.
 
-<< insert figure from independent fragment screening >>
 
 If you proceeded with collecting data for each individual fragment, you now have collected data for the first order effects of swapping in a single designed fragment to the parent sequence. A model trained on this data will only tell you to combine the best fragments together. Rather than training the model at this point we suggest that you sample combinations of some of the best looking independent fragments above some threshold. For the PETase we tested all possible combinations of the top 2 fragments (32 total designs) and additionally set activity bins for the initial screening which we used to sample fragments from to test combinations. See the [`sampling_from_activity_bins.ipynb`](notebooks/sampling_from_activity_bins.ipynb) to see an example of how this sampling is done. Acquiring data on higher order combinations of fragments will help the model learn interactions between fragments. The figure below demonstrates the results of setting a variety of bins and screening combinations of fragments from each bin. For completeness we use thresholds all the way down to a final bin where fragment combinations are randomly sampled from the library. You may want to restrict your sampling to the higher activity bins.
 
-<< insert figure showing bins of the independent fragment screening >> 
 
 
 
@@ -344,6 +320,31 @@ We often see that the measured activity can plateau after 4 or 5 rounds of optim
 
 
 <br>
+
+---
+
+## 📝 Naming Conventions
+
+Throughout the CLEO workflow, fragments and sequences follow consistent naming conventions. Adhering to these conventions ensures compatibility across all scripts.
+
+**Fragment names** follow the format: `{frag_num}.{unique_id}`
+- The first dot-delimited token is **always** the 1-indexed integer fragment number.
+- Everything after the first dot is a unique identifier (e.g. a zero-padded index, a hex hash, a descriptive label, or a combination).
+- Examples: `1.0003.a7b2c8d1`, `2.dist1.05ff28c9`, `3.topk.00`
+
+**Fragment dictionaries** (JSON) use the integer fragment number as the key:
+```json
+{
+  "1": [["1.0000.a1b2c3d4", "MGEEE..."], ["1.0001.e5f6a7b8", "MGEEE..."]],
+  "2": [["2.0000.c9d0e1f2", "IEEIR..."], ["2.0001.a3b4c5d6", "IEEIR..."]],
+  "3": [["3.0000.f7a8b9c0", "RKALE..."], ["3.0001.d1e2f3a4", "RKALE..."]]
+}
+```
+
+**Resampled sequence names** join the constituent fragment names with a connector string (default `___`):
+`1.0003.a7b2c8d1___2.0010.b5c6d7e8___3.0001.f9a0b1c2`
+
+These conventions are enforced by `sample_from_policy.py` (output), `resample_fragments.py` (input/output), `evaluate_sequences.py` (input), the analysis notebook (parsing), and `dna_fragment_design.py` (input parsing).
 
 ---
 

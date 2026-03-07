@@ -9,10 +9,19 @@ import pandas as pd
 
 
 def get_fragment_dictionary(fragment_csv):
-    '''
-        parse fragment order csv
-        csv must have columns: 'name','fragment','seq'
-    '''
+    """Parse a fragment CSV into an ordered dictionary of (name, sequence) pairs.
+
+    The CSV must have columns ``name``, ``fragment`` (1-indexed integer region
+    number), and ``seq``. Entries within each fragment are sorted alphabetically
+    by name for deterministic ordering.
+
+    Args:
+        fragment_csv: Path to the CSV file.
+
+    Returns:
+        Dict mapping fragment number (int, 1-indexed) to a sorted list of
+        ``(name, sequence)`` tuples.
+    """
     # read in csv
     library_df = pd.read_csv(fragment_csv)
     
@@ -33,9 +42,22 @@ def get_fragment_dictionary(fragment_csv):
 
 
 def make_all_sequences(fragment_dictionary, seq_list=[('','')], frag_num=1, to_join_on=':'):
-    '''
-        recursive func to make all possible sequences in list
-    '''
+    """Recursively enumerate all combinatorial sequences from a fragment dictionary.
+
+    Builds full-length sequences by concatenating one entry from each
+    fragment region. Names are joined with ``to_join_on`` (default ``:``)
+    as the delimiter.
+
+    Args:
+        fragment_dictionary: Dict from :func:`get_fragment_dictionary`.
+        seq_list: Accumulated list of ``(name, sequence)`` tuples (internal
+            recursion state).
+        frag_num: Current fragment region number (1-indexed).
+        to_join_on: Delimiter for joining fragment names.
+
+    Returns:
+        List of ``(name, sequence)`` tuples covering all combinations.
+    """
     new_seq_list = []
     for name,seq in seq_list:
         for name_to_add,frag_to_add in fragment_dictionary[frag_num]:
@@ -54,17 +76,35 @@ def make_all_sequences(fragment_dictionary, seq_list=[('','')], frag_num=1, to_j
 
 
 def get_all_sequences(fragment_dictionary):
-    '''
-        wrapper func to make all seqs in the library
-    '''
+    """Enumerate and sort all combinatorial sequences in the library.
+
+    Args:
+        fragment_dictionary: Dict from :func:`get_fragment_dictionary`.
+
+    Returns:
+        Sorted list of ``(name, sequence)`` tuples.
+    """
     all_seqs = make_all_sequences(fragment_dictionary)
     all_seqs.sort()
     return all_seqs
 
 def featurize_fragments(names, fragment_dictionary, to_split_on=':', num_fragments=None):
-    '''
-        split sequences by fragment and return features for training over fragment space
-    '''
+    """Convert compound fragment names into integer index tensors.
+
+    Each name is split on ``to_split_on`` and each token is looked up in
+    the corresponding fragment region to produce a per-region index.
+
+    Args:
+        names: List of compound names (e.g. ``"fragA:fragB:fragC"``).
+        fragment_dictionary: Dict from :func:`get_fragment_dictionary`.
+        to_split_on: Delimiter used in compound names.
+        num_fragments: If set, truncate to this many fragments (useful when
+            names carry extra suffixes).
+
+    Returns:
+        Integer tensor of shape ``(len(names), num_regions)`` with fragment
+        indices suitable for embedding layers.
+    """
     frag_nums = []
     for n in names:
         frag_list = n.split(to_split_on)

@@ -1,4 +1,11 @@
-# COPIED FROM PROTEIN MPNN UTILS (https://github.com/dauparas/ProteinMPNN/blob/main/protein_mpnn_utils.py)
+"""ProteinMPNN model architecture and feature extraction modules.
+
+Adapted from the official ProteinMPNN repository
+(https://github.com/dauparas/ProteinMPNN/blob/main/protein_mpnn_utils.py).
+Contains the main :class:`ProteinMPNN` model (encoder–decoder with
+autoregressive sampling), and feature extraction modules for different
+model variants: standard, ligand-aware, membrane, PSSM, and MSA.
+"""
 from __future__ import print_function
 import numpy as np
 import torch
@@ -9,6 +16,15 @@ import sys
 import time
 
 class ProteinMPNN(nn.Module):
+    """Message-passing neural network for protein sequence design.
+
+    Encoder–decoder architecture that takes backbone (and optionally ligand)
+    coordinates and autoregressively generates amino acid sequences. Supports
+    multiple model variants via *model_type*: ``protein_mpnn``,
+    ``ligand_mpnn``, ``soluble_mpnn``, ``antibody_mpnn``,
+    ``per_residue_label_membrane_mpnn``, ``global_label_membrane_mpnn``,
+    ``pssm_mpnn``, and ``msa_mpnn``.
+    """
     def __init__(self, 
                  num_letters=21, 
                  node_features=128, 
@@ -100,6 +116,16 @@ class ProteinMPNN(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def encode(self, feature_dict):
+        """Encode structure into node and edge hidden representations.
+
+        Args:
+            feature_dict: Batched feature dict from :func:`featurize`.
+
+        Returns:
+            Tuple of (h_V, h_E, E_idx) — node embeddings ``[B, L, H]``,
+            edge embeddings ``[B, L, K, H]``, and neighbour indices
+            ``[B, L, K]``.
+        """
         #xyz_37 = feature_dict["xyz_37"] #[B,L,37,3] - xyz coordinates for all atoms if needed
         #xyz_37_m = feature_dict["xyz_37_m"] #[B,L,37] - mask for all coords
         #Y = feature_dict["Y"] #[B,L,num_context_atoms,3] - for ligandMPNN coords
@@ -185,6 +211,22 @@ class ProteinMPNN(nn.Module):
 
 
     def sample(self, feature_dict):
+        """Autoregressively sample sequences conditioned on structure.
+
+        Decodes one position at a time in a random order determined by
+        ``feature_dict["randn"]``, applying temperature scaling, per-position
+        amino acid bias, and optional pairwise bias and symmetry constraints.
+
+        Args:
+            feature_dict: Batched feature dict including ``batch_size``,
+                ``temperature``, ``bias``, ``randn``, ``symmetry_residues``,
+                and ``symmetry_weights``.
+
+        Returns:
+            Dict with ``S`` (sampled sequences ``[B, L]``),
+            ``sampling_probs`` ``[B, L, 20]``, ``log_probs`` ``[B, L, 21]``,
+            and ``decoding_order`` ``[B, L]``.
+        """
         #xyz_37 = feature_dict["xyz_37"] #[B,L,37,3] - xyz coordinates for all atoms if needed
         #xyz_37_m = feature_dict["xyz_37_m"] #[B,L,37] - mask for all coords
         #Y = feature_dict["Y"] #[B,L,num_context_atoms,3] - for ligandMPNN coords
@@ -382,6 +424,18 @@ class ProteinMPNN(nn.Module):
 
 
     def unconditional_probs(self, feature_dict):
+        """Compute unconditional (structure-only) log probabilities.
+
+        Runs the decoder without any sequence context — every position
+        attends only to encoder features, producing probabilities that
+        reflect the structural prior alone.
+
+        Args:
+            feature_dict: Batched feature dict with ``batch_size``.
+
+        Returns:
+            Dict with ``log_probs`` of shape ``[B, L, 21]``.
+        """
         #xyz_37 = feature_dict["xyz_37"] #[B,L,37,3] - xyz coordinates for all atoms if needed
         #xyz_37_m = feature_dict["xyz_37_m"] #[B,L,37] - mask for all coords
         #Y = feature_dict["Y"] #[B,L,num_context_atoms,3] - for ligandMPNN coords
@@ -419,8 +473,20 @@ class ProteinMPNN(nn.Module):
         return output_dict
 
     def score(self, feature_dict):
-        #check if score matches - sample log probs
+        """Score a given sequence conditioned on structure (teacher forcing).
 
+        Runs the decoder with the true sequence provided at every position
+        (non-autoregressive), returning per-position log probabilities that
+        can be used for sequence likelihood evaluation.
+
+        Args:
+            feature_dict: Batched feature dict including the true sequence
+                ``S``, ``randn`` for decoding order, and ``chain_mask``.
+
+        Returns:
+            Dict with ``S``, ``log_probs`` ``[B, L, 21]``, and
+            ``decoding_order`` ``[L]``.
+        """
         #xyz_37 = feature_dict["xyz_37"] #[B,L,37,3] - xyz coordinates for all atoms if needed
         #xyz_37_m = feature_dict["xyz_37_m"] #[B,L,37] - mask for all coords
         #Y = feature_dict["Y"] #[B,L,num_context_atoms,3] - for ligandMPNN coords
@@ -480,6 +546,7 @@ class ProteinMPNN(nn.Module):
 
 
 class ProteinFeaturesLigand(nn.Module):
+    """Feature extraction for LigandMPNN: backbone RBF edges + ligand atom context."""
     def __init__(self, edge_features, node_features, num_positional_embeddings=16, num_rbf=16, top_k=30, augment_eps=0., device=None, atom_context_num=16, use_side_chains=False):
         """ Extract protein features """
         super(ProteinFeaturesLigand, self).__init__()
@@ -730,6 +797,7 @@ class ProteinFeaturesLigand(nn.Module):
 
 
 class ProteinFeatures(nn.Module):
+    """Standard backbone-only feature extraction (25 RBF atom-pair channels)."""
     def __init__(self, edge_features, node_features, num_positional_embeddings=16, num_rbf=16, top_k=48, augment_eps=0.0):
         """ Extract protein features """
         super(ProteinFeatures, self).__init__()
@@ -835,6 +903,7 @@ class ProteinFeatures(nn.Module):
 
 
 class ProteinFeaturesMembrane(nn.Module):
+    """Feature extraction with per-residue membrane topology labels."""
     def __init__(self, edge_features, node_features, num_positional_embeddings=16, num_rbf=16, top_k=48, augment_eps=0.0, num_classes=3):
         """ Extract protein features """
         super(ProteinFeaturesMembrane, self).__init__()
@@ -949,6 +1018,7 @@ class ProteinFeaturesMembrane(nn.Module):
 
 
 class ProteinFeaturesPSSM(nn.Module):
+    """Feature extraction with position-specific scoring matrix (PSSM) node features."""
     def __init__(self, edge_features, node_features, num_positional_embeddings=16, num_rbf=16, top_k=48, augment_eps=0.0):
         """ Extract protein features """
         super(ProteinFeaturesPSSM, self).__init__()
@@ -1061,6 +1131,7 @@ class ProteinFeaturesPSSM(nn.Module):
 
 
 class ProteinFeaturesMSA(nn.Module):
+    """Feature extraction with multiple sequence alignment (MSA) edge features."""
     def __init__(self, edge_features, node_features, num_positional_embeddings=16, num_rbf=16, top_k=48, augment_eps=0.0):
         super(ProteinFeaturesMSA, self).__init__()
         self.edge_features = edge_features
@@ -1178,6 +1249,7 @@ class ProteinFeaturesMSA(nn.Module):
 
 
 class DecLayerJ(nn.Module):
+    """Decoder layer variant for ligand context with extra dimension in neighbor expand."""
     def __init__(self, num_hidden, num_in, dropout=0.1, num_heads=None, scale=30):
         super(DecLayerJ, self).__init__()
         self.num_hidden = num_hidden
@@ -1218,6 +1290,7 @@ class DecLayerJ(nn.Module):
         return h_V
 
 class PositionWiseFeedForward(nn.Module):
+    """Two-layer MLP with GELU activation, used in transformer blocks."""
     def __init__(self, num_hidden, num_ff):
         super(PositionWiseFeedForward, self).__init__()
         self.W_in = nn.Linear(num_hidden, num_ff, bias=True)
@@ -1229,6 +1302,7 @@ class PositionWiseFeedForward(nn.Module):
         return h
 
 class PositionalEncodings(nn.Module):
+    """Learnable relative positional encoding with cross-chain masking."""
     def __init__(self, num_embeddings, max_relative_feature=32):
         super(PositionalEncodings, self).__init__()
         self.num_embeddings = num_embeddings
@@ -1242,6 +1316,7 @@ class PositionalEncodings(nn.Module):
         return E
 
 class DecLayer(nn.Module):
+    """Standard decoder layer: message-passing + feedforward with residual connections."""
     def __init__(self, num_hidden, num_in, dropout=0.1, num_heads=None, scale=30):
         super(DecLayer, self).__init__()
         self.num_hidden = num_hidden
@@ -1283,6 +1358,7 @@ class DecLayer(nn.Module):
 
 
 class EncLayer(nn.Module):
+    """Encoder layer: bidirectional message-passing that updates both node and edge features."""
     def __init__(self, num_hidden, num_in, dropout=0.1, num_heads=None, scale=30):
         super(EncLayer, self).__init__()
         self.num_hidden = num_hidden
@@ -1331,7 +1407,6 @@ class EncLayer(nn.Module):
 
 
 
-# The following gather functions
 def gather_edges(edges, neighbor_idx):
     # Features [B,N,N,C] at Neighbor indices [B,N,K] => Neighbor features [B,N,K,C]
     neighbors = neighbor_idx.unsqueeze(-1).expand(-1, -1, -1, edges.size(-1))

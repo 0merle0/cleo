@@ -17,7 +17,24 @@ from cleo.design.utils.geom import torch_get_rmsd, angle_between_three_points, c
 
 
 def compute_petase_metrics(cif_path, cfg, ref):
+    """Compute active-site geometry metrics for a single PETase structure.
 
+    Measures catalytic triad distances (Ser-OG ↔ His-NE2, His-NE2 ↔ ester
+    oxygen), oxyanion hole backbone-N distances, the His-CE1/NE2/Ser-OG
+    angle, and ligand RMSD after CA-based alignment to a reference.
+
+    Args:
+        cif_path: Path to a Boltz-predicted ``.cif`` structure file.
+        cfg: OmegaConf config specifying residue numbers, chain IDs,
+            reference structure path, and atom name orderings.
+        ref: Pre-loaded Biotite AtomArray of the reference structure
+            (avoids reloading per sequence).
+
+    Returns:
+        Dict with keys ``acylox_oxh1bbN``, ``acylox_oxh2bbN``,
+        ``hisNE2_esterox``, ``hisNE2_serOG``, ``his_ser_angle``,
+        and ``ligand_rmsd``.
+    """
     cr_ser = cfg.cat_res_ser
     cr_his = cfg.cat_res_his
     cr_asp = cfg.cat_res_asp

@@ -19,10 +19,12 @@ from cleo.design.utils.policy import alphabet
 
 
 class UniversalReward():
-    """
-        Universal reward function
-        will run the steps and reward aggregations
-        described in the config file
+    """Configurable reward function for RL fine-tuning of ProteinMPNN.
+
+    Executes a pipeline of metric steps (e.g. structure prediction, distance
+    calculations) on sampled sequences, then aggregates per-metric scores
+    into a single scalar reward via normalised weighted summation. Steps and
+    weights are defined in the training config.
     """
 
     def __init__(
@@ -39,8 +41,16 @@ class UniversalReward():
         self.reward_aggregation = reward_aggregation
     
     def get_sequences(self, policy_output, chain_mask=None):
-        """
-            Return list of sampled sequences
+        """Decode integer token sequences from policy output into amino acid strings.
+
+        Args:
+            policy_output: Dict with key ``S`` containing sampled sequence
+                tensors of shape ``(B, L)``.
+            chain_mask: Optional boolean tensor of shape ``(L,)`` to select
+                only the designed chain positions.
+
+        Returns:
+            List of amino acid strings, one per batch element.
         """
         sampled_sequences = policy_output["S"]
 
@@ -67,6 +77,18 @@ class UniversalReward():
     
     @torch.no_grad()
     def __call__(self, step, policy_output, feature_dict, device):
+        """Run the full reward pipeline: decode → metric steps → aggregate.
+
+        Args:
+            step: Current training step number (used for output directory naming).
+            policy_output: Dict from the policy's ``sample`` method.
+            feature_dict: Structural feature dict with ``chain_labels``.
+            device: Torch device for the returned reward tensor.
+
+        Returns:
+            Tuple of (reward_tensor, log_dict) where reward_tensor has shape
+            ``(B,)`` and log_dict contains per-metric batch statistics.
+        """
 
         rundir = os.path.join(
             self.output_dir, 

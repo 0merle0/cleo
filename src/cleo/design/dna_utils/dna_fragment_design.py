@@ -86,6 +86,7 @@ DEFAULT_SPECIFICATIONS_DICT["MinimizeNumKmers"] = MinimizeNumKmers
 # ============================================
 
 def reverse_complement(seq):
+    """Return the reverse complement of a DNA sequence."""
     complement = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
     return ''.join(complement[x] for x in reversed(seq.upper()))
 
@@ -182,6 +183,14 @@ def reverse_translate(
 
 
 def get_vector_enzyme(file_path):
+    """Load vector and restriction enzyme definitions from a JSON file.
+
+    Args:
+        file_path: Path to JSON containing ``vectors`` and ``enzymes`` keys.
+
+    Returns:
+        Tuple of (vectors_dict, enzymes_dict).
+    """
     with open(file_path, 'r') as f:
         vector_enzyme = json.load(f)
     return vector_enzyme['vectors'], vector_enzyme['enzymes']
@@ -327,6 +336,12 @@ def combine_dna(df, dna_overlaps, vector_info, cuts):
 
 
 def to_fasta(df, filepath):
+    """Write fragment DNA sequences to a FASTA file.
+
+    Args:
+        df: DataFrame with ``fragment_name`` and ``full_dna`` columns.
+        filepath: Output FASTA path.
+    """
     with open(filepath, 'w') as f:
         for _, r in df.iterrows():
             f.write(f'>{r.fragment_name}\n{r.full_dna}\n')

@@ -64,7 +64,8 @@ _CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/optimize")
 
 @hydra.main(version_base=None, config_path=_CONFIG_DIR)
 def main(cfg):
-
+    """Hydra entrypoint: load a surrogate model, run acquisition-function
+    optimization over fragment space, and save candidate sequences."""
     out_path = os.path.join(cfg.outdir, cfg.run_name)
     os.makedirs(out_path, exist_ok=True)
 

@@ -41,6 +41,14 @@ def torch_get_rmsd(a, b, eps=1e-6):
     return rmsd, U
 
 def angle_between_three_points(A, B, C):
+    """Compute the angle ABC in degrees, where B is the vertex.
+
+    Args:
+        A, B, C: numpy arrays of shape ``(3,)`` representing 3D coordinates.
+
+    Returns:
+        Angle in degrees (0–180).
+    """
     u = A - B
     v = C - B
     cos_theta = np.dot(u, v) / (np.linalg.norm(u) * np.linalg.norm(v))

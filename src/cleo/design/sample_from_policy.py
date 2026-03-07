@@ -1,3 +1,12 @@
+"""Sample sequences from a trained ProteinMPNN policy checkpoint.
+
+Loads one or more policy checkpoints, samples batches of amino acid
+sequences, writes full-length FASTA output, and optionally splits
+sequences into fragment regions for downstream library construction.
+
+Usage:
+    python -m cleo.design.sample_from_policy --config-name sample
+"""
 import os
 import json
 import secrets
@@ -72,14 +81,27 @@ def write_fasta(sequences, path, names=None):
 
 
 def write_fragment_dict_json(fragment_dict, path):
-    """Write the fragment dictionary as JSON (list of [name, seq] pairs per fragment)."""
+    """Write the fragment dictionary as JSON.
+
+    Args:
+        fragment_dict: Dict mapping fragment number (str) to list of
+            ``(name, sequence)`` tuples.
+        path: Output JSON file path.
+    """
     serializable = {k: list(v) for k, v in fragment_dict.items()}
     with open(path, "w") as f:
         json.dump(serializable, f, indent=2)
 
 
 def write_fragment_fasta(fragment_dict, output_dir, prefix):
-    """Write one FASTA per fragment region."""
+    """Write one FASTA file per fragment region.
+
+    Args:
+        fragment_dict: Dict mapping fragment number (str) to list of
+            ``(name, sequence)`` tuples.
+        output_dir: Directory to write FASTA files into.
+        prefix: Filename prefix (e.g. ``"{prefix}_{frag_num}.fasta"``).
+    """
     for frag_name, entries in fragment_dict.items():
         path = os.path.join(output_dir, f"{prefix}_{frag_name}.fasta")
         with open(path, "w") as f:
@@ -92,7 +114,7 @@ _CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/design")
 
 @hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="sample")
 def sample_from_policy(cfg):
-
+    """Hydra entrypoint: sample sequences from policy checkpoints and write outputs."""
     os.makedirs(cfg.output_dir, exist_ok=True)
 
     overrides = {}
