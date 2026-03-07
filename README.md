@@ -30,29 +30,27 @@ After activation, all `cleo-design-*` and `cleo-optimize-*` CLI commands in this
 
 The two main themes of this workflow are:
 
-[**Library Design**](#-library-design)
+[**Library Design**](#library-design)
    - [Library constraints](#-library-constraints)
    - [Aligning proteinMPNN to rewards](#-aligning-proteinmpnn-to-rewards)
    - [Sampling and filtering sequence fragments](#-sampling-and-filtering-sequence-fragments)
    - [Reverse Translation and Order Preparation](#-reverse-translation-and-order-preparation)
 
-[**Multi Round Experimental Optimization**](#-multi-round-experimental-optimization)  
+[**Multi Round Experimental Optimization**](#multi-round-experimental-optimization)  
    - [Data collection philosophy and assay design](#-data-collection-philosophy-and-assay-design)  
    - [Strategies for early rounds of testing](#-early-rounds-of-testing)  
    - [Training sequence-to-function models](#-training-sequence-to-function-models)  
    - [Proposing batch of sequences to test next](#-proposing-batch-of-sequences-to-test-next)  
    - [Looping it all together](#-looping-it-all-together)
 
-[**Naming Conventions**](#-naming-conventions)
-
-[**Help & Contributing**](#-help--contributing)
-
+[**Naming Conventions**](#-naming-conventions)  
+[**Help & Contributing**](#-help--contributing)  
 [**License**](#-license)
 
 ---
 <br><br>
 
-# ⚙️ Library Design
+# Library Design
 
 ![library gif](figs/frag_animation.gif)
 
@@ -210,7 +208,7 @@ When ordering the DNA fragments it is possible to order as a pool with unique pr
 ---
 <br><br>
 
-# 📈 Multi Round Experimental Optimization
+# Multi Round Experimental Optimization
 The following sections will detail how we think about the **lab-in-a-loop** process and what we have learned along the way. Before we dive into details about where to start and how to screen the first round, it is important we cover some basics.
 
 Ideally you have decided on what function you are interested in optimizing for; this can be any combination of expression, binding affinity, catalytic rate, immunogenicity, and more. It is important to ensure the assay you will use for assessing function is properly developed to demonstrate clear and consistent signal for a positive control over background. A good dynamic range with consistent replicates is imperative for this to work. We have given a lot of thought to collecting quality experimental data. To demonstrate we will continue with our example of PETase optimization.
