@@ -31,7 +31,6 @@ After activation, all `cleo-design-*` and `cleo-optimize-*` CLI commands in this
 The two main themes of this workflow are:
 
 [**Library Design**](#-library-design)
-   - [Example data](#-example-data)
    - [Library constraints](#-library-constraints)
    - [Aligning proteinMPNN to rewards](#-aligning-proteinmpnn-to-rewards)
    - [Sampling and filtering sequence fragments](#-sampling-and-filtering-sequence-fragments)
@@ -39,13 +38,15 @@ The two main themes of this workflow are:
 
 [**Multi Round Experimental Optimization**](#-multi-round-experimental-optimization)  
    - [Data collection philosophy and assay design](#-data-collection-philosophy-and-assay-design)  
-   - [Strategies for early rounds of testing](#-strategies-for-early-rounds-of-testing)  
+   - [Strategies for early rounds of testing](#-early-rounds-of-testing)  
    - [Training sequence-to-function models](#-training-sequence-to-function-models)  
    - [Proposing batch of sequences to test next](#-proposing-batch-of-sequences-to-test-next)  
    - [Looping it all together](#-looping-it-all-together)
 
 [**Naming Conventions**](#-naming-conventions)
+
 [**Help & Contributing**](#-help--contributing)
+
 [**License**](#-license)
 
 ---
