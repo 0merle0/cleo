@@ -107,6 +107,16 @@ reward:
     #     ckpt_path: example_data/surrogate_model # path to checkpoint folder
     #     ckpt_name: last.ckpt # checkpoint name to use (usually last.ckpt)
 
+    # !! MUTATION DIVERSITY REWARD !!
+    # # reward sequences for contributing unique mutations to the batch.
+    # # outputs both marginal (exclusive-only) and fractional (1/k) scores.
+    # # marginal_count: mutations only this sequence carries (sparse, strong signal)
+    # # fractional_score: sum of 1/k per mutation, k = batch members sharing it (smooth signal)
+    # - name: mutation_diversity
+    #   target_fn: cleo.design.utils.mutation_diversity.mutation_diversity_from_df
+    #   cfg:
+    #     ref_seq: MGEEEELELERPSGERTPVRRHRFPARKANNIEEAVANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGTAGEAVVQVLASAGVDVLLMGGLGSGVPVTIYRA
+
 
   # Normalizing metrics and aggregating to a single scalar reward
   reward_aggregation:
@@ -170,4 +180,18 @@ reward:
     #   lower_bound: -1.0
     #   upper_bound: 2.0
     #   weight: 5.0
+    #   mode: max
+
+    # !! MUTATION DIVERSITY REWARDS !!
+    # # Use one or both — fractional is smoother, marginal is stricter.
+    # # Track both during training to compare which drives more diversity.
+    # - metric: mutation_diversity_fractional_score
+    #   lower_bound: 0
+    #   upper_bound: 10    # tune based on batch size and typical mutation counts
+    #   weight: 1.0
+    #   mode: max
+    # - metric: mutation_diversity_marginal_count
+    #   lower_bound: 0
+    #   upper_bound: 10    # tune based on batch size and typical mutation counts
+    #   weight: 1.0
     #   mode: max
