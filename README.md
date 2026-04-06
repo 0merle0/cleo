@@ -64,7 +64,7 @@ We have found that it does not matter too much where the splits occur, even spli
 
 Assembling the fragments *in vitro* requires orhtogonal overhangs. [NEB Golden Gate Assembly](https://www.neb.com/en-us/nebinspired-blog/getting-started-with-golden-gate) requires designing 4 base pair overhangs that are unique to each junction. To facilitate this we recommend fixing 2 amino acids at the start and end of each fragment (which correspond to 12 base pair stretch to search for compatible overhangs within).
 
-Fixing other residues which may be critical for function is easy to do in the config file. We provide an example config file: `[denovo_petase.yaml](config/design/denovo_petase.yaml)` for PETase here with more details on how to setup your own run.
+Fixing other residues which may be critical for function is easy to do in the config file. We provide an example config file: [denovo_petase.yaml](config/design/denovo_petase.yaml) for PETase here with more details on how to setup your own run.
 
 ## 🎯 Aligning proteinMPNN to rewards:
 
@@ -79,7 +79,7 @@ The **[config](config/design/denovo_petase.yaml)** should serve as a template fo
 To evaluate sequences we will need to define a series of steps to analyze the sequences proposed by proteinMPNN. These steps will be defined in the `reward.steps` section of the config. Each step is configured with the following fields:
 
 - `name`: A unique name for the step.
-- `target_fn`: The function to call to perform the analysis (should live in `[cleo/design/utils](src/cleo/design/utils/)` folder).
+- `target_fn`: The function to call to perform the analysis (should live in [cleo/design/utils](src/cleo/design/utils/) folder).
 - `cfg`: Parameters needed for the function.
 
 Each step function will have the following structure:
@@ -101,7 +101,7 @@ def step_fn(df_input: pd.DataFrame, cfg: Dict, step_name="step") -> pd.DataFrame
    
 ```
 
-For the PETase optimization we folded the sequences with a structure prediction oracle, measured a variety of distances between atoms involved with catalytic activity, and computed hamming distance of the sampled sequence to reference sequences (this can all be found in the example config: `[denovo_petase.yaml](config/design/denovo_petase.yaml)`).
+For the PETase optimization we folded the sequences with a structure prediction oracle, measured a variety of distances between atoms involved with catalytic activity, and computed hamming distance of the sampled sequence to reference sequences (this can all be found in the example config: [denovo_petase.yaml](config/design/denovo_petase.yaml)).
 
 The list of steps will be run consecutively, with the outputs of the previous passed as the input to the next step. Each step will add new columns to the dataframe containing the results of the analysis. Be sure to order the steps such that access to infomation from previous steps is available if needed.
 
@@ -134,9 +134,9 @@ The training script will create an output directory (configured by `output_dir` 
 - `{run_name}_step_NNNN.pt` — periodic checkpoints
 - `{run_name}_best.pt` / `{run_name}_last.pt` — best and final checkpoints
 
-Example training output from two runs with different distance-to-reference weights can be found in `[example_data/library_design/test_run_1_w1/](example_data/library_design/test_run_1_w1/)` and `[example_data/library_design/test_run_1_w10/](example_data/library_design/test_run_1_w10/)`.
+Example training output from two runs with different distance-to-reference weights can be found in [example_data/library_design/test_run_1_w1/](example_data/library_design/test_run_1_w1/) and [example_data/library_design/test_run_1_w10/](example_data/library_design/test_run_1_w10/).
 
-Checkout the notebook `[library_design_monitor_training.ipynb](notebooks/library_design_monitor_training.ipynb)` to see what tracking an example training run looks like.
+Checkout the notebook [library_design_monitor_training.ipynb](notebooks/library_design_monitor_training.ipynb) to see what tracking an example training run looks like.
 
 ## 🎲 Sampling and Filtering Sequence Fragments
 
@@ -148,13 +148,13 @@ Once you have a few training runs converge you can sample sequences from them. T
 cleo-design-sample --config-name sample
 ```
 
-This loads one or more checkpoints (configured in `[config/design/sample.yaml](config/design/sample.yaml)`), samples sequences from the policy, splits them into fragments, and writes:
+This loads one or more checkpoints (configured in [config/design/sample.yaml](config/design/sample.yaml)), samples sequences from the policy, splits them into fragments, and writes:
 
 - `{output_name}.fasta` — full-length sequences
 - `{output_name}_fragments.json` — fragment dictionary (keyed by fragment number)
 - `{output_name}_{N}.fasta` — per-region fragment FASTA files
 
-Example output: `[example_data/library_design/sampled_sequences/](example_data/library_design/sampled_sequences/)`
+Example output: [example_data/library_design/sampled_sequences/](example_data/library_design/sampled_sequences/)
 
 ### Step 2: Resample combinatorial sequences from fragments
 
@@ -162,9 +162,9 @@ Example output: `[example_data/library_design/sampled_sequences/](example_data/l
 cleo-design-resample --config-name resample_fragments
 ```
 
-Takes the fragment dictionary JSON and generates new full-length sequences by sampling one fragment per region with inverse-count weighting for uniform coverage. See `[config/design/resample_fragments.yaml](config/design/resample_fragments.yaml)` for configuration.
+Takes the fragment dictionary JSON and generates new full-length sequences by sampling one fragment per region with inverse-count weighting for uniform coverage. See [config/design/resample_fragments.yaml](config/design/resample_fragments.yaml) for configuration.
 
-Example output: `[example_data/library_design/resampled_sequences/example_resampled.fasta](example_data/library_design/resampled_sequences/example_resampled.fasta)`
+Example output: [example_data/library_design/resampled_sequences/example_resampled.fasta](example_data/library_design/resampled_sequences/example_resampled.fasta)
 
 ### Step 3: Evaluate resampled sequences
 
@@ -172,13 +172,13 @@ Example output: `[example_data/library_design/resampled_sequences/example_resamp
 cleo-design-evaluate --config-name evaluate
 ```
 
-Runs the resampled sequences through the same metric pipeline used during training and outputs a CSV with all computed metrics. The steps are configured in `[config/design/evaluate.yaml](config/design/evaluate.yaml)` using the same format as `reward.steps` in the training config.
+Runs the resampled sequences through the same metric pipeline used during training and outputs a CSV with all computed metrics. The steps are configured in [config/design/evaluate.yaml](config/design/evaluate.yaml) using the same format as `reward.steps` in the training config.
 
-Example output: `[example_data/library_design/evaluation_results/example_evaluation.csv](example_data/library_design/evaluation_results/example_evaluation.csv)`
+Example output: [example_data/library_design/evaluation_results/example_evaluation.csv](example_data/library_design/evaluation_results/example_evaluation.csv)
 
 ### Step 4: Aggregate sequence level metrics to fragment level
 
-See the notebook `[library_design_fragment_analysis.ipynb](notebooks/library_design_fragment_analysis.ipynb)` to understand how to aggregate the evaluation metrics from sequence level to fragment level, rank the top-k fragments per region, and export them to FASTA for ordering. The notebook requires the evaluation CSV and fragment dictionary JSON as inputs — examples of both are in `[example_data/library_design/evaluation_results/](example_data/library_design/evaluation_results/)`.
+See the notebook [library_design_fragment_analysis.ipynb](notebooks/library_design_fragment_analysis.ipynb) to understand how to aggregate the evaluation metrics from sequence level to fragment level, rank the top-k fragments per region, and export them to FASTA for ordering. The notebook requires the evaluation CSV and fragment dictionary JSON as inputs — examples of both are in [example_data/library_design/evaluation_results/](example_data/library_design/evaluation_results/).
 
 ### Filtering considerations
 
@@ -195,12 +195,12 @@ Reverse translating protein sequences into DNA sequences is the final step befor
 cleo-design-dna --config-name dna_fragment_design
 ```
 
-Takes amino acid fragment sequences (FASTA and/or CSV) and produces codon-optimized DNA with Golden Gate assembly adapters. See `[config/design/dna_fragment_design.yaml](config/design/dna_fragment_design.yaml)` for configuration including vector and enzyme settings.
+Takes amino acid fragment sequences (FASTA and/or CSV) and produces codon-optimized DNA with Golden Gate assembly adapters. See [config/design/dna_fragment_design.yaml](config/design/dna_fragment_design.yaml) for configuration including vector and enzyme settings.
 
 Example input files:
 
-- FASTA: `[example_data/library_design/dna_utils/input_example.fa](example_data/library_design/dna_utils/input_example.fa)`
-- CSV: `[example_data/library_design/dna_utils/input_example.csv](example_data/library_design/dna_utils/input_example.csv)`
+- FASTA: [example_data/library_design/dna_utils/input_example.fa](example_data/library_design/dna_utils/input_example.fa)
+- CSV: [example_data/library_design/dna_utils/input_example.csv](example_data/library_design/dna_utils/input_example.csv)
 
 The script outputs a CSV and FASTA of the final DNA fragments with adapters attached.
 
@@ -228,7 +228,7 @@ Since we are interested in optimizing Kcat, we will run the reaction under exces
 
 To process the data we generate a plate map csv file prior to testing with information about each well on the plate including what construct is being expressed, the sequence, sample type (i.e. positive control, negative control, sample), replicate number and any other metadata which could be helpful for data processing. 
 
-The following `[data_processing_example.ipynb](notebooks/data_processing_example.ipynb)` serves as a guide for processing the raw data collected from the plate reader as described above. The notebook walks through parsing raw instrument files, applying standard curves, fitting kinetics, normalizing by expression, and filtering — using real example data from a single round of the PETase campaign. All input files (raw plate-reader exports, plate maps, standard curves) and expected output are provided in `[example_data/data_processing/](example_data/data_processing/)`.
+The following [data_processing_example.ipynb](notebooks/data_processing_example.ipynb) serves as a guide for processing the raw data collected from the plate reader as described above. The notebook walks through parsing raw instrument files, applying standard curves, fitting kinetics, normalizing by expression, and filtering — using real example data from a single round of the PETase campaign. All input files (raw plate-reader exports, plate maps, standard curves) and expected output are provided in [example_data/data_processing/](example_data/data_processing/).
 
 ## 🦠 Early Rounds of Testing
 
@@ -240,7 +240,7 @@ For libraries where function is more rare to find, it will be helpful to first e
 
 Since the vast majority of variants in the library appeared dead, we proceeded with independent fragment testing for PETase. In the figure below you can see the results of testing each fragment indepedently, overlayed with the pooled testing results for comparison.
 
-If you proceeded with collecting data for each individual fragment, you now have collected data for the first order effects of swapping in a single designed fragment to the parent sequence. A model trained on this data will only tell you to combine the best fragments together. Rather than training the model at this point we suggest that you sample combinations of some of the best looking independent fragments above some threshold. For the PETase we tested all possible combinations of the top 2 fragments (32 total designs) and additionally set activity bins for the initial screening which we used to sample fragments from to test combinations. See the `[sampling_from_activity_bins.ipynb](notebooks/sampling_from_activity_bins.ipynb)` to see an example of how this sampling is done. Acquiring data on higher order combinations of fragments will help the model learn interactions between fragments. The figure below demonstrates the results of setting a variety of bins and screening combinations of fragments from each bin. For completeness we use thresholds all the way down to a final bin where fragment combinations are randomly sampled from the library. You may want to restrict your sampling to the higher activity bins.
+If you proceeded with collecting data for each individual fragment, you now have collected data for the first order effects of swapping in a single designed fragment to the parent sequence. A model trained on this data will only tell you to combine the best fragments together. Rather than training the model at this point we suggest that you sample combinations of some of the best looking independent fragments above some threshold. For the PETase we tested all possible combinations of the top 2 fragments (32 total designs) and additionally set activity bins for the initial screening which we used to sample fragments from to test combinations. See the [sampling_from_activity_bins.ipynb](notebooks/sampling_from_activity_bins.ipynb) to see an example of how this sampling is done. Acquiring data on higher order combinations of fragments will help the model learn interactions between fragments. The figure below demonstrates the results of setting a variety of bins and screening combinations of fragments from each bin. For completeness we use thresholds all the way down to a final bin where fragment combinations are randomly sampled from the library. You may want to restrict your sampling to the higher activity bins.
 
 ## 🤖 Training Sequence-to-Function Models
 
@@ -248,9 +248,9 @@ At this stage you have collected some valuable data, and it is time to use the d
 
 The best performing models across different datasets we have collected are simple multilayer perceptron (MLP) with non-linear activation (ReLU) and stochastic dropout at every layer. We follow [Lakshminarayanan et. al.](https://arxiv.org/abs/1612.01474) in training an ensemble of MLPs with a gaussian negative log-likelihood objective to learn both a mean and uncertainty head for each model in the ensemble. By treating each estimate as a gaussian we can mix them together to get the ensemble’s mean and variance for a sequence (this is described in the paper referenced above). 
 
-Before training the model we recommend applying z-score normalization to the activity values you wish to train on. Additionally, we suggest sampling an validation set approximately 10-20% of the training data to assess hyperparameters of the model. The input dataset for training the predictor should be a csv file (most easily exported from pandas) with columns including sequence, activity, and validation. See this `[model_data_preparation.ipynb](notebooks/model_data_preparation.ipynb)` we provide an example of how such a dataset should be formatted for training.
+Before training the model we recommend applying z-score normalization to the activity values you wish to train on. Additionally, we suggest sampling an validation set approximately 10-20% of the training data to assess hyperparameters of the model. The input dataset for training the predictor should be a csv file (most easily exported from pandas) with columns including sequence, activity, and validation. See this [model_data_preparation.ipynb](notebooks/model_data_preparation.ipynb) we provide an example of how such a dataset should be formatted for training.
 
-To train the model you will need to create a config. We provide `[momi.yaml](config/optimize/momi.yaml)` which inherits from `[base_surrogate.yaml](config/optimize/base_surrogate.yaml)` as a reference — please see the config files to understand what parameters are important to change for training. A training run can be launched with the following command:
+To train the model you will need to create a config. We provide [momi.yaml](config/optimize/momi.yaml) which inherits from [base_surrogate.yaml](config/optimize/base_surrogate.yaml) as a reference — please see the config files to understand what parameters are important to change for training. A training run can be launched with the following command:
 
 ```bash
 cleo-optimize-train --config-name momi data_path=<path_to_training_csv> use_validation=true
@@ -260,11 +260,11 @@ cleo-optimize-train --config-name momi data_path=<path_to_training_csv> use_vali
 
 It is recommended that you begin by training with a validation set (this can be turned on in the config) to understand if the model is converging well. The training script will save plots of the ground truth vs predicted activities for the validation set. In addition plots displaying the correlation of the mean and variance as well as the variance and the squared error associated with the prediction. The most important metric to monitor is the correlation of the ground truth and predicted activities. 
 
-Strong convergence on the validation set will indicate the hyperparameters are well tuned. It is important you are able to train these models to convergence without over-fitting on the training data. The easiest hyperparameter to sweep over is the hidden dimension of the model for the MLP (`[4, 128]` is a good suggested range to sweep across). Finding a set of hyperparameters that lead to convergence is important because you will want to train the model on all available data (including what was originally reserved as the validation set) before  proposing the next round of candidates. You can checkout the notebook `[model_training_and_evaluation.ipynb](notebooks/model_training_and_evaluation.ipynb)` for more details on training and evaluating the model.
+Strong convergence on the validation set will indicate the hyperparameters are well tuned. It is important you are able to train these models to convergence without over-fitting on the training data. The easiest hyperparameter to sweep over is the hidden dimension of the model for the MLP (`[4, 128]` is a good suggested range to sweep across). Finding a set of hyperparameters that lead to convergence is important because you will want to train the model on all available data (including what was originally reserved as the validation set) before  proposing the next round of candidates. You can checkout the notebook [model_training_and_evaluation.ipynb](notebooks/model_training_and_evaluation.ipynb) for more details on training and evaluating the model.
 
 ## 🧠 Proposing Batch of Sequences to Test Next
 
-Now that you have a model trained on all of the data available, it is time to predict the next set of variants to test. Depending on the size of your library there are two ways we recommend going about this. If your library is smaller than a billion unique variants, it should be feasible to greedily assess every variant. See `cleo-optimize-predict` with config `[pred_fasta.yaml](config/optimize/pred_fasta.yaml)` that will allow you to predict the activity for sequences listed in a fasta file. This script can also be used generally to evaluate the trained model with a set of sequences you provide in a fasta file.
+Now that you have a model trained on all of the data available, it is time to predict the next set of variants to test. Depending on the size of your library there are two ways we recommend going about this. If your library is smaller than a billion unique variants, it should be feasible to greedily assess every variant. See `cleo-optimize-predict` with config [pred_fasta.yaml](config/optimize/pred_fasta.yaml) that will allow you to predict the activity for sequences listed in a fasta file. This script can also be used generally to evaluate the trained model with a set of sequences you provide in a fasta file.
 
 For larger libraries where it may be computationally intractable to make a prediction for every variant, we follow [Daulton et. al.](https://arxiv.org/abs/2210.10199) who propose a framework to optimize an acquisition function over discrete space. We have modified their original implementation to operte over the fragment space. As they discuss in the paper, traditional gradient optimization through the acquisition function will not work as the space we are able to draw samples from is discrete (and in our case not just amino acid level discrete but fragment level). Running this optimization procedure requires that you have a JSON file saved of all the fragment options available to you (see the expected format of the JSON below). 
 
@@ -305,13 +305,13 @@ In some of the provided notebooks you will often see `fragment_dictionary` which
 }
 ```
 
-The optimizer uses a simple acquisition function which rewards both upper confidence bound (UCB) and batch diversity. Note that the variance estimates often correlate strongly with the predicted mean, so ranking by UCB or mean alone yeilds similar results. The gamma hyperparameter will allow the user to weight how much they value diversity in the batch. The diversity metric is a pairwise average of how similar a given sequence is to the rest of the batch. In practice we recommend sweeping over a variety of gamma values to build a final batch of sequences to test from. When thinking about sampling the final batch of sequences to test we recommend thinking about the following: first would be looking at the distribution of predicted mean values for the sequence to function model on the training data. This will give you an idea of what mean values are expected amongst the best sequences you have collected data for so far. For example you may want to only consider sequences with a predicted mean activity in the top 5% of the training data. In addition you may also want to consider testing the most diverse sequences. While it can be tempting just to take the top-k predictions from the model to experimentally test, it is recommended that you sample above some threshold in earlier rounds of optimization as the model may not be well aligned with the underlying fitness of the sequences especially in the high activity regime. Furthermore, it can also be helpful to choose some sequences which are predicted to cover a range of possible activities by the model. Doing this can provide more insight into the calibration of your predictor. As more data is collected and the predictor is better calibrated, it will be more valuable to take the top-k ranked options. The notebook `[batch_proposal_filtering.ipynb](notebooks/batch_proposal_filtering.ipynb)` walksthrough the various considerations discussed above in sampling the next PETase batch.
+The optimizer uses a simple acquisition function which rewards both upper confidence bound (UCB) and batch diversity. Note that the variance estimates often correlate strongly with the predicted mean, so ranking by UCB or mean alone yeilds similar results. The gamma hyperparameter will allow the user to weight how much they value diversity in the batch. The diversity metric is a pairwise average of how similar a given sequence is to the rest of the batch. In practice we recommend sweeping over a variety of gamma values to build a final batch of sequences to test from. When thinking about sampling the final batch of sequences to test we recommend thinking about the following: first would be looking at the distribution of predicted mean values for the sequence to function model on the training data. This will give you an idea of what mean values are expected amongst the best sequences you have collected data for so far. For example you may want to only consider sequences with a predicted mean activity in the top 5% of the training data. In addition you may also want to consider testing the most diverse sequences. While it can be tempting just to take the top-k predictions from the model to experimentally test, it is recommended that you sample above some threshold in earlier rounds of optimization as the model may not be well aligned with the underlying fitness of the sequences especially in the high activity regime. Furthermore, it can also be helpful to choose some sequences which are predicted to cover a range of possible activities by the model. Doing this can provide more insight into the calibration of your predictor. As more data is collected and the predictor is better calibrated, it will be more valuable to take the top-k ranked options. The notebook [batch_proposal_filtering.ipynb](notebooks/batch_proposal_filtering.ipynb) walksthrough the various considerations discussed above in sampling the next PETase batch.
 
 ## 🔄 Looping it all together
 
 Now you can run the loop: test → train → propose !
 
-We often see that the measured activity can plateau after 4 or 5 rounds of optimization. At this point you can use the data collected to design another library if desired. A template for this is provided in the config file `[denovo_petase_with_predictor.yaml](config/design/denovo_petase.yaml)`.
+We often see that the measured activity can plateau after 4 or 5 rounds of optimization. At this point you can use the data collected to design another library if desired. A template for this is provided in the config file [denovo_petase_with_predictor.yaml](config/design/denovo_petase.yaml).
 
 ---
 
