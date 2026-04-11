@@ -1,10 +1,13 @@
 """
-Structure prediction oracle using Boltz (https://github.com/jwohlwend/boltz).
+Structure prediction oracles for reward pipelines.
 
-Provides :func:`boltz_from_df`, a reward-pipeline step that writes Boltz
-input YAML files, runs predictions across available GPUs in parallel, and
-collects confidence metrics (pTM, ipTM, pLDDT, etc.) back into the
-sequence DataFrame.
+Provides step functions that write oracle-specific input files, run
+predictions across available GPUs in parallel, and collect confidence
+metrics back into the sequence DataFrame.
+
+Supported oracles:
+  - Boltz  (:func:`boltz_from_df`)  — https://github.com/jwohlwend/boltz
+  - AF3    (:func:`af3_from_df`)    — AlphaFold 3 via Apptainer container
 """
 
 import os
@@ -171,6 +174,122 @@ def boltz_from_df(df_input, cfg, step_name="boltz"):
         output_data[f"{step_name}_complex_iplddt"].append(conf_data["complex_iplddt"])
         output_data[f"{step_name}_complex_pde"].append(conf_data["complex_pde"])
         output_data[f"{step_name}_complex_ipde"].append(conf_data["complex_ipde"])
+
+    df_output = pd.DataFrame(output_data)
+    df_merged = pd.merge(df_input, df_output, on='name', how='inner')
+
+    return df_merged
+
+
+# For running AlphaFold 3 via Apptainer container
+def make_af3_command(input_folder, output_folder, container_path, script_path, model_dir):
+    cmd = (
+        f"apptainer run --nv {container_path} python {script_path}"
+        f" --input_dir {input_folder} --output_dir {output_folder}"
+        f" --run_data_pipeline=false --model_dir={model_dir}"
+        f" --num_diffusion_samples=1"
+    )
+    return cmd
+
+
+def af3_from_df(df_input, cfg, step_name="af3"):
+    """
+    Runs AlphaFold 3 and aggregates confidence metrics from the output.
+    """
+    assert cfg.rundir is not None, "rundir must be specified in cfg"
+
+    outdir = f'{cfg.rundir}/{step_name}/outputs'
+    inputdir = f'{cfg.rundir}/{step_name}/inputs'
+    os.makedirs(outdir, exist_ok=True)
+    os.makedirs(inputdir, exist_ok=True)
+
+    sequences = df_input['sequence'].tolist()
+    names = df_input['name'].tolist()
+
+    with open(cfg.template_path) as f:
+        af3_template = json.load(f)
+
+    if torch.cuda.is_available():
+        num_gpus = torch.cuda.device_count()
+        print(f"Running locally on {num_gpus} GPUs")
+        chunk_size = num_gpus
+    else:
+        chunk_size = 1
+        print("No GPUs detected, running on CPU. This may be very slow.")
+
+    cmd_list = []
+    for i, seqs_chunked in enumerate(chunk([(n, s) for n, s in zip(names, sequences)], chunk_size)):
+
+        batch_folder = os.path.join(inputdir, f"batch_{i:04}")
+        os.makedirs(batch_folder, exist_ok=True)
+
+        for j, (name, seq) in enumerate(seqs_chunked):
+            _template = copy.deepcopy(af3_template)
+            _template["name"] = name
+            _template["sequences"][0]["protein"]["sequence"] = seq
+            _template["modelSeeds"] = [int(np.random.randint(1, 1e5))]
+
+            file_path = os.path.join(batch_folder, f"{name}.json")
+            with open(file_path, "w") as f:
+                json.dump(_template, f, indent=4)
+
+        _cmd = make_af3_command(
+            batch_folder, outdir,
+            cfg.af3_container, cfg.af3_script, cfg.model_dir,
+        )
+        cmd_list.append(_cmd)
+
+    jobs_file = os.path.join(cfg.rundir, f'jobs.{step_name}.list')
+    if os.path.exists(jobs_file):
+        os.remove(jobs_file)
+    with open(jobs_file, 'w') as f:
+        f.writelines([cmd + '\n' for cmd in cmd_list])
+    print(f"Wrote {len(cmd_list)} commands to {jobs_file}")
+
+    run_multi_gpu_commands(cmd_list)
+
+    # AF3 outputs: <outdir>/<name>/<name>_model.cif and <name>_summary_confidences.json
+    output_folders = glob.glob(os.path.join(outdir, "*"))
+    output_folders = [f for f in output_folders if os.path.isdir(f)]
+    assert len(output_folders) > 0, f"No output folders found in {outdir}"
+
+    output_data = {
+        "name": [],
+        f"{step_name}_path": [],
+        f"{step_name}_ptm": [],
+        f"{step_name}_iptm": [],
+        f"{step_name}_ranking_score": [],
+        f"{step_name}_chain_ptm_protein": [],
+        f"{step_name}_chain_ptm_ligand": [],
+        f"{step_name}_chain_iptm_protein": [],
+        f"{step_name}_chain_iptm_ligand": [],
+        f"{step_name}_fraction_disordered": [],
+        f"{step_name}_has_clash": [],
+    }
+
+    for folder in output_folders:
+        name = os.path.basename(folder)
+        cif_path = os.path.join(folder, f"{name}_model.cif")
+        conf_json_path = os.path.join(folder, f"{name}_summary_confidences.json")
+
+        if not os.path.exists(conf_json_path):
+            print(f"Warning: confidence file not found for {name}, skipping.")
+            continue
+
+        with open(conf_json_path, "r") as f:
+            conf_data = json.load(f)
+
+        output_data["name"].append(name)
+        output_data[f"{step_name}_path"].append(cif_path)
+        output_data[f"{step_name}_ptm"].append(conf_data["ptm"])
+        output_data[f"{step_name}_iptm"].append(conf_data["iptm"])
+        output_data[f"{step_name}_ranking_score"].append(conf_data["ranking_score"])
+        output_data[f"{step_name}_chain_ptm_protein"].append(conf_data["chain_ptm"][0])
+        output_data[f"{step_name}_chain_ptm_ligand"].append(conf_data["chain_ptm"][1])
+        output_data[f"{step_name}_chain_iptm_protein"].append(conf_data["chain_iptm"][0])
+        output_data[f"{step_name}_chain_iptm_ligand"].append(conf_data["chain_iptm"][1])
+        output_data[f"{step_name}_fraction_disordered"].append(conf_data["fraction_disordered"])
+        output_data[f"{step_name}_has_clash"].append(conf_data["has_clash"])
 
     df_output = pd.DataFrame(output_data)
     df_merged = pd.merge(df_input, df_output, on='name', how='inner')
