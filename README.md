@@ -11,7 +11,7 @@ CLEO uses [uv](https://docs.astral.sh/uv/), follow the steps below to install.
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. Clone the repository
-git clone <repo-url> && cd cleo
+git clone https://github.com/0merle0/cleo.git && cd cleo
 
 # 3. Create the virtual environment and install all dependencies
 uv sync              # CPU-only (includes Boltz for CPU inference)
@@ -50,9 +50,9 @@ After activation, all `cleo-design-*` and `cleo-optimize-*` CLI commands in this
 
 # Library Design
 
-library gif
+![library fragment animation](figs/frag_animation.gif)
 
-Changes in protein sequence space can lead to major jumps in function. To explore the surrounding sequence of a particular protein, this workflow will act as a guide to designing large scale libaries. By splitting protein sequences into fragments and ordering the fragments as independent DNAs, we can stitch the DNA together *in vitro* to create any unique variant from the combinatorial set to test. This tutorial uses PETase (a plastic-degrading enzyme) as an example, however the workflow can apply widely to other proteins and functions. The following steps will serve as a guide for first aligning proteinMPNN to custom reward functions and then sampling sequence fragments to create a library for experimental testing.
+Changes in protein sequence space can lead to major jumps in function. To explore the surrounding sequence of a particular protein, this workflow will act as a guide to designing large scale libraries. By splitting protein sequences into fragments and ordering the fragments as independent DNAs, we can stitch the DNA together *in vitro* to create any unique variant from the combinatorial set to test. This tutorial uses PETase (a plastic-degrading enzyme) as an example, however the workflow can apply widely to other proteins and functions. The following steps will serve as a guide for first aligning proteinMPNN to custom reward functions and then sampling sequence fragments to create a library for experimental testing.
 
 📌 **Note**: The libraries designed here focus on a single fold space, each variant will adopt a unique atomic constellation but retain a consistent topology. 
 
@@ -62,13 +62,13 @@ One of the first steps to consider is how to split your protein into fragments. 
 
 We have found that it does not matter too much where the splits occur, even splitting in the middle of secondary structure elements is fine. For designing an enzyme or binding protein it can be helpful to have multiple fragments in the active/binding site to allow for more combinatorial diversity in these key regions.
 
-Assembling the fragments *in vitro* requires orhtogonal overhangs. [NEB Golden Gate Assembly](https://www.neb.com/en-us/nebinspired-blog/getting-started-with-golden-gate) requires designing 4 base pair overhangs that are unique to each junction. To facilitate this we recommend fixing 2 amino acids at the start and end of each fragment (which correspond to 12 base pair stretch to search for compatible overhangs within).
+Assembling the fragments *in vitro* requires orthogonal overhangs. [NEB Golden Gate Assembly](https://www.neb.com/en-us/nebinspired-blog/getting-started-with-golden-gate) requires designing 4 base pair overhangs that are unique to each junction. To facilitate this we recommend fixing 2 amino acids at the start and end of each fragment (which correspond to 12 base pair stretch to search for compatible overhangs within).
 
 Fixing other residues which may be critical for function is easy to do in the config file. We provide an example config file: [denovo_petase.yaml](config/design/denovo_petase.yaml) for PETase here with more details on how to setup your own run.
 
-## 🎯 Aligning proteinMPNN to rewards:
+## 🎯 Aligning proteinMPNN to rewards
 
-online finetuning
+![online finetuning](figs/online_finetuning.png)
 
 [Group relative policy optimization (GRPO)](https://arxiv.org/pdf/2402.03300) is the finetuning framework we use to align proteinMPNN to custom reward functions. Given a backbone, proteinMPNN will propose sequences, these sequences will then be evaluated by reward functions (including: structure prediction oracle, distance to reference, etc.), and finally the model is updated to increase the likelihood of sampling sequences with good rewards.
 
@@ -103,7 +103,7 @@ def step_fn(df_input: pd.DataFrame, cfg: Dict, step_name="step") -> pd.DataFrame
 
 For the PETase optimization we folded the sequences with a structure prediction oracle, measured a variety of distances between atoms involved with catalytic activity, and computed hamming distance of the sampled sequence to reference sequences (this can all be found in the example config: [denovo_petase.yaml](config/design/denovo_petase.yaml)).
 
-The list of steps will be run consecutively, with the outputs of the previous passed as the input to the next step. Each step will add new columns to the dataframe containing the results of the analysis. Be sure to order the steps such that access to infomation from previous steps is available if needed.
+The list of steps will be run consecutively, with the outputs of the previous passed as the input to the next step. Each step will add new columns to the dataframe containing the results of the analysis. Be sure to order the steps such that access to information from previous steps is available if needed.
 
 ### Aggregating metrics to compute overall reward
 
@@ -115,7 +115,7 @@ Once the steps have finished running, an overall reward will need to be computed
 - `weight`: The weight to assign to the metric when computing the overall reward
 - `mode`: The mode of optimization for the metric, either 'max' or 'min'
 
-For each metrics you wish to optimize, we first normalize it to the range `[0,1]` using the provided lower and upper bounds. If the mode is **max** then the normalized metric is used as is, if the mode is **min** then we use `(1 - normalized metric)`. Finally, the overall reward is computed as a weighted sum of all the normalized metrics using the provided weights.
+For each metric you wish to optimize, we first normalize it to the range `[0,1]` using the provided lower and upper bounds. If the mode is **max** then the normalized metric is used as is, if the mode is **min** then we use `(1 - normalized metric)`. Finally, the overall reward is computed as a weighted sum of all the normalized metrics using the provided weights.
 
 📌 **Note**: If a particular metric is not being optimized, make sure that the bounds encompass the output distribution of the metric. If the metric's output distribution sits mostly outside the bounds provided then the reward will appear static.
 
@@ -222,9 +222,9 @@ Directed evolution often uses the slogan "you get what you screen for", and this
 
 In the following section we will give an overview of the different considerations made for designing the PETase assay, but for more detail please see the methods section of the paper. The basic workflow involves using Golden Gate Assembly (GGA) to assemble DNA constructs (mostly done with an Echo Acoustic Liquid Handling robot to mix all of the fragments together), polymerase chain reaction (PCR) to amplify the assembled GGA product, and cell free expression with PUREfrex system. A PET fluorescent reporter molecule is then added to the lysate directly and the fluorescence of the product is monitored over time.
 
-For robust data collection we test 3 replicates at the protein expression stage. In addition it is important to have positive and negative control replicates on every plate tested to ensure the assay is robust and reproducible. We use a vector with a fluorescent protein tag (mscarlett) to estimate the amount of protein expressed in each sample. 
+For robust data collection we test 3 replicates at the protein expression stage. In addition it is important to have positive and negative control replicates on every plate tested to ensure the assay is robust and reproducible. We use a vector with a fluorescent protein tag (mScarlet) to estimate the amount of protein expressed in each sample. 
 
-Since we are interested in optimizing Kcat, we will run the reaction under excess substrate conditions and normalize the rate by the concentration of enzyme. To ensure high data quality we filter on two thresholds: protein expression of at least 0.1uM for each replicate and coefficient of variation for the aggregated rate of < 1. The first threshold ensure that some protein has been expressed in our system, and the second ensures the replicate data is tightly clustered.
+Since we are interested in optimizing Kcat, we will run the reaction under excess substrate conditions and normalize the rate by the concentration of enzyme. To ensure high data quality we filter on two thresholds: protein expression of at least 0.1 µM for each replicate and coefficient of variation for the aggregated rate of < 1. The first threshold ensures that some protein has been expressed in our system, and the second ensures the replicate data is tightly clustered.
 
 To process the data we generate a plate map csv file prior to testing with information about each well on the plate including what construct is being expressed, the sequence, sample type (i.e. positive control, negative control, sample), replicate number and any other metadata which could be helpful for data processing. 
 
@@ -236,11 +236,11 @@ When you begin to evaluate the library there are a few important things to consi
 
 For libraries where function is more rare to find, it will be helpful to first evaluate the independent effects of each fragment in the library. This can be done by testing each fragment individually while keeping the other fragments constant to the parent sequence. This will allow you to map out which fragments are more likely to preserve or increase activity of the parent construct. 
 
-📌 **Note**: If you order the library as a pool with primers to amplify out all the options for a particular fragment, it is also possible to do some early pool based testing and get quick feedback about how functional the designs for a particlar fragment are. More details on this in the methods section of the paper.
+📌 **Note**: If you order the library as a pool with primers to amplify out all the options for a particular fragment, it is also possible to do some early pool based testing and get quick feedback about how functional the designs for a particular fragment are. More details on this in the methods section of the paper.
 
-Since the vast majority of variants in the library appeared dead, we proceeded with independent fragment testing for PETase. In the figure below you can see the results of testing each fragment indepedently, overlayed with the pooled testing results for comparison.
+Since the vast majority of variants in the library appeared dead, we proceeded with independent fragment testing for PETase.
 
-If you proceeded with collecting data for each individual fragment, you now have collected data for the first order effects of swapping in a single designed fragment to the parent sequence. A model trained on this data will only tell you to combine the best fragments together. Rather than training the model at this point we suggest that you sample combinations of some of the best looking independent fragments above some threshold. For the PETase we tested all possible combinations of the top 2 fragments (32 total designs) and additionally set activity bins for the initial screening which we used to sample fragments from to test combinations. See the [sampling_from_activity_bins.ipynb](notebooks/sampling_from_activity_bins.ipynb) to see an example of how this sampling is done. Acquiring data on higher order combinations of fragments will help the model learn interactions between fragments. The figure below demonstrates the results of setting a variety of bins and screening combinations of fragments from each bin. For completeness we use thresholds all the way down to a final bin where fragment combinations are randomly sampled from the library. You may want to restrict your sampling to the higher activity bins.
+If you proceeded with collecting data for each individual fragment, you now have collected data for the first order effects of swapping in a single designed fragment to the parent sequence. A model trained on this data will only tell you to combine the best fragments together. Rather than training the model at this point we suggest that you sample combinations of some of the best looking independent fragments above some threshold. For the PETase we tested all possible combinations of the top 2 fragments (32 total designs) and additionally set activity bins for the initial screening which we used to sample fragments from to test combinations. See the [sampling_from_activity_bins.ipynb](notebooks/sampling_from_activity_bins.ipynb) to see an example of how this sampling is done. Acquiring data on higher order combinations of fragments will help the model learn interactions between fragments. For completeness we use thresholds all the way down to a final bin where fragment combinations are randomly sampled from the library. You may want to restrict your sampling to the higher activity bins.
 
 ## 🤖 Training Sequence-to-Function Models
 
@@ -248,7 +248,7 @@ At this stage you have collected some valuable data, and it is time to use the d
 
 The best performing models across different datasets we have collected are simple multilayer perceptron (MLP) with non-linear activation (ReLU) and stochastic dropout at every layer. We follow [Lakshminarayanan et. al.](https://arxiv.org/abs/1612.01474) in training an ensemble of MLPs with a gaussian negative log-likelihood objective to learn both a mean and uncertainty head for each model in the ensemble. By treating each estimate as a gaussian we can mix them together to get the ensemble’s mean and variance for a sequence (this is described in the paper referenced above). 
 
-Before training the model we recommend applying z-score normalization to the activity values you wish to train on. Additionally, we suggest sampling a validation set approximately 10-20% of the training data to assess hyperparameters of the model. The input dataset for training the predictor should be a csv file (most easily exported from pandas) with columns including sequence, activity, and validation. See this [model_data_preparation.ipynb](notebooks/model_data_preparation.ipynb) we provide an example of how such a dataset should be formatted for training.
+Before training the model we recommend applying z-score normalization to the activity values you wish to train on. Additionally, we suggest sampling a validation set of approximately 10-20% of the training data to assess hyperparameters of the model. The input dataset for training the predictor should be a csv file (most easily exported from pandas) with columns including sequence, activity, and validation. See this [model_data_preparation.ipynb](notebooks/model_data_preparation.ipynb) we provide an example of how such a dataset should be formatted for training.
 
 To train the model you will need to create a config. We provide [momi.yaml](config/optimize/momi.yaml) which inherits from [base_surrogate.yaml](config/optimize/base_surrogate.yaml) as a reference — please see the config files to understand what parameters are important to change for training. A training run can be launched with the following command:
 
@@ -266,7 +266,7 @@ Strong convergence on the validation set will indicate the hyperparameters are w
 
 Now that you have a model trained on all of the data available, it is time to predict the next set of variants to test. Depending on the size of your library there are two ways we recommend going about this. If your library is smaller than a billion unique variants, it should be feasible to greedily assess every variant. See `cleo-optimize-predict` with config [pred_fasta.yaml](config/optimize/pred_fasta.yaml) that will allow you to predict the activity for sequences listed in a fasta file. This script can also be used generally to evaluate the trained model with a set of sequences you provide in a fasta file.
 
-For larger libraries where it may be computationally intractable to make a prediction for every variant, we follow [Daulton et. al.](https://arxiv.org/abs/2210.10199) who propose a framework to optimize an acquisition function over discrete space. We have modified their original implementation to operte over the fragment space. As they discuss in the paper, traditional gradient optimization through the acquisition function will not work as the space we are able to draw samples from is discrete (and in our case not just amino acid level discrete but fragment level). Running this optimization procedure requires that you have a JSON file saved of all the fragment options available to you (see the expected format of the JSON below). 
+For larger libraries where it may be computationally intractable to make a prediction for every variant, we follow [Daulton et. al.](https://arxiv.org/abs/2210.10199) who propose a framework to optimize an acquisition function over discrete space. We have modified their original implementation to operate over the fragment space. As they discuss in the paper, traditional gradient optimization through the acquisition function will not work as the space we are able to draw samples from is discrete (and in our case not just amino acid level discrete but fragment level). Running this optimization procedure requires that you have a JSON file saved of all the fragment options available to you (see the expected format of the JSON below). 
 
 In some of the provided notebooks you will often see `fragment_dictionary` which refers to a dictionary with the following format where the keys are the integer fragment number (as a string) and the values are a list of `[name, sequence]` pairs. Fragment names follow the convention `{frag_num}.{unique_id}` — the first dot-delimited token is always the fragment number.
 
