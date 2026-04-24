@@ -136,7 +136,7 @@ The training script will create an output directory (configured by `output_dir` 
 
 Example training output from two runs with different distance-to-reference weights can be found in [example_data/library_design/test_run_1_w1/](example_data/library_design/test_run_1_w1/) and [example_data/library_design/test_run_1_w10/](example_data/library_design/test_run_1_w10/).
 
-Checkout the notebook [library_design_monitor_training.ipynb](notebooks/library_design_monitor_training.ipynb) to see what tracking an example training run looks like.
+Check out the notebook [library_design_monitor_training.ipynb](notebooks/library_design_monitor_training.ipynb) to see what tracking an example training run looks like.
 
 ## 🎲 Sampling and Filtering Sequence Fragments
 
