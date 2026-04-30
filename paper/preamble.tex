@@ -1,0 +1,32 @@
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{amsmath, amssymb}
+\usepackage{siunitx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=black, citecolor=black, urlcolor=blue}
+
+\usepackage{authblk}
+
+\graphicspath{{figures/pdf/}}
+
+% --- Shared color palette ---
+% Edit these once; use everywhere via \color{cleoBlue} etc.
+\definecolor{cleoBlue}{HTML}{2E5C8A}
+\definecolor{cleoOrange}{HTML}{D97A29}
+\definecolor{cleoGreen}{HTML}{4A8C5A}
+\definecolor{cleoRed}{HTML}{B23A3A}
+\definecolor{cleoGray}{HTML}{6B7280}
+
+% --- Convenience macros ---
+\newcommand{\cleo}{\textsc{cleo}}
+\newcommand{\todo}[1]{\textcolor{cleoRed}{\textbf{[TODO: #1]}}}

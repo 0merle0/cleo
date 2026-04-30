@@ -1,0 +1,28 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.nav
+*.snm
+*.vrb
+*.lof
+*.lot
+*.run.xml
+*.bcf
+
+# Compiled PDF output (kept untracked; CI will publish)
+main.pdf
+supplement.pdf
+
+# SVG → PDF build output
+figures/pdf/
+
+# Editor / OS noise
+.DS_Store
+*.swp

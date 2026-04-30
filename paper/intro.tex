@@ -1,0 +1,38 @@
+% --- Introduction ---
+% Science research articles do not use \section labels in the main narrative,
+% but we keep paragraph-level scaffolding here as comments so collaborators
+% can see the intended arc.
+
+% Paragraph 1 — The promise of de novo enzyme design.
+%   - RFdiffusion + MPNN have made it possible to design catalysts from scratch
+%     for diverse chemistries.
+%   - Filtering pipelines have improved success rates at the design stage.
+%   - But initial designs are typically weak; optimization is the bottleneck.
+\todo{p1 — frame de novo enzyme design + the optimization bottleneck}
+
+% Paragraph 2 — Why existing optimization tools fall short.
+%   - Site-saturation mutagenesis (SSM): local search; cannot escape the
+%     neighborhood of the starting design.
+%   - Vanilla MPNN re-sampling: structurally informed but functionally blind;
+%     biased toward the sequences MPNN's prior favors, not the sequences that
+%     catalyze.
+%   - Both miss active variants that lie 10s of mutations away.
+\todo{p2 — limits of SSM and vanilla MPNN re-sampling}
+
+% Paragraph 3 — Our hypothesis.
+%   - The active-variant region of sequence space for a given de novo backbone
+%     is broader and farther from the starting design than current tools assume.
+%   - Reaching it requires (i) a sampler aligned to function-relevant rewards
+%     and (ii) a library construction strategy that can physically test
+%     combinatorially-large sets of candidates.
+\todo{p3 — broad sequence-space search hypothesis}
+
+% Paragraph 4 — What this paper shows.
+%   - Framework: RL-aligned MPNN (GRPO) + fragment-based combinatorial library
+%     + surrogate-guided iteration.
+%   - Head-to-head on click-ase and heme enzyme: outperforms SSM and vanilla
+%     MPNN re-sampling at matched experimental effort.
+%   - Deep dive on a de novo PETase: XXX-fold kcat improvement on a fluorogenic
+%     PET-trimer probe, exceeding optimized natural counterparts on the same
+%     substrate; best variant ~30 mutations from the starting design.
+\todo{p4 — contributions and headline results}
