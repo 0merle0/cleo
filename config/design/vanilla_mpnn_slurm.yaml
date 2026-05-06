@@ -1,0 +1,29 @@
+# Write a SLURM array bundle: vanilla ProteinMPNN sampling + same evaluate_sequences pipeline as training.
+#
+# Generate bundle (from cleo/):
+#   uv run python -m cleo.design.run_vanilla_mpnn_slurm slurm_bundle_dir=slurm_vanilla_mpnn_bundle
+#
+# Submit:
+#   cd cleo && sbatch slurm_vanilla_mpnn_bundle/submit_array.sh
+#
+# Worker (array task):
+#   manifest_path=.../manifest.json task_id=0
+#
+# Re-run only downstream eval (reuse AF3 in run/af3/outputs, no GPU fold):
+#   CLEO_AF3_SKIP_RUN=1 uv run --frozen python -m cleo.design.evaluate_sequences \\
+#     --config-path <run>/_hydra_configs --config-name eval_vanilla
+# Or: override  ``+steps.0.cfg.skip_run=true``  (first step must be af3).
+
+repo_root: /home/jgershon/projects/antibody_opt
+
+slurm_bundle_dir: null
+slurm_job_name: cleo_vanilla_mpnn
+slurm_array_throttle: null
+slurm_partition: gpu-train
+slurm_gres: gpu:l40:2
+slurm_cpus_per_task: 2
+
+manifest_path: null
+task_id: null
+
+num_batches: 4

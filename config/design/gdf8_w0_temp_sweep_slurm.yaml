@@ -1,0 +1,24 @@
+# gdf8_lep_w0: sample from best.pt at several temperatures, then run evaluate_sequences
+# (AF3 + dist_to_ref + …) on GPU, same as vanilla_mfpnn / checkpoint_sample_eval.
+#
+# Generate Slurm bundle (from cleo/):
+#   uv run --frozen python -m cleo.design.run_finetuned_temp_sweep_slurm slurm_bundle_dir=slurm_gdf8_w0_temp_sweep
+# Submit:
+#   cd cleo && sbatch slurm_gdf8_w0_temp_sweep/submit_array.sh
+# Worker: manifest_path=.../manifest.json task_id=0
+
+repo_root: /home/jgershon/projects/antibody_opt
+
+slurm_bundle_dir: null
+slurm_job_name: cleo_gdf8_w0_temps
+slurm_array_throttle: null
+slurm_partition: gpu-train
+slurm_gres: gpu:l40:2
+slurm_cpus_per_task: 2
+
+manifest_path: null
+task_id: null
+
+num_batches: 4
+# null = 0.75, 0.5, 0.2, 0.1
+temperatures: null

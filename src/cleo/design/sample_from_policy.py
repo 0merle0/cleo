@@ -39,6 +39,27 @@ def load_policy_from_checkpoint(ckpt_path, overrides=None):
     return policy, ckpt.get("step"), ckpt.get("reward")
 
 
+def load_policy_from_train_config(config_path: str | os.PathLike, overrides=None):
+    """
+    Load PolicyMPNN using the same design constraints as a training YAML (PDB, fixed
+    residues, ``model_type``, etc.) but **public** ProteinMPNN / LigandMPNN weights
+    only—``checkpoint_path`` is cleared so :class:`~cleo.design.utils.policy.PolicyMPNN`
+    loads the bundled vanilla checkpoint.
+    """
+    from cleo.design.utils.policy import PolicyMPNN
+
+    train_cfg = OmegaConf.load(config_path)
+    train_cfg.checkpoint_path = None
+
+    if overrides:
+        for key, val in overrides.items():
+            if val is not None:
+                OmegaConf.update(train_cfg, key, val)
+
+    policy = PolicyMPNN(train_cfg)
+    return policy, None, None
+
+
 def split_into_fragments(sequences, fragment_bounds):
     """
     Split full-length sequences into fragments defined by [start, end] bounds (inclusive).
@@ -112,6 +133,14 @@ def write_fragment_fasta(fragment_dict, output_dir, prefix):
 _CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/design")
 
 
+def _truthy_baseline_train_config(cfg) -> bool:
+    raw = cfg.get("baseline_train_config")
+    if raw is None:
+        return False
+    s = str(raw).strip()
+    return s not in ("", "null", "None", "~")
+
+
 @hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="sample")
 def sample_from_policy(cfg):
     """Hydra entrypoint: sample sequences from policy checkpoints and write outputs."""
@@ -128,21 +157,47 @@ def sample_from_policy(cfg):
     all_sequences = []
     seq_names = []
 
-    for ckpt_path in cfg.checkpoints:
-        assert os.path.exists(ckpt_path), f"Checkpoint not found: {ckpt_path}"
-
-        print(f"\nLoading checkpoint: {ckpt_path}")
-        policy, step, reward = load_policy_from_checkpoint(ckpt_path, overrides)
-        print(f"  Step: {step}, Reward: {reward:.4f}")
-
+    if _truthy_baseline_train_config(cfg):
+        cfg_path = Path(cfg.baseline_train_config)
+        if not cfg_path.is_file():
+            raise FileNotFoundError(f"baseline_train_config not found: {cfg_path}")
+        print(f"\nBaseline sampling (bundled MPNN weights, no finetuned .pt): {cfg_path}")
+        policy, step, reward = load_policy_from_train_config(cfg_path, overrides)
+        if reward is not None:
+            print(f"  Step: {step}, Reward: {reward:.4f}")
+        else:
+            print("  Using public checkpoint weights; no RL step / reward.")
         sequences = policy.sample_from_policy(cfg.num_batches)
         print(f"  Sampled {len(sequences)} sequences")
-
-        run_name = os.path.basename(os.path.dirname(ckpt_path))
+        # FASTA record prefix matches ``output_name`` (e.g. gdf8_T0.1_vanilla.0000.abc123).
+        run_tag = str(cfg.output_name)
         for i, seq in enumerate(sequences):
-            name = f"{run_name}.step{step:04d}.{i:04d}.{secrets.token_hex(4)}"
+            name = f"{run_tag}.{i:04d}.{secrets.token_hex(4)}"
             seq_names.append(name)
         all_sequences.extend(sequences)
+    else:
+        ckpts = list(cfg.get("checkpoints") or [])
+        if not ckpts:
+            raise ValueError(
+                "No checkpoints given. Pass ``checkpoints=[...]`` or set "
+                "``baseline_train_config`` to a training YAML for vanilla MPNN sampling."
+            )
+        for ckpt_path in ckpts:
+            ckpt_path = str(ckpt_path)
+            assert os.path.exists(ckpt_path), f"Checkpoint not found: {ckpt_path}"
+
+            print(f"\nLoading checkpoint: {ckpt_path}")
+            policy, step, reward = load_policy_from_checkpoint(ckpt_path, overrides)
+            print(f"  Step: {step}, Reward: {reward:.4f}")
+
+            sequences = policy.sample_from_policy(cfg.num_batches)
+            print(f"  Sampled {len(sequences)} sequences")
+
+            run_name = os.path.basename(os.path.dirname(ckpt_path))
+            for i, seq in enumerate(sequences):
+                name = f"{run_name}.step{step:04d}.{i:04d}.{secrets.token_hex(4)}"
+                seq_names.append(name)
+            all_sequences.extend(sequences)
 
     # always write full-sequence FASTA
     fasta_path = os.path.join(cfg.output_dir, f"{cfg.output_name}.fasta")

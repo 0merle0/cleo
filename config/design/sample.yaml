@@ -10,22 +10,29 @@
 output_dir: ${hydra:runtime.cwd}/sampled_sequences
 output_name: sampled  # prefix for output files
 
-# List of checkpoint .pt files to sample from.
+# List of checkpoint .pt files to sample from (ignored if ``baseline_train_config`` is set).
 # Each entry is a path to a checkpoint file saved during training.
 # The script will load the training config from the checkpoint automatically.
 checkpoints:
   - ${hydra:runtime.cwd}/example_data/library_design/test_run_1_w1/test_run_1_w1_step_0100.pt
   - ${hydra:runtime.cwd}/example_data/library_design/test_run_1_w10/test_run_1_w10_step_0100.pt
 
+# If set, sample with **bundled** ProteinMPNN/LigandMPNN weights using the same PDB,
+# fixed residues, and MPNN options as this training YAML (``checkpoint_path`` forced to null).
+# Example:
+#   uv run python -m cleo.design.sample_from_policy \\
+#     baseline_train_config=/path/to/gdf8_vhh_lep_run10_distw0.yaml \\
+#     temperature=0.1 num_batches=4 fragment_bounds=null \\
+#     output_dir=/path/out output_name=sampled
+baseline_train_config: null
+
 num_batches: 8  # number of sampling batches per checkpoint to sample
 batch_size: null  # override batch size from checkpoint config (null = use checkpoint's value)
 temperature: null  # override sampling temperature (null = use checkpoint's value)
 
-# Override the PDB path stored in the checkpoint config.
-# NOTE: checkpoint files store the absolute PDB path from the machine where training ran.
-# If you are running on a different machine or the path has changed, you MUST set this
-# to the correct path. If null, the script will use whatever path is in the checkpoint.
-pdb: ${hydra:runtime.cwd}/templates/structure/momi_petase_reference_structure.pdb
+# Override the PDB path from the checkpoint / baseline training YAML.
+# If null, uses the path stored in the checkpoint (finetuned runs) or in ``baseline_train_config``.
+pdb: null
 
 # Fragment bounds for splitting sampled sequences into fragments.
 # Each entry is [start_index, end_index] (inclusive, 0-indexed).

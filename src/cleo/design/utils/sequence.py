@@ -33,6 +33,11 @@ def compute_dist_to_ref_seqs_from_df(df_input, cfg, step_name="dist_to_ref_seqs"
     """
     Computes distance to reference sequences for each sequence in the dataframe.
     """
+    if df_input is None or len(df_input) == 0:
+        raise ValueError(
+            "dist_to_ref_seqs: empty input dataframe. A prior step (e.g. af3) may have dropped "
+            "all rows, or the pipeline was called with no sequences."
+        )
 
     metrics_list = []
 

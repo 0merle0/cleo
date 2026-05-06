@@ -1,0 +1,86 @@
+# Sample from policy checkpoints and run evaluate_sequences (same metric steps as training).
+#
+# Usage (from cleo directory):
+#   uv run python -m cleo.design.run_checkpoint_sample_eval
+#   uv run python -m cleo.design.run_checkpoint_sample_eval --config-name checkpoint_sample_eval
+#
+# Overrides:
+#   uv run python -m cleo.design.run_checkpoint_sample_eval dry_run=true
+#   uv run python -m cleo.design.run_checkpoint_sample_eval slurm_bundle_dir=/path/to/bundle
+#   uv run python -m cleo.design.run_checkpoint_sample_eval manifest_path=/path/manifest.json task_id=0
+#
+# Each run must set either ``checkpoints`` (explicit tag + .pt path) or ``auto_discover_min_step``
+# (integer) to glob step_*.pt, best, and last under the training run directory.
+
+repo_root: /home/jgershon/projects/antibody_opt
+
+dry_run: false
+num_batches: 4
+
+# If set, write manifest.json + submit_array.sh and exit (no sampling).
+# submit_array.sh defaults: partition gpu-train, gres gpu:l40:2, cpus-per-task 2 (see run_checkpoint_sample_eval.py).
+# Override: slurm_partition=... slurm_gres=... slurm_cpus_per_task=...
+slurm_bundle_dir: null
+slurm_job_name: cleo_ckpt_eval
+slurm_array_throttle: null
+
+# Worker mode (SLURM array): set both; task_id defaults to $SLURM_ARRAY_TASK_ID if null.
+manifest_path: null
+task_id: null
+
+runs:
+  - label: gdf8_lep_w0
+    train_yaml: ${repo_root}/configs/gdf8_vhh/gdf8_vhh_lep_run10_distw0.yaml
+    run_name_override: null
+    auto_discover_min_step: null
+    checkpoints:
+      - tag: step_0400
+        path: ${repo_root}/cleo_runs/gdf8_vhh/gdf8_vhh_lep_run10_distw0_v1/gdf8_vhh_lep_run10_distw0_v1/gdf8_vhh_lep_run10_distw0_v1_step_0400.pt
+      - tag: step_0450
+        path: ${repo_root}/cleo_runs/gdf8_vhh/gdf8_vhh_lep_run10_distw0_v1/gdf8_vhh_lep_run10_distw0_v1/gdf8_vhh_lep_run10_distw0_v1_step_0450.pt
+      - tag: best
+        path: ${repo_root}/cleo_runs/gdf8_vhh/gdf8_vhh_lep_run10_distw0_v1/gdf8_vhh_lep_run10_distw0_v1/gdf8_vhh_lep_run10_distw0_v1_best.pt
+      - tag: last
+        path: ${repo_root}/cleo_runs/gdf8_vhh/gdf8_vhh_lep_run10_distw0_v1/gdf8_vhh_lep_run10_distw0_v1/gdf8_vhh_lep_run10_distw0_v1_last.pt
+
+  - label: gdf8_lep_w1
+    train_yaml: ${repo_root}/configs/gdf8_vhh/gdf8_vhh_lep_run10_distw1.yaml
+    run_name_override: null
+    auto_discover_min_step: null
+    checkpoints:
+      - tag: step_0400
+        path: ${repo_root}/cleo_runs/gdf8_vhh/gdf8_vhh_lep_run10_distw1_v1/gdf8_vhh_lep_run10_distw1_v1/gdf8_vhh_lep_run10_distw1_v1_step_0400.pt
+      - tag: step_0450
+        path: ${repo_root}/cleo_runs/gdf8_vhh/gdf8_vhh_lep_run10_distw1_v1/gdf8_vhh_lep_run10_distw1_v1/gdf8_vhh_lep_run10_distw1_v1_step_0450.pt
+      - tag: best
+        path: ${repo_root}/cleo_runs/gdf8_vhh/gdf8_vhh_lep_run10_distw1_v1/gdf8_vhh_lep_run10_distw1_v1/gdf8_vhh_lep_run10_distw1_v1_best.pt
+      - tag: last
+        path: ${repo_root}/cleo_runs/gdf8_vhh/gdf8_vhh_lep_run10_distw1_v1/gdf8_vhh_lep_run10_distw1_v1/gdf8_vhh_lep_run10_distw1_v1_last.pt
+
+  - label: ltk_v2
+    train_yaml: ${repo_root}/configs/ltk_vhh/ltk_vhh_design.yaml
+    run_name_override: ltk_vhh_design_v2
+    auto_discover_min_step: null
+    checkpoints:
+      - tag: step_0400
+        path: ${repo_root}/cleo_runs/ltk_vhh/ltk_vhh_design_v2/ltk_vhh_design_v2/ltk_vhh_design_v2_step_0400.pt
+      - tag: step_0450
+        path: ${repo_root}/cleo_runs/ltk_vhh/ltk_vhh_design_v2/ltk_vhh_design_v2/ltk_vhh_design_v2_step_0450.pt
+      - tag: best
+        path: ${repo_root}/cleo_runs/ltk_vhh/ltk_vhh_design_v2/ltk_vhh_design_v2/ltk_vhh_design_v2_best.pt
+      - tag: last
+        path: ${repo_root}/cleo_runs/ltk_vhh/ltk_vhh_design_v2/ltk_vhh_design_v2/ltk_vhh_design_v2_last.pt
+
+  - label: ltk_v3
+    train_yaml: ${repo_root}/configs/ltk_vhh/ltk_vhh_design.yaml
+    run_name_override: null
+    auto_discover_min_step: null
+    checkpoints:
+      - tag: step_0400
+        path: ${repo_root}/cleo_runs/ltk_vhh/ltk_vhh_design_v3/ltk_vhh_design_v3/ltk_vhh_design_v3_step_0400.pt
+      - tag: step_0450
+        path: ${repo_root}/cleo_runs/ltk_vhh/ltk_vhh_design_v3/ltk_vhh_design_v3/ltk_vhh_design_v3_step_0450.pt
+      - tag: best
+        path: ${repo_root}/cleo_runs/ltk_vhh/ltk_vhh_design_v3/ltk_vhh_design_v3/ltk_vhh_design_v3_best.pt
+      - tag: last
+        path: ${repo_root}/cleo_runs/ltk_vhh/ltk_vhh_design_v3/ltk_vhh_design_v3/ltk_vhh_design_v3_last.pt

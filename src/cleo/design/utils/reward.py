@@ -6,6 +6,13 @@ Universal reward function for RL fine-tuning of ProteinMPNN.
 and aggregates the results into a scalar reward via normalised
 weighted summation. Steps and aggregation weights are defined in the
 training config under ``reward.steps`` and ``reward.reward_aggregation``.
+
+Each step also appends **batch** sequence stats to the training log (floats in
+``{run_name}_train_metrics.csv``): mean pairwise Hamming / fraction differing,
+``batch_unique_mutation_sites_wrt_ref`` (union of distinct (position, AA) vs
+``ref_seq`` / first ``ref_seqs`` in the steps), and
+``batch_unique_mutation_sites_wrt_consensus`` vs a per-position mode
+consensus of the current batch.
 """
 
 import os
@@ -14,8 +21,41 @@ import numpy as np
 import torch
 import pandas as pd
 from hydra.utils import get_method
+from omegaconf import OmegaConf
 
+from cleo.design.utils.mutation_diversity import batch_diversity_log_metrics
 from cleo.design.utils.policy import alphabet
+
+
+def _ref_seq_for_batch_metrics_from_steps(steps) -> str | None:
+    """Get VHH parent sequence from a ``dist_to_ref_seqs`` or ``mutation_diversity`` step."""
+    for s in steps or []:
+        try:
+            cfg = s.cfg
+        except Exception:  # pragma: no cover
+            continue
+        if cfg is None:
+            continue
+        if OmegaConf.is_config(cfg):
+            rs = OmegaConf.select(cfg, "ref_seq", default=None)
+            if rs is not None and str(rs).strip():
+                return str(rs)
+            rlist = OmegaConf.select(cfg, "ref_seqs", default=None)
+            if rlist is not None and len(rlist) > 0:
+                return str(rlist[0])
+        if isinstance(cfg, dict):
+            if cfg.get("ref_seq"):
+                return str(cfg["ref_seq"])
+            rs = cfg.get("ref_seqs")
+            if rs:
+                first = rs[0] if isinstance(rs, (list, tuple)) and len(rs) > 0 else rs
+                return str(first)
+        if getattr(cfg, "ref_seq", None) is not None and str(getattr(cfg, "ref_seq")).strip():
+            return str(cfg.ref_seq)
+        rlist = getattr(cfg, "ref_seqs", None)
+        if rlist is not None and len(rlist) > 0:
+            return str(rlist[0])
+    return None
 
 
 class UniversalReward():
@@ -165,5 +205,9 @@ class UniversalReward():
                 to_log[f"{col}_batch_min"] = col_tensor.min().item()
                 to_log[f"{col}_batch_max"] = col_tensor.max().item()
 
-        
+        # Batch-level sequence diversity: pairwise Hamming, and union of unique (pos,AA)
+        # w.r.t. the template ref and w.r.t. a per-position consensus (“average” batch design).
+        _ref = _ref_seq_for_batch_metrics_from_steps(self.steps)
+        to_log.update(batch_diversity_log_metrics(sequences, _ref))
+
         return reward.to(device), to_log
