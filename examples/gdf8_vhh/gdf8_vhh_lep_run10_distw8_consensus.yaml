@@ -1,0 +1,114 @@
+# Cleo RL config: start from lepionce run10_packed41 GDF8 binder.
+#
+# Backbone: lepionce_run10_packed41 complex (128aa VHH + 143aa GDF8 target)
+# Starting VHH: caplacizumab_401 scaffold, CDRs differ from gdf8_vhh53.
+# Chain A = VHH, Chain B = GDF8
+# CDRs (designable, lepionce's annotation): A26-32 (CDR1), A51-56 (CDR2), A97-118 (CDR3)
+# Framework + target chain = fixed
+#
+# This variant: dist_to_ref_seqs_min weight = 8.0 (very strong pull toward
+# lepionce sequence; w=5 landed ~11 muts/seq, target now is lower).
+# plus mutation_diversity_marginal_count_vs_consensus weight = 1.0 to reward
+# per-sequence novel mutations vs the batch consensus.
+#
+# Usage:
+#   cd /home/jgershon/projects/antibody_opt/cleo
+#   uv run cleo-design-train \
+#       --config-path /home/jgershon/projects/antibody_opt/configs/gdf8_vhh \
+#       --config-name gdf8_vhh_lep_run10_distw8_consensus
+
+run_name: gdf8_vhh_lep_run10_distw8_consensus_v1
+output_dir: /home/jgershon/projects/antibody_opt/cleo_runs/gdf8_vhh
+pdb: /home/jgershon/projects/antibody_opt/data/gdf8_vhh/lepionce_run10_packed41_complex.pdb
+checkpoint_path: null
+checkpoint_every_n_steps: 50
+
+algorithm: grpo
+batch_size: 32
+N_steps: 500
+lr: 1e-4
+
+# GRPO params
+kl_weight: 0.0
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+
+# MPNN params
+model_type: protein_mpnn
+temperature: 1.0
+omit_AA: CX
+
+# Fixed residues: everything except lepionce CDRs
+# CDR1: A26-A32, CDR2: A51-A56, CDR3: A97-A118 (35 residues total designable)
+fixed_residues: "A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 A15 A16 A17 A18 A19 A20 A21 A22 A23 A24 A25 A33 A34 A35 A36 A37 A38 A39 A40 A41 A42 A43 A44 A45 A46 A47 A48 A49 A50 A57 A58 A59 A60 A61 A62 A63 A64 A65 A66 A67 A68 A69 A70 A71 A72 A73 A74 A75 A76 A77 A78 A79 A80 A81 A82 A83 A84 A85 A86 A87 A88 A89 A90 A91 A92 A93 A94 A95 A96 A119 A120 A121 A122 A123 A124 A125 A126 A127 A128"
+
+reward:
+  _target_: cleo.design.utils.reward.UniversalReward
+  output_dir: ${output_dir}
+  run_name: ${run_name}
+
+  steps:
+    - name: af3
+      target_fn: cleo.design.utils.oracle.af3_from_df
+      cfg:
+        run_dir: null
+        template_path: /home/jgershon/projects/antibody_opt/configs/gdf8_vhh/af3_template_gdf8.json
+        af3_container: /software/containers/users/ikalvet/mlfold3/mlfold3_01.sif
+        af3_script: /opt/alphafold3/run_alphafold.py
+        model_dir: /databases/alphafold
+
+    - name: dist_to_ref_seqs
+      target_fn: cleo.design.utils.sequence.compute_dist_to_ref_seqs_from_df
+      cfg:
+        ref_seqs:
+          - EVQLVESGGGLVQPGGSLRLSCAASGVPSSAIMGWFRQAPGKGRELVAAINGSGASTYYPDSVEGRFTISRDNAKRMVYLQMNSLRAEDTAVYYCAVWTELGALGVPLSLLPQFEPDYWGQGTQVTVS
+
+    - name: mutation_diversity
+      target_fn: cleo.design.utils.mutation_diversity.mutation_diversity_from_df
+      cfg:
+        ref_seq: EVQLVESGGGLVQPGGSLRLSCAASGVPSSAIMGWFRQAPGKGRELVAAINGSGASTYYPDSVEGRFTISRDNAKRMVYLQMNSLRAEDTAVYYCAVWTELGALGVPLSLLPQFEPDYWGQGTQVTVS
+
+  reward_aggregation:
+    - metric: af3_iptm
+      lower_bound: 0.0
+      upper_bound: 1.0
+      weight: 1.0
+      mode: max
+
+    - metric: af3_ptm
+      lower_bound: 0.0
+      upper_bound: 1.0
+      weight: 1.0
+      mode: max
+
+    - metric: dist_to_ref_seqs_min
+      lower_bound: 0
+      upper_bound: 50
+      weight: 8.0
+      mode: min
+
+    - metric: mutation_diversity_fractional_score
+      lower_bound: 0
+      upper_bound: 10
+      weight: 1.0
+      mode: max
+
+    - metric: mutation_diversity_marginal_count_vs_consensus
+      lower_bound: 0
+      upper_bound: 5
+      weight: 1.0
+      mode: max
+
+    - metric: af3_interaction_pae_min
+      lower_bound: 0.0
+      upper_bound: 20.0
+      weight: 1.0
+      mode: min
+
+    - metric: af3_chain_ptm_ligand
+      lower_bound: 0.5
+      upper_bound: 1.0
+      weight: 0.5
+      mode: max

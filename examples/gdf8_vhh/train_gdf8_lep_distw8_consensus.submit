@@ -1,0 +1,33 @@
+#!/bin/bash
+#SBATCH -p gpu-train
+#SBATCH --gres=gpu:l40:8
+#SBATCH --nodes=1
+#SBATCH -c 8
+#SBATCH -J gdf8_vhh_lep_run10_distw8_consensus
+#SBATCH --mem=64g
+#SBATCH --ntasks=1
+#SBATCH --time=2-00:00:00
+#SBATCH -o /home/jgershon/projects/antibody_opt/logs/%x_%j.out
+#SBATCH --exclude g2521,g2536,g2540,g2541,g2543
+
+export MASTER_PORT=36959
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+export HYDRA_FULL_ERROR=1
+
+CLEO_DIR=/home/jgershon/projects/antibody_opt/cleo
+PROJECT_ROOT=/home/jgershon/projects/antibody_opt
+
+EXP_NAME=gdf8_vhh_lep_run10_distw8_consensus_v1
+EXP_DIR=${PROJECT_ROOT}/cleo_runs/gdf8_vhh/${EXP_NAME}
+
+cd ${CLEO_DIR}
+mkdir -p "${PROJECT_ROOT}/logs" "${EXP_DIR}"
+
+NESTED_DIR="${EXP_DIR}/${EXP_NAME}"
+mkdir -p "${NESTED_DIR}"
+
+uv run cleo-design-train \
+    --config-path ${PROJECT_ROOT}/configs/gdf8_vhh \
+    --config-name gdf8_vhh_lep_run10_distw8_consensus \
+    run_name=${EXP_NAME} \
+    output_dir=${EXP_DIR}

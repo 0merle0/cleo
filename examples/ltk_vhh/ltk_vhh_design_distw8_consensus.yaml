@@ -1,0 +1,114 @@
+# Cleo RL config for LTK VHH affinity maturation.
+#
+# Backbone: ltk_vhh_97 complex (123aa VHH + 297aa LTK target)
+# Best binder by AF3 metrics: iptm 0.91 (vobarilizumab scaffold)
+# Chain H = VHH, Chain A = LTK target
+# CDRs (designable): H26-33 (CDR1), H50-59 (CDR2), H99-113 (CDR3)
+# Framework + target chain = fixed
+#
+# This variant: dist_to_ref_seqs_min weight = 8.0 (very strong pull toward
+# reference; w=2 only moved muts to ~22, w=8 should compress further).
+# plus mutation_diversity_marginal_count_vs_consensus weight = 1.0 to reward
+# per-sequence novel mutations vs the batch consensus.
+#
+# Usage:
+#   cd /home/jgershon/projects/antibody_opt/cleo
+#   uv run cleo-design-train \
+#       --config-path /home/jgershon/projects/antibody_opt/configs/ltk_vhh \
+#       --config-name ltk_vhh_design_distw8_consensus
+
+run_name: ltk_vhh_design_distw8_consensus_v1
+output_dir: /home/jgershon/projects/antibody_opt/cleo_runs/ltk_vhh
+pdb: /home/jgershon/projects/antibody_opt/data/ltk_vhh/ltk_vhh97_complex_HA.pdb
+checkpoint_path: null
+checkpoint_every_n_steps: 50
+
+algorithm: grpo
+batch_size: 32
+N_steps: 500
+lr: 1e-4
+
+# GRPO params
+kl_weight: 0.0
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+
+# MPNN params
+model_type: protein_mpnn
+temperature: 1.0
+omit_AA: CX
+
+# Fixed residues: VHH framework (everything except CDRs) — target chain A is fixed by default
+# CDR1: H26-H33, CDR2: H50-H59, CDR3: H99-H113
+fixed_residues: "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25 H34 H35 H36 H37 H38 H39 H40 H41 H42 H43 H44 H45 H46 H47 H48 H49 H60 H61 H62 H63 H64 H65 H66 H67 H68 H69 H70 H71 H72 H73 H74 H75 H76 H77 H78 H79 H80 H81 H82 H83 H84 H85 H86 H87 H88 H89 H90 H91 H92 H93 H94 H95 H96 H97 H98 H114 H115 H116 H117 H118 H119 H120 H121 H122 H123"
+
+reward:
+  _target_: cleo.design.utils.reward.UniversalReward
+  output_dir: ${output_dir}
+  run_name: ${run_name}
+
+  steps:
+    - name: af3
+      target_fn: cleo.design.utils.oracle.af3_from_df
+      cfg:
+        run_dir: null
+        template_path: /home/jgershon/projects/antibody_opt/configs/ltk_vhh/af3_template_ltk.json
+        af3_container: /software/containers/users/ikalvet/mlfold3/mlfold3_01.sif
+        af3_script: /opt/alphafold3/run_alphafold.py
+        model_dir: /databases/alphafold
+
+    - name: dist_to_ref_seqs
+      target_fn: cleo.design.utils.sequence.compute_dist_to_ref_seqs_from_df
+      cfg:
+        ref_seqs:
+          - EVQLVESGGGLVQPGGSLRLSCAATNVTTEERVMAWYRQAPGKGRELVAGLLIFAGKTRTSYADSVKGRFTISRDNAKNTLYLQMNSLRPEDTAVYYCAVSLYDPVARRHVESWGQGTLVTVS
+
+    - name: mutation_diversity
+      target_fn: cleo.design.utils.mutation_diversity.mutation_diversity_from_df
+      cfg:
+        ref_seq: EVQLVESGGGLVQPGGSLRLSCAATNVTTEERVMAWYRQAPGKGRELVAGLLIFAGKTRTSYADSVKGRFTISRDNAKNTLYLQMNSLRPEDTAVYYCAVSLYDPVARRHVESWGQGTLVTVS
+
+  reward_aggregation:
+    - metric: af3_iptm
+      lower_bound: 0.0
+      upper_bound: 1.0
+      weight: 1.0
+      mode: max
+
+    - metric: af3_ptm
+      lower_bound: 0.0
+      upper_bound: 1.0
+      weight: 1.0
+      mode: max
+
+    - metric: dist_to_ref_seqs_min
+      lower_bound: 0
+      upper_bound: 50
+      weight: 8.0
+      mode: min
+
+    - metric: mutation_diversity_fractional_score
+      lower_bound: 0
+      upper_bound: 10
+      weight: 1.0
+      mode: max
+
+    - metric: mutation_diversity_marginal_count_vs_consensus
+      lower_bound: 0
+      upper_bound: 5
+      weight: 1.0
+      mode: max
+
+    - metric: af3_interaction_pae_min
+      lower_bound: 0.0
+      upper_bound: 20.0
+      weight: 1.0
+      mode: min
+
+    - metric: af3_chain_ptm_ligand
+      lower_bound: 0.5
+      upper_bound: 1.0
+      weight: 0.5
+      mode: max

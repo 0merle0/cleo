@@ -1,0 +1,28 @@
+{
+    "name": "gdf8_vhh",
+    "sequences": [
+        {
+            "protein": {
+                "id": ["H"],
+                "sequence": "EVQLVESGGGLVQPGGSLRLSCAASGLTSSLSSYNMAWYRQAPGKGRELVAGISGSGFTSYADSVKGRFTISRDNAKNTLYLQMNSLRPEDTAVYYCALTPDTSSVDTVILDEDDFDYWGQGTLVTVS",
+                "unpairedMsa": "",
+                "pairedMsa": "",
+                "templates": []
+            }
+        },
+        {
+            "protein": {
+                "id": ["T"],
+                "sequence": "ETIITMPTESDFLMQVDGKPKCCFFKFSSKIQYNKVVKAQLWIYLRPVETPTTVFVQILRLIKPMKDGTRYTGIRSLKLDMNPGTGIWQSIDVKTVLQNWLKQPESNLGIEIKALDENGHDLAVTFPGPGEDGLNPFLEVKVT",
+                "unpairedMsa": "",
+                "unpairedMsaPath": "/home/jgershon/projects/antibody_opt/data/gdf8_vhh/GDF8_116-258.a3m",
+                "pairedMsa": "",
+                "pairedMsaPath": "/home/jgershon/projects/antibody_opt/data/gdf8_vhh/GDF8_116-258.a3m",
+                "templates": []
+            }
+        }
+    ],
+    "modelSeeds": [2222],
+    "dialect": "alphafold3",
+    "version": 2
+}
