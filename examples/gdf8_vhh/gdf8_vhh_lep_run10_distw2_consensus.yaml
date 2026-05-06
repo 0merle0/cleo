@@ -19,7 +19,7 @@
 
 run_name: gdf8_vhh_lep_run10_distw8_consensus_v1
 output_dir: /home/jgershon/projects/antibody_opt/cleo_runs/gdf8_vhh
-pdb: /home/jgershon/projects/antibody_opt/data/gdf8_vhh/lepionce_run10_packed41_complex.pdb
+pdb: examples/gdf8_vhh/lepionce_run10_packed41_complex.pdb
 checkpoint_path: null
 checkpoint_every_n_steps: 50
 
@@ -54,7 +54,7 @@ reward:
       target_fn: cleo.design.utils.oracle.af3_from_df
       cfg:
         run_dir: null
-        template_path: /home/jgershon/projects/antibody_opt/configs/gdf8_vhh/af3_template_gdf8.json
+        template_path: examples/gdf8_vhh/af3_template_gdf8.json
         af3_container: /software/containers/users/ikalvet/mlfold3/mlfold3_01.sif
         af3_script: /opt/alphafold3/run_alphafold.py
         model_dir: /databases/alphafold
@@ -86,7 +86,7 @@ reward:
     - metric: dist_to_ref_seqs_min
       lower_bound: 0
       upper_bound: 50
-      weight: 8.0
+      weight: 2.0
       mode: min
 
     - metric: mutation_diversity_fractional_score

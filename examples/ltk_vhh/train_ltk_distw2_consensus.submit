@@ -3,31 +3,28 @@
 #SBATCH --gres=gpu:l40:8
 #SBATCH --nodes=1
 #SBATCH -c 8
-#SBATCH -J ltk_vhh_design_distw8_consensus
+#SBATCH -J ltk_vhh_design_distw2_consensus
 #SBATCH --mem=64g
 #SBATCH --ntasks=1
 #SBATCH --time=2-00:00:00
-#SBATCH -o /home/jgershon/projects/antibody_opt/logs/%x_%j.out
+#SBATCH -o logs/%x_%j.out
 #SBATCH --exclude g2521,g2536,g2540,g2541,g2543
 
 export MASTER_PORT=36961
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export HYDRA_FULL_ERROR=1
 
+# Edit CLEO_DIR to point to your clone of the cleo repo.
 CLEO_DIR=/home/jgershon/projects/antibody_opt/cleo
-PROJECT_ROOT=/home/jgershon/projects/antibody_opt
 
-EXP_NAME=ltk_vhh_design_distw8_consensus_v1
-EXP_DIR=${PROJECT_ROOT}/cleo_runs/ltk_vhh/${EXP_NAME}
+EXP_NAME=ltk_vhh_design_distw2_consensus_v1
+EXP_DIR=${CLEO_DIR}/cleo_runs/ltk_vhh/${EXP_NAME}
 
 cd ${CLEO_DIR}
-mkdir -p "${PROJECT_ROOT}/logs" "${EXP_DIR}"
-
-NESTED_DIR="${EXP_DIR}/${EXP_NAME}"
-mkdir -p "${NESTED_DIR}"
+mkdir -p logs "${EXP_DIR}"
 
 uv run cleo-design-train \
-    --config-path ${PROJECT_ROOT}/configs/ltk_vhh \
-    --config-name ltk_vhh_design_distw8_consensus \
+    --config-path ${CLEO_DIR}/examples/ltk_vhh \
+    --config-name ltk_vhh_design_distw2_consensus \
     run_name=${EXP_NAME} \
     output_dir=${EXP_DIR}
