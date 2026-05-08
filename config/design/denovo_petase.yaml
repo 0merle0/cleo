@@ -108,14 +108,12 @@ reward:
     #     ckpt_name: last.ckpt # checkpoint name to use (usually last.ckpt)
 
     # !! MUTATION DIVERSITY REWARD !!
-    # # reward sequences for contributing unique mutations to the batch.
-    # # outputs both marginal (exclusive-only) and fractional (1/k) scores.
-    # # marginal_count: mutations only this sequence carries (sparse, strong signal)
-    # # fractional_score: sum of 1/k per mutation, k = batch members sharing it (smooth signal)
+    # # Reward sequences for diverging from the per-position batch consensus.
+    # # Reference-free: pushes the policy away from wherever the batch is piling up.
+    # # consensus_divergence: count of positions where this seq's AA is not among the batch modal AA(s).
     # - name: mutation_diversity
     #   target_fn: cleo.design.utils.mutation_diversity.mutation_diversity_from_df
-    #   cfg:
-    #     ref_seq: MGEEEELELERPSGERTPVRRHRFPARKANNIEEAVANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGTAGEAVVQVLASAGVDVLLMGGLGSGVPVTIYRA
+    #   cfg: {}
 
 
   # Normalizing metrics and aggregating to a single scalar reward
@@ -182,16 +180,9 @@ reward:
     #   weight: 5.0
     #   mode: max
 
-    # !! MUTATION DIVERSITY REWARDS !!
-    # # Use one or both — fractional is smoother, marginal is stricter.
-    # # Track both during training to compare which drives more diversity.
-    # - metric: mutation_diversity_fractional_score
+    # !! MUTATION DIVERSITY REWARD !!
+    # - metric: mutation_diversity_consensus_divergence
     #   lower_bound: 0
-    #   upper_bound: 10    # tune based on batch size and typical mutation counts
-    #   weight: 1.0
-    #   mode: max
-    # - metric: mutation_diversity_marginal_count
-    #   lower_bound: 0
-    #   upper_bound: 10    # tune based on batch size and typical mutation counts
+    #   upper_bound: 30    # tune based on protein length and target diversity
     #   weight: 1.0
     #   mode: max
