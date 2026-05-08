@@ -15,24 +15,27 @@ from collections import Counter
 import pandas as pd
 
 
-def _consensus_sets(sequences):
-    """For each position, return the set of modal AAs (handles ties)."""
+def _position_counts(sequences):
+    """For each position, return a Counter of AA -> occurrence in the batch."""
     seq_len = len(sequences[0])
-    consensus = []
-    for i in range(seq_len):
-        counts = Counter(seq[i] for seq in sequences)
-        top = max(counts.values())
-        consensus.append({aa for aa, c in counts.items() if c == top})
-    return consensus
+    return [Counter(seq[i] for seq in sequences) for i in range(seq_len)]
 
 
 def mutation_diversity_from_df(df_input, cfg, step_name="mutation_diversity"):
     """Per-sequence divergence from the batch consensus.
 
+    For each position, the consensus set is the batch's modal AA(s) (ties
+    treated as multi-modal so even splits aren't penalized).
+
     Output columns (prefixed by step_name):
         _consensus_divergence: Number of positions where this sequence's AA
             is not among the batch's modal AA(s) at that position.
         _consensus_divergence_fraction: Above, divided by sequence length.
+        _fractional_divergence: At each divergent position, credit 1/k where
+            k is the number of batch members sharing this sequence's
+            non-consensus AA. Penalizes secondary-mode collapse.
+        _fractional_divergence_normalized: Fractional divergence divided by
+            sequence length.
     """
     sequences = df_input["sequence"].tolist()
     if not sequences:
@@ -41,16 +44,28 @@ def mutation_diversity_from_df(df_input, cfg, step_name="mutation_diversity"):
     if len({len(s) for s in sequences}) != 1:
         raise ValueError("All sequences in batch must have the same length.")
 
-    consensus = _consensus_sets(sequences)
-    seq_len = len(consensus)
+    pos_counts = _position_counts(sequences)
+    seq_len = len(pos_counts)
+    consensus = [
+        {aa for aa, c in counts.items() if c == max(counts.values())}
+        for counts in pos_counts
+    ]
 
     metrics_list = []
     for idx, seq in enumerate(sequences):
-        divergence = sum(1 for i, aa in enumerate(seq) if aa not in consensus[i])
+        divergence = 0
+        fractional = 0.0
+        for i, aa in enumerate(seq):
+            if aa not in consensus[i]:
+                divergence += 1
+                fractional += 1.0 / pos_counts[i][aa]
+
         metrics_list.append({
             "name": df_input.iloc[idx]["name"],
             f"{step_name}_consensus_divergence": divergence,
             f"{step_name}_consensus_divergence_fraction": divergence / seq_len,
+            f"{step_name}_fractional_divergence": fractional,
+            f"{step_name}_fractional_divergence_normalized": fractional / seq_len,
         })
 
     output_df = pd.DataFrame(metrics_list)
