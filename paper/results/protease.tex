@@ -1,0 +1,37 @@
+% --- Results: Protease (diversity reward ablation) ---
+% Claim: a batch-consensus mutation-diversity reward accesses rarer
+% mutations and improves catalytic activity over an otherwise-matched
+% library that lacks the diversity term.
+%
+% This is the most novel and most fragile claim:
+%   - It depends on wet-lab activity data for both arms (with / without
+%     diversity reward).
+%   - The load-bearing finding is "rare mutations IMPROVE activity," not
+%     just "we sampled more of sequence space."
+%   - Without that activity uplift, this section reduces to a
+%     diversity-for-diversity's-sake observation.
+
+% Block 1 — Setup.
+%   - De novo protease backbone.
+%   - Two arms, matched library budget:
+%       (i)  RL fine-tuned MPNN, standard reward set.
+%       (ii) Same as (i) plus the batch-consensus mutation-diversity reward
+%            (cleo.design.utils.mutation_diversity).
+\todo{protease results — setup, both arms}
+
+% Block 2 — Sequence-space coverage.
+%   - Mutation-frequency spectra: arm (ii) should populate rarer mutations
+%     more heavily than arm (i).
+%   - Position-level entropy / consensus-divergence statistics.
+\todo{protease results — sequence-space coverage figure}
+
+% Block 3 — Activity comparison.
+%   - Activity distribution: arm (i) vs arm (ii).
+%   - Best-variant comparison.
+%   - Are the rare-mutation-bearing variants the ones with highest activity?
+%     (this is the punchline — call it out explicitly)
+\todo{protease results — activity comparison; rare-mutation/activity link}
+
+% Block 4 — Mechanism for the diversity payoff.
+%   - Which rare mutations contributed; structural rationalization if possible.
+\todo{protease results — mechanistic rationalization}

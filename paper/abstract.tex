@@ -1,15 +1,22 @@
 \begin{abstract}
 % Science abstract target: ~125 words.
-% Structure:
-%   1. Hook — why de novo enzyme optimization matters.
-%   2. Problem — current tools (SSM, vanilla MPNN) cannot reach active variants
-%      that lie far from the starting design in sequence space.
-%   3. Approach — RL-aligned MPNN + fragment-based combinatorial library +
-%      surrogate-guided iteration.
-%   4. Result — head-to-head improvements on click-ase and heme enzyme;
-%      deep dive on a de novo PETase reaching XXX-fold over the starting design
-%      and exceeding optimized natural counterparts on a PET-trimer probe.
-%   5. Implication — broad sequence-space search is the missing ingredient
-%      for de novo enzyme optimization.
-\todo{abstract — fill once intro and results paragraphs converge}
+% Structure aligned to the three-application spine:
+%   1. Hook — de novo enzyme design produces backbones; optimization is the
+%      bottleneck that prevents most from reaching useful activity.
+%   2. Approach — function-aligned RL fine-tuning of ProteinMPNN, combined
+%      with fragment-based combinatorial libraries and a closed-loop
+%      experimental optimization protocol.
+%   3. Three application results, each proving a separate capability:
+%      (a) Heme oxidation: fine-tuned MPNN outperforms SSM and vanilla MPNN
+%          at matched experimental effort.
+%      (b) PETase: experimental data from an initial library trains a
+%          surrogate that drives a second library to substantially better
+%          designs (XXX-fold over starting; exceeds optimized natural
+%          enzymes on the PET-trimer probe).
+%      (c) Protease: a batch-consensus mutation diversity reward unlocks
+%          rarer mutations and improves catalytic activity over an
+%          equivalent library without the diversity term.
+%   4. Implication — broad, function-aligned sequence-space search plus
+%      experimental closed loop is a general strategy for de novo enzymes.
+\todo{abstract — fill once results sections converge}
 \end{abstract}

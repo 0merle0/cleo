@@ -2,29 +2,36 @@
 % Science research articles end with a short discussion / outlook paragraph
 % rather than a separate Conclusion section. Keep this tight (~250-400 words).
 
-% Paragraph A — What was learned.
+% Paragraph A — Central scientific takeaway.
 %   - The active-variant region for a de novo enzyme is broader and farther
 %     from the starting design than SSM or vanilla MPNN can reach.
-%   - Function-aligned sampling + combinatorial library construction is the
-%     missing ingredient.
-\todo{conclusion p1 — central scientific takeaway}
+%   - Function-aligned RL sampling + combinatorial library construction +
+%     experimental closed loop together close the gap.
+\todo{conclusion p1 — central takeaway tying the three applications together}
 
-% Paragraph B — Generality.
-%   - Same pipeline applied across hydrolysis (PETase), bond-forming (click)
-%     and oxidation (heme) chemistries.
-%   - Implies the bottleneck is general, not chemistry-specific.
-\todo{conclusion p2 — generality across chemistries}
+% Paragraph B — What each application individually established.
+%   - Heme: fine-tuned MPNN dominates SSM and vanilla MPNN under matched
+%     experimental effort — the foundation.
+%   - PETase: experimental data → surrogate reward → improved next library;
+%     a closed loop, not a single shot.
+%   - Protease: explicit diversity pressure (batch-consensus divergence
+%     reward) unlocks rare mutations and improves activity over an
+%     otherwise-matched library.
+\todo{conclusion p2 — what each app proves about the platform}
 
-% Paragraph C — Limitations.
-%   - PETase: trimer + dimer activity demonstrated; bulk PET activity remains
-%     an open challenge attributed to substrate accessibility on solid plastic.
-%   - Surrogate models require initial functional data — first-round designs
-%     still depend on design-time rewards.
-%   - Library size is large but not exhaustive; we sample, not enumerate.
-\todo{conclusion p3 — honest limitations, including bulk PET}
+% Paragraph C — Honest limitations.
+%   - PETase: probe and dimer activity demonstrated; bulk PET activity
+%     remains an open challenge attributed to substrate accessibility on
+%     solid plastic.
+%   - Closed-loop iteration depends on having an assay-ready experimental
+%     pipeline; cold-start is still hard.
+%   - Diversity reward improves access to rare mutations but does not
+%     substitute for a well-specified function reward.
+\todo{conclusion p3 — limitations, including bulk PET gap}
 
 % Paragraph D — Outlook.
-%   - Closed-loop design + experimental optimization as a general strategy
-%     for de novo enzymes.
-%   - Application to harder substrate classes, including bulk polymers.
+%   - Generalization to additional chemistries and substrate classes
+%     (including bulk polymers).
+%   - Tighter integration of design-time rewards with experimental
+%     surrogate signals across more rounds.
 \todo{conclusion p4 — outlook}

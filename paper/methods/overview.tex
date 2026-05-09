@@ -1,0 +1,27 @@
+% --- Methods: Overview ---
+% Shared methodology that underlies all three applications. Per-application
+% method specifics live in methods/{heme,petase,protease}.tex.
+
+% Block 1 — RL fine-tuning of ProteinMPNN with GRPO.
+%   - Reference cleo.design.train_policy + cleo.design.utils.grpo.
+%   - Reward pipeline composition (UniversalReward, ordered metric steps,
+%     normalized weighted aggregation).
+\todo{methods overview — GRPO + reward pipeline}
+
+% Block 2 — Fragment-based combinatorial libraries.
+%   - Sampling, fragment splitting, combinatorial recombination.
+%   - DNA assembly via Golden Gate adapters.
+\todo{methods overview — fragment library construction}
+
+% Block 3 — Surrogate models for closed-loop optimization.
+%   - MLP ensemble with Gaussian NLL.
+%   - Acquisition function (BatchUCB + diversity).
+%   - Used as a reward step inside the RL pipeline.
+\todo{methods overview — surrogate ensemble + acquisition}
+
+% Block 4 — Batch-consensus mutation-diversity reward.
+%   - Per-position modal AA across the batch (ties multi-modal).
+%   - Two metrics: consensus_divergence (count) and fractional_divergence
+%     (1/k weighted, penalizes secondary-mode collapse).
+%   - Reference cleo.design.utils.mutation_diversity.
+\todo{methods overview — diversity reward definition}

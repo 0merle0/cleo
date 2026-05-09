@@ -1,0 +1,31 @@
+% --- Results: PETase (closed-loop iteration) ---
+% Claim: experimental data from an initial library can be used to train a
+% surrogate that becomes a reward signal for a second library, producing
+% substantially improved designs.
+%
+% This is the iterative-loop claim. The risk is the second library has to
+% be meaningfully better than the first — not just predicted-better.
+
+% Block 1 — Initial library.
+%   - De novo PETase backbone, RF-diffusion origin.
+%   - Library 1: function-aligned RL sampling without surrogate.
+%   - ~6k designs tested; activity distribution on PET-trimer fluorogenic probe.
+\todo{petase results — library 1 setup and outcomes}
+
+% Block 2 — Surrogate training.
+%   - MLP ensemble trained on (sequence, activity) pairs from library 1.
+%   - Validation behavior; calibration of predicted activity vs measured.
+\todo{petase results — surrogate training}
+
+% Block 3 — Library 2 with surrogate-as-reward.
+%   - Surrogate added as a reward step in the RL pipeline for library 2.
+%   - Library 2 size, mutation-distance distribution from starting design.
+%   - Activity distribution comparison: library 1 vs library 2.
+\todo{petase results — library 2 design and outcome}
+
+% Block 4 — Best-variant deep dive.
+%   - XXX-fold kcat improvement over starting design on PET-trimer probe.
+%   - Comparison to optimized natural PETases on the same substrate.
+%   - PET-dimer activity confirmed.
+%   - Honest framing of bulk PET gap (substrate accessibility, not catalysis).
+\todo{petase results — best variant kinetics + PET-dimer + bulk-PET caveat}

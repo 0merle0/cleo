@@ -13,20 +13,24 @@
 
 \input{intro}
 
-% --- Methods ---
-% Add files in methods/ and \input them here as the paper grows.
-% e.g.
-% \input{methods/overview}
-% \input{methods/grpo}
-% \input{methods/fragment_library}
-% \input{methods/surrogate}
-
 % --- Results ---
-% Add files in results/ and \input them here as the paper grows.
-% e.g.
-% \input{results/clickase}
-% \input{results/heme}
-% \input{results/petase}
+% Note on Science formatting: Science articles run results inline with the
+% narrative rather than under a "Results" heading. We keep them in separate
+% files for collaborator-friendly editing; final compilation order is:
+%   heme (method foundation) -> petase (closed-loop iteration) ->
+%   protease (diversity reward).
+\input{results/heme}
+\input{results/petase}
+\input{results/protease}
+
+% --- Methods ---
+% In Science research articles, methods detail goes to "Materials and
+% Methods" (often supplementary). We keep one shared overview and per-app
+% methods files here.
+\input{methods/overview}
+\input{methods/heme}
+\input{methods/petase}
+\input{methods/protease}
 
 \input{conclusion}
 

@@ -1,0 +1,33 @@
+% --- Results: Heme oxidation enzyme ---
+% Claim: fine-tuned ProteinMPNN beats SSM and vanilla MPNN re-sampling at
+% finding active variants under matched experimental effort.
+%
+% This is the foundational claim of the paper. If the comparison is not
+% clean, the entire methods narrative is in trouble — this section needs
+% the cleanest, most defensible head-to-head.
+
+% Block 1 — Setup.
+%   - Backbone: <de novo heme oxidation enzyme, RF-diffusion origin>.
+%   - Starting design: <activity baseline>.
+%   - Three arms, matched library budget (N variants ordered/tested):
+%       (i)  SSM around starting design.
+%       (ii) Vanilla MPNN re-sampling on backbone.
+%       (iii) Fine-tuned MPNN (this work) + fragment library.
+\todo{heme results — setup paragraph}
+
+% Block 2 — Headline figure.
+%   - Activity distribution across all three arms.
+%   - Hit rate (fraction above starting design / above background).
+%   - Best-variant comparison.
+\todo{heme results — main comparison figure + numbers}
+
+% Block 3 — Mutation distance / sequence-space analysis.
+%   - Where in sequence space the best variants from each arm live.
+%   - Demonstrate the SSM/vanilla-MPNN arms are confined to a near
+%     neighborhood while fine-tuned MPNN reaches farther.
+\todo{heme results — sequence-space analysis}
+
+% Block 4 — Mechanism check (if available).
+%   - Structural / spectroscopic / kinetic confirmation that the
+%     improvement is real catalysis, not artifact.
+\todo{heme results — mechanism check}
