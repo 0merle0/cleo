@@ -50,7 +50,20 @@ cleo-optimize-predict = "cleo.optimize.predict_fasta:main"
 
 [project.optional-dependencies]
 cuda = ["boltz[cuda]"]
+dev = [
+    "pytest>=8",
+    "pytest-cov",
+    "hypothesis",
+]
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: long-running tests (training loops, oracle calls)",
+    "gpu: tests that require a GPU",
+]
+addopts = "-m 'not slow and not gpu'"
