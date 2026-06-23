@@ -427,7 +427,11 @@ def parse_PDB(input_path: str,
             "OXT"
         ]
 
-    atoms = parsePDB(input_path)
+    # Accept either PDB or mmCIF/CIF input (e.g. AF3 predictions are .cif).
+    if input_path.lower().endswith((".cif", ".mmcif")):
+        atoms = parseMMCIF(input_path)
+    else:
+        atoms = parsePDB(input_path)
     atoms = atoms.select('occupancy > 0')
     if chains:
         str_out=""
