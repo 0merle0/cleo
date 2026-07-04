@@ -64,7 +64,7 @@ class PolicyMPNNvGRPO(PolicyMPNN):
         model.load_state_dict(ckpt["model_state_dict"], strict=False)
         return model.to(self.device)
 
-    def train_step(self, step, init_state, feature_dict):
+    def train_step(self, step, init_state, feature_dict, reward_fn=None):
         """GRPO/DAPO update: collect one rollout batch, then perform
         ``N_updates`` clipped-surrogate gradient steps on random sub-batches.
 
@@ -75,6 +75,7 @@ class PolicyMPNNvGRPO(PolicyMPNN):
         config flag.
         """
 
+        reward_fn = reward_fn if reward_fn is not None else self.reward_fn
         to_log = {}
 
         # --- Collect experience (no gradients) ---
@@ -82,7 +83,7 @@ class PolicyMPNNvGRPO(PolicyMPNN):
             h_V_in, h_E_in, E_idx_in = init_state
             out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in)
 
-            batched_rewards, metrics = self.reward_fn(step, out, feature_dict, self.device)
+            batched_rewards, metrics = reward_fn(step, out, feature_dict, self.device)
             to_log.update(metrics)
             to_log["reward"] = batched_rewards.mean().cpu().item()
 

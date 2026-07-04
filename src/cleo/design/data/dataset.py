@@ -128,6 +128,10 @@ class DesignDataset:
             ds._validate_row(i, row)
         return ds
 
+    def package(self, name: str):
+        """Public accessor for a loaded reward package (plain dict, resolve=False)."""
+        return self._package(name)
+
     def _package(self, name: str):
         if name not in self._packages:
             path = os.path.join(self.reward_dir, f"{name}.yaml")

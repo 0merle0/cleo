@@ -57,7 +57,25 @@ class PolicyMPNN:
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
 
-        self.reward_fn = hydra.utils.instantiate(cfg.reward)
+        # Single-target reward (cfg.reward). Optional in dataset-driven mode, where the
+        # reward is built per-example by the registry (SPEC 6.4).
+        self.reward_fn = hydra.utils.instantiate(cfg.reward) if cfg.get("reward") else None
+
+        # Dataset-driven multi-example harness (SPEC 6). When cfg.dataset is set, sample
+        # one example per step and bind its reward package; otherwise use cfg.pdb + reward_fn.
+        self.dataset = None
+        self.reward_registry = None
+        if cfg.get("dataset"):
+            from cleo.design.data.dataset import DesignDataset
+            from cleo.design.data.registry import RewardRegistry
+
+            self.dataset = DesignDataset.load(
+                cfg.dataset.jsonl,
+                cfg.dataset.reward_dir,
+                structures_root=cfg.dataset.get("structures_root", ""),
+            )
+            self.reward_registry = RewardRegistry(self.dataset, cfg.output_dir, cfg.run_name)
+            print(f"Loaded dataset with {len(self.dataset)} examples from {cfg.dataset.jsonl}")
 
         self.checkpoint_every_n_steps = self.cfg.checkpoint_every_n_steps
         self.best_seen_reward = 0
@@ -119,8 +137,14 @@ class PolicyMPNN:
         )
         return optimizer
 
-    def featurize_pdb(self, pdb):
-        """Parse a PDB file and build the feature dictionary consumed by :meth:`rollout`."""
+    def _featurize(self, pdb, fixed_residues_fn):
+        """Parse a structure and build the feature dict consumed by :meth:`rollout`.
+
+        ``fixed_residues_fn(chain_letters, R_idx, icodes) -> list[str]`` returns the
+        residue tokens to hold fixed (NOT designed). ``featurize_pdb`` supplies the
+        config-level ``fixed_residues``; ``featurize_example`` computes the CDR-mask
+        complement from the dataset example.
+        """
 
         protein_dict, backbone, other_atoms, icodes, water_atoms = parse_PDB(
             pdb,
@@ -143,7 +167,7 @@ class PolicyMPNN:
         )
         protein_dict["chain_mask"] = chain_mask
 
-        fixed_residues = [item for item in self.cfg.fixed_residues.split()]
+        fixed_residues = fixed_residues_fn(chain_letters_list, R_idx_list, icodes)
         fixed_positions = torch.tensor(
             [int(item not in fixed_residues) for item in encoded_residues],
             device=self.device,
@@ -188,6 +212,22 @@ class PolicyMPNN:
         )
 
         return feature_dict
+
+    def featurize_pdb(self, pdb):
+        """Featurize a single PDB, holding ``cfg.fixed_residues`` fixed (single-target path)."""
+        return self._featurize(pdb, lambda cl, ri, ic: self.cfg.fixed_residues.split())
+
+    def featurize_example(self, example):
+        """Featurize a dataset example, masking to its ``params.cdr_spans`` (SPEC 6.4).
+
+        ``fixed_residues`` = the CDR-mask complement computed by the data layer from
+        the example's ``design_chain`` + ``cdr_spans`` against this exact enumeration,
+        so the mask lines up 1:1 with the tokens ``_featurize`` builds.
+        """
+        return self._featurize(
+            example.structure,
+            lambda cl, ri, ic: self.dataset.fixed_residues(example, cl, ri, ic).split(),
+        )
 
     def encode_initial_state(self, feature_dict):
         """
@@ -375,9 +415,10 @@ class PolicyMPNN:
             sequences.append(seq_str)
         return sequences
 
-    def train_step(self, step, init_state, feature_dict):
+    def train_step(self, step, init_state, feature_dict, reward_fn=None):
         """Run one REINFORCE update: rollout -> reward -> policy gradient."""
 
+        reward_fn = reward_fn if reward_fn is not None else self.reward_fn
         to_log = {}
         self.optimizer.zero_grad()
 
@@ -390,7 +431,7 @@ class PolicyMPNN:
         seq_mask = torch.nn.functional.one_hot(out["S"], num_classes=len(alphabet)).float()
         batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1))
 
-        batched_reward, metrics = self.reward_fn(step, out, feature_dict, self.device)
+        batched_reward, metrics = reward_fn(step, out, feature_dict, self.device)
         to_log.update(metrics)
 
         baseline = torch.tensor(self.reward_history, dtype=torch.float32, device=self.device).mean()
@@ -416,11 +457,21 @@ class PolicyMPNN:
         start_time = time.time()
         for step in tqdm(range(self.cfg.N_steps), desc="Training"):
             self.model.train()
-            feature_dict = self.featurize_pdb(self.cfg.pdb)
+
+            # Dataset-driven: sample one example, featurize+mask it, bind its reward
+            # package. Single-PDB path (cfg.pdb + shared reward_fn) is the fallback.
+            if self.reward_registry is not None:
+                example = self.dataset.sample()
+                feature_dict = self.featurize_example(example)
+                reward_fn = self.reward_registry.bind(example)
+            else:
+                feature_dict = self.featurize_pdb(self.cfg.pdb)
+                reward_fn = self.reward_fn
+
             h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
             init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
 
-            to_log = self.train_step(step, init_state, feature_dict)
+            to_log = self.train_step(step, init_state, feature_dict, reward_fn)
 
             runtime = time.time() - start_time
             self.log_metrics(step, runtime, to_log)
