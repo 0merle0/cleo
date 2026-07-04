@@ -1,0 +1,31 @@
+# Antibody interface reward package (SPEC 6.2).
+#
+# `requires` + `steps.*.inputs` are the package's declared contract, read by the
+# data layer (DesignDataset.load) and hard-validated per row. They are METADATA
+# for the reward registry, which resolves `inputs` per example and seeds them as
+# df columns via get_input_df (SPEC 6.4) before building a UniversalReward from
+# `steps` + `reward_aggregation`. `requires`/`inputs` are NOT passed to
+# UniversalReward.__init__.
+requires: [antigen_sequence, antigen_msa_dir, framework_msa_dir, cdr_spans, epitope_residues]
+
+steps:
+  - name: protenix                       # ORACLE step (builds the per-design MSA internally)
+    target_fn: cleo.design.utils.protenix_oracle.protenix_from_df
+    cfg:                                 # STATIC, shared across examples (rundir/step reserved)
+      cycle: 4
+      n_diffusion_step: 20
+      n_sample: 1
+      use_msa: true
+      need_atom_confidence: true         # residue-level PAE for protenix_cdr_interface_pae
+    inputs:                              # per-example -> resolved to df columns
+      antigen_sequence:  ${native.seq.T}            # co-crystal antigen = chain T
+      antigen_msa_dir:   ${row.params.antigen_msa_dir}
+      framework_msa_dir: ${row.params.framework_msa_dir}   # scaffold CDR-gapped framework MSA
+      cdr_spans:         ${row.params.cdr_spans}     # -> per-design gapped a3m + CDR-residue masks
+      epitope_residues:  ${row.params.epitope_residues}    # epitope_cdr_coverage + cdr_interface_pae
+
+reward_aggregation:
+  - {metric: protenix_interface_iptm,       mode: max, lower_bound: 0.0, upper_bound: 0.8,  weight: 1.0}
+  - {metric: protenix_epitope_overlap,      mode: max, lower_bound: 0.0, upper_bound: 1.0,  weight: 1.0}  # precision
+  - {metric: protenix_epitope_cdr_coverage, mode: max, lower_bound: 0.0, upper_bound: 1.0,  weight: 1.0}  # recall
+  - {metric: protenix_cdr_interface_pae,    mode: min, lower_bound: 0.0, upper_bound: 30.0, weight: 1.0}  # paratope PAE
