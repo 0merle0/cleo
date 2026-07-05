@@ -57,7 +57,6 @@ class PolicyMPNN:
 
         self.model = self.load_mpnn_model()
         self.model.to(self.device)
-        self.optimizer = self.get_optimizer()
 
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
@@ -66,8 +65,8 @@ class PolicyMPNN:
         # exact no-op with zero params (byte-identical M1 baseline), so this is safe to always
         # construct. When enabled, build a SECOND ProteinMPNN whose encoder embeds the epitope
         # (init from the pretrained base weights, independently trainable) and hand it to the
-        # conditioner. Hooks are wired into encode/rollout in a later slice-2 step.
-        # (self.conditioning_cfg was parsed at the top of __init__.)
+        # conditioner. Built BEFORE the optimizer so its trainable hook params (step 4) are
+        # picked up by get_optimizer. (self.conditioning_cfg was parsed at the top of __init__.)
         if self.conditioning_cfg.enabled:
             self.epi_encoder = self._build_epitope_encoder()
             self.conditioner = EpitopeConditioner(
@@ -77,6 +76,8 @@ class PolicyMPNN:
         else:
             self.epi_encoder = None
             self.conditioner = EpitopeConditioner(self.conditioning_cfg)  # no-op, no params
+
+        self.optimizer = self.get_optimizer()
 
         # Single-target reward (cfg.reward). Optional in dataset-driven mode, where the
         # reward is built per-example by the registry (SPEC 6.4).
@@ -173,16 +174,25 @@ class PolicyMPNN:
         return model.to(self.device)
 
     def get_optimizer(self):
-        """Freeze encoder parameters and return an Adam optimizer over the decoder."""
+        """Freeze the framework encoder and return an Adam optimizer over the decoder
+        (plus the epitope-conditioning hook params when conditioning is enabled).
+
+        The framework encoder stays frozen and the cached init-state is reused (step 6
+        unfreezes both). So node-init / encoder cross-attn sit upstream of the detached
+        init-state leaf and don't receive gradients yet, but the **decoder cross-attn**
+        runs inside the grad-tracked rollout, so its params train now — hence the
+        conditioner is added to the optimizer here.
+        """
 
         for name, param in self.model.named_parameters():
             if "decoder_layers" not in name and "W_out" not in name:
                 param.requires_grad = False
 
-        optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, self.model.parameters()),
-            lr=self.cfg.lr,
-        )
+        trainable = [p for p in self.model.parameters() if p.requires_grad]
+        if self.conditioning_cfg.enabled:
+            trainable += list(self.conditioner.parameters())
+
+        optimizer = torch.optim.Adam(trainable, lr=self.cfg.lr)
         return optimizer
 
     def _featurize(self, pdb, fixed_residues_fn, gap=None):
@@ -361,12 +371,45 @@ class PolicyMPNN:
         feature_dict["epitope_mask"] = epitope_mask
         return feature_dict
 
-    def encode_initial_state(self, feature_dict):
+    def attach_epitope(self, example, feature_dict):
+        """Encode the epitope once and stash its per-residue embeddings + patch mask into
+        ``feature_dict`` for the conditioning hooks (SPEC 4.1, slice-2 step 4).
+
+        No-op (returns ``feature_dict`` unchanged) when conditioning is disabled or the
+        example carries no ``epitope_residues``. Runs the epitope encoder under ``no_grad``
+        for now — like the framework encoder it is frozen until step 6; the downstream
+        ``decoder_cross_attn`` params still train because ``epi_per_res`` enters them as a
+        constant inside the grad-tracked rollout.
+
+        Keys written: ``epi_per_res`` ``[1, M, H]`` (per-antigen-residue embeddings) and
+        ``epi_mask`` ``[1, M]`` (the epitope patch returned by ``encode_epitope``).
         """
-        Run the MPNN model without gradient tracking.
+        if not (self.conditioning_cfg.enabled and example.epitope_residues):
+            return feature_dict
+        epi_fd = self.featurize_epitope(example)
+        with torch.no_grad():
+            epi_per_res, epi_mask = self.conditioner.encode_epitope(epi_fd)
+        feature_dict["epi_per_res"] = epi_per_res
+        feature_dict["epi_mask"] = epi_mask
+        return feature_dict
+
+    def encode_initial_state(self, feature_dict):
+        """Encode the framework structure (no grad) and apply the post-encode framework-node
+        conditioning (node-init + encoder cross-attn) at CDR positions (SPEC 4.1 hook 1+2).
+
+        ``condition_nodes`` is an identity when conditioning is disabled, so the M1 baseline
+        path is byte-identical. When ``attach_epitope`` populated ``epi_per_res`` the CDR
+        nodes also absorb the pooled epitope + per-residue encoder cross-attn.
         """
         with torch.no_grad():
             h_V, h_E, E_idx = self.model.encode(feature_dict)
+            if self.conditioning_cfg.enabled:
+                h_V = self.conditioner.condition_nodes(
+                    h_V,
+                    feature_dict["chain_mask"],
+                    feature_dict.get("epi_per_res"),
+                    feature_dict.get("epi_mask"),
+                )
         return h_V, h_E, E_idx
 
     def gather_nodes(self, nodes, neighbor_idx):
@@ -504,6 +547,16 @@ class PolicyMPNN:
 
             h_V_t = torch.gather(h_V_stack[-1], 1, t[:, None, None].repeat(1, 1, h_V_stack[-1].shape[-1]))[:, 0]
 
+            # Hook 3 (SPEC 4.1): per-step decoder cross-attn to epitope residues, gated to the
+            # CDR decode steps (chain_mask_t == 1). Identity elsewhere and when conditioning /
+            # decoder_cross_attn is off. The delta's params sit in the grad-tracked path, so they
+            # train even while the encoder stays frozen (step 4).
+            if self.conditioning_cfg.enabled and feature_dict.get("epi_per_res") is not None:
+                h_V_t_cond = self.conditioner.decoder_cross_attn(
+                    h_V_t, feature_dict["epi_per_res"], feature_dict.get("epi_mask"),
+                )
+                h_V_t = torch.where(chain_mask_t[:, None] > 0.5, h_V_t_cond, h_V_t)
+
             logits = model.W_out(h_V_t)
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
 
@@ -595,6 +648,7 @@ class PolicyMPNN:
             if self.reward_registry is not None:
                 example = self.dataset.sample()
                 feature_dict = self.featurize_example(example)
+                feature_dict = self.attach_epitope(example, feature_dict)  # epitope hooks (step 4)
                 reward_fn = self.reward_registry.bind(example)
             else:
                 feature_dict = self.featurize_pdb(self.cfg.pdb)

@@ -207,3 +207,71 @@ def test_epitope_source_prefers_separate_antigen_file(tmp_path):
     policy = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))
     fd = policy.featurize_epitope(split)                        # reads antigen_structure, not structure
     assert fd["epitope_mask"].sum().item() == 3
+
+
+# --- step 4: the 3 conditioning hooks wired into encode + rollout ----------- #
+
+def test_attach_epitope_populates_embeddings(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": True}))
+    ex = _gapped_example()
+    fd = p.attach_epitope(ex, p.featurize_example(ex))
+    assert fd["epi_per_res"].shape == (1, 10, 128)             # per-residue over whole chain T
+    assert fd["epi_mask"].sum().item() == 3                    # the epitope patch, not all 10
+
+
+def test_attach_epitope_noop_when_disabled(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path))                             # conditioning off
+    p.dataset = _StubDataset()
+    ex = _gapped_example()
+    fd = p.attach_epitope(ex, p.featurize_example(ex))
+    assert "epi_per_res" not in fd and "epi_mask" not in fd
+
+
+def test_encode_initial_state_conditions_only_cdr_nodes(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": True}))
+    p.model.eval()                                            # deterministic encode (dropout off)
+    ex = _gapped_example()
+    fd = p.attach_epitope(ex, p.featurize_example(ex))
+
+    with torch.no_grad():
+        h_plain, _, _ = p.model.encode(fd)                   # un-conditioned reference
+    h_cond, _, _ = p.encode_initial_state(fd)                # applies condition_nodes
+
+    cdr = fd["chain_mask"][0] > 0.5                           # the 6 gap nodes
+    assert torch.allclose(h_cond[0][~cdr], h_plain[0][~cdr], atol=1e-6)   # framework untouched
+    assert not torch.allclose(h_cond[0][cdr], h_plain[0][cdr])            # CDR nodes conditioned
+
+
+def test_encode_initial_state_identity_when_disabled(tmp_path):
+    """M1 baseline preserved: no epitope embeddings, encode == plain model.encode."""
+    p = PolicyMPNN(_cfg(tmp_path))
+    p.model.eval()
+    p.dataset = _StubDataset()
+    ex = _gapped_example()
+    fd = p.featurize_example(ex)
+    with torch.no_grad():
+        h_plain, _, _ = p.model.encode(fd)
+    h_cond, _, _ = p.encode_initial_state(fd)
+    assert torch.allclose(h_cond, h_plain, atol=1e-6)
+
+
+def test_conditioner_params_are_optimized_when_enabled(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))
+    opt_ids = {id(pp) for g in p.optimizer.param_groups for pp in g["params"]}
+    cond_ids = {id(pp) for pp in p.conditioner.parameters()}
+    assert cond_ids                                           # the conditioner has trainable params
+    assert cond_ids <= opt_ids                                # all of them are in the optimizer
+
+
+def test_rollout_runs_end_to_end_with_conditioning(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": True}))
+    p.model.eval()
+    ex = _gapped_example()
+    fd = p.attach_epitope(ex, p.featurize_example(ex))       # decoder cross-attn active
+    h_V, h_E, E_idx = p.encode_initial_state(fd)
+    out = p.rollout(fd, h_V, h_E, E_idx)
+
+    L = fd["X"].shape[1]
+    assert out["S"].shape == (1, L)                          # full graph (gapped chain A + chain T)
+    assert torch.isfinite(out["log_probs"]).all()
+    assert out["chain_mask"].sum().item() == 6               # only the 6 gap nodes designable
