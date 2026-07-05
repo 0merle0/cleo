@@ -94,15 +94,26 @@ class Example:
     id: str
     task: str
     reward: str
-    structure: str
+    structure: str                  # framework scaffold PDB (design chain(s); no antigen)
     design_chain: Any               # str (VHH "A") or list (Fab ["A", "B"])
     design_regions: list = field(default_factory=list)
     params: dict = field(default_factory=dict)
+    antigen_structure: str = ""     # SEPARATE antigen PDB (chain T); no shared frame with framework
     raw: dict = field(default_factory=dict, repr=False)
 
     @property
     def cdr_spans(self) -> dict:
         return self.params.get("cdr_spans", {})
+
+    @property
+    def epitope_source(self) -> str:
+        """PDB the epitope lives in — the separate antigen file when given, else ``structure``.
+
+        Framework and antigen are always independent files (no dock / no shared coordinate
+        frame; SPEC 4.5): the framework carries only the design chain(s), the antigen only
+        chain T. Falling back to ``structure`` supports single-file fixtures/tests.
+        """
+        return self.antigen_structure or self.structure
 
     @property
     def epitope_residues(self) -> list:
@@ -152,6 +163,13 @@ class DesignDataset:
         s = row["structure"]
         return s if os.path.isabs(s) or not self.structures_root else os.path.join(self.structures_root, s)
 
+    def _antigen_path(self, row: dict) -> str:
+        """Resolve the separate antigen structure path, or "" when the row has none."""
+        s = row.get("antigen_structure")
+        if not s:
+            return ""
+        return s if os.path.isabs(s) or not self.structures_root else os.path.join(self.structures_root, s)
+
     def _validate_row(self, i: int, row: dict):
         for f in _REQUIRED_FIELDS:
             if f not in row:
@@ -167,6 +185,18 @@ class DesignDataset:
             if c not in present:
                 raise DesignDatasetError(
                     f"[{row['id']}] design_chain {c!r} absent from structure (present: {sorted(present)})"
+                )
+
+        # Antigen lives in a SEPARATE file (no shared frame); validate it holds chain T when given.
+        antigen_path = self._antigen_path(row)
+        if antigen_path:
+            if not os.path.isfile(antigen_path):
+                raise DesignDatasetError(f"[{row['id']}] antigen_structure not found: {antigen_path}")
+            antigen_present = scan_chain_ids(antigen_path)
+            if "T" not in antigen_present:
+                raise DesignDatasetError(
+                    f"[{row['id']}] antigen chain 'T' absent from antigen_structure "
+                    f"(present: {sorted(antigen_present)})"
                 )
 
         # Resolve the reward contract with a LIGHT native resolver: chain-presence only,
@@ -192,6 +222,7 @@ class DesignDataset:
             design_chain=row["design_chain"],
             design_regions=row.get("design_regions", []),
             params=row.get("params", {}),
+            antigen_structure=self._antigen_path(row),
             raw=row,
         )
 

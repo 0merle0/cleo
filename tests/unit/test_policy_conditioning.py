@@ -40,6 +40,9 @@ def _cfg(tmp_path, conditioning=None):
         "model_type": "protein_mpnn",
         "lr": 1e-4,
         "checkpoint_every_n_steps": 100,
+        "omit_AA": None,
+        "batch_size": 1,
+        "temperature": 1.0,
     }
     if conditioning is not None:
         d["conditioning"] = conditioning
@@ -148,3 +151,59 @@ def test_baseline_policy_model_has_no_surgery(tmp_path):
     p = PolicyMPNN(_cfg(tmp_path))                              # conditioning disabled
     assert p.model.features.coord_free_cdr_edges is False
     assert not hasattr(p.model.features, "unknown_rbf")
+
+
+# --- step 3.5: gapped-framework featurize + two-file loading ---------------- #
+
+def _gapped_example():
+    """Chain A native residues 4,5,6 (positional span [4,7)) excised -> 6 gap nodes decoded in."""
+    return Example(
+        id="gap0", task="nanobody_design", reward="antibody_interface",
+        structure=FIXTURE, design_chain="A",
+        params={"cdr_spans": {"H1": [4, 7]}, "cdr_lengths": {"H1": 6},
+                "epitope_residues": EPI_RESIDUES},
+    )
+
+
+def test_featurize_example_gaps_cdrs_when_coord_free_on(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": True}))
+    fd = p.featurize_example(_gapped_example())
+
+    # mini_complex = chain A (15) + chain T (10); gapping A: 15 - 3 native + 6 gap = 18 (+10) = 28
+    assert fd["X"].shape[1] == 28
+    assert fd["chain_mask"].sum().item() == 6                   # exactly the 6 gap nodes designable
+    assert torch.isfinite(fd["X"]).all()                       # gap backbone copied from stem
+
+
+class _StubDataset:
+    """Minimal stand-in for the fixed-residues resolver (no JSONL/reward machinery needed)."""
+
+    def fixed_residues(self, example, cl, ri, ic):
+        from cleo.design.data.mask import resolve_fixed_residues
+        return resolve_fixed_residues(cl, ri, ic, example.design_chain, example.cdr_spans)
+
+
+def test_featurize_example_no_gap_when_coord_free_off(tmp_path):
+    """Master enabled but surgery off => the stock fixed-residues path (native lengths kept)."""
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": False}))
+    p.dataset = _StubDataset()
+    fd = p.featurize_example(_gapped_example())
+    assert fd["X"].shape[1] == 25                               # 15 + 10, nothing spliced
+    assert fd["chain_mask"].sum().item() == 3                   # native CDR positions 4,5,6
+
+
+def test_epitope_source_prefers_separate_antigen_file(tmp_path):
+    """Two-file loading: epitope comes from antigen_structure when set, else falls back."""
+    combined = _epitope_example()
+    assert combined.epitope_source == FIXTURE                   # fallback (single-file fixture)
+
+    split = Example(
+        id="split0", task="nanobody_design", reward="antibody_interface",
+        structure="/some/framework.pdb", design_chain="A",
+        antigen_structure=FIXTURE, params={"epitope_residues": EPI_RESIDUES},
+    )
+    assert split.epitope_source == FIXTURE                      # separate antigen file wins
+
+    policy = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))
+    fd = policy.featurize_epitope(split)                        # reads antigen_structure, not structure
+    assert fd["epitope_mask"].sum().item() == 3

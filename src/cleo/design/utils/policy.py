@@ -22,6 +22,8 @@ from omegaconf import OmegaConf
 from cleo.design.protein_mpnn_utils.data_utils import featurize, parse_PDB
 from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN
 from cleo.design.nanobody import ConditioningConfig, EpitopeConditioner
+from cleo.design.data.gapping import apply_cdr_gaps
+from cleo.design.data.mask import sample_cdr_lengths
 
 
 PROTEIN_MPNN_UTILS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "protein_mpnn_utils")
@@ -183,13 +185,19 @@ class PolicyMPNN:
         )
         return optimizer
 
-    def _featurize(self, pdb, fixed_residues_fn):
+    def _featurize(self, pdb, fixed_residues_fn, gap=None):
         """Parse a structure and build the feature dict consumed by :meth:`rollout`.
 
         ``fixed_residues_fn(chain_letters, R_idx, icodes) -> list[str]`` returns the
         residue tokens to hold fixed (NOT designed). ``featurize_pdb`` supplies the
         config-level ``fixed_residues``; ``featurize_example`` computes the CDR-mask
         complement from the dataset example.
+
+        ``gap`` (SPEC 6.8 step 3.5): when given — ``{"design_chain", "cdr_spans", "cdr_lengths"}``
+        — the native CDRs are excised and sampled-length gap nodes are spliced in
+        (:func:`cleo.design.data.gapping.apply_cdr_gaps`), which sets ``chain_mask`` itself
+        (gap nodes designable); ``fixed_residues_fn`` is then unused. Requires
+        ``coord_free_cdr_edges`` so the gap nodes' placeholder coordinates are never read.
         """
 
         protein_dict, backbone, other_atoms, icodes, water_atoms = parse_PDB(
@@ -200,28 +208,33 @@ class PolicyMPNN:
             parse_all_atoms=self.ligand_mpnn_use_side_chain_context,
         )
 
-        R_idx_list = list(protein_dict["R_idx"].cpu().numpy())
-        chain_letters_list = list(protein_dict["chain_letters"])
-        encoded_residues = [
-            str(chain_letters_list[i]) + str(R_idx_list[i]) + icodes[i]
-            for i in range(len(R_idx_list))
-        ]
+        if gap is not None:
+            protein_dict = apply_cdr_gaps(
+                protein_dict, gap["design_chain"], gap["cdr_spans"], gap["cdr_lengths"]
+            )  # sets chain_mask (gap = designable) + side_chain_mask
+        else:
+            R_idx_list = list(protein_dict["R_idx"].cpu().numpy())
+            chain_letters_list = list(protein_dict["chain_letters"])
+            encoded_residues = [
+                str(chain_letters_list[i]) + str(R_idx_list[i]) + icodes[i]
+                for i in range(len(R_idx_list))
+            ]
 
-        chain_mask = torch.tensor(
-            np.array([True for _ in protein_dict["chain_letters"]], dtype=np.int32),
-            device=self.device,
-        )
-        protein_dict["chain_mask"] = chain_mask
+            chain_mask = torch.tensor(
+                np.array([True for _ in protein_dict["chain_letters"]], dtype=np.int32),
+                device=self.device,
+            )
+            protein_dict["chain_mask"] = chain_mask
 
-        fixed_residues = fixed_residues_fn(chain_letters_list, R_idx_list, icodes)
-        fixed_positions = torch.tensor(
-            [int(item not in fixed_residues) for item in encoded_residues],
-            device=self.device,
-        )
-        if fixed_residues:
-            protein_dict["chain_mask"] = protein_dict["chain_mask"] * fixed_positions
+            fixed_residues = fixed_residues_fn(chain_letters_list, R_idx_list, icodes)
+            fixed_positions = torch.tensor(
+                [int(item not in fixed_residues) for item in encoded_residues],
+                device=self.device,
+            )
+            if fixed_residues:
+                protein_dict["chain_mask"] = protein_dict["chain_mask"] * fixed_positions
 
-        protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
+            protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
 
         omit_AA_list = self.cfg.omit_AA if self.cfg.omit_AA is not None else []
         omit_AA = torch.tensor(
@@ -229,8 +242,9 @@ class PolicyMPNN:
             device=self.device,
         )
 
-        bias_AA_per_residue = torch.zeros([len(encoded_residues), 21], device=self.device, dtype=torch.float32)
-        omit_AA_per_residue = torch.zeros([len(encoded_residues), 21], device=self.device, dtype=torch.float32)
+        n_res = protein_dict["chain_mask"].shape[0]            # post-gapping length (gap != native)
+        bias_AA_per_residue = torch.zeros([n_res, 21], device=self.device, dtype=torch.float32)
+        omit_AA_per_residue = torch.zeros([n_res, 21], device=self.device, dtype=torch.float32)
 
         feature_dict = featurize(
             protein_dict,
@@ -279,9 +293,24 @@ class PolicyMPNN:
                 f"featurize_example(mode={mode!r}) is a Stage-2 seam (SPEC 4.5/6.8); only "
                 f"'scaffold' is implemented."
             )
+        # Stage-1 gapped-framework path (SPEC 6.8 step 3.5): excise native CDRs and splice in
+        # sampled-length gap nodes. Only when the coord-free surgery is on (so the gap nodes'
+        # placeholder coordinates are never read) and the example actually defines CDR spans.
+        gap = None
+        if (
+            self.conditioning_cfg.enabled
+            and self.conditioning_cfg.coord_free_cdr_edges
+            and example.cdr_spans
+        ):
+            gap = {
+                "design_chain": example.design_chain,
+                "cdr_spans": example.cdr_spans,
+                "cdr_lengths": sample_cdr_lengths(example.params),  # fresh per step (length diversity)
+            }
         return self._featurize(
             example.structure,
             lambda cl, ri, ic: self.dataset.fixed_residues(example, cl, ri, ic).split(),
+            gap=gap,
         )
 
     def featurize_epitope(self, example):
@@ -295,14 +324,14 @@ class PolicyMPNN:
           so the CDR conditions on the epitope specifically, not the whole antigen (§4.1, 2026-07-04).
         """
         protein_dict, _bb, _oa, icodes, _wa = parse_PDB(
-            example.structure,
+            example.epitope_source,
             device=self.device,
             atom_context_num=self.atom_context_num,
             chains=["T"],
             parse_all_atoms=self.ligand_mpnn_use_side_chain_context,
         )
         if protein_dict["R_idx"].shape[0] == 0:
-            raise ValueError(f"example {example.id}: no antigen chain 'T' found in {example.structure}")
+            raise ValueError(f"example {example.id}: no antigen chain 'T' found in {example.epitope_source}")
 
         # The epitope is fixed context (never designed); featurize() still requires these keys.
         n_res = protein_dict["R_idx"].shape[0]

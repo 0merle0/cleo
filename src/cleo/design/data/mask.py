@@ -18,9 +18,49 @@ routed by prefix — ``H*`` -> first design chain, ``L*`` -> second.
 """
 from __future__ import annotations
 
+import random
+
 
 class MaskError(ValueError):
     """Raised when design regions cannot be resolved against a structure."""
+
+
+def sample_cdr_lengths(params: dict, rng: random.Random | None = None) -> dict[str, int]:
+    """Draw a design length for each CDR (SPEC 4.5 / 6.8 step 3.5).
+
+    Length is an explicit design variable, decoupled from the framework template: the CDRs
+    are gapped out and this many residues are decoded back in. Two sources, in priority order:
+
+    - ``params.cdr_lengths`` — a fixed ``{cdr: n}`` override (inference / deterministic tests).
+    - ``params.cdr_length_ranges`` — ``{cdr: [lo, hi]}`` inclusive; one length sampled per CDR
+      each call (Stage-1 broad prior gets length diversity, per user 2026-07-05).
+
+    A fixed override wins per-CDR; any CDR without either source falls back to its ``cdr_spans``
+    native width (so a spans-only example reproduces its template length). Returns ``{cdr: n}``
+    over the union of CDR keys mentioned by any of the three sources.
+    """
+    rng = rng or random
+    fixed = {str(k): int(v) for k, v in (params.get("cdr_lengths") or {}).items()}
+    ranges = params.get("cdr_length_ranges") or {}
+    spans = params.get("cdr_spans") or {}
+
+    keys = set(fixed) | set(ranges) | set(spans)
+    out: dict[str, int] = {}
+    for k in keys:
+        if k in fixed:
+            n = fixed[k]
+        elif k in ranges:
+            lo, hi = int(ranges[k][0]), int(ranges[k][1])
+            if hi < lo:
+                raise MaskError(f"cdr_length_ranges[{k!r}] = [{lo}, {hi}] is reversed (need lo <= hi)")
+            n = rng.randint(lo, hi)
+        else:
+            s, e = int(spans[k][0]), int(spans[k][1])
+            n = e - s
+        if n <= 0:
+            raise MaskError(f"CDR {k!r} resolved to non-positive length {n}")
+        out[k] = n
+    return out
 
 
 def as_chain_list(design_chain) -> list[str]:
