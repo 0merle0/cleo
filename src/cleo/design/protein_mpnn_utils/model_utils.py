@@ -37,9 +37,10 @@ class ProteinMPNN(nn.Module):
                  augment_eps=0.0, 
                  dropout=0.0,
                  device=None, 
-                 atom_context_num=0, 
+                 atom_context_num=0,
                  model_type="protein_mpnn",
-                 ligand_mpnn_use_side_chain_context=False):
+                 ligand_mpnn_use_side_chain_context=False,
+                 coord_free_cdr_edges=False):
         super(ProteinMPNN, self).__init__()
 
         self.model_type = model_type
@@ -70,7 +71,7 @@ class ProteinMPNN(nn.Module):
                 for _ in range(2)
             ])
         elif self.model_type == "protein_mpnn" or self.model_type == "soluble_mpnn" or self.model_type == "antibody_mpnn":
-            self.features = ProteinFeatures(node_features, edge_features, top_k=k_neighbors, augment_eps=augment_eps)
+            self.features = ProteinFeatures(node_features, edge_features, top_k=k_neighbors, augment_eps=augment_eps, coord_free_cdr_edges=coord_free_cdr_edges)
         elif self.model_type == "per_residue_label_membrane_mpnn" or self.model_type == "global_label_membrane_mpnn":
             self.W_v = nn.Linear(node_features, hidden_dim, bias=True)
             self.features = ProteinFeaturesMembrane(node_features, edge_features, top_k=k_neighbors, augment_eps=augment_eps, num_classes=3)
@@ -798,13 +799,13 @@ class ProteinFeaturesLigand(nn.Module):
 
 class ProteinFeatures(nn.Module):
     """Standard backbone-only feature extraction (25 RBF atom-pair channels)."""
-    def __init__(self, edge_features, node_features, num_positional_embeddings=16, num_rbf=16, top_k=48, augment_eps=0.0):
+    def __init__(self, edge_features, node_features, num_positional_embeddings=16, num_rbf=16, top_k=48, augment_eps=0.0, coord_free_cdr_edges=False):
         """ Extract protein features """
         super(ProteinFeatures, self).__init__()
         self.edge_features = edge_features
         self.node_features = node_features
         self.top_k = top_k
-        self.augment_eps = augment_eps 
+        self.augment_eps = augment_eps
         self.num_rbf = num_rbf
         self.num_positional_embeddings = num_positional_embeddings
 
@@ -812,6 +813,16 @@ class ProteinFeatures(nn.Module):
         edge_in = num_positional_embeddings + num_rbf*25
         self.edge_embedding = nn.Linear(edge_in, edge_features, bias=False)
         self.norm_edges = nn.LayerNorm(edge_features)
+
+        # Coordinate-free CDR edges (SPEC 4.1). When on, masked CDR positions (chain_mask==1)
+        # borrow their nearest framework stem's Cα for kNN neighbor selection only, and every
+        # CDR-incident edge's RBF distance block is replaced by this learned "unknown-distance"
+        # token (both directions) — no fabricated coordinate ever becomes a feature. The token
+        # is only allocated when enabled, so a disabled feature extractor is byte-identical to
+        # stock (no extra params). Zero-init = "no distance bin active" ≈ beyond-range / unknown.
+        self.coord_free_cdr_edges = coord_free_cdr_edges
+        if coord_free_cdr_edges:
+            self.unknown_rbf = nn.Parameter(torch.zeros(num_rbf * 25))
 
     def _dist(self, X, mask, eps=1E-6):
         mask_2D = torch.unsqueeze(mask,1) * torch.unsqueeze(mask,2)
@@ -836,13 +847,38 @@ class ProteinFeatures(nn.Module):
         D_A_B = torch.sqrt(torch.sum((A[:,:,None,:] - B[:,None,:,:])**2,-1) + 1e-6) #[B, L, L]
         D_A_B_neighbors = gather_edges(D_A_B[:,:,:,None], E_idx)[:,:,:,0] #[B,L,K]
         RBF_A_B = self._rbf(D_A_B_neighbors)
-        return RBF_A_B   
+        return RBF_A_B
 
-    def forward(self, input_features):   
+    def _stem_borrowed_ca(self, Ca, chain_mask, mask, chain_labels):
+        """Cα for kNN neighbor selection with CDRs treated as gapped (SPEC 4.1).
+
+        Each masked CDR position (``chain_mask==1``) borrows the Cα of its **nearest framework
+        residue by sequence index** (``chain_mask==0``, valid, same chain), so it lands in a real
+        neighborhood instead of using its own (unknown/discarded) coordinate. Used for the topk
+        graph ONLY — no borrowed coordinate ever becomes an edge feature; every CDR-incident edge's
+        distances are replaced by the learned unknown token downstream. Non-CDR positions keep
+        their own Cα, so framework↔framework connectivity is unchanged.
+        """
+        B, L, _ = Ca.shape
+        device = Ca.device
+        idx = torch.arange(L, device=device)
+        cdr = chain_mask > 0.5                                          # [B, L] designable = CDR
+        framework = (~cdr) & (mask > 0.5)                              # [B, L] valid non-CDR
+        dij = (idx[None, :, None] - idx[None, None, :]).abs().float()   # [1, L, L] |i - j|
+        same_chain = chain_labels[:, :, None] == chain_labels[:, None, :]  # [B, L, L]
+        valid_j = framework[:, None, :] & same_chain                   # [B, L, L] j usable as a stem
+        big = float(L + 1)
+        dist = torch.where(valid_j, dij.expand(B, L, L),
+                           torch.full((B, L, L), big, device=device))  # [B, L, L]
+        nearest = dist.argmin(dim=-1)                                  # [B, L] nearest framework j
+        Ca_borrow = torch.gather(Ca, 1, nearest[:, :, None].expand(B, L, 3))
+        return torch.where(cdr[:, :, None], Ca_borrow, Ca)             # borrow at CDRs, own elsewhere
+
+    def forward(self, input_features):
         X = input_features["X"]
         mask = input_features["mask"]
         R_idx = input_features["R_idx"]
-        chain_labels = input_features["chain_labels"]     
+        chain_labels = input_features["chain_labels"]
 
         if self.augment_eps > 0:
             X = X + self.augment_eps * torch.randn_like(X)
@@ -856,8 +892,16 @@ class ProteinFeatures(nn.Module):
         N = X[:,:,0,:]
         C = X[:,:,2,:]
         O = X[:,:,3,:]
- 
-        D_neighbors, E_idx = self._dist(Ca, mask)
+
+        # Coordinate-free CDR edges (SPEC 4.1): stem-borrowed Cα for neighbor selection when the
+        # flag is on and a CDR mask is present; otherwise stock behaviour (byte-identical).
+        cdr_edges_on = self.coord_free_cdr_edges and ("chain_mask" in input_features)
+        if cdr_edges_on:
+            Ca_knn = self._stem_borrowed_ca(Ca, input_features["chain_mask"], mask, chain_labels)
+        else:
+            Ca_knn = Ca
+
+        D_neighbors, E_idx = self._dist(Ca_knn, mask)
 
         RBF_all = []
         RBF_all.append(self._rbf(D_neighbors)) #Ca-Ca
@@ -887,9 +931,22 @@ class ProteinFeatures(nn.Module):
         RBF_all.append(self._get_rbf(C, O, E_idx)) #C-O
         RBF_all = torch.cat(tuple(RBF_all), dim=-1)
 
+        # Coordinate-free CDR edges (SPEC 4.1): replace the RBF distance block on every
+        # CDR-incident edge (either endpoint designable, both directions) with the learned
+        # unknown-distance token. torch.where fully substitutes (no product), so any garbage/NaN
+        # in discarded CDR coordinates cannot leak. The positional/chain edge features below stay
+        # active, so CDR edges still carry coordinate-free sequence-offset information.
+        if cdr_edges_on:
+            cdr = (input_features["chain_mask"] > 0.5).float()            # [B, L]
+            cdr_i = cdr[:, :, None]                                       # [B, L, 1] source is CDR
+            cdr_j = gather_nodes(cdr[:, :, None], E_idx).squeeze(-1)      # [B, L, K] neighbor is CDR
+            cdr_edge = ((cdr_i + cdr_j) > 0.5)[..., None]                 # [B, L, K, 1]
+            unknown = self.unknown_rbf.view(1, 1, 1, -1).to(RBF_all.dtype)
+            RBF_all = torch.where(cdr_edge, unknown.expand_as(RBF_all), RBF_all)
+
         offset = R_idx[:,:,None]-R_idx[:,None,:]
         offset = gather_edges(offset[:,:,:,None], E_idx)[:,:,:,0] #[B, L, K]
-        
+
         d_chains = ((chain_labels[:, :, None] - chain_labels[:,None,:])==0).long() #find self vs non-self interaction
         E_chains = gather_edges(d_chains[:,:,:,None], E_idx)[:,:,:,0]
         E_positional = self.embeddings(offset.long(), E_chains)

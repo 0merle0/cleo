@@ -43,6 +43,8 @@ class PolicyMPNN:
     def __init__(self, cfg):
         self.cfg = cfg
         self.device = DEVICE
+        # Parsed early so load_mpnn_model can thread coord_free_cdr_edges into the feature extractor.
+        self.conditioning_cfg = ConditioningConfig.from_dict(cfg.get("conditioning"))
         self.run_name = cfg.run_name
         self.output_dir = os.path.join(cfg.output_dir, cfg.run_name)
 
@@ -63,7 +65,7 @@ class PolicyMPNN:
         # construct. When enabled, build a SECOND ProteinMPNN whose encoder embeds the epitope
         # (init from the pretrained base weights, independently trainable) and hand it to the
         # conditioner. Hooks are wired into encode/rollout in a later slice-2 step.
-        self.conditioning_cfg = ConditioningConfig.from_dict(cfg.get("conditioning"))
+        # (self.conditioning_cfg was parsed at the top of __init__.)
         if self.conditioning_cfg.enabled:
             self.epi_encoder = self._build_epitope_encoder()
             self.conditioner = EpitopeConditioner(
@@ -134,6 +136,9 @@ class PolicyMPNN:
             atom_context_num=self.atom_context_num,
             model_type=model_type,
             ligand_mpnn_use_side_chain_context=self.ligand_mpnn_use_side_chain_context,
+            coord_free_cdr_edges=(
+                self.conditioning_cfg.enabled and self.conditioning_cfg.coord_free_cdr_edges
+            ),
         )
 
         is_default_checkpoint = ckpt_path in [PROTEIN_MPNN_CKPT_PATH, LIGAND_MPNN_CKPT_PATH]

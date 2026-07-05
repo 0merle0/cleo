@@ -126,3 +126,25 @@ def test_featurize_epitope_rejects_positional_indices(tmp_path):
     policy = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))
     with pytest.raises(ValueError, match="epitope_residues"):
         policy.featurize_epitope(_epitope_example(epitope_residues=[0, 1, 2]))
+
+
+# --- step 3: coord_free_cdr_edges flag threaded into the policy model ------- #
+
+def test_coord_free_flag_threaded_into_policy_model(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": True}))
+    assert p.model.features.coord_free_cdr_edges is True
+    assert hasattr(p.model.features, "unknown_rbf")
+    assert p.epi_encoder.features.coord_free_cdr_edges is False  # epitope has no CDRs -> no surgery
+
+
+def test_coord_free_independent_toggle_off(tmp_path):
+    """Master enabled but the mechanism toggle off => no surgery on the policy model."""
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": False}))
+    assert p.model.features.coord_free_cdr_edges is False
+    assert not hasattr(p.model.features, "unknown_rbf")
+
+
+def test_baseline_policy_model_has_no_surgery(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path))                              # conditioning disabled
+    assert p.model.features.coord_free_cdr_edges is False
+    assert not hasattr(p.model.features, "unknown_rbf")
