@@ -258,17 +258,74 @@ class PolicyMPNN:
         """Featurize a single PDB, holding ``cfg.fixed_residues`` fixed (single-target path)."""
         return self._featurize(pdb, lambda cl, ri, ic: self.cfg.fixed_residues.split())
 
-    def featurize_example(self, example):
+    def featurize_example(self, example, mode="scaffold"):
         """Featurize a dataset example, masking to its ``params.cdr_spans`` (SPEC 6.4).
 
         ``fixed_residues`` = the CDR-mask complement computed by the data layer from
         the example's ``design_chain`` + ``cdr_spans`` against this exact enumeration,
         so the mask lines up 1:1 with the tokens ``_featurize`` builds.
+
+        ``mode`` (SPEC 6.8 forward-compat seam #2): ``"scaffold"`` = the Stage-1 gapped-framework
+        path (design chain only, CDRs masked); ``"complex"`` is reserved for Stage-2 pose
+        conditioning (framework + predicted CDR + epitope in one frame) and is not built yet.
         """
+        if mode != "scaffold":
+            raise NotImplementedError(
+                f"featurize_example(mode={mode!r}) is a Stage-2 seam (SPEC 4.5/6.8); only "
+                f"'scaffold' is implemented."
+            )
         return self._featurize(
             example.structure,
             lambda cl, ri, ic: self.dataset.fixed_residues(example, cl, ri, ic).split(),
         )
+
+    def featurize_epitope(self, example):
+        """Build the epitope feature dict consumed by ``EpitopeConditioner.encode_epitope`` (SPEC 4.1).
+
+        Parses the **whole antigen chain T** (full structural context for message passing) with its
+        **known sequence** in ``S`` (path-b injection). Emits two masks:
+        - ``mask`` — all valid antigen residues; the encoder message-passes over this (whole fold).
+        - ``epitope_mask`` — the ``epitope_residues`` patch (matched by PDB residue number, the
+          reward's convention); ``encode_epitope`` returns THIS for ``pool_epitope`` + cross-attn,
+          so the CDR conditions on the epitope specifically, not the whole antigen (§4.1, 2026-07-04).
+        """
+        protein_dict, _bb, _oa, icodes, _wa = parse_PDB(
+            example.structure,
+            device=self.device,
+            atom_context_num=self.atom_context_num,
+            chains=["T"],
+            parse_all_atoms=self.ligand_mpnn_use_side_chain_context,
+        )
+        if protein_dict["R_idx"].shape[0] == 0:
+            raise ValueError(f"example {example.id}: no antigen chain 'T' found in {example.structure}")
+
+        # The epitope is fixed context (never designed); featurize() still requires these keys.
+        n_res = protein_dict["R_idx"].shape[0]
+        protein_dict["chain_mask"] = torch.ones(n_res, device=self.device)
+        protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
+
+        feature_dict = featurize(
+            protein_dict,
+            cutoff_for_score=self.ligand_mpnn_cutoff_for_score,
+            use_atom_context=self.ligand_mpnn_use_atom_context,
+            number_of_ligand_atoms=self.atom_context_num,
+            model_type="protein_mpnn",
+        )
+
+        R_idx_list = [int(r) for r in protein_dict["R_idx"].cpu().numpy()]
+        epi_set = {int(r) for r in example.epitope_residues}
+        epitope_mask = torch.tensor(
+            [[1.0 if r in epi_set else 0.0 for r in R_idx_list]],
+            device=self.device,
+            dtype=torch.float32,
+        )
+        if float(epitope_mask.sum()) == 0.0:
+            raise ValueError(
+                f"example {example.id}: none of epitope_residues={sorted(epi_set)} matched chain-T "
+                f"residue numbers (are they PDB seqid.num, not positional indices?)"
+            )
+        feature_dict["epitope_mask"] = epitope_mask
+        return feature_dict
 
     def encode_initial_state(self, feature_dict):
         """

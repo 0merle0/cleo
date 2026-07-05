@@ -16,8 +16,21 @@ import pytest
 torch = pytest.importorskip("torch")
 OmegaConf = pytest.importorskip("omegaconf").OmegaConf
 
+from cleo.design.data.dataset import Example
 from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN
 from cleo.design.utils.policy import PolicyMPNN
+
+FIXTURE = str(Path(__file__).resolve().parents[1] / "fixtures" / "mini_complex.pdb")
+# chain T = residues 8..17 (NLAFALSELD); pick 3 epitope residues by PDB number
+EPI_RESIDUES = [9, 11, 13]           # -> enumeration positions 1, 3, 5
+
+
+def _epitope_example(epitope_residues=EPI_RESIDUES):
+    return Example(
+        id="epi0", task="nanobody_design", reward="antibody_interface",
+        structure=FIXTURE, design_chain="A",
+        params={"epitope_residues": epitope_residues},
+    )
 
 
 def _cfg(tmp_path, conditioning=None):
@@ -74,3 +87,42 @@ def test_epitope_encoder_inits_from_pretrained_base(tmp_path):
     got = policy.epi_encoder.state_dict()
     key = "W_e.weight"                                   # an encoder edge-embedding weight
     assert torch.allclose(got[key].cpu(), base[key], atol=0)
+
+
+# --- step 2: featurize_epitope + mode seam + encode_epitope patch mask ------ #
+
+def test_featurize_epitope_builds_patch_mask(tmp_path):
+    policy = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))
+    fd = policy.featurize_epitope(_epitope_example())
+
+    M = fd["mask"].shape[1]
+    assert M == 10                                       # whole chain T encoded
+    assert fd["mask"].sum().item() == 10                 # all antigen residues valid (message passing)
+    em = fd["epitope_mask"]
+    assert em.shape == (1, 10)
+    assert em.sum().item() == 3                          # only the 3 epitope residues
+    assert em[0].nonzero().flatten().tolist() == [1, 3, 5]  # PDB 9/11/13 -> positions 1/3/5
+    assert fd["S"].shape == (1, 10)                      # known antigen sequence present (path-b)
+
+
+def test_encode_epitope_returns_patch_mask_not_full(tmp_path):
+    policy = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))
+    fd = policy.featurize_epitope(_epitope_example())
+    epi_per_res, cond_mask = policy.conditioner.encode_epitope(fd)
+
+    assert epi_per_res.shape == (1, 10, 128)             # per-residue over the WHOLE antigen
+    assert torch.equal(cond_mask, fd["epitope_mask"])    # returns the patch, not the full mask
+    assert cond_mask.sum().item() == 3                   # (full mask would be 10)
+
+
+def test_featurize_example_complex_mode_is_stage2_seam(tmp_path):
+    policy = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))
+    with pytest.raises(NotImplementedError):
+        policy.featurize_example(_epitope_example(), mode="complex")
+
+
+def test_featurize_epitope_rejects_positional_indices(tmp_path):
+    """Guard: positional-looking indices (0,1,2) don't match chain-T PDB numbers 8..17."""
+    policy = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))
+    with pytest.raises(ValueError, match="epitope_residues"):
+        policy.featurize_epitope(_epitope_example(epitope_residues=[0, 1, 2]))

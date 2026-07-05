@@ -185,11 +185,15 @@ class EpitopeConditioner(nn.Module):
 
     # -- epitope encoding (path b: seq-injected message passing) ------------- #
     def encode_epitope(self, epi_feature_dict):
-        """Run the separate MPNN encoder over the epitope with the known sequence injected.
+        """Run the separate MPNN encoder over the WHOLE antigen with the known sequence injected.
 
-        Returns ``(epi_per_res [B, M, H], epi_mask [B, M])``. The sequence is added to
-        the node features BEFORE the encoder layers so message passing over the
-        structural edges mixes sequence + structure.
+        Returns ``(epi_per_res [B, M, H], cond_mask [B, M])``. The sequence is added to the node
+        features BEFORE the encoder layers so message passing over the structural edges mixes
+        sequence + structure. Message passing uses ``mask`` (all valid antigen residues → full
+        structural context), but the returned ``cond_mask`` is the ``epitope_mask`` **patch** so
+        that ``pool_epitope`` + cross-attention condition on the epitope residues specifically,
+        not the whole antigen (SPEC 4.1, 2026-07-04). Falls back to the full ``mask`` (i.e.
+        antigen-wide conditioning) when no ``epitope_mask`` is supplied.
         """
         from cleo.design.protein_mpnn_utils.model_utils import gather_nodes
 
@@ -205,7 +209,8 @@ class EpitopeConditioner(nn.Module):
         mask_attend = mask.unsqueeze(-1) * mask_attend
         for layer in m.encoder_layers:
             h_V, h_E = layer(h_V, h_E, E_idx, mask, mask_attend)
-        return h_V, mask
+        cond_mask = epi_feature_dict.get("epitope_mask", mask)
+        return h_V, cond_mask
 
     # -- hook 1+2: post-encode framework node conditioning ------------------- #
     def condition_nodes(self, h_V, chain_mask, epi_per_res=None, epi_mask=None):

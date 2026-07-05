@@ -104,6 +104,12 @@ class Example:
     def cdr_spans(self) -> dict:
         return self.params.get("cdr_spans", {})
 
+    @property
+    def epitope_residues(self) -> list:
+        """PDB residue numbers (chain T seqid.num) of the intended epitope — NOT positional
+        indices (unlike cdr_spans). Matches the convention read by the reward oracle."""
+        return self.params.get("epitope_residues", [])
+
 
 # --------------------------------------------------------------------------- #
 # dataset
