@@ -21,6 +21,7 @@ from omegaconf import OmegaConf
 
 from cleo.design.protein_mpnn_utils.data_utils import featurize, parse_PDB
 from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN
+from cleo.design.nanobody import ConditioningConfig, EpitopeConditioner
 
 
 PROTEIN_MPNN_UTILS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "protein_mpnn_utils")
@@ -56,6 +57,22 @@ class PolicyMPNN:
 
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
+
+        # Epitope conditioning (SPEC 4.1 / 6.8). Master `enabled=False` => the conditioner is an
+        # exact no-op with zero params (byte-identical M1 baseline), so this is safe to always
+        # construct. When enabled, build a SECOND ProteinMPNN whose encoder embeds the epitope
+        # (init from the pretrained base weights, independently trainable) and hand it to the
+        # conditioner. Hooks are wired into encode/rollout in a later slice-2 step.
+        self.conditioning_cfg = ConditioningConfig.from_dict(cfg.get("conditioning"))
+        if self.conditioning_cfg.enabled:
+            self.epi_encoder = self._build_epitope_encoder()
+            self.conditioner = EpitopeConditioner(
+                self.conditioning_cfg, epi_encoder=self.epi_encoder
+            ).to(self.device)
+            print(f"Epitope conditioning ENABLED: {self.conditioning_cfg}")
+        else:
+            self.epi_encoder = None
+            self.conditioner = EpitopeConditioner(self.conditioning_cfg)  # no-op, no params
 
         # Single-target reward (cfg.reward). Optional in dataset-driven mode, where the
         # reward is built per-example by the registry (SPEC 6.4).
@@ -121,6 +138,30 @@ class PolicyMPNN:
 
         is_default_checkpoint = ckpt_path in [PROTEIN_MPNN_CKPT_PATH, LIGAND_MPNN_CKPT_PATH]
         ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=is_default_checkpoint)
+        model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        return model.to(self.device)
+
+    def _build_epitope_encoder(self):
+        """A second ProteinMPNN whose encoder embeds the epitope (SPEC 4.1).
+
+        Initialised from the **pretrained base** ProteinMPNN weights (not the policy's training
+        checkpoint — the epitope encoder is an independent module, not a fine-tuned decoder), and
+        independently trainable. Only its encoder side is used (``encode_epitope``, path-b
+        sequence injection); the decoder weights load but stay unused.
+        """
+        model = ProteinMPNN(
+            node_features=128,
+            edge_features=128,
+            hidden_dim=128,
+            num_encoder_layers=3,
+            num_decoder_layers=3,
+            k_neighbors=48,
+            device=self.device,
+            atom_context_num=1,
+            model_type="protein_mpnn",
+            ligand_mpnn_use_side_chain_context=0,
+        )
+        ckpt = torch.load(PROTEIN_MPNN_CKPT_PATH, map_location=self.device, weights_only=True)
         model.load_state_dict(ckpt["model_state_dict"], strict=False)
         return model.to(self.device)
 
