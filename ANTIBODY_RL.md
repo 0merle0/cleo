@@ -5,7 +5,7 @@ against PINDER-derived antigen targets, scored by a Protenix v2 interface oracle
 dual-encoder epitope-conditioning channel and a dataset-driven, on-the-fly training harness on top of
 CLEO's single-target GRPO loop.
 
-> Full design doc: `../SPEC.md` (kept outside this repo). Section numbers below (§4.1, §6.9, …)
+> Full design doc: [`docs/SPEC.md`](docs/SPEC.md). Section numbers below (§4.1, §6.9, …)
 > refer to it. This file is the digestible map of *what changed and where*.
 
 ## The idea in one paragraph
