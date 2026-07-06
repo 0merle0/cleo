@@ -42,6 +42,9 @@ class ConditioningConfig:
     node_init_interpolate: bool = True    # flanking-stem anchor interpolation for CDR nodes
     node_init_relpos: bool = True         # (i, L) relative-position embedding on CDR nodes
     node_init_pooled_epitope: bool = True # add pooled epitope embedding to CDR nodes
+    node_init_cdr_identity: bool = False  # (step 5) which-CDR embedding (H1/H2/H3, L1-L3) on CDR nodes
+    node_init_stem_geom: bool = False     # (step 5) flanking-stem gap geometry (span dist, dist/len) on CDR nodes
+    attention_pool: bool = False          # (step 5) pool the epitope by learned-query attention (else masked mean)
     encoder_cross_attn: bool = True       # per-residue epitope cross-attn at the encoder (CDR nodes)
     decoder_cross_attn: bool = True       # per-residue epitope cross-attn at each decode step
     coord_free_cdr_edges: bool = True     # Option B: coordinate-free CDR graph edges (ProteinFeatures surgery)
@@ -61,7 +64,45 @@ class ConditioningConfig:
 
     @property
     def uses_node_init(self) -> bool:
-        return self.node_init_interpolate or self.node_init_relpos or self.node_init_pooled_epitope
+        return (
+            self.node_init_interpolate
+            or self.node_init_relpos
+            or self.node_init_pooled_epitope
+            or self.node_init_cdr_identity
+            or self.node_init_stem_geom
+        )
+
+
+#: canonical CDR-type vocabulary (heavy then light) for the identity embedding (step 5).
+CDR_TYPE_IDS = {"H1": 0, "H2": 1, "H3": 2, "L1": 3, "L2": 4, "L3": 5}
+
+
+def ordered_cdr_type_ids(design_chain, cdr_spans) -> list[int]:
+    """CDR-type ids (into ``CDR_TYPE_IDS``) in structure/position order, aligned to the
+    segments ``cdr_segments_from_chain_mask`` returns.
+
+    Routing mirrors ``mask._route_spans`` — **positional**, not by literal chain letter: ``H*``
+    CDRs belong to the first design chain, ``L*`` to the second (a VHH may name its chain ``"A"``
+    while its CDRs are still ``H1/H2/H3``). Segments appear in position order: the first design
+    chain before the second, and within a chain sorted by span start — exactly the order the gapped
+    structure lays them out. Returns one id per CDR so ``CDRNodeInit`` stamps the right identity.
+    """
+    from cleo.design.data.mask import _cdr_key, as_chain_list
+
+    n_chains = len(as_chain_list(design_chain))
+    per_chain: dict[int, list] = {i: [] for i in range(n_chains)}
+    for k, v in cdr_spans.items():
+        key = _cdr_key(k)
+        idx = 0 if key.startswith("H") else (1 if key.startswith("L") else None)
+        if idx is None or idx >= n_chains:
+            continue  # unroutable (e.g. an L* CDR on a single-chain VHH) — gapping validates this
+        per_chain[idx].append((int(v[0]), key))
+
+    ids: list[int] = []
+    for i in range(n_chains):
+        for _start, key in sorted(per_chain[i]):
+            ids.append(CDR_TYPE_IDS[key])
+    return ids
 
 
 def pool_epitope(epi_per_res, epi_mask=None):
@@ -70,6 +111,28 @@ def pool_epitope(epi_per_res, epi_mask=None):
         return epi_per_res.mean(dim=1)
     w = epi_mask.to(epi_per_res.dtype).unsqueeze(-1)          # [B, M, 1]
     return (epi_per_res * w).sum(dim=1) / w.sum(dim=1).clamp_min(1e-6)
+
+
+class AttentionPool(nn.Module):
+    """Pool epitope residues into ``[B, H]`` via a single learned query (step 5).
+
+    A content-based alternative to the masked mean: a learned query attends over the epitope
+    residues, so the pooled vector can weight the residues that matter for the paratope instead
+    of averaging uniformly.
+    """
+
+    def __init__(self, hidden_dim, n_heads):
+        super().__init__()
+        self.query = nn.Parameter(torch.zeros(1, 1, hidden_dim))
+        nn.init.normal_(self.query, std=0.02)
+        self.attn = nn.MultiheadAttention(hidden_dim, n_heads, batch_first=True)
+
+    def forward(self, epi_per_res, epi_mask=None):
+        B = epi_per_res.shape[0]
+        q = self.query.expand(B, -1, -1)
+        kpm = None if epi_mask is None else (epi_mask <= 0.5)
+        out, _ = self.attn(q, epi_per_res, epi_per_res, key_padding_mask=kpm, need_weights=False)
+        return out[:, 0]                                       # [B, H]
 
 
 def cdr_segments_from_chain_mask(chain_mask):
@@ -129,18 +192,36 @@ class CDRNodeInit(nn.Module):
             self.len_emb = nn.Embedding(cfg.max_cdr_len + 1, H)
         if cfg.node_init_pooled_epitope:
             self.W_pool = nn.Linear(H, H)
+        if cfg.node_init_cdr_identity:
+            self.cdr_emb = nn.Embedding(len(CDR_TYPE_IDS), H)
+        if cfg.node_init_stem_geom:
+            self.stem_geom = nn.Linear(3, H)   # [span dist, dist/(len+1), len/max_cdr_len] -> H
 
-    def forward(self, h_V, segments, pooled=None):
+    def forward(self, h_V, segments, pooled=None, cdr_ids=None, X=None):
         cfg = self.cfg
         B, L, H = h_V.shape
         device = h_V.device
         init_full = torch.zeros(B, L, H, device=device, dtype=h_V.dtype)
         cdr_mask = torch.zeros(L, dtype=torch.bool, device=device)
 
-        for (positions, stem_n, stem_c) in segments:
+        use_cdr_id = cfg.node_init_cdr_identity and cdr_ids is not None and len(cdr_ids) == len(segments)
+        ca = X[..., 1, :] if (cfg.node_init_stem_geom and X is not None) else None  # Cα coords [B, L, 3]
+
+        for seg_i, (positions, stem_n, stem_c) in enumerate(segments):
             Lr = len(positions)
             n_idx = stem_n if stem_n is not None else stem_c
             c_idx = stem_c if stem_c is not None else stem_n
+
+            # per-segment CDR-identity + stem-gap-geometry vectors (constant across the segment)
+            cdr_vec = self.cdr_emb.weight[cdr_ids[seg_i]] if use_cdr_id else None
+            geom_vec = None
+            if ca is not None and stem_n is not None and stem_c is not None:
+                d = torch.linalg.norm(ca[:, stem_c] - ca[:, stem_n], dim=-1)          # [B]
+                feats = torch.stack(
+                    [d, d / (Lr + 1), torch.full_like(d, Lr / cfg.max_cdr_len)], dim=-1
+                )                                                                       # [B, 3]
+                geom_vec = self.stem_geom(feats)                                        # [B, H]
+
             for k, p in enumerate(positions):
                 cdr_mask[p] = True
                 contrib = torch.zeros(B, H, device=device, dtype=h_V.dtype)
@@ -153,6 +234,10 @@ class CDRNodeInit(nn.Module):
                     contrib = contrib + self.pos_emb.weight[ki] + self.len_emb.weight[li]
                 if cfg.node_init_pooled_epitope and pooled is not None:
                     contrib = contrib + self.W_pool(pooled)
+                if cdr_vec is not None:
+                    contrib = contrib + cdr_vec
+                if geom_vec is not None:
+                    contrib = contrib + geom_vec
                 init_full[:, p] = contrib
 
         gate = cdr_mask.view(1, L, 1)
@@ -178,10 +263,18 @@ class EpitopeConditioner(nn.Module):
             return
         if cfg.uses_node_init:
             self.node_init = CDRNodeInit(cfg)
+        if cfg.attention_pool and cfg.node_init_pooled_epitope:
+            self.attn_pool = AttentionPool(cfg.hidden_dim, cfg.n_heads)
         if cfg.encoder_cross_attn:
             self.enc_xattn = PerResidueCrossAttention(cfg.hidden_dim, cfg.n_heads)
         if cfg.decoder_cross_attn:
             self.dec_xattn = PerResidueCrossAttention(cfg.hidden_dim, cfg.n_heads)
+
+    def _pool(self, epi_per_res, epi_mask=None):
+        """Pool the epitope to ``[B, H]`` — learned-query attention if configured, else masked mean."""
+        if hasattr(self, "attn_pool"):
+            return self.attn_pool(epi_per_res, epi_mask)
+        return pool_epitope(epi_per_res, epi_mask)
 
     # -- epitope encoding (path b: seq-injected message passing) ------------- #
     def encode_epitope(self, epi_feature_dict):
@@ -213,8 +306,13 @@ class EpitopeConditioner(nn.Module):
         return h_V, cond_mask
 
     # -- hook 1+2: post-encode framework node conditioning ------------------- #
-    def condition_nodes(self, h_V, chain_mask, epi_per_res=None, epi_mask=None):
-        """Node-init + encoder cross-attn at CDR positions. Identity when disabled."""
+    def condition_nodes(self, h_V, chain_mask, epi_per_res=None, epi_mask=None, cdr_ids=None, X=None):
+        """Node-init + encoder cross-attn at CDR positions. Identity when disabled.
+
+        ``cdr_ids`` (one CDR-type id per segment, from :func:`ordered_cdr_type_ids`) and ``X``
+        (backbone coords ``[B, L, 4, 3]``) feed the step-5 identity / stem-geometry node signals;
+        both are optional and ignored unless their flags are on.
+        """
         if not self.cfg.enabled:
             return h_V
         segments = cdr_segments_from_chain_mask(chain_mask)
@@ -222,8 +320,8 @@ class EpitopeConditioner(nn.Module):
         if self.cfg.uses_node_init:
             pooled = None
             if self.cfg.node_init_pooled_epitope and epi_per_res is not None:
-                pooled = pool_epitope(epi_per_res, epi_mask)
-            h_V = self.node_init(h_V, segments, pooled)
+                pooled = self._pool(epi_per_res, epi_mask)
+            h_V = self.node_init(h_V, segments, pooled, cdr_ids=cdr_ids, X=X)
 
         if self.cfg.encoder_cross_attn and epi_per_res is not None:
             gate = self._cdr_gate(chain_mask, h_V)                 # [1, L, 1]

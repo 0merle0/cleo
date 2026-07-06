@@ -35,6 +35,11 @@ temperature: 1.0
 omit_AA: CX
 fixed_residues: ""                # unused: the dataset supplies the CDR-mask complement per example
 
+# Step 6 (SPEC 6.8): unfreeze the framework + epitope encoders (all-trainable) and re-encode the
+# initial state grad-tracked every PPO update, so node-init / encoder cross-attn / epitope-encoder
+# params train (not just the decoder). Set false for the cheaper decoder-only regime.
+train_framework_encoder: true
+
 # -- Dataset-driven harness (SPEC 6). `composer` => on-the-fly ComposingDataset --
 dataset:
   reward_dir: ${hydra:runtime.cwd}/config/design/reward
@@ -54,6 +59,9 @@ conditioning:
   node_init_interpolate: true      # flanking-stem anchor interpolation for CDR nodes
   node_init_relpos: true           # (i, L) relative-position embedding on CDR nodes
   node_init_pooled_epitope: true   # pooled epitope embedding added to CDR nodes
+  node_init_cdr_identity: true     # (step 5) which-CDR embedding (H1/H2/H3, L1-L3) on CDR nodes
+  node_init_stem_geom: true        # (step 5) flanking-stem gap geometry (span dist / len) on CDR nodes
+  attention_pool: true             # (step 5) pool the epitope by learned-query attention (else masked mean)
   encoder_cross_attn: true         # per-residue epitope cross-attn at the encoder
   decoder_cross_attn: true         # per-residue epitope cross-attn at each decode step
   coord_free_cdr_edges: true       # REQUIRED for the gapped-framework path (gap nodes have no coords)

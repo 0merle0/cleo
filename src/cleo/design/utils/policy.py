@@ -11,6 +11,7 @@ Amino-acid encoding constants used across the codebase (``alphabet``,
 this module rather than duplicated elsewhere.
 """
 
+import contextlib
 import json
 import os
 import torch
@@ -22,7 +23,7 @@ from omegaconf import OmegaConf
 
 from cleo.design.protein_mpnn_utils.data_utils import featurize, parse_PDB
 from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN
-from cleo.design.nanobody import ConditioningConfig, EpitopeConditioner
+from cleo.design.nanobody import ConditioningConfig, EpitopeConditioner, ordered_cdr_type_ids
 from cleo.design.data.gapping import apply_cdr_gaps
 from cleo.design.data.mask import sample_cdr_lengths
 
@@ -77,6 +78,14 @@ class PolicyMPNN:
         else:
             self.epi_encoder = None
             self.conditioner = EpitopeConditioner(self.conditioning_cfg)  # no-op, no params
+
+        # Step 6 (SPEC 6.8): when set, the framework encoder + epitope encoder are unfrozen and the
+        # initial state is re-encoded (grad-tracked) every PPO update instead of being cached as a
+        # detached leaf — so node-init / encoder cross-attn / epitope-encoder params get gradients.
+        # Only meaningful with conditioning on; the default (False) keeps the decoder-only step-4 path.
+        self.train_framework_encoder = self.conditioning_cfg.enabled and bool(
+            cfg.get("train_framework_encoder", False)
+        )
 
         self.optimizer = self.get_optimizer()
 
@@ -193,23 +202,31 @@ class PolicyMPNN:
         return model.to(self.device)
 
     def get_optimizer(self):
-        """Freeze the framework encoder and return an Adam optimizer over the decoder
-        (plus the epitope-conditioning hook params when conditioning is enabled).
+        """Return an Adam optimizer over the trainable parameters.
 
-        The framework encoder stays frozen and the cached init-state is reused (step 6
-        unfreezes both). So node-init / encoder cross-attn sit upstream of the detached
-        init-state leaf and don't receive gradients yet, but the **decoder cross-attn**
-        runs inside the grad-tracked rollout, so its params train now — hence the
-        conditioner is added to the optimizer here.
+        Two regimes (SPEC 6.8):
+
+        - **Step 4 (default)** — freeze the framework encoder; train the decoder (``decoder_layers``
+          + ``W_out``) plus the epitope-conditioning hook params. The cached init-state is a detached
+          leaf, so node-init / encoder cross-attn sit upstream of it and get no gradient yet; only the
+          decoder cross-attn (inside the grad-tracked rollout) trains.
+        - **Step 6 (``train_framework_encoder``)** — everything trainable: the whole framework MPNN
+          (encoder + decoder), the epitope encoder, and every conditioner hook. The init-state is
+          re-encoded grad-tracked each update (see ``train_step``), so the upstream hooks train too.
         """
-
-        for name, param in self.model.named_parameters():
-            if "decoder_layers" not in name and "W_out" not in name:
-                param.requires_grad = False
-
-        trainable = [p for p in self.model.parameters() if p.requires_grad]
-        if self.conditioning_cfg.enabled:
-            trainable += list(self.conditioner.parameters())
+        if self.train_framework_encoder:
+            for param in self.model.parameters():
+                param.requires_grad = True
+            trainable = list(self.model.parameters())
+            if self.conditioning_cfg.enabled:
+                trainable += list(self.conditioner.parameters())  # incl. the epitope encoder submodule
+        else:
+            for name, param in self.model.named_parameters():
+                if "decoder_layers" not in name and "W_out" not in name:
+                    param.requires_grad = False
+            trainable = [p for p in self.model.parameters() if p.requires_grad]
+            if self.conditioning_cfg.enabled:
+                trainable += list(self.conditioner.parameters())
 
         optimizer = torch.optim.Adam(trainable, lr=self.cfg.lr)
         return optimizer
@@ -336,11 +353,16 @@ class PolicyMPNN:
                 "cdr_spans": example.cdr_spans,
                 "cdr_lengths": sample_cdr_lengths(example.params),  # fresh per step (length diversity)
             }
-        return self._featurize(
+        feature_dict = self._featurize(
             example.structure,
             lambda cl, ri, ic: self.dataset.fixed_residues(example, cl, ri, ic).split(),
             gap=gap,
         )
+        # CDR-type ids per segment (position order), for the step-5 CDR-identity node signal.
+        # Ignored downstream unless conditioning.node_init_cdr_identity is on.
+        if self.conditioning_cfg.enabled and example.cdr_spans:
+            feature_dict["cdr_ids"] = ordered_cdr_type_ids(example.design_chain, example.cdr_spans)
+        return feature_dict
 
     def featurize_epitope(self, example):
         """Build the epitope feature dict consumed by ``EpitopeConditioner.encode_epitope`` (SPEC 4.1).
@@ -395,32 +417,47 @@ class PolicyMPNN:
         ``feature_dict`` for the conditioning hooks (SPEC 4.1, slice-2 step 4).
 
         No-op (returns ``feature_dict`` unchanged) when conditioning is disabled or the
-        example carries no ``epitope_residues``. Runs the epitope encoder under ``no_grad``
-        for now — like the framework encoder it is frozen until step 6; the downstream
-        ``decoder_cross_attn`` params still train because ``epi_per_res`` enters them as a
-        constant inside the grad-tracked rollout.
+        example carries no ``epitope_residues``.
 
-        Keys written: ``epi_per_res`` ``[1, M, H]`` (per-antigen-residue embeddings) and
-        ``epi_mask`` ``[1, M]`` (the epitope patch returned by ``encode_epitope``).
+        Always stashes the parsed epitope feature dict ``epi_fd`` so ``encode_initial_state``
+        can (re-)encode it. In the **step-4** regime (framework frozen) the embeddings are
+        precomputed here once under ``no_grad`` and cached; the downstream ``decoder_cross_attn``
+        still trains because ``epi_per_res`` enters it as a constant inside the grad-tracked
+        rollout. In the **step-6** regime (``train_framework_encoder``) they are left for
+        ``encode_initial_state`` to recompute grad-tracked each update, so the epitope encoder trains.
+
+        Keys written: ``epi_fd`` (parsed antigen feature dict), and — step-4 only — ``epi_per_res``
+        ``[1, M, H]`` + ``epi_mask`` ``[1, M]`` (the epitope patch from ``encode_epitope``).
         """
         if not (self.conditioning_cfg.enabled and example.epitope_residues):
             return feature_dict
-        epi_fd = self.featurize_epitope(example)
-        with torch.no_grad():
-            epi_per_res, epi_mask = self.conditioner.encode_epitope(epi_fd)
-        feature_dict["epi_per_res"] = epi_per_res
-        feature_dict["epi_mask"] = epi_mask
+        feature_dict["epi_fd"] = self.featurize_epitope(example)
+        if not self.train_framework_encoder:
+            with torch.no_grad():
+                epi_per_res, epi_mask = self.conditioner.encode_epitope(feature_dict["epi_fd"])
+            feature_dict["epi_per_res"] = epi_per_res
+            feature_dict["epi_mask"] = epi_mask
         return feature_dict
 
-    def encode_initial_state(self, feature_dict):
-        """Encode the framework structure (no grad) and apply the post-encode framework-node
-        conditioning (node-init + encoder cross-attn) at CDR positions (SPEC 4.1 hook 1+2).
+    def encode_initial_state(self, feature_dict, grad=False):
+        """Encode the framework structure and apply the post-encode framework-node conditioning
+        (node-init + encoder cross-attn) at CDR positions (SPEC 4.1 hook 1+2).
 
         ``condition_nodes`` is an identity when conditioning is disabled, so the M1 baseline
-        path is byte-identical. When ``attach_epitope`` populated ``epi_per_res`` the CDR
-        nodes also absorb the pooled epitope + per-residue encoder cross-attn.
+        path is byte-identical. ``grad=False`` (default) runs under ``no_grad`` — the step-4
+        cached-init-state path and every experience-collection rollout. ``grad=True`` (step 6)
+        keeps the graph so the framework + epitope encoders train; it (re)computes the epitope
+        embeddings grad-tracked from ``epi_fd``. When enabled but no embeddings are cached yet
+        (step-6 experience collection), they are computed here under the active context so the
+        experience and update rollouts see the *same* conditioning.
         """
-        with torch.no_grad():
+        ctx = contextlib.nullcontext() if grad else torch.no_grad()
+        with ctx:
+            if self.conditioning_cfg.enabled and feature_dict.get("epi_fd") is not None:
+                if grad or feature_dict.get("epi_per_res") is None:
+                    epi_per_res, epi_mask = self.conditioner.encode_epitope(feature_dict["epi_fd"])
+                    feature_dict["epi_per_res"] = epi_per_res
+                    feature_dict["epi_mask"] = epi_mask
             h_V, h_E, E_idx = self.model.encode(feature_dict)
             if self.conditioning_cfg.enabled:
                 h_V = self.conditioner.condition_nodes(
@@ -428,6 +465,8 @@ class PolicyMPNN:
                     feature_dict["chain_mask"],
                     feature_dict.get("epi_per_res"),
                     feature_dict.get("epi_mask"),
+                    cdr_ids=feature_dict.get("cdr_ids"),
+                    X=feature_dict.get("X"),
                 )
         return h_V, h_E, E_idx
 
@@ -626,9 +665,14 @@ class PolicyMPNN:
         to_log = {}
         self.optimizer.zero_grad()
 
-        h_V_in, h_E_in, E_idx_in = init_state
-        h_V_in.requires_grad = True
-        h_E_in.requires_grad = True
+        # init_state=None (step 6): re-encode grad-tracked so the encoders train. Else use the
+        # cached detached leaf and flip on grad (decoder-only path).
+        if init_state is None:
+            h_V_in, h_E_in, E_idx_in = self.encode_initial_state(feature_dict, grad=True)
+        else:
+            h_V_in, h_E_in, E_idx_in = init_state
+            h_V_in.requires_grad = True
+            h_E_in.requires_grad = True
 
         out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in)
 
@@ -673,8 +717,13 @@ class PolicyMPNN:
                 feature_dict = self.featurize_pdb(self.cfg.pdb)
                 reward_fn = self.reward_fn
 
-            h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
-            init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
+            # Step 6: re-encode grad-tracked each update inside train_step (init_state=None).
+            # Otherwise cache a detached init-state leaf once (step-4 / stock decoder-only path).
+            if self.train_framework_encoder:
+                init_state = None
+            else:
+                h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
+                init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
 
             to_log = self.train_step(step, init_state, feature_dict, reward_fn)
             if self.reward_registry is not None:
@@ -743,6 +792,10 @@ class PolicyMPNN:
             "reward": curr_reward,
             "model_state_dict": self.model.state_dict(),
         }
+        # The conditioner carries trainable params (hooks + epitope encoder); persist them so a
+        # conditioned run is recoverable. Absent/no-op for the M1 baseline.
+        if self.conditioning_cfg.enabled:
+            ckpt["conditioner_state_dict"] = self.conditioner.state_dict()
 
         torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_last.pt"))
         torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_step_{step:04}.pt"))

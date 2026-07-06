@@ -128,3 +128,92 @@ def test_pool_epitope_respects_mask():
 def test_config_from_dict_ignores_unknown():
     cfg = ConditioningConfig.from_dict({"enabled": True, "n_heads": 8, "bogus": 1})
     assert cfg.enabled and cfg.n_heads == 8
+
+
+# --- step 5: CDR-identity embedding, stem-gap geometry, attention-pool ------ #
+
+from cleo.design.nanobody import AttentionPool, ordered_cdr_type_ids   # noqa: E402
+
+
+def test_ordered_cdr_type_ids_vhh_and_fv():
+    # VHH: single chain H, sorted by span start -> H1,H2,H3 ids [0,1,2]
+    vhh = ordered_cdr_type_ids("H", {"H2": [51, 57], "H1": [25, 32], "H3": [98, 109]})
+    assert vhh == [0, 1, 2]
+    # Fv: H chain then L chain, each sorted by start -> H1,H2,H3,L1,L2,L3 ids [0..5]
+    fv = ordered_cdr_type_ids(
+        "H L",
+        {"L1": [23, 39], "H1": [25, 32], "H3": [98, 109], "L3": [93, 102],
+         "H2": [51, 57], "L2": [54, 61]},
+    )
+    assert fv == [0, 1, 2, 3, 4, 5]
+
+
+def test_cdr_identity_only_cdr_and_depends_on_id():
+    cond = EpitopeConditioner(_cfg(node_init_cdr_identity=True))
+    h_V, epi, epi_mask = _inputs()
+    segs = cdr_segments_from_chain_mask(CHAIN_MASK)          # two segments
+    out_a = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, cdr_ids=[0, 1])
+    out_b = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, cdr_ids=[2, 3])
+    assert len(segs) == 2
+    assert torch.equal(out_a[:, FRAME_IDX], h_V[:, FRAME_IDX])         # framework untouched
+    assert not torch.allclose(out_a[:, CDR_IDX], h_V[:, CDR_IDX])      # CDRs changed
+    assert not torch.allclose(out_a[:, CDR_IDX], out_b[:, CDR_IDX])    # different CDR ids => different init
+
+
+def test_cdr_identity_missing_ids_no_error_and_omits_signal():
+    """Missing / mismatched cdr_ids must not error; they simply omit the identity term (with
+    another node-init mechanism on, the node is still computed)."""
+    cond = EpitopeConditioner(_cfg(node_init_interpolate=True, node_init_cdr_identity=True))
+    h_V, epi, epi_mask = _inputs()
+    out_noids = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, cdr_ids=None)
+    out_ids = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, cdr_ids=[0, 1])
+    assert out_noids.shape == h_V.shape                               # no error
+    assert not torch.allclose(out_noids[:, CDR_IDX], out_ids[:, CDR_IDX])  # ids add a signal
+    out_bad = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, cdr_ids=[0])  # wrong length
+    assert torch.allclose(out_bad[:, CDR_IDX], out_noids[:, CDR_IDX])  # treated like None
+
+
+def test_stem_geom_only_cdr_and_depends_on_coords():
+    cond = EpitopeConditioner(_cfg(node_init_stem_geom=True))
+    h_V, epi, epi_mask = _inputs()
+    # segment 1 stems are nodes 1 (N) and 5 (C); vary only the C stem so the span distance changes.
+    X_a = torch.zeros(1, L, 4, 3)
+    X_a[:, 5, 1, 0] = 3.0                                  # span dist(seg1) = 3
+    X_b = torch.zeros(1, L, 4, 3)
+    X_b[:, 5, 1, 0] = 9.0                                  # span dist(seg1) = 9
+    out_a = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, X=X_a)
+    out_b = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, X=X_b)
+    assert torch.equal(out_a[:, FRAME_IDX], h_V[:, FRAME_IDX])        # framework untouched
+    assert not torch.allclose(out_a[:, CDR_IDX], h_V[:, CDR_IDX])     # geometry writes CDR nodes
+    assert not torch.allclose(out_a[:, [2, 3, 4]], out_b[:, [2, 3, 4]])  # seg1 depends on stem coords
+
+
+def test_attention_pool_differs_from_mean_and_is_used():
+    cfg = _cfg(node_init_pooled_epitope=True, attention_pool=True)
+    cond = EpitopeConditioner(cfg)
+    assert hasattr(cond, "attn_pool")
+    epi = torch.randn(1, M, H)
+    mask = torch.ones(1, M)
+    pooled_attn = cond._pool(epi, mask)
+    assert pooled_attn.shape == (1, H)
+    assert not torch.allclose(pooled_attn, pool_epitope(epi, mask))    # attention != masked mean
+
+
+def test_attention_pool_module_masks_padding():
+    ap = AttentionPool(H, NH)
+    epi = torch.randn(1, 4, H)
+    mask = torch.tensor([[1.0, 1.0, 0.0, 0.0]])
+    out = ap(epi, mask)
+    assert out.shape == (1, H) and torch.isfinite(out).all()
+
+
+def test_step5_gradients_flow():
+    cond = EpitopeConditioner(_cfg(node_init_cdr_identity=True, node_init_stem_geom=True,
+                                   node_init_pooled_epitope=True, attention_pool=True))
+    h_V, epi, epi_mask = _inputs()
+    X = torch.randn(1, L, 4, 3)
+    out = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, cdr_ids=[0, 1], X=X)
+    out.sum().backward()
+    assert cond.node_init.cdr_emb.weight.grad.abs().sum() > 0
+    assert cond.node_init.stem_geom.weight.grad.abs().sum() > 0
+    assert cond.attn_pool.query.grad.abs().sum() > 0

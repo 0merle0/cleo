@@ -686,15 +686,19 @@ the live policy for the **Stage-1 pose-free** build (§4.5). Every step below is
 `ConditioningConfig.enabled=False` remains a byte-identical stock-MPNN run (the M1 baseline). Ordered
 by risk, each independently testable.
 
-**Progress: steps 1–3 + 3.5 + 4 + 7(config) BUILT + tested 2026-07-05** (commits incl. `683a8c6`:
+**Progress: steps 1–6 + 7(config) BUILT + tested 2026-07-05** (commits incl. `683a8c6`:
 policy epitope-encoder/conditioner; featurize_epitope + patch-mask + mode seam; ProteinFeatures
 coord-free CDR edges; gapped-framework data path; **step 4 = 3 hooks wired**). Since then: the reward
 oracle was generalized to **N designed chains** (VHH + Fv, §4.2), the **composing dataset** (§6.9) was
-built, and a training config (`config/design/antibody_composed.yaml`) wires `cfg.dataset.composer` +
-`cfg.conditioning` (step 7 config). Full unit suite **212 passed**.
-**Remaining: step 5** (pose-free node signals: CDR-identity embed, stem-gap geometry, attention-pool),
-**step 6** (unfreeze framework encoder + all-trainable optimizer + drop cached init_state), and the
-**step-7 e2e smoke** (enabled=True shapes/grad-flow; enabled=False baseline equivalence).
+built, **step 5** added the pose-free node signals (CDR-identity embedding, stem-gap geometry,
+attention-pool — each its own toggle, default off), **step 6** added `train_framework_encoder`
+(all-trainable optimizer + grad-tracked re-encode every PPO update, dropping the cached init_state so
+the framework + epitope encoders and upstream hooks train), and a training config
+(`config/design/antibody_composed.yaml`) wires `cfg.dataset.composer` + `cfg.conditioning` +
+`train_framework_encoder`. Full unit suite **226 passed**.
+**Remaining: the step-7 e2e smoke** — run `antibody_composed.yaml` a few steps with
+`conditioning.enabled=True` (shapes / grad-flow / Protenix reward) and an `enabled=False`
+baseline-equivalence check (byte-identical stock MPNN). Kept for a human read-through of the code first.
 
 4. **Wire the 3 conditioning hooks into encode + rollout (`policy.py`).** (a) `attach_epitope(example,
    feature_dict)` — encode the epitope once per example (frozen, `no_grad`) and stash `epi_per_res`
@@ -939,13 +943,9 @@ under `src/cleo/design/utils/`, plus `configs/`, `structures/`, run/log dirs. We
 ## 11. Immediate next steps
 (M0 scaffolding + the data pipeline are done: PINDER subset in `~/pinder`, epitope precompute,
 uniref MSAs, VHH/Fv scaffold library + VD backbones, Protenix v2 oracle (N-chain), dataset-driven
-harness, epitope conditioner wired (steps 1–4), composing dataset (§6.9), and the training config.)
+harness, epitope conditioner wired (steps 1–6), composing dataset (§6.9), and the training config.)
 
-1. **Slice-2 step 5** — pose-free node signals: CDR-identity embedding (H1–H3 / L1–L3), stem-gap
-   geometry from real stem Cα's, attention-pool the epitope (replaces pooled-mean).
-2. **Slice-2 step 6** — unfreeze the framework encoder (all-trainable optimizer) and drop the cached
-   `init_state` so node-init / encoder cross-attn get gradients.
-3. **Slice-2 step 7 e2e smoke** — run `antibody_composed.yaml` on a few steps with `conditioning.
+1. **Slice-2 step 7 e2e smoke** — run `antibody_composed.yaml` on a few steps with `conditioning.
    enabled=True` (shapes / grad-flow / Protenix reward), plus an `enabled=False` baseline-equivalence
-   check (byte-identical stock MPNN, M1 baseline).
-4. **M1 → M2 runs** — multi-target GRPO baseline (conditioning off) vs conditioned, ablations per §8.1.
+   check (byte-identical stock MPNN, M1 baseline). *(Held for a human read-through of steps 5–6 first.)*
+2. **M1 → M2 runs** — multi-target GRPO baseline (conditioning off) vs conditioned, ablations per §8.1.

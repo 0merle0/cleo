@@ -80,7 +80,12 @@ class PolicyMPNNvGRPO(PolicyMPNN):
 
         # --- Collect experience (no gradients) ---
         with torch.no_grad():
-            h_V_in, h_E_in, E_idx_in = init_state
+            # init_state=None (step 6): encode fresh under no_grad (also computes/caches the epitope
+            # embeddings so this rollout sees the SAME conditioning as the grad-tracked updates).
+            if init_state is None:
+                h_V_in, h_E_in, E_idx_in = self.encode_initial_state(feature_dict)
+            else:
+                h_V_in, h_E_in, E_idx_in = init_state
             out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in)
 
             batched_rewards, metrics = reward_fn(step, out, feature_dict, self.device)
@@ -103,9 +108,14 @@ class PolicyMPNNvGRPO(PolicyMPNN):
 
             self.optimizer.zero_grad()
 
-            h_V_in, h_E_in, E_idx_in = init_state
-            h_V_in.requires_grad = True
-            h_E_in.requires_grad = True
+            # init_state=None (step 6): re-encode grad-tracked each update so the framework +
+            # epitope encoders receive gradients. Else use the cached detached leaf (decoder-only).
+            if init_state is None:
+                h_V_in, h_E_in, E_idx_in = self.encode_initial_state(feature_dict, grad=True)
+            else:
+                h_V_in, h_E_in, E_idx_in = init_state
+                h_V_in.requires_grad = True
+                h_E_in.requires_grad = True
 
             if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
                 with torch.no_grad():

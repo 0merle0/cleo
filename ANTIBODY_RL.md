@@ -72,20 +72,30 @@ to the separate antigen file. Per rollout the loop logs `is_vhh` into the train-
 provenance (`scaffold_id`, `kind`, `target_id`, `cdr_lengths`) to `{run_name}_provenance.csv`.
 Tests: `tests/unit/test_composer.py`.
 
-### Epitope conditioning (§4.1, wired in slice-2 steps 1–4)
+### Epitope conditioning (§4.1, slice-2 steps 1–6)
 `src/cleo/design/nanobody/epitope.py` + hooks in `src/cleo/design/utils/policy.py`: a second
 ProteinMPNN encodes the epitope; CDR nodes get node-init signals + encoder/decoder cross-attn;
 coordinate-free CDR graph edges let the gapped (coord-less) CDR nodes participate. Master-switch and
-per-mechanism toggles for ablations. Tests: `tests/unit/test_policy_conditioning.py`,
+per-mechanism toggles for ablations.
+- **Step 5** node signals (each its own toggle, default off): a **CDR-identity** embedding
+  (H1/H2/H3, L1–L3), **stem-gap geometry** (the flanking-stem span distance and its ratio to the
+  sampled CDR length), and an **attention-pool** of the epitope (learned query) replacing the masked
+  mean.
+- **Step 6** `train_framework_encoder`: unfreezes the framework + epitope encoders (all-trainable
+  optimizer) and re-encodes the initial state grad-tracked every PPO update instead of caching a
+  detached leaf — so node-init / encoder cross-attn / epitope-encoder params train, not just the
+  decoder. `false` keeps the cheaper decoder-only regime (byte-identical step-4 path).
+
+Tests: `tests/unit/test_epitope_conditioning.py`, `test_policy_conditioning.py`,
 `test_coord_free_edges.py`, `test_gapping.py`.
 
 ## Status
 
-Built + tested (212 unit tests): data pipeline, N-chain oracle, composing dataset, conditioner
-hooks (steps 1–4), and the training config. **Not yet run end-to-end** — remaining before a live run
-is slice-2 step 5 (extra node signals), step 6 (unfreeze encoder / all-trainable optimizer), and the
-step-7 e2e smoke (`enabled=True` grad-flow + `enabled=False` baseline equivalence). See §11 of the
-SPEC.
+Built + tested (226 unit tests): data pipeline, N-chain oracle, composing dataset, conditioner
+hooks (steps 1–6), and the training config. **Not yet run end-to-end** — the only remaining piece is
+the slice-2 step-7 e2e smoke: run `antibody_composed.yaml` a few steps with `conditioning.enabled=true`
+(shapes / grad-flow / Protenix reward) plus an `enabled=false` baseline-equivalence check. See §11 of
+[`docs/SPEC.md`](docs/SPEC.md).
 
 ## Tests
 

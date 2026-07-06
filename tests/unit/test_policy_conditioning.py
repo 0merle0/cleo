@@ -278,6 +278,70 @@ def test_rollout_runs_end_to_end_with_conditioning(tmp_path):
     assert out["chain_mask"].sum().item() == 6               # only the 6 gap nodes designable
 
 
+# --- step 5 wiring: featurize_example stashes per-segment CDR-type ids -------- #
+
+def test_featurize_example_stashes_cdr_ids(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": True}))
+    fd = p.featurize_example(_gapped_example())              # one CDR: H1 -> type id 0
+    assert fd["cdr_ids"] == [0]
+
+
+# --- step 6: unfreeze framework + epitope encoders, grad-tracked re-encode ---- #
+
+def _step6_cfg(tmp_path):
+    cfg = _cfg(tmp_path, {"enabled": True, "coord_free_cdr_edges": True})
+    return OmegaConf.merge(cfg, {"train_framework_encoder": True})
+
+
+def test_step4_default_freezes_framework_encoder(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path, {"enabled": True}))        # train_framework_encoder defaults False
+    assert not p.train_framework_encoder
+    frozen = [p_ for n, p_ in p.model.named_parameters()
+              if "decoder_layers" not in n and "W_out" not in n]
+    assert frozen and not any(p_.requires_grad for p_ in frozen)   # encoder stays frozen
+
+
+def test_step6_gated_on_conditioning_enabled(tmp_path):
+    cfg = OmegaConf.merge(_cfg(tmp_path), {"train_framework_encoder": True})  # no conditioning
+    p = PolicyMPNN(cfg)
+    assert not p.train_framework_encoder                    # nothing to train => no-op
+
+
+def test_step6_unfreezes_all_and_optimizer_covers_both_encoders(tmp_path):
+    p = PolicyMPNN(_step6_cfg(tmp_path))
+    assert p.train_framework_encoder
+    assert all(pp.requires_grad for pp in p.model.parameters())    # framework all-trainable
+    opt_ids = {id(pp) for g in p.optimizer.param_groups for pp in g["params"]}
+    enc_ids = {id(pp) for n, pp in p.model.named_parameters() if "encoder_layers" in n}
+    epi_ids = {id(pp) for pp in p.epi_encoder.parameters()}
+    assert enc_ids and enc_ids <= opt_ids                   # framework encoder optimized
+    assert epi_ids and epi_ids <= opt_ids                   # epitope encoder optimized
+
+
+def test_step6_attach_epitope_defers_encoding(tmp_path):
+    """Step 6 stashes only the epitope feature dict; embeddings are (re)computed grad-tracked
+    in encode_initial_state, not cached under no_grad here."""
+    p = PolicyMPNN(_step6_cfg(tmp_path))
+    ex = _gapped_example()
+    fd = p.attach_epitope(ex, p.featurize_example(ex))
+    assert "epi_fd" in fd and "epi_per_res" not in fd
+
+
+def test_step6_grad_reaches_framework_and_epitope_encoders(tmp_path):
+    p = PolicyMPNN(_step6_cfg(tmp_path))
+    p.model.eval()
+    ex = _gapped_example()
+    fd = p.attach_epitope(ex, p.featurize_example(ex))
+    h_V, h_E, E_idx = p.encode_initial_state(fd, grad=True)
+    assert h_V.requires_grad                                 # grad-tracked (not a detached leaf)
+    assert fd["epi_per_res"].requires_grad                   # epitope embeddings recomputed grad-tracked
+    h_V.sum().backward()
+    enc_grad = [pp for n, pp in p.model.named_parameters() if "encoder_layers" in n and pp.grad is not None]
+    epi_grad = [pp for pp in p.epi_encoder.parameters() if pp.grad is not None]
+    assert enc_grad                                          # framework encoder received gradient
+    assert epi_grad                                          # epitope encoder received gradient
+
+
 def test_epitope_log_fields_reports_size_and_charge(tmp_path):
     p = PolicyMPNN(_cfg(tmp_path))
     ex = Example(
