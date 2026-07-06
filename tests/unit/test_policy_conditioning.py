@@ -11,6 +11,7 @@ suite (test_epitope_conditioning.py) because this one actually loads MPNN weight
 """
 from pathlib import Path
 
+import math
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -275,3 +276,24 @@ def test_rollout_runs_end_to_end_with_conditioning(tmp_path):
     assert out["S"].shape == (1, L)                          # full graph (gapped chain A + chain T)
     assert torch.isfinite(out["log_probs"]).all()
     assert out["chain_mask"].sum().item() == 6               # only the 6 gap nodes designable
+
+
+def test_epitope_log_fields_reports_size_and_charge(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path))
+    ex = Example(
+        id="e", task="nanobody_design", reward="antibody_interface",
+        structure=FIXTURE, design_chain="A",
+        params={"epitope_residues": EPI_RESIDUES, "epitope_net_charge": -2},
+    )
+    fields = p._epitope_log_fields(ex)
+    assert fields["epitope_size"] == float(len(EPI_RESIDUES))  # 3
+    assert fields["epitope_net_charge"] == -2.0
+    assert all(isinstance(v, float) for v in fields.values())   # log_metrics only writes floats
+
+
+def test_epitope_log_fields_nan_charge_when_missing(tmp_path):
+    p = PolicyMPNN(_cfg(tmp_path))
+    ex = _epitope_example()                                      # params has no epitope_net_charge
+    fields = p._epitope_log_fields(ex)
+    assert fields["epitope_size"] == 3.0
+    assert math.isnan(fields["epitope_net_charge"])             # stable column, NaN when unknown

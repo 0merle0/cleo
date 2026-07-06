@@ -1,0 +1,63 @@
+# Epitope-conditioned nanobody/Fv design — composing dataset + epitope conditioning (SPEC 6.9).
+#
+# Usage:
+#   cleo-design-train --config-path config/design --config-name antibody_composed \
+#       run_name=<exp> output_dir=<path>
+#
+# Unlike the single-PDB flow (denovo_petase.yaml), there is NO `pdb` and NO `cfg.reward`:
+# the ComposingDataset draws one (target x scaffold x CDR-lengths) example per step and the
+# RewardRegistry binds that example's reward package (config/design/reward/*.yaml) per step.
+# `fixed_residues` is likewise dataset-driven (the CDR-mask complement), so the cfg field is
+# unused here.
+
+# -- General training params --
+run_name: ab_composed_v1
+output_dir: ${hydra:runtime.cwd}/cleo_runs/ab_composed_v1
+pdb: null                         # dataset-driven: framework scaffold comes from the composer
+checkpoint_path: null             # null = start from base ProteinMPNN weights
+checkpoint_every_n_steps: 50
+
+algorithm: grpo
+batch_size: 16                    # designs sampled per rollout (each folded by Protenix — keep modest)
+N_steps: 1000
+lr: 1e-4
+
+# -- GRPO params --
+kl_weight: 1e-2
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+
+# -- MPNN params --
+model_type: protein_mpnn          # framework + antigen are protein-only (no ligand)
+temperature: 1.0
+omit_AA: CX
+fixed_residues: ""                # unused: the dataset supplies the CDR-mask complement per example
+
+# -- Dataset-driven harness (SPEC 6). `composer` => on-the-fly ComposingDataset --
+dataset:
+  reward_dir: ${hydra:runtime.cwd}/config/design/reward
+  composer:
+    targets_csv: /home/jgershon/projects/antibody_rl/data/pinder_epitopes_trainable.csv
+    scaffold_pool_csv: /home/jgershon/projects/antibody_rl/data/scaffold_pool.csv
+    reward: antibody_interface_composed     # reward package name under reward_dir
+    split: train                            # train | val (val = 140 held-out targets)
+    vhh_fraction: 0.5                        # P(sample a VHH scaffold); 1-p = Fv. Tunable.
+    cdr_length_ranges: null                  # null => native span width (no length diversity yet);
+                                             # e.g. {H3: [8, 20], H1: [5, 9]} to sample lengths per step
+
+# -- Epitope conditioning (SPEC 4.1 / 6.8). Master `enabled` gates every hook --
+conditioning:
+  enabled: true
+  inject_epitope_sequence: true    # path (b): antigen sequence into epitope node feats
+  node_init_interpolate: true      # flanking-stem anchor interpolation for CDR nodes
+  node_init_relpos: true           # (i, L) relative-position embedding on CDR nodes
+  node_init_pooled_epitope: true   # pooled epitope embedding added to CDR nodes
+  encoder_cross_attn: true         # per-residue epitope cross-attn at the encoder
+  decoder_cross_attn: true         # per-residue epitope cross-attn at each decode step
+  coord_free_cdr_edges: true       # REQUIRED for the gapped-framework path (gap nodes have no coords)
+  node_init_mode: replace          # replace | add at CDR positions
+  hidden_dim: 128
+  n_heads: 4
+  max_cdr_len: 32

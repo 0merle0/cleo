@@ -121,6 +121,20 @@ class Example:
         indices (unlike cdr_spans). Matches the convention read by the reward oracle."""
         return self.params.get("epitope_residues", [])
 
+    @property
+    def n_epitope(self) -> int:
+        """Epitope size (residue count). Metadata only — logged per rollout to track
+        whether reward correlates with epitope size (SPEC 6.7)."""
+        return len(self.epitope_residues)
+
+    @property
+    def epitope_net_charge(self):
+        """Net charge of the epitope patch at physiological pH, ``(Arg+Lys) - (Asp+Glu)``,
+        precomputed in the manifest (data/pinder_epitopes.csv). Metadata only — logged per
+        rollout for post-hoc charge/reward analysis; never fed to the model. ``None`` if the
+        row predates the charge precompute."""
+        return self.params.get("epitope_net_charge")
+
 
 # --------------------------------------------------------------------------- #
 # dataset
@@ -243,7 +257,14 @@ class DesignDataset:
         ``DESIGN_SEQ``-valued columns are left for the caller to alias to ``sequence``.
         """
         package = self._package(example.reward)
-        resolver = lambda chain: self.native.seq(example.structure, chain)  # noqa: E731
+
+        # Antigen chain 'T' lives in the SEPARATE antigen file (epitope_source); the design
+        # chain(s) live in `structure`. Single-file fixtures collapse both (epitope_source
+        # falls back to structure), so this stays byte-compatible with the JSONL path.
+        def resolver(chain: str) -> str:
+            path = example.epitope_source if chain == "T" else example.structure
+            return self.native.seq(path, chain)
+
         return resolve_inputs(package, example.raw, native_seq_fn(example.raw, resolver))
 
     def fixed_residues(self, example: Example, chain_letters, R_idx, icodes) -> str:

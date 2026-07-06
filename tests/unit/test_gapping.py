@@ -14,7 +14,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from cleo.design.data.gapping import _UNK_AA, apply_cdr_gaps
-from cleo.design.data.mask import MaskError, sample_cdr_lengths
+from cleo.design.data.mask import MaskError, as_chain_list, sample_cdr_lengths
 
 
 # --- length sampler -------------------------------------------------------- #
@@ -115,3 +115,54 @@ def test_out_of_bounds_span_raises():
     pd = _protein_dict(L=10)
     with pytest.raises(MaskError, match="out of bounds"):
         apply_cdr_gaps(pd, "A", {"H1": [8, 12]}, {"H1": 3})
+
+
+# --- Fv (two-chain) robustness --------------------------------------------- #
+
+def _fv_protein_dict(Lh=10, Ll=8):
+    """A minimal two-chain (H then L) parsed protein_dict for the paired-Fv path."""
+    g = torch.Generator().manual_seed(0)
+    L = Lh + Ll
+    return {
+        "X": torch.randn(L, 4, 3, generator=g),
+        "mask": torch.ones(L, dtype=torch.int32),
+        "R_idx": torch.arange(100, 100 + L, dtype=torch.int32),
+        "chain_labels": torch.tensor([0] * Lh + [1] * Ll, dtype=torch.int32),
+        "S": torch.arange(L, dtype=torch.int32) % 20,
+        "xyz_37": torch.randn(L, 37, 3, generator=g),
+        "xyz_37_m": torch.ones(L, 37, dtype=torch.int32),
+        "chain_letters": ["H"] * Lh + ["L"] * Ll,
+    }
+
+
+def test_fv_gaps_both_chains():
+    """H* spans route to chain 0, L* spans to chain 1; gap nodes land in both chains."""
+    pd = _fv_protein_dict(Lh=10, Ll=8)                 # H rows 0..9, L rows 10..17
+    out = apply_cdr_gaps(
+        pd, ["H", "L"],
+        {"H1": [3, 6], "L1": [2, 5]},                  # positional ranges *into each chain*
+        {"H1": 4, "L1": 3},
+    )
+    # new length: (10 - 3 + 4) + (8 - 3 + 3) = 11 + 8 = 19
+    assert out["X"].shape[0] == 19
+    cm = out["chain_mask"]
+    assert cm.sum().item() == 7                        # 4 (H1) + 3 (L1) designable
+    letters = [str(c) for c in out["chain_letters"]]
+    gap_rows = cm.nonzero().flatten().tolist()
+    gap_chains = {letters[i] for i in gap_rows}
+    assert gap_chains == {"H", "L"}                    # both chains contributed gap nodes
+    assert torch.all(out["S"][cm.bool()] == _UNK_AA)   # every designable node is unknown-seq
+    assert torch.isfinite(out["X"]).all()
+
+
+def test_light_span_without_second_chain_raises():
+    """An L* CDR on a single-chain (VHH) design is a hard error, not a silent misroute."""
+    pd = _protein_dict(L=10)
+    with pytest.raises(MaskError, match="light chain"):
+        apply_cdr_gaps(pd, "H", {"L1": [2, 5]}, {"L1": 3})
+
+
+def test_as_chain_list_normalizes_all_forms():
+    assert as_chain_list("H") == ["H"]                 # VHH single chain
+    assert as_chain_list("H L") == ["H", "L"]          # Fv serialized as whitespace-joined string
+    assert as_chain_list(["H", "L"]) == ["H", "L"]     # already a list

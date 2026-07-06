@@ -11,6 +11,7 @@ Amino-acid encoding constants used across the codebase (``alphabet``,
 this module rather than duplicated elsewhere.
 """
 
+import json
 import os
 import torch
 import numpy as np
@@ -88,16 +89,34 @@ class PolicyMPNN:
         self.dataset = None
         self.reward_registry = None
         if cfg.get("dataset"):
-            from cleo.design.data.dataset import DesignDataset
             from cleo.design.data.registry import RewardRegistry
 
-            self.dataset = DesignDataset.load(
-                cfg.dataset.jsonl,
-                cfg.dataset.reward_dir,
-                structures_root=cfg.dataset.get("structures_root", ""),
-            )
+            comp = cfg.dataset.get("composer")
+            if comp is not None:
+                # On-the-fly composer: sample target x scaffold x CDR-lengths per step
+                # (no materialized cross-product JSONL; SPEC 6.9).
+                from cleo.design.data.composer import ComposingDataset
+
+                ranges = comp.get("cdr_length_ranges", None)
+                self.dataset = ComposingDataset.load(
+                    comp.targets_csv,
+                    comp.scaffold_pool_csv,
+                    comp.reward,
+                    cfg.dataset.reward_dir,
+                    split=comp.get("split", None),
+                    vhh_fraction=comp.get("vhh_fraction", 0.5),
+                    cdr_length_ranges=OmegaConf.to_container(ranges) if ranges is not None else None,
+                )
+            else:
+                from cleo.design.data.dataset import DesignDataset
+
+                self.dataset = DesignDataset.load(
+                    cfg.dataset.jsonl,
+                    cfg.dataset.reward_dir,
+                    structures_root=cfg.dataset.get("structures_root", ""),
+                )
+                print(f"Loaded dataset with {len(self.dataset)} examples from {cfg.dataset.jsonl}")
             self.reward_registry = RewardRegistry(self.dataset, cfg.output_dir, cfg.run_name)
-            print(f"Loaded dataset with {len(self.dataset)} examples from {cfg.dataset.jsonl}")
 
         self.checkpoint_every_n_steps = self.cfg.checkpoint_every_n_steps
         self.best_seen_reward = 0
@@ -658,6 +677,9 @@ class PolicyMPNN:
             init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
 
             to_log = self.train_step(step, init_state, feature_dict, reward_fn)
+            if self.reward_registry is not None:
+                to_log.update(self._epitope_log_fields(example))
+                self._log_provenance(step, example)
 
             runtime = time.time() - start_time
             self.log_metrics(step, runtime, to_log)
@@ -667,6 +689,40 @@ class PolicyMPNN:
 
         print("Training complete.")
         print(f"Best reward seen: {self.best_seen_reward:.4f} at step {self.step_at_best_seen_reward}")
+
+    def _epitope_log_fields(self, example):
+        """Per-rollout epitope metadata for the training CSV: epitope size and net charge,
+        so post-hoc analysis can surface any reward/size or reward/charge trends (SPEC 6.7).
+        Both keys are emitted on every dataset-driven step (0.0 / NaN when an example carries
+        no epitope) so the CSV columns stay stable across the run."""
+        nc = example.epitope_net_charge
+        fields = {
+            "epitope_size": float(example.n_epitope),
+            "epitope_net_charge": float(nc) if nc is not None else float("nan"),
+        }
+        # Composer rollouts also carry the scaffold modality (VHH vs Fv). Emit it as a float
+        # so post-hoc analysis can split reward by modality; absent (=> no column) for the
+        # JSONL path, keeping CSV columns stable within any single run.
+        kind = example.params.get("kind")
+        if kind is not None:
+            fields["is_vhh"] = 1.0 if kind == "vhh" else 0.0
+        return fields
+
+    def _log_provenance(self, step, example):
+        """Append this rollout's composed provenance (scaffold, target, sampled CDR lengths)
+        to ``{run_name}_provenance.csv``. Only the composer stamps ``scaffold_id`` into params;
+        the JSONL / single-PDB paths are no-ops. String-valued, so it lives outside the
+        float-only training-metrics CSV."""
+        p = example.params
+        if "scaffold_id" not in p:
+            return
+        log_path = os.path.join(self.output_dir, f"{self.run_name}_provenance.csv")
+        cdr_lengths = json.dumps(p.get("cdr_lengths", {}), separators=(",", ":"))
+        if not os.path.exists(log_path):
+            with open(log_path, "w") as f:
+                f.write("step,scaffold_id,kind,target_id,cdr_lengths\n")
+        with open(log_path, "a") as f:
+            f.write(f'{step},{p["scaffold_id"]},{p["kind"]},{p["target_id"]},"{cdr_lengths}"\n')
 
     def log_metrics(self, step, runtime, to_log):
         """Append one row to the CSV training log."""

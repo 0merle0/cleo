@@ -64,9 +64,14 @@ def sample_cdr_lengths(params: dict, rng: random.Random | None = None) -> dict[s
 
 
 def as_chain_list(design_chain) -> list[str]:
-    """Normalize a ``design_chain`` field (str or list) to a list of chain letters."""
+    """Normalize a ``design_chain`` field to a list of chain letters.
+
+    Accepts a list (``["H", "L"]``), a single-chain string (``"H"``), or a whitespace-joined
+    multi-chain string (``"H L"`` -> ``["H", "L"]``). The whitespace form is safe because chain
+    IDs are single tokens, so an embedded space can only delimit chains — this keeps the VHH
+    (1-chain) and Fv (2-chain) paths robust regardless of how ``design_chain`` was serialized."""
     if isinstance(design_chain, str):
-        return [design_chain]
+        return design_chain.split()
     return [str(c) for c in design_chain]
 
 
