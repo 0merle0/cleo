@@ -83,7 +83,7 @@ def _composer(tmp_path, vhh_fraction=0.5, ranges=None, native_lengths=None):
     targets = _load_targets(str(t), "train")
     vhh, fv, _ = _load_scaffolds(str(s))
     ds = ComposingDataset(
-        targets, vhh, fv, "antibody_interface_composed", str(tmp_path),
+        targets, vhh, fv, "antibody_interface", str(tmp_path),
         vhh_fraction=vhh_fraction, cdr_length_ranges=ranges, rng=random.Random(0),
     )
     if native_lengths is not None:

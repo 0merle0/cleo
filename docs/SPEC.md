@@ -33,8 +33,24 @@ The novel crux is (2). (1) is both a prerequisite and an independently testable 
 **Non-goals (for now)**
 - Wet-lab validation. Success is measured against the in-silico oracle + retrospective recovery.
 - Framework / full-Fv design. We design **CDR positions only**; framework + antigen are fixed.
-- Backbone/pose generation. We assume a posed complex is available (see §8 open dependency).
+- Docking against a given complex. **No posed antibody–antigen complex is available or assumed.**
+  The CDRs start **masked** and are updated from epitope conditioning; the policy proposes CDR
+  loops, and the structure oracle (Protenix) folds them — this is masked-CDR *backbone* generation,
+  not refinement of a known pose. See §2.1 for the two-phase framing.
 - De novo epitope discovery. The epitope is an input, not something we search over.
+
+### 2.1 What we are actually training (framing)
+
+Two phases:
+- **Phase 1 — pretrain a proposal prior (this repo's current target).** Train the policy across many
+  antigens so that, given an epitope, it proposes a *diverse* set of CDR-loop backbones that fold
+  (via Protenix) into good, epitope-precise interfaces. The goal is a strong prior over "what CDR
+  loops fit this ab–ag interaction," not a single optimized binder. Batch **CDR diversity** is
+  rewarded (§8) so the prior spreads over backbones rather than collapsing.
+- **Phase 2 — online per-target finetuning (later).** Take the pretrained prior and optimize toward
+  one specific antigen in an online loop (beam-style: keep the best folded backbones each round and
+  keep updating the policy). ProteinMPNN is cheap enough to run this GRPO loop on CPU while folding
+  the trajectories' best designs.
 
 ## 3. Locked design decisions
 
@@ -57,8 +73,8 @@ The novel crux is (2). (1) is both a prerequisite and an independently testable 
   (PINDER)      │    sample G CDR seqs ~ π_θ(· | fw, epitope_t)│──► reward via oracle
                 │    r_i = Oracle(nanobody_i, antigen_t)       │◄── Protenix v2
                 │    A_i = (r_i - mean_G) / std_G              │    (or proxy)
-                │    grpo_loss += -A_i · logπ_θ(seq_i) + βKL   │
-                │  θ ← θ - η ∇loss                             │
+                │    grpo_loss += -A_i · logπ_θ(seq_i)         │  (clipped surrogate; no KL penalty)
+                │  θ ← θ - η ∇loss   (drift: lr + grad-norm)   │
                 └─────────────────────────────────────────────┘
                               │
                               ▼
@@ -96,7 +112,7 @@ The novel crux is (2). (1) is both a prerequisite and an independently testable 
      full encoder so structural message passing mixes sequence + structure and every per-residue
      epitope embedding carries both. (Path (a) — teacher-force the decoder and read hidden states —
      was the alternative; path (b) is simpler, keeps a single forward pass, and gives the per-residue
-     keys/values the cross-attention needs.) Built in `nanobody/epitope.py::encode_epitope`.
+     keys/values the cross-attention needs.) Built in `data/epitope.py::encode_epitope`.
 - **Epitope → CDR conditioning (encoder-side node init, LOCKED 2026-07-03):** each masked CDR
   position's node embedding is built from two sources combined:
   1. **Interpolated anchor init** — a directional N→C sweep that mixes the two flanking framework
@@ -196,6 +212,14 @@ The novel crux is (2). (1) is both a prerequisite and an independently testable 
     aggregates, so this requires running Protenix with **`--need_atom_confidence true`** to dump the
     residue-level PAE matrix (`_full_data_sample_*.json`) — bigger output + slightly slower fold; gate
     it behind the reward package that requests it.
+- **Batch CDR diversity (maximize, added 2026-07-10).** A batch-relative term that rewards each design
+  for how different its CDR loops are from the *other designs of the same CDR type in the batch*, so
+  the Phase-1 prior spreads over backbones instead of collapsing to one loop per epitope. Two signals
+  (`cleo.design.utils.cdr_diversity`): **structural** = mean pairwise CA-RMSD (Kabsch-superposed)
+  between same-type CDR loops read from the predicted `.cif` (over equal-length pairs); **sequence** =
+  mean normalized string distance between same-type CDR subsequences (always available). Reference-
+  free like `mutation_diversity`; weight either/both in `reward_aggregation`. Runs as a step *after*
+  the oracle so it can read the folded structures.
 - **MSA strategy in the loop (REVISED — see §5.4, calibrated 2026-07-02):** the nanobody must be
   folded **with its scaffold framework MSA (CDR columns gapped)**, NOT single-sequence. This was
   measured, not assumed: on the 1mel known binder, single-sequence nanobody gives interface
@@ -216,7 +240,10 @@ The novel crux is (2). (1) is both a prerequisite and an independently testable 
 - Group = G samples for a single complex/target; advantage normalized **within** the group
   (no critic/value net).
 - A training batch spans **many targets**; each contributes its own normalized group.
-- KL penalty to a frozen reference policy (base ProteinMPNN) to prevent collapse.
+- **No KL penalty.** Drift is controlled by the learning rate + the clipped surrogate objective.
+  The KL to a frozen reference and the global **grad-norm** are *logged as diagnostics only* (KL is
+  not subtracted from the loss and grad-norm is not clipped), so we can watch drift without
+  penalizing it (revisit only if runs actually diverge).
 - Reuse CLEO's GRPO loop; new code = multi-target batching + per-group reward bookkeeping.
 
 ### 4.4 Alternative conditioning (documented, not chosen)
@@ -306,6 +333,9 @@ Filters (per system): heterodimer (`cluster_id_R != cluster_id_L`); antigen chai
   (`cluster_id`) separation; because we redefined the task to be **antigen-chain-centric**, we must
   additionally exclude antigen-chain homologs or the val antigen may have been seen in training.
   Raw val 438 antigen-targets → **236 honest antigen-targets / 231 antigen clusters / 178 systems**.
+  **No in-loop validation (2026-07-10):** the training loop does *not* evaluate the val split during
+  training — it only trains on `split == 'train'`. Held-out val is scored **offline** on saved
+  checkpoints (§8), keeping the loop cheap and the val set untouched until a run finishes.
 - **Files:** complexes in `~/pinder/pdbs/` (train, native `{id}.pdb`, both chains R/L) and
   `~/pinder/pdbs_val/`. Manifests in `~/projects/antibody_rl/data/`: `pinder_targets.csv` +
   `pinder_target_ids.txt` (train systems), `pinder_train_antigen_targets.csv` (per-chain targets),
@@ -409,13 +439,16 @@ backward compatible). Three objects, each kept in the form it's good at:
   mask, `task`, `reward` name, `params`.
 - **Reward package** (a Hydra config group; few + reusable) — the *how*: an ordered pipeline of
   steps (prep + oracle + processing) and how to scale/combine metrics. **Target-agnostic.**
-- **Dataset** — JSONL on disk → `pd.read_json(lines=True)` → dataframe in memory. One row per
-  example; add as many as you want.
+- **Dataset** — the per-example source. **The antibody runtime uses the online `ComposingDataset`
+  (§6.9), not a materialized JSONL** — it composes each `Example` on the fly from two small pools.
+  The JSONL-on-disk form below is the generic `DesignDataset` schema (still used by simpler tasks and
+  by the offline assembler); an `Example` has the same shape however it is produced.
 
-Locked (2026-07-03): JSONL manifest; per-example params reach the oracle as **df columns**
-(`protenix_from_df` already reads `antigen_sequence` / `antigen_msa_dir` / `epitope_residues` from
-df columns); **uniform-random, one example per rollout step** — keeps the GRPO group homogeneous so
-group-relative advantage stays valid and per-example reward-scale differences wash out.
+Locked (2026-07-03): per-example params reach the oracle as **df columns** (`protenix_from_df` reads
+`antigen_sequence` / `antigen_msa_dir` / `design_chains` / `epitope_residues` from df columns);
+**uniform-random, one example per rollout step** — keeps the GRPO group homogeneous so group-relative
+advantage stays valid and per-example reward-scale differences wash out. (Runtime composition is
+online + seedable; §6.9.)
 
 ### 6.1 Example schema (JSONL row)
 ```jsonl
@@ -599,8 +632,7 @@ cleo/src/cleo/design/data/          # DATA LAYER — BUILT + unit-tested 2026-07
                  #   authoritative region = params.cdr_spans; H*->chain A, L*->chain B
   binding.py     # resolve_one/resolve_inputs: ${row|native|design|literal}; DESIGN_SEQ
                  #   sentinel; hard error on unsatisfied requires / missing chain / missing key
-  nanobody/
-    epitope.py   # BUILT + tested 2026-07-04. ConditioningConfig (master `enabled` +
+  epitope.py     # BUILT + tested 2026-07-04 (moved into data/ 2026-07-10). ConditioningConfig (master `enabled` +
                  #   one flag per mechanism = ablation surface); EpitopeConditioner with 3
                  #   hooks — encode_epitope (path-b seq-injected message passing), condition_nodes
                  #   (CDR node-init: interp anchors + rel-pos + pooled epitope, then encoder
@@ -681,24 +713,30 @@ later — the JSONL schema (§6.1) is problem-agnostic.
   numbering matches). Remaining: thread scaffold `cdr_*` + these epitopes into the training JSONL.
 
 ### 6.8 Slice 2 — wiring the conditioner into the policy (Stage-1, pose-free)
-The conditioner module (`nanobody/epitope.py`) is built + unit-tested (§6.6). Slice 2 wires it into
+The conditioner module (`data/epitope.py`) is built + unit-tested (§6.6). Slice 2 wires it into
 the live policy for the **Stage-1 pose-free** build (§4.5). Every step below is gated so
 `ConditioningConfig.enabled=False` remains a byte-identical stock-MPNN run (the M1 baseline). Ordered
 by risk, each independently testable.
 
-**Progress: steps 1–6 + 7(config) BUILT + tested 2026-07-05** (commits incl. `683a8c6`:
-policy epitope-encoder/conditioner; featurize_epitope + patch-mask + mode seam; ProteinFeatures
-coord-free CDR edges; gapped-framework data path; **step 4 = 3 hooks wired**). Since then: the reward
-oracle was generalized to **N designed chains** (VHH + Fv, §4.2), the **composing dataset** (§6.9) was
-built, **step 5** added the pose-free node signals (CDR-identity embedding, stem-gap geometry,
-attention-pool — each its own toggle, default off), **step 6** added `train_framework_encoder`
-(all-trainable optimizer + grad-tracked re-encode every PPO update, dropping the cached init_state so
-the framework + epitope encoders and upstream hooks train), and a training config
-(`config/design/antibody_composed.yaml`) wires `cfg.dataset.composer` + `cfg.conditioning` +
-`train_framework_encoder`. Full unit suite **226 passed**.
+**What exists now (2026-07-10).** The pose-free Stage-1 policy is fully built + unit-tested (**235
+passing**), gated so `conditioning.enabled=False` is byte-identical stock MPNN:
+- **Dual-encoder conditioner** (`data/epitope.py`): separate epitope encoder (seq-injected message
+  passing), CDR node-init (interp anchors, rel-pos, pooled epitope, CDR-identity, per-CDR position
+  table, stem-gap geometry), encoder + decoder per-residue cross-attn, coord-free CDR edges,
+  learned-query attention-pool — each an independent ablation toggle. An epitope mask is **required**
+  (whole-antigen conditioning is opt-in via `allow_whole_epitope`); unroutable CDRs error loudly.
+- **Policy wiring** (`policy.py`): `attach_epitope` / `encode_initial_state` / `rollout` apply the
+  three hooks; `train_framework_encoder` unfreezes the framework + epitope encoders (grad-tracked
+  re-encode every PPO update). Per-item assert that the antigen chain is `T`.
+- **Composing dataset** (§6.9), **N-chain oracle** (VHH + Fv, §4.2), **batch CDR-diversity reward**
+  (`cdr_diversity.py`, §4.2), and **no-KL GRPO** (KL + grad-norm logged as diagnostics). Config:
+  `config/design/antibody_composed.yaml`.
+
 **Remaining: the step-7 e2e smoke** — run `antibody_composed.yaml` a few steps with
 `conditioning.enabled=True` (shapes / grad-flow / Protenix reward) and an `enabled=False`
-baseline-equivalence check (byte-identical stock MPNN). Kept for a human read-through of the code first.
+baseline-equivalence check. Kept for a human read-through of the code first.
+
+<details><summary>Historical build log (slice-2 steps, ordered by risk) — kept for provenance.</summary>
 
 4. **Wire the 3 conditioning hooks into encode + rollout (`policy.py`).** (a) `attach_epitope(example,
    feature_dict)` — encode the epitope once per example (frozen, `no_grad`) and stash `epi_per_res`
@@ -760,6 +798,8 @@ featurize mode body, the pose-confidence gate, and the predicted-structure inges
 (#1 optional `pose` arg, #2 `featurize_example(mode=...)`) exist so these are additive, not a
 rearchitecture.
 
+</details>
+
 ### 6.9 Composing dataset — target × scaffold × CDR-lengths on the fly (built 2026-07-05)
 A materialized JSONL manifest (§6.1) cannot hold the antibody training distribution: it is the full
 **cross-product** of every antigen target × every framework scaffold × every CDR-length draw
@@ -782,11 +822,16 @@ The composed row is byte-compatible with the existing featurize/reward path and 
 for Fv (H-then-L; `H*` spans → H record via `msa_dir_H`, `L*` → L via `msa_dir_L`). Per-chain
 `length = len(native VD) − Σ(native span widths) + Σ(sampled lengths)` is exactly the decoded segment
 length the oracle's `_split_seq` (§4.2) expects, so VHH (1 chain) and Fv (2 chains) go through the same
-generalized oracle path. Reward package = `config/design/reward/antibody_interface_composed.yaml`
-(requires `design_chains` instead of the scalar single-chain `framework_msa_dir`/`cdr_spans`).
+generalized oracle path. Reward package = `config/design/reward/antibody_interface.yaml` (the single
+package, requires `design_chains` instead of the scalar single-chain `framework_msa_dir`/`cdr_spans`).
 `DesignDataset.bind_inputs` routes `${native.seq.T}` to the separate antigen file (`epitope_source`),
 backward-compatible via fallback. Per rollout the loop logs `is_vhh` into the train-metrics CSV and
 full provenance (`scaffold_id`, `kind`, `target_id`, `cdr_lengths`) to `{run_name}_provenance.csv`.
+
+**Online + reproducible.** This is the runtime dataloading path — composition is fully online (no
+materialized cross-product on disk). All three draws go through the composer's own `rng`, so seeding
+it makes a run **deterministically replayable** while staying online; the provenance CSV records the
+exact (scaffold, target, CDR-length) draw per step for post-hoc audit.
 Tests: `test_composer.py` (11). Config: `config/design/antibody_composed.yaml`.
 
 ## 7. Milestones
@@ -841,7 +886,7 @@ high-signal discriminator.
   is the actual interface reward, so a strategy's speed edge is measured against the objective we
   care about. Kept affordable by the small scale: only **9 cells**, a handful of strategies compared,
   and RL-fast sampling (c4/p20/e1, small K·B) — the same per-fold cost already benchmarked (~12s).
-  Depends on the conditioned policy module (`nanobody/epitope.py`) existing.
+  Depends on the conditioned policy module (`data/epitope.py`) existing.
 
 **The ladder:**
 - **Rung 0 — plumbing (pre-RL unit test).** *Forward-pass sensitivity:* perturb/swap the epitope
@@ -928,12 +973,13 @@ under `src/cleo/design/utils/`, plus `configs/`, `structures/`, run/log dirs. We
   SPEC.md
   cleo/                         # clone of github.com/0merle0/cleo @ branch antibody-rl
     src/cleo/design/utils/
-      grpo.py                   # extend: multi-target batching
+      grpo.py                   # extend: multi-target batching; KL + grad-norm logged (not penalized)
       reward.py                 # UniversalReward (reuse)
-      oracle.py                 # add: protenix_from_df
-      nanobody/                 # NEW: dual-encoder policy, epitope encoder+seq injection, cross-attn
-      epitope.py                # NEW: epitope extraction + epitope_overlap metric step
-      pinder_data.py            # NEW: PINDER subset loader, MSA caching
+      protenix_oracle.py        # NEW: protenix_from_df (N-chain: VHH + Fv) + epitope_overlap metric
+      cdr_diversity.py          # NEW: batch CDR-diversity reward step (structural + sequence)
+    src/cleo/design/data/
+      epitope.py                # NEW: dual-encoder conditioner (epitope encoder+seq injection, cross-attn)
+      composer.py               # NEW: on-the-fly target × scaffold × CDR-length composing dataset
   configs/                      # M1/M2 training, sample, evaluate configs (Hydra)
   structures/                   # canonical VHH framework scaffold(s)
   cleo_runs/  logs/  train.submit   # outputs + SLURM (gpu-train, l40)

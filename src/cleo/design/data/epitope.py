@@ -43,12 +43,14 @@ class ConditioningConfig:
     node_init_relpos: bool = True         # (i, L) relative-position embedding on CDR nodes
     node_init_pooled_epitope: bool = True # add pooled epitope embedding to CDR nodes
     node_init_cdr_identity: bool = False  # (step 5) which-CDR embedding (H1/H2/H3, L1-L3) on CDR nodes
+    node_init_relpos_per_cdr: bool = False  # (step 5) per-CDR-type position embedding (unique table per H1..L3)
     node_init_stem_geom: bool = False     # (step 5) flanking-stem gap geometry (span dist, dist/len) on CDR nodes
     attention_pool: bool = False          # (step 5) pool the epitope by learned-query attention (else masked mean)
     encoder_cross_attn: bool = True       # per-residue epitope cross-attn at the encoder (CDR nodes)
     decoder_cross_attn: bool = True       # per-residue epitope cross-attn at each decode step
     coord_free_cdr_edges: bool = True     # Option B: coordinate-free CDR graph edges (ProteinFeatures surgery)
     node_init_mode: str = "replace"       # "replace" | "add" at CDR positions
+    allow_whole_epitope: bool = False     # explicit opt-in to condition on the whole antigen when no epitope_mask
     hidden_dim: int = 128
     n_heads: int = 4
     max_cdr_len: int = 32                 # rel-pos table size (H3 ~24)
@@ -67,10 +69,15 @@ class ConditioningConfig:
         return (
             self.node_init_interpolate
             or self.node_init_relpos
+            or self.node_init_relpos_per_cdr
             or self.node_init_pooled_epitope
             or self.node_init_cdr_identity
             or self.node_init_stem_geom
         )
+
+
+class EpitopeConditioningError(ValueError):
+    """Raised on malformed conditioning inputs (unroutable CDRs, missing epitope mask)."""
 
 
 #: canonical CDR-type vocabulary (heavy then light) for the identity embedding (step 5).
@@ -94,8 +101,14 @@ def ordered_cdr_type_ids(design_chain, cdr_spans) -> list[int]:
     for k, v in cdr_spans.items():
         key = _cdr_key(k)
         idx = 0 if key.startswith("H") else (1 if key.startswith("L") else None)
-        if idx is None or idx >= n_chains:
-            continue  # unroutable (e.g. an L* CDR on a single-chain VHH) — gapping validates this
+        # Every framework is heavy (VHH) or heavy+light (Fv); anything else is a data error, not a
+        # silently-dropped CDR. An L* CDR on a single-chain VHH means the scaffold/spec disagree.
+        if idx is None:
+            raise EpitopeConditioningError(f"CDR key {key!r} is neither heavy (H*) nor light (L*)")
+        if idx >= n_chains:
+            raise EpitopeConditioningError(
+                f"CDR {key!r} routes to design chain {idx} but the framework has only "
+                f"{n_chains} chain(s) — heavy/light mismatch between scaffold and cdr_spans")
         per_chain[idx].append((int(v[0]), key))
 
     ids: list[int] = []
@@ -190,6 +203,10 @@ class CDRNodeInit(nn.Module):
         if cfg.node_init_relpos:
             self.pos_emb = nn.Embedding(cfg.max_cdr_len, H)
             self.len_emb = nn.Embedding(cfg.max_cdr_len + 1, H)
+        if cfg.node_init_relpos_per_cdr:
+            # a unique position table per CDR type (H1..L3): the within-CDR position embedding is
+            # CDR-specific, so H3 position 4 differs from L1 position 4 (SPEC 4.1 rel-pos comment).
+            self.pos_emb_per_cdr = nn.Embedding(len(CDR_TYPE_IDS) * cfg.max_cdr_len, H)
         if cfg.node_init_pooled_epitope:
             self.W_pool = nn.Linear(H, H)
         if cfg.node_init_cdr_identity:
@@ -204,7 +221,9 @@ class CDRNodeInit(nn.Module):
         init_full = torch.zeros(B, L, H, device=device, dtype=h_V.dtype)
         cdr_mask = torch.zeros(L, dtype=torch.bool, device=device)
 
-        use_cdr_id = cfg.node_init_cdr_identity and cdr_ids is not None and len(cdr_ids) == len(segments)
+        have_ids = cdr_ids is not None and len(cdr_ids) == len(segments)
+        use_cdr_id = cfg.node_init_cdr_identity and have_ids
+        use_per_cdr_pos = cfg.node_init_relpos_per_cdr and have_ids
         ca = X[..., 1, :] if (cfg.node_init_stem_geom and X is not None) else None  # Cα coords [B, L, 3]
 
         for seg_i, (positions, stem_n, stem_c) in enumerate(segments):
@@ -232,6 +251,9 @@ class CDRNodeInit(nn.Module):
                     ki = min(k, cfg.max_cdr_len - 1)
                     li = min(Lr, cfg.max_cdr_len)
                     contrib = contrib + self.pos_emb.weight[ki] + self.len_emb.weight[li]
+                if use_per_cdr_pos:
+                    ki = min(k, cfg.max_cdr_len - 1)
+                    contrib = contrib + self.pos_emb_per_cdr.weight[cdr_ids[seg_i] * cfg.max_cdr_len + ki]
                 if cfg.node_init_pooled_epitope and pooled is not None:
                     contrib = contrib + self.W_pool(pooled)
                 if cdr_vec is not None:
@@ -285,8 +307,8 @@ class EpitopeConditioner(nn.Module):
         sequence + structure. Message passing uses ``mask`` (all valid antigen residues → full
         structural context), but the returned ``cond_mask`` is the ``epitope_mask`` **patch** so
         that ``pool_epitope`` + cross-attention condition on the epitope residues specifically,
-        not the whole antigen (SPEC 4.1, 2026-07-04). Falls back to the full ``mask`` (i.e.
-        antigen-wide conditioning) when no ``epitope_mask`` is supplied.
+        not the whole antigen (SPEC 4.1, 2026-07-04). An ``epitope_mask`` is required; to condition
+        on the whole antigen chain instead, opt in explicitly with ``allow_whole_epitope=true``.
         """
         from cleo.design.protein_mpnn_utils.model_utils import gather_nodes
 
@@ -302,8 +324,19 @@ class EpitopeConditioner(nn.Module):
         mask_attend = mask.unsqueeze(-1) * mask_attend
         for layer in m.encoder_layers:
             h_V, h_E = layer(h_V, h_E, E_idx, mask, mask_attend)
-        cond_mask = epi_feature_dict.get("epitope_mask", mask)
-        return h_V, cond_mask
+        return h_V, self._resolve_cond_mask(epi_feature_dict, mask)
+
+    def _resolve_cond_mask(self, epi_feature_dict, mask):
+        """The conditioning mask: the ``epitope_mask`` patch if present, else the whole-antigen
+        ``mask`` **only** when ``allow_whole_epitope`` is explicitly set — otherwise error rather
+        than silently conditioning on the whole chain (SPEC 4.1)."""
+        if epi_feature_dict.get("epitope_mask") is not None:
+            return epi_feature_dict["epitope_mask"]
+        if self.cfg.allow_whole_epitope:
+            return mask
+        raise EpitopeConditioningError(
+            "no 'epitope_mask' supplied to encode_epitope; set "
+            "conditioning.allow_whole_epitope=true to condition on the whole antigen chain")
 
     # -- hook 1+2: post-encode framework node conditioning ------------------- #
     def condition_nodes(self, h_V, chain_mask, epi_per_res=None, epi_mask=None, cdr_ids=None, X=None):

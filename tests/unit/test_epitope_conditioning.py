@@ -8,7 +8,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from cleo.design.nanobody import (
+from cleo.design.data.epitope import (
     ConditioningConfig,
     EpitopeConditioner,
     cdr_segments_from_chain_mask,
@@ -132,7 +132,47 @@ def test_config_from_dict_ignores_unknown():
 
 # --- step 5: CDR-identity embedding, stem-gap geometry, attention-pool ------ #
 
-from cleo.design.nanobody import AttentionPool, ordered_cdr_type_ids   # noqa: E402
+from cleo.design.data.epitope import (   # noqa: E402
+    AttentionPool,
+    EpitopeConditioningError,
+    ordered_cdr_type_ids,
+)
+
+
+# --- PR#27: routing is strict, per-CDR position encoding, explicit epitope mask ---- #
+
+
+def test_ordered_cdr_type_ids_raises_on_unroutable():
+    # an L* CDR on a single-chain VHH is a heavy/light mismatch, not a silently dropped CDR
+    with pytest.raises(EpitopeConditioningError):
+        ordered_cdr_type_ids("H", {"H1": [25, 32], "L1": [23, 39]})
+    # a key that is neither heavy nor light
+    with pytest.raises(EpitopeConditioningError):
+        ordered_cdr_type_ids("H", {"X1": [1, 5]})
+
+
+def test_relpos_per_cdr_writes_cdr_and_depends_on_type():
+    cond = EpitopeConditioner(_cfg(node_init_relpos_per_cdr=True))
+    h_V, epi, epi_mask = _inputs()
+    out_a = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, cdr_ids=[0, 1])
+    out_b = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask, cdr_ids=[2, 3])
+    assert torch.equal(out_a[:, FRAME_IDX], h_V[:, FRAME_IDX])         # framework untouched
+    assert not torch.allclose(out_a[:, CDR_IDX], h_V[:, CDR_IDX])      # CDRs written
+    assert not torch.allclose(out_a[:, CDR_IDX], out_b[:, CDR_IDX])    # different types => different pos enc
+
+
+def test_resolve_cond_mask_requires_explicit_whole_chain():
+    mask = torch.ones(1, 4)
+    patch = torch.tensor([[1.0, 0.0, 0.0, 0.0]])
+    # epitope_mask present -> returned as-is
+    cond = EpitopeConditioner(_cfg())
+    assert torch.equal(cond._resolve_cond_mask({"epitope_mask": patch}, mask), patch)
+    # no epitope_mask and no opt-in -> error (no silent whole-chain fallback)
+    with pytest.raises(EpitopeConditioningError):
+        cond._resolve_cond_mask({}, mask)
+    # explicit opt-in -> whole-antigen mask
+    cond_whole = EpitopeConditioner(_cfg(allow_whole_epitope=True))
+    assert torch.equal(cond_whole._resolve_cond_mask({}, mask), mask)
 
 
 def test_ordered_cdr_type_ids_vhh_and_fv():

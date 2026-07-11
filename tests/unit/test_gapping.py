@@ -90,6 +90,21 @@ def test_gap_synthesis_preserves_framework_and_marks_gaps():
     assert torch.equal(out["X"][3], pd["X"][2])                # N-side stem coordinate
 
 
+def test_cdrs_are_non_existent_in_mask_mode():
+    """SPEC 4.1 mask-mode (initial training): the parser resolves CDR positions as *non-existent* —
+    they carry no native identity, only UNK tokens, so the policy cannot copy the native loop. (The
+    future post-training 'un-mask' mode that keeps native CDRs + docks is a separate path.)"""
+    pd = _protein_dict(L=10)
+    out = apply_cdr_gaps(pd, "A", {"H1": [3, 6]}, {"H1": 5})
+    cm = out["chain_mask"].bool()
+    assert torch.all(out["S"][cm] == _UNK_AA)                     # native CDR sequence is gone
+    # the masked region is independent of whatever native residues occupied the CDR columns
+    pd2 = _protein_dict(L=10)
+    pd2["S"][3:6] = (pd2["S"][3:6] + 7) % 20
+    out2 = apply_cdr_gaps(pd2, "A", {"H1": [3, 6]}, {"H1": 5})
+    assert torch.equal(out["S"][cm], out2["S"][out2["chain_mask"].bool()])
+
+
 def test_gap_synthesis_renumbers_design_chain_contiguously():
     pd = _protein_dict(L=10)
     out = apply_cdr_gaps(pd, "A", {"H1": [3, 6]}, {"H1": 5})

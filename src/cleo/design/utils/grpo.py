@@ -2,10 +2,13 @@
 Group Relative Policy Optimization (GRPO) fine-tuning of ProteinMPNN.
 
 Extends :class:`PolicyMPNN` with a clipped surrogate objective
-(following DAPO — https://arxiv.org/pdf/2503.14476) and an optional
-KL penalty to a frozen reference ProteinMPNN model. Advantages are
+(following DAPO — https://arxiv.org/pdf/2503.14476). Advantages are
 computed relative to the batch mean (group-relative), and multiple
 gradient updates are performed per rollout batch.
+
+Drift is controlled by the learning rate + clipped surrogate; the KL to a frozen
+reference and the global grad-norm are logged as DIAGNOSTICS only (neither is added
+to the loss and grad-norm is not clipped), so we can watch them without penalizing.
 """
 
 import torch
@@ -19,7 +22,7 @@ from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN as ProteinMPN
 
 
 class PolicyMPNNvGRPO(PolicyMPNN):
-    """GRPO/DAPO variant of PolicyMPNN with clipped surrogate loss and optional KL penalty."""
+    """GRPO/DAPO variant of PolicyMPNN with clipped surrogate loss; KL + grad-norm are logged as diagnostics."""
 
     def __init__(self, cfg):
         super().__init__(cfg)
@@ -157,15 +160,22 @@ class PolicyMPNNvGRPO(PolicyMPNN):
 
             obj = torch.min(min_term1, min_term2).mean()
 
+            # KL is a DIAGNOSTIC only — it is tracked (never subtracted from the objective). Drift is
+            # controlled by learning rate + the grad-norm we log below (SPEC §training, 2026-07-10).
             if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
                 ref_batched_log_probs = (ref_batched_log_probs * seq_mask).sum(dim=-1)
                 kl_ratio = torch.exp(ref_batched_log_probs - batched_log_probs)
                 kl = kl_ratio - (ref_batched_log_probs - batched_log_probs) - 1
-                obj = obj - self.cfg.kl_weight * kl.mean()
-                to_log["kl_penalty"] = kl.mean().cpu().item()
+                to_log["kl"] = kl.mean().cpu().item()
 
             loss = -obj
             loss.backward()
+            # Track (do NOT clip) the global grad-norm as the other drift diagnostic.
+            params = [p for grp in self.optimizer.param_groups for p in grp["params"] if p.grad is not None]
+            if params:
+                to_log["grad_norm"] = float(
+                    torch.nn.utils.clip_grad_norm_(params, max_norm=float("inf"))
+                )
             self.optimizer.step()
 
         return to_log

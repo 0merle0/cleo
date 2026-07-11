@@ -23,9 +23,10 @@ from omegaconf import OmegaConf
 
 from cleo.design.protein_mpnn_utils.data_utils import featurize, parse_PDB
 from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN
-from cleo.design.nanobody import ConditioningConfig, EpitopeConditioner, ordered_cdr_type_ids
+from cleo.design.data.epitope import ConditioningConfig, EpitopeConditioner, ordered_cdr_type_ids
 from cleo.design.data.gapping import apply_cdr_gaps
 from cleo.design.data.mask import sample_cdr_lengths
+from cleo.design.data.dataset import scan_chain_ids
 
 
 PROTEIN_MPNN_UTILS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "protein_mpnn_utils")
@@ -374,6 +375,14 @@ class PolicyMPNN:
           reward's convention); ``encode_epitope`` returns THIS for ``pool_epitope`` + cross-attn,
           so the CDR conditions on the epitope specifically, not the whole antigen (§4.1, 2026-07-04).
         """
+        # Invariant (SPEC §6.1, LOCKED 2026-07-04): the antigen/target chain is always 'T'. Assert
+        # it per item rather than trusting the manifest, so a mislabeled antigen fails loudly here.
+        antigen_chains = scan_chain_ids(example.epitope_source)
+        if "T" not in antigen_chains:
+            raise ValueError(
+                f"example {example.id}: antigen source {example.epitope_source} has no chain 'T' "
+                f"(found {sorted(antigen_chains)}); the antigen/target chain must be 'T'")
+
         protein_dict, _bb, _oa, icodes, _wa = parse_PDB(
             example.epitope_source,
             device=self.device,

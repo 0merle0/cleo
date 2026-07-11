@@ -11,12 +11,14 @@ CLEO's single-target GRPO loop.
 ## The idea in one paragraph
 
 Each training step composes a task on the fly — **one antigen target × one framework scaffold ×
-one CDR-length draw** — gaps the scaffold's CDRs out, decodes new CDRs conditioned on the target
-epitope, folds the (designed antibody + antigen) with Protenix, and rewards interface quality +
-epitope precision/recall. The framework and antigen are always **separate files** with a canonical
-chain namespace **H / L / T** (heavy / light / antigen); they never share a coordinate frame (the
-dual encoder conditions without docking). Everything is gated so `conditioning.enabled=false` is a
-byte-identical stock-MPNN run (the M1 baseline).
+one CDR-length draw** — gaps the scaffold's CDRs out (they start **masked**, no native identity),
+decodes new CDRs conditioned on the target epitope, folds the (designed antibody + antigen) with
+Protenix, and rewards interface quality + epitope precision/recall + **batch CDR diversity**. The
+framework and antigen are always **separate files** with a canonical chain namespace **H / L / T**
+(heavy / light / antigen); **there is no pose/dock** — the dual encoder conditions blind. This is
+masked-CDR *backbone* generation: Phase 1 (here) trains a **diverse proposal prior** over CDR loops
+given an epitope; Phase 2 (later) finetunes that prior online toward one antigen. Everything is gated
+so `conditioning.enabled=false` is a byte-identical stock-MPNN run (the M1 baseline).
 
 ## Run it
 
@@ -66,33 +68,44 @@ pools and composes one `Example` per `sample()` — no materialized cross-produc
   native VD length − Σ native span widths + Σ sampled lengths` — exactly the decoded segment length
   the oracle expects.
 
-Reward package `config/design/reward/antibody_interface_composed.yaml` requires `design_chains`
-(instead of the scalar single-chain inputs). `DesignDataset.bind_inputs` now routes `${native.seq.T}`
+Reward package `config/design/reward/antibody_interface.yaml` (the single package — the old scalar
+variant was retired) requires `design_chains` (instead of the scalar single-chain inputs). It also
+adds a **batch CDR-diversity** step (`cdr_diversity.py`): per design, how different its CDR loops are
+from the batch's same-type CDRs — **structural** (pairwise CA-RMSD over the folded loops) and
+**sequence** (normalized string distance). `DesignDataset.bind_inputs` now routes `${native.seq.T}`
 to the separate antigen file. Per rollout the loop logs `is_vhh` into the train-metrics CSV and full
 provenance (`scaffold_id`, `kind`, `target_id`, `cdr_lengths`) to `{run_name}_provenance.csv`.
 Tests: `tests/unit/test_composer.py`.
 
 ### Epitope conditioning (§4.1, slice-2 steps 1–6)
-`src/cleo/design/nanobody/epitope.py` + hooks in `src/cleo/design/utils/policy.py`: a second
+`src/cleo/design/data/epitope.py` + hooks in `src/cleo/design/utils/policy.py`: a second
 ProteinMPNN encodes the epitope; CDR nodes get node-init signals + encoder/decoder cross-attn;
 coordinate-free CDR graph edges let the gapped (coord-less) CDR nodes participate. Master-switch and
 per-mechanism toggles for ablations.
 - **Step 5** node signals (each its own toggle, default off): a **CDR-identity** embedding
-  (H1/H2/H3, L1–L3), **stem-gap geometry** (the flanking-stem span distance and its ratio to the
-  sampled CDR length), and an **attention-pool** of the epitope (learned query) replacing the masked
-  mean.
+  (H1/H2/H3, L1–L3), a **per-CDR-type position table** (`node_init_relpos_per_cdr` — a unique
+  positional embedding per CDR type), **stem-gap geometry** (the flanking-stem span distance and its
+  ratio to the sampled CDR length), and an **attention-pool** of the epitope (learned query)
+  replacing the masked mean. The epitope mask is **required**; whole-antigen conditioning is opt-in
+  via `allow_whole_epitope` (no silent fallback), and unroutable CDRs (heavy/light mismatch) error.
 - **Step 6** `train_framework_encoder`: unfreezes the framework + epitope encoders (all-trainable
   optimizer) and re-encodes the initial state grad-tracked every PPO update instead of caching a
   detached leaf — so node-init / encoder cross-attn / epitope-encoder params train, not just the
   decoder. `false` keeps the cheaper decoder-only regime (byte-identical step-4 path).
 
+### GRPO trainer — no KL penalty
+`grpo.py`: the KL to a frozen reference is **no longer subtracted from the loss**. Drift is controlled
+by learning rate + the clipped surrogate; the reference KL and the global **grad-norm** are logged as
+diagnostics only (grad-norm is measured, not clipped). `use_ref_kl=true` still logs the KL.
+
 Tests: `tests/unit/test_epitope_conditioning.py`, `test_policy_conditioning.py`,
-`test_coord_free_edges.py`, `test_gapping.py`.
+`test_coord_free_edges.py`, `test_gapping.py`, `test_cdr_diversity.py`.
 
 ## Status
 
-Built + tested (226 unit tests): data pipeline, N-chain oracle, composing dataset, conditioner
-hooks (steps 1–6), and the training config. **Not yet run end-to-end** — the only remaining piece is
+Built + tested (235 unit tests): data pipeline, N-chain oracle, composing dataset, conditioner
+hooks (steps 1–6 + step-5 per-CDR position table / explicit epitope mask), CDR-diversity reward,
+no-KL GRPO, and the training config. **Not yet run end-to-end** — the only remaining piece is
 the slice-2 step-7 e2e smoke: run `antibody_composed.yaml` a few steps with `conditioning.enabled=true`
 (shapes / grad-flow / Protenix reward) plus an `enabled=false` baseline-equivalence check. See §11 of
 [`docs/SPEC.md`](docs/SPEC.md).

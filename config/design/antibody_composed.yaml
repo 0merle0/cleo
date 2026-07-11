@@ -23,7 +23,10 @@ N_steps: 1000
 lr: 1e-4
 
 # -- GRPO params --
-kl_weight: 1e-2
+# Drift control = learning rate + clipped surrogate (below). KL to a frozen reference is NOT
+# penalized; it and the global grad-norm are logged as diagnostics only (SPEC §training). Set
+# use_ref_kl=true to also log the reference KL (doubles the rollout cost).
+use_ref_kl: false
 N_updates: 16
 update_batch_size: 8
 clip_eps_low: 0.2
@@ -46,7 +49,7 @@ dataset:
   composer:
     targets_csv: /home/jgershon/projects/antibody_rl/data/pinder_epitopes_trainable.csv
     scaffold_pool_csv: /home/jgershon/projects/antibody_rl/data/scaffold_pool.csv
-    reward: antibody_interface_composed     # reward package name under reward_dir
+    reward: antibody_interface     # reward package name under reward_dir
     split: train                            # train | val (val = 140 held-out targets)
     vhh_fraction: 0.5                        # P(sample a VHH scaffold); 1-p = Fv. Tunable.
     cdr_length_ranges: null                  # null => native span width (no length diversity yet);
@@ -58,6 +61,7 @@ conditioning:
   inject_epitope_sequence: true    # path (b): antigen sequence into epitope node feats
   node_init_interpolate: true      # flanking-stem anchor interpolation for CDR nodes
   node_init_relpos: true           # (i, L) relative-position embedding on CDR nodes
+  node_init_relpos_per_cdr: false  # (step 5) per-CDR-type position table (unique for H1..L3); off => shared relpos
   node_init_pooled_epitope: true   # pooled epitope embedding added to CDR nodes
   node_init_cdr_identity: true     # (step 5) which-CDR embedding (H1/H2/H3, L1-L3) on CDR nodes
   node_init_stem_geom: true        # (step 5) flanking-stem gap geometry (span dist / len) on CDR nodes
@@ -66,6 +70,7 @@ conditioning:
   decoder_cross_attn: true         # per-residue epitope cross-attn at each decode step
   coord_free_cdr_edges: true       # REQUIRED for the gapped-framework path (gap nodes have no coords)
   node_init_mode: replace          # replace | add at CDR positions
+  allow_whole_epitope: false       # require an explicit epitope_mask; true => condition on the whole antigen
   hidden_dim: 128
   n_heads: 4
   max_cdr_len: 32
