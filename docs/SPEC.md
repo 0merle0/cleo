@@ -307,6 +307,22 @@ and the reward oracle:
   refinement); the per-round pose gate (caveat 2) decides which survivors are trustworthy enough to
   condition on vs. fall back to pose-free.
 
+### 4.6 Backlog — parked ideas (PR #27, revisit later, not built)
+Captured so they aren't lost; none are on the Phase-1 critical path.
+- **Variable CDR length via a stop token.** Instead of pre-specifying each CDR length, let the model
+  emit a stop token (possibly a repurposed mask token) so length is generated, not fixed. Likely
+  needs teaching the token — e.g. randomly injecting it early. A neat variant, not needed for the
+  first iteration.
+- **Alternating CDR self-attention ↔ CDR–epitope message passing.** Build a separate graph over *all*
+  CDR residues (across chains for an Fv) and alternate: CDRs talk among themselves to organize, then
+  exchange messages with the epitope residues, repeat. Richer than the current one-shot cross-attn;
+  requires the cross-chain CDR graph.
+- **Post-training "un-mask" / dock parser mode.** For Phase 2, after some backbones exist, toggle the
+  parser *off* "mask-CDR mode" so it keeps the (now-generated) CDR positions and encodes the CDRs +
+  antigen docked — the complement of the Phase-1 masked path (which resolves CDRs as non-existent).
+- **Beam-style online per-antigen finetuning** — already sketched in §2.1 / §4.5 (rounds ≥1); listed
+  here for completeness.
+
 ## 5. Data
 
 - **Primary source: PINDER as an epitope source (online-RL reframing).** Because training is
