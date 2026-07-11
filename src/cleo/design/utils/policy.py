@@ -47,7 +47,11 @@ class PolicyMPNN:
 
     def __init__(self, cfg):
         self.cfg = cfg
-        self.device = DEVICE
+        # Device knob: `policy_device` overrides the auto default (cuda if available). Lets the MPNN
+        # policy run on CPU while the Protenix reward subprocess keeps the GPU (SPEC — cheap-MPNN
+        # idea). Default (null/"auto") keeps the policy on GPU for training.
+        _dev = cfg.get("policy_device", None)
+        self.device = DEVICE if _dev in (None, "auto") else torch.device(_dev)
         # Parsed early so load_mpnn_model can thread coord_free_cdr_edges into the feature extractor.
         self.conditioning_cfg = ConditioningConfig.from_dict(cfg.get("conditioning"))
         self.run_name = cfg.run_name

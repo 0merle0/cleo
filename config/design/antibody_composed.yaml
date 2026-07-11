@@ -21,6 +21,7 @@ algorithm: grpo
 batch_size: 16                    # designs sampled per rollout (each folded by Protenix — keep modest)
 N_steps: 1000
 lr: 1e-4
+policy_device: auto              # auto/null => GPU when available (training default); set "cpu" to free the GPU for folding
 
 # -- GRPO params --
 # Drift control = learning rate + clipped surrogate (below). KL to a frozen reference is NOT
