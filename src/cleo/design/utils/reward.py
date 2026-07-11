@@ -75,6 +75,22 @@ class UniversalReward():
         })
     
     
+    @staticmethod
+    def _design_chain_mask(feature_dict):
+        """Positions of the decoded sequence to hand the oracle: **every residue of every designed
+        chain**, in chain order.
+
+        A chain is "designed" if it contains at least one designable residue (``chain_mask==1``).
+        This spans all design chains — an Fv has two (H, L), a VHH one — while still excluding any
+        non-designed context chain (which has no designable residues). Single-chain designs reduce
+        to the old ``chain_labels == 0`` behavior. The oracle then splits this full sequence per
+        chain via ``design_chains`` lengths, so it must include the fixed framework, not just CDRs.
+        """
+        chain_labels = feature_dict["chain_labels"][0]
+        designable = feature_dict["chain_mask"][0].bool()
+        designed_ids = torch.unique(chain_labels[designable])
+        return torch.isin(chain_labels, designed_ids)
+
     def _aggregate_rewards(self, df):
         """Normalized weighted sum of the configured metrics -> per-design reward tensor.
 
@@ -140,8 +156,7 @@ class UniversalReward():
             shutil.rmtree(rundir, ignore_errors=True)
         os.makedirs(rundir, exist_ok=True)
 
-        chain_mask = feature_dict["chain_labels"] == 0
-        chain_mask = chain_mask[0]
+        chain_mask = self._design_chain_mask(feature_dict)
 
         sequences = self.get_sequences(policy_output, chain_mask=chain_mask)
         df = self.get_input_df(sequences)

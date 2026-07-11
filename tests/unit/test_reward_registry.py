@@ -91,7 +91,11 @@ def test_full_reward_pipeline_step_sees_injected_columns(tmp_path, monkeypatch):
 
     B, L = 3, 4
     policy_output = {"S": torch.randint(0, 20, (B, L))}
-    feature_dict = {"chain_labels": torch.zeros(1, L, dtype=torch.long)}
+    # real feature dicts carry both; chain_mask marks the designable positions (all, here — single chain)
+    feature_dict = {
+        "chain_labels": torch.zeros(1, L, dtype=torch.long),
+        "chain_mask": torch.ones(1, L, dtype=torch.long),
+    }
     rewards, to_log = reward(step=0, policy_output=policy_output, feature_dict=feature_dict, device="cpu")
 
     assert rewards.shape == (B,)

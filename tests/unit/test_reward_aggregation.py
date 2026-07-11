@@ -35,3 +35,23 @@ def test_aggregate_rewards_raises_on_inf():
     df = pd.DataFrame({"name": ["x"], "a": [float("inf")]})
     with pytest.raises(ValueError, match="non-finite"):
         r._aggregate_rewards(df)
+
+
+def test_design_chain_mask_spans_all_design_chains_fv():
+    # Fv: chain 0 (H) + chain 1 (L), both with designable CDR residues -> sequence spans BOTH.
+    fd = {"chain_labels": torch.tensor([[0, 0, 0, 1, 1]]),
+          "chain_mask": torch.tensor([[0, 1, 0, 1, 0]])}
+    assert UniversalReward._design_chain_mask(fd).tolist() == [True] * 5
+
+
+def test_design_chain_mask_single_chain_vhh():
+    fd = {"chain_labels": torch.tensor([[0, 0, 0, 0]]),
+          "chain_mask": torch.tensor([[0, 1, 1, 0]])}
+    assert UniversalReward._design_chain_mask(fd).tolist() == [True] * 4
+
+
+def test_design_chain_mask_excludes_undesigned_context_chain():
+    # chain 0 designed, chain 1 a fixed context chain (no designable) -> excluded from the sequence.
+    fd = {"chain_labels": torch.tensor([[0, 0, 1, 1]]),
+          "chain_mask": torch.tensor([[1, 1, 0, 0]])}
+    assert UniversalReward._design_chain_mask(fd).tolist() == [True, True, False, False]
