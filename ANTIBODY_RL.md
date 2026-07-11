@@ -88,6 +88,11 @@ per-mechanism toggles for ablations.
   ratio to the sampled CDR length), and an **attention-pool** of the epitope (learned query)
   replacing the masked mean. The epitope mask is **required**; whole-antigen conditioning is opt-in
   via `allow_whole_epitope` (no silent fallback), and unroutable CDRs (heavy/light mismatch) error.
+- **Step 5b** `cdr_epitope_coupler`: an iterated **CDR self-attention ↔ CDR–epitope cross-attention**
+  block (`coupler_rounds`), stacked *after* the one-shot encoder cross-attn. It gathers all CDR nodes
+  (unioning H+L for an Fv → cross-chain paratope organization), lets them attend among themselves,
+  then exchange messages with the epitope, and repeats — writing only CDR positions. Its own toggle,
+  default off, ablatable against the one-shot cross-attn.
 - **Step 6** `train_framework_encoder`: unfreezes the framework + epitope encoders (all-trainable
   optimizer) and re-encodes the initial state grad-tracked every PPO update instead of caching a
   detached leaf — so node-init / encoder cross-attn / epitope-encoder params train, not just the
@@ -103,9 +108,10 @@ Tests: `tests/unit/test_epitope_conditioning.py`, `test_policy_conditioning.py`,
 
 ## Status
 
-Built + tested (235 unit tests): data pipeline, N-chain oracle, composing dataset, conditioner
-hooks (steps 1–6 + step-5 per-CDR position table / explicit epitope mask), CDR-diversity reward,
-no-KL GRPO, and the training config. **Not yet run end-to-end** — the only remaining piece is
+Built + tested (239 unit tests): data pipeline, N-chain oracle, composing dataset, conditioner
+hooks (steps 1–6 + step-5 per-CDR position table / explicit epitope mask + step-5b CDR–epitope
+coupler), CDR-diversity reward, no-KL GRPO, and the training config. Phase-2 docked refinement
+(`mode="complex"`) is speced (SPEC §4.7) but not built. **Not yet run end-to-end** — the only remaining piece is
 the slice-2 step-7 e2e smoke: run `antibody_composed.yaml` a few steps with `conditioning.enabled=true`
 (shapes / grad-flow / Protenix reward) plus an `enabled=false` baseline-equivalence check. See §11 of
 [`docs/SPEC.md`](docs/SPEC.md).

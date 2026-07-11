@@ -67,6 +67,8 @@ conditioning:
   node_init_stem_geom: true        # (step 5) flanking-stem gap geometry (span dist / len) on CDR nodes
   attention_pool: true             # (step 5) pool the epitope by learned-query attention (else masked mean)
   encoder_cross_attn: true         # per-residue epitope cross-attn at the encoder
+  cdr_epitope_coupler: false       # (step 5b) iterated CDR self-attn <-> CDR-epitope cross-attn, stacked after encoder_cross_attn
+  coupler_rounds: 2                # rounds of (CDR self-attn -> CDR<-epitope cross-attn) in the coupler
   decoder_cross_attn: true         # per-residue epitope cross-attn at each decode step
   coord_free_cdr_edges: true       # REQUIRED for the gapped-framework path (gap nodes have no coords)
   node_init_mode: replace          # replace | add at CDR positions

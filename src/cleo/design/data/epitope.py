@@ -48,6 +48,8 @@ class ConditioningConfig:
     attention_pool: bool = False          # (step 5) pool the epitope by learned-query attention (else masked mean)
     encoder_cross_attn: bool = True       # per-residue epitope cross-attn at the encoder (CDR nodes)
     decoder_cross_attn: bool = True       # per-residue epitope cross-attn at each decode step
+    cdr_epitope_coupler: bool = False     # (step 5b) iterated CDR self-attn <-> CDR-epitope cross-attn; stacks AFTER encoder_cross_attn
+    coupler_rounds: int = 2               # rounds of (CDR self-attn -> CDR<-epitope cross-attn) in the coupler
     coord_free_cdr_edges: bool = True     # Option B: coordinate-free CDR graph edges (ProteinFeatures surgery)
     node_init_mode: str = "replace"       # "replace" | "add" at CDR positions
     allow_whole_epitope: bool = False     # explicit opt-in to condition on the whole antigen when no epitope_mask
@@ -193,6 +195,44 @@ class PerResidueCrossAttention(nn.Module):
         return self.norm(out)
 
 
+class CDREpitopeCoupler(nn.Module):
+    """Iterated CDR self-attention <-> CDR-epitope cross-attention (step 5b).
+
+    Operates on the **gathered CDR node set** ``[B, N_cdr, H]`` — for an Fv this set unions the
+    heavy and light CDRs, so a single self-attention pass lets the whole paratope organize *across
+    chains* before (and between) exchanging messages with the epitope. Each round is
+    ``LN(h + selfattn(h)) -> LN(h + xattn(h <- epitope))``; ``coupler_rounds`` of them. Any CDR
+    positional/identity signal already written into the nodes by ``CDRNodeInit`` (step-5 identity /
+    per-CDR position) rides along, so the self-attention knows which loop is which.
+
+    Returns the refined CDR node set; the caller scatters it back to the CDR positions only (the
+    framework is never touched). All-residual, so with small init it starts near identity.
+    """
+
+    def __init__(self, hidden_dim, n_heads, rounds):
+        super().__init__()
+        self.rounds = max(1, int(rounds))
+        self.self_attn = nn.ModuleList(
+            nn.MultiheadAttention(hidden_dim, n_heads, batch_first=True) for _ in range(self.rounds))
+        self.cross_attn = nn.ModuleList(
+            nn.MultiheadAttention(hidden_dim, n_heads, batch_first=True) for _ in range(self.rounds))
+        self.norm_self = nn.ModuleList(nn.LayerNorm(hidden_dim) for _ in range(self.rounds))
+        self.norm_cross = nn.ModuleList(nn.LayerNorm(hidden_dim) for _ in range(self.rounds))
+
+    def forward(self, h_cdr, epi_per_res, epi_mask=None, cdr_mask=None):
+        # cdr_mask [B, N_cdr] (1 = real CDR node); epi_mask [B, M] (1 = real epitope residue)
+        self_kpm = None if cdr_mask is None else (cdr_mask <= 0.5)
+        epi_kpm = None if epi_mask is None else (epi_mask <= 0.5)
+        h = h_cdr
+        for r in range(self.rounds):
+            sa, _ = self.self_attn[r](h, h, h, key_padding_mask=self_kpm, need_weights=False)
+            h = self.norm_self[r](h + sa)
+            ca, _ = self.cross_attn[r](h, epi_per_res, epi_per_res, key_padding_mask=epi_kpm,
+                                       need_weights=False)
+            h = self.norm_cross[r](h + ca)
+        return h
+
+
 class CDRNodeInit(nn.Module):
     """Build CDR node embeddings: interpolated flanking-stem anchors + rel-pos + pooled epitope."""
 
@@ -289,6 +329,8 @@ class EpitopeConditioner(nn.Module):
             self.attn_pool = AttentionPool(cfg.hidden_dim, cfg.n_heads)
         if cfg.encoder_cross_attn:
             self.enc_xattn = PerResidueCrossAttention(cfg.hidden_dim, cfg.n_heads)
+        if cfg.cdr_epitope_coupler:
+            self.coupler = CDREpitopeCoupler(cfg.hidden_dim, cfg.n_heads, cfg.coupler_rounds)
         if cfg.decoder_cross_attn:
             self.dec_xattn = PerResidueCrossAttention(cfg.hidden_dim, cfg.n_heads)
 
@@ -360,7 +402,24 @@ class EpitopeConditioner(nn.Module):
             gate = self._cdr_gate(chain_mask, h_V)                 # [1, L, 1]
             delta = self.enc_xattn(h_V, epi_per_res, epi_mask)     # [B, L, H]
             h_V = h_V + gate * delta
+
+        # (step 5b) iterated CDR self-attn <-> CDR-epitope cross-attn, STACKED after the one-shot
+        # encoder cross-attn above. Writes only the CDR node rows; framework passes through.
+        if self.cfg.cdr_epitope_coupler and epi_per_res is not None:
+            h_V = self._apply_coupler(h_V, chain_mask, epi_per_res, epi_mask)
         return h_V
+
+    def _apply_coupler(self, h_V, chain_mask, epi_per_res, epi_mask):
+        """Gather the CDR nodes (across chains), run the coupler, scatter back to CDR positions."""
+        cm = chain_mask[0] if chain_mask.dim() > 1 else chain_mask
+        idx = (cm > 0.5).nonzero(as_tuple=False).flatten()        # CDR node indices [N_cdr]
+        if idx.numel() == 0:
+            return h_V
+        h_cdr = h_V[:, idx, :]                                    # [B, N_cdr, H]
+        coupled = self.coupler(h_cdr, epi_per_res, epi_mask)      # [B, N_cdr, H]
+        out = h_V.clone()
+        out[:, idx, :] = coupled
+        return out
 
     # -- hook 3: per-step decoder cross-attn --------------------------------- #
     def decoder_cross_attn(self, h_V_t, epi_per_res=None, epi_mask=None):

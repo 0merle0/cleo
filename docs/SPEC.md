@@ -313,15 +313,40 @@ Captured so they aren't lost; none are on the Phase-1 critical path.
   emit a stop token (possibly a repurposed mask token) so length is generated, not fixed. Likely
   needs teaching the token — e.g. randomly injecting it early. A neat variant, not needed for the
   first iteration.
-- **Alternating CDR self-attention ↔ CDR–epitope message passing.** Build a separate graph over *all*
-  CDR residues (across chains for an Fv) and alternate: CDRs talk among themselves to organize, then
-  exchange messages with the epitope residues, repeat. Richer than the current one-shot cross-attn;
-  requires the cross-chain CDR graph.
-- **Post-training "un-mask" / dock parser mode.** For Phase 2, after some backbones exist, toggle the
-  parser *off* "mask-CDR mode" so it keeps the (now-generated) CDR positions and encodes the CDRs +
-  antigen docked — the complement of the Phase-1 masked path (which resolves CDRs as non-existent).
-- **Beam-style online per-antigen finetuning** — already sketched in §2.1 / §4.5 (rounds ≥1); listed
-  here for completeness.
+- **Beam-style online per-antigen finetuning** — already sketched in §2.1 / §4.5 (rounds ≥1); the
+  docked-refinement primitive it needs is §4.7.
+
+*(Built since first parking: the **alternating CDR self-attn ↔ CDR–epitope coupler** — now the
+`cdr_epitope_coupler` toggle, §4.1 step 5b. The **un-mask/dock** idea is now speced concretely as
+§4.7.)*
+
+### 4.7 Phase 2 — docked refinement (`featurize mode="complex"`), planned
+The PR #27 "un-mask the parser" suggestion is directionally right — there **is** a Phase-1 (masked,
+pose-free) mode and a Phase-2 (docked) mode — but a single parser boolean is the wrong knob, because
+"un-mask" silently bundles two orthogonal changes and one hidden sub-choice:
+1. the CDR positions gain **coordinates** (no longer gapped / coord-free), and
+2. there is now a **shared pose**, so the antigen should enter the *same* graph (docked) with real
+   CDR↔epitope contact edges instead of sitting in the separate epitope encoder;
+3. (hidden) you may keep the CDR **coords** but still **re-mask the sequence** to re-decode — so
+   "un-mask" is not even binary.
+
+Also, in Phase 2 the CDR coords come from the **predicted** complex (a folded Phase-1 design), **not**
+the native scaffold — so it is "ingest a predicted pose," not "keep the native CDRs."
+
+**Plan — express it as the reserved `featurize_example(mode=…)` seam + optional `pose` arg + a
+pose-confidence gate, not a parser flag:**
+- `mode="pose_free"` (Phase 1, built): gap CDRs (coord-free), antigen in the separate encoder — the
+  current path. The parser resolving CDRs as non-existent (`test_gapping.py`) is this mode.
+- `mode="complex"` (Phase 2, planned): ingest a predicted `pose` (best folded Phase-1 backbone),
+  CDRs carry coords, antigen residues join the MPNN graph with real CDR↔epitope edges; conditioning
+  shifts toward the geometric / complex-graph route (§4.4). Sequence may be kept or partially
+  re-masked (choice 3 above) per refinement round.
+- **Pose-confidence gate (§4.5 caveat 2):** only condition on a predicted pose when it is trustworthy
+  (oracle confidence over threshold); otherwise fall back to `pose_free`. A naked parser flag cannot
+  express this fallback — which is exactly why the seam, not the flag, is the right mechanism.
+
+The two seams already exist (the optional `pose` arg and the `featurize_example(mode=…)` switch, see
+the §6.8 "deferred to Stage 2" note), so `mode="complex"` is an additive build, not a rearchitecture.
 
 ## 5. Data
 
@@ -738,8 +763,10 @@ by risk, each independently testable.
 passing**), gated so `conditioning.enabled=False` is byte-identical stock MPNN:
 - **Dual-encoder conditioner** (`data/epitope.py`): separate epitope encoder (seq-injected message
   passing), CDR node-init (interp anchors, rel-pos, pooled epitope, CDR-identity, per-CDR position
-  table, stem-gap geometry), encoder + decoder per-residue cross-attn, coord-free CDR edges,
-  learned-query attention-pool — each an independent ablation toggle. An epitope mask is **required**
+  table, stem-gap geometry), encoder + decoder per-residue cross-attn, an iterated **CDR self-attn ↔
+  CDR–epitope coupler** (`cdr_epitope_coupler`, step 5b — cross-chain paratope organization, stacked
+  after the one-shot encoder cross-attn), coord-free CDR edges, learned-query attention-pool — each
+  an independent ablation toggle. An epitope mask is **required**
   (whole-antigen conditioning is opt-in via `allow_whole_epitope`); unroutable CDRs error loudly.
 - **Policy wiring** (`policy.py`): `attach_epitope` / `encode_initial_state` / `rollout` apply the
   three hooks; `train_framework_encoder` unfreezes the framework + epitope encoders (grad-tracked

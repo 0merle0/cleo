@@ -247,6 +247,51 @@ def test_attention_pool_module_masks_padding():
     assert out.shape == (1, H) and torch.isfinite(out).all()
 
 
+# --- step 5b: CDR self-attn <-> CDR-epitope coupler (stacked, cross-chain) --------- #
+
+
+def test_coupler_absent_when_disabled_present_when_on():
+    assert not hasattr(EpitopeConditioner(_cfg()), "coupler")           # off by default
+    cond = EpitopeConditioner(_cfg(cdr_epitope_coupler=True, coupler_rounds=2))
+    assert hasattr(cond, "coupler") and cond.coupler.rounds == 2
+
+
+def test_coupler_only_touches_cdr_and_depends_on_epitope():
+    cond = EpitopeConditioner(_cfg(cdr_epitope_coupler=True))
+    h_V, epi, epi_mask = _inputs()
+    out_a = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask)
+    out_b = cond.condition_nodes(h_V, CHAIN_MASK, epi + 5.0, epi_mask)
+    assert torch.equal(out_a[:, FRAME_IDX], h_V[:, FRAME_IDX])          # framework untouched
+    assert not torch.allclose(out_a[:, CDR_IDX], h_V[:, CDR_IDX])       # CDRs updated
+    assert not torch.allclose(out_a[:, CDR_IDX], out_b[:, CDR_IDX])     # CDRs depend on epitope
+
+
+def test_coupler_couples_cdr_segments_across_the_set():
+    """Self-attention over the gathered CDR set means one segment's nodes influence another's —
+    this is the cross-chain organization (both segments are in one attention set)."""
+    cond = EpitopeConditioner(_cfg(cdr_epitope_coupler=True))
+    h_V, epi, epi_mask = _inputs()
+    out1 = cond.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask)
+    h_V2 = h_V.clone()
+    h_V2[:, 7] = h_V2[:, 7] + 5.0                                       # perturb a node in segment 2
+    out2 = cond.condition_nodes(h_V2, CHAIN_MASK, epi, epi_mask)
+    assert not torch.allclose(out1[:, [2, 3, 4]], out2[:, [2, 3, 4]])   # segment-1 output shifts too
+
+
+def test_coupler_stacks_after_encoder_cross_attn():
+    base = EpitopeConditioner(_cfg(encoder_cross_attn=True))
+    stacked = EpitopeConditioner(_cfg(encoder_cross_attn=True, cdr_epitope_coupler=True))
+    stacked.enc_xattn.load_state_dict(base.enc_xattn.state_dict())      # isolate the coupler's effect
+    h_V, epi, epi_mask = _inputs()
+    out_base = base.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask)
+    out_stacked = stacked.condition_nodes(h_V, CHAIN_MASK, epi, epi_mask)
+    assert torch.equal(out_base[:, FRAME_IDX], out_stacked[:, FRAME_IDX])
+    assert not torch.allclose(out_base[:, CDR_IDX], out_stacked[:, CDR_IDX])
+    out_stacked.sum().backward()
+    grads = [p.grad for p in stacked.coupler.parameters() if p.grad is not None]
+    assert len(grads) > 0 and any(g.abs().sum() > 0 for g in grads)
+
+
 def test_step5_gradients_flow():
     cond = EpitopeConditioner(_cfg(node_init_cdr_identity=True, node_init_stem_geom=True,
                                    node_init_pooled_epitope=True, attention_pool=True))
