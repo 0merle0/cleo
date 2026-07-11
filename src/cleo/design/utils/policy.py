@@ -11,6 +11,8 @@ Amino-acid encoding constants used across the codebase (``alphabet``,
 this module rather than duplicated elsewhere.
 """
 
+import contextlib
+import json
 import os
 import torch
 import numpy as np
@@ -21,6 +23,10 @@ from omegaconf import OmegaConf
 
 from cleo.design.protein_mpnn_utils.data_utils import featurize, parse_PDB
 from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN
+from cleo.design.data.epitope import ConditioningConfig, EpitopeConditioner, ordered_cdr_type_ids
+from cleo.design.data.gapping import apply_cdr_gaps
+from cleo.design.data.mask import sample_cdr_lengths
+from cleo.design.data.dataset import scan_chain_ids
 
 
 PROTEIN_MPNN_UTILS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "protein_mpnn_utils")
@@ -41,7 +47,13 @@ class PolicyMPNN:
 
     def __init__(self, cfg):
         self.cfg = cfg
-        self.device = DEVICE
+        # Device knob: `policy_device` overrides the auto default (cuda if available). Lets the MPNN
+        # policy run on CPU while the Protenix reward subprocess keeps the GPU (SPEC — cheap-MPNN
+        # idea). Default (null/"auto") keeps the policy on GPU for training.
+        _dev = cfg.get("policy_device", None)
+        self.device = DEVICE if _dev in (None, "auto") else torch.device(_dev)
+        # Parsed early so load_mpnn_model can thread coord_free_cdr_edges into the feature extractor.
+        self.conditioning_cfg = ConditioningConfig.from_dict(cfg.get("conditioning"))
         self.run_name = cfg.run_name
         self.output_dir = os.path.join(cfg.output_dir, cfg.run_name)
 
@@ -52,12 +64,79 @@ class PolicyMPNN:
 
         self.model = self.load_mpnn_model()
         self.model.to(self.device)
-        self.optimizer = self.get_optimizer()
 
         self.ligand_mpnn_use_atom_context = 1
         self.ligand_mpnn_cutoff_for_score = 8.0
 
-        self.reward_fn = hydra.utils.instantiate(cfg.reward)
+        # Epitope conditioning (SPEC 4.1 / 6.8). Master `enabled=False` => the conditioner is an
+        # exact no-op with zero params (byte-identical M1 baseline), so this is safe to always
+        # construct. When enabled, build a SECOND ProteinMPNN whose encoder embeds the epitope
+        # (init from the pretrained base weights, independently trainable) and hand it to the
+        # conditioner. Built BEFORE the optimizer so its trainable hook params (step 4) are
+        # picked up by get_optimizer. (self.conditioning_cfg was parsed at the top of __init__.)
+        if self.conditioning_cfg.enabled:
+            self.epi_encoder = self._build_epitope_encoder()
+            self.conditioner = EpitopeConditioner(
+                self.conditioning_cfg, epi_encoder=self.epi_encoder
+            ).to(self.device)
+            print(f"Epitope conditioning ENABLED: {self.conditioning_cfg}")
+        else:
+            self.epi_encoder = None
+            self.conditioner = EpitopeConditioner(self.conditioning_cfg)  # no-op, no params
+
+        # Step 6 (SPEC 6.8): when set, the framework encoder + epitope encoder are unfrozen and the
+        # initial state is re-encoded (grad-tracked) every PPO update instead of being cached as a
+        # detached leaf — so node-init / encoder cross-attn / epitope-encoder params get gradients.
+        # Only meaningful with conditioning on; the default (False) keeps the decoder-only step-4 path.
+        self.train_framework_encoder = self.conditioning_cfg.enabled and bool(
+            cfg.get("train_framework_encoder", False)
+        )
+
+        self.optimizer = self.get_optimizer()
+
+        # Single-target reward (cfg.reward). Optional in dataset-driven mode, where the
+        # reward is built per-example by the registry (SPEC 6.4).
+        self.reward_fn = hydra.utils.instantiate(cfg.reward) if cfg.get("reward") else None
+
+        # Dataset-driven multi-example harness (SPEC 6). When cfg.dataset is set, sample
+        # one example per step and bind its reward package; otherwise use cfg.pdb + reward_fn.
+        self.dataset = None
+        self.reward_registry = None
+        if cfg.get("dataset"):
+            from cleo.design.data.registry import RewardRegistry
+
+            comp = cfg.dataset.get("composer")
+            if comp is not None:
+                # On-the-fly composer: sample target x scaffold x CDR-lengths per step
+                # (no materialized cross-product JSONL; SPEC 6.9).
+                import random as _random
+
+                from cleo.design.data.composer import ComposingDataset
+
+                ranges = comp.get("cdr_length_ranges", None)
+                # Data seed (SPEC 6.9): seeding the composer's own rng makes the target/scaffold/
+                # CDR-length draws deterministically replayable while staying online. None => unseeded.
+                data_seed = comp.get("seed", None)
+                self.dataset = ComposingDataset.load(
+                    comp.targets_csv,
+                    comp.scaffold_pool_csv,
+                    comp.reward,
+                    cfg.dataset.reward_dir,
+                    split=comp.get("split", None),
+                    vhh_fraction=comp.get("vhh_fraction", 0.5),
+                    cdr_length_ranges=OmegaConf.to_container(ranges) if ranges is not None else None,
+                    rng=_random.Random(data_seed) if data_seed is not None else None,
+                )
+            else:
+                from cleo.design.data.dataset import DesignDataset
+
+                self.dataset = DesignDataset.load(
+                    cfg.dataset.jsonl,
+                    cfg.dataset.reward_dir,
+                    structures_root=cfg.dataset.get("structures_root", ""),
+                )
+                print(f"Loaded dataset with {len(self.dataset)} examples from {cfg.dataset.jsonl}")
+            self.reward_registry = RewardRegistry(self.dataset, cfg.output_dir, cfg.run_name)
 
         self.checkpoint_every_n_steps = self.cfg.checkpoint_every_n_steps
         self.best_seen_reward = 0
@@ -99,6 +178,9 @@ class PolicyMPNN:
             atom_context_num=self.atom_context_num,
             model_type=model_type,
             ligand_mpnn_use_side_chain_context=self.ligand_mpnn_use_side_chain_context,
+            coord_free_cdr_edges=(
+                self.conditioning_cfg.enabled and self.conditioning_cfg.coord_free_cdr_edges
+            ),
         )
 
         is_default_checkpoint = ckpt_path in [PROTEIN_MPNN_CKPT_PATH, LIGAND_MPNN_CKPT_PATH]
@@ -106,21 +188,74 @@ class PolicyMPNN:
         model.load_state_dict(ckpt["model_state_dict"], strict=False)
         return model.to(self.device)
 
-    def get_optimizer(self):
-        """Freeze encoder parameters and return an Adam optimizer over the decoder."""
+    def _build_epitope_encoder(self):
+        """A second ProteinMPNN whose encoder embeds the epitope (SPEC 4.1).
 
-        for name, param in self.model.named_parameters():
-            if "decoder_layers" not in name and "W_out" not in name:
-                param.requires_grad = False
-
-        optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, self.model.parameters()),
-            lr=self.cfg.lr,
+        Initialised from the **pretrained base** ProteinMPNN weights (not the policy's training
+        checkpoint — the epitope encoder is an independent module, not a fine-tuned decoder), and
+        independently trainable. Only its encoder side is used (``encode_epitope``, path-b
+        sequence injection); the decoder weights load but stay unused.
+        """
+        model = ProteinMPNN(
+            node_features=128,
+            edge_features=128,
+            hidden_dim=128,
+            num_encoder_layers=3,
+            num_decoder_layers=3,
+            k_neighbors=48,
+            device=self.device,
+            atom_context_num=1,
+            model_type="protein_mpnn",
+            ligand_mpnn_use_side_chain_context=0,
         )
+        ckpt = torch.load(PROTEIN_MPNN_CKPT_PATH, map_location=self.device, weights_only=True)
+        model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        return model.to(self.device)
+
+    def get_optimizer(self):
+        """Return an Adam optimizer over the trainable parameters.
+
+        Two regimes (SPEC 6.8):
+
+        - **Step 4 (default)** — freeze the framework encoder; train the decoder (``decoder_layers``
+          + ``W_out``) plus the epitope-conditioning hook params. The cached init-state is a detached
+          leaf, so node-init / encoder cross-attn sit upstream of it and get no gradient yet; only the
+          decoder cross-attn (inside the grad-tracked rollout) trains.
+        - **Step 6 (``train_framework_encoder``)** — everything trainable: the whole framework MPNN
+          (encoder + decoder), the epitope encoder, and every conditioner hook. The init-state is
+          re-encoded grad-tracked each update (see ``train_step``), so the upstream hooks train too.
+        """
+        if self.train_framework_encoder:
+            for param in self.model.parameters():
+                param.requires_grad = True
+            trainable = list(self.model.parameters())
+            if self.conditioning_cfg.enabled:
+                trainable += list(self.conditioner.parameters())  # incl. the epitope encoder submodule
+        else:
+            for name, param in self.model.named_parameters():
+                if "decoder_layers" not in name and "W_out" not in name:
+                    param.requires_grad = False
+            trainable = [p for p in self.model.parameters() if p.requires_grad]
+            if self.conditioning_cfg.enabled:
+                trainable += list(self.conditioner.parameters())
+
+        optimizer = torch.optim.Adam(trainable, lr=self.cfg.lr)
         return optimizer
 
-    def featurize_pdb(self, pdb):
-        """Parse a PDB file and build the feature dictionary consumed by :meth:`rollout`."""
+    def _featurize(self, pdb, fixed_residues_fn, gap=None):
+        """Parse a structure and build the feature dict consumed by :meth:`rollout`.
+
+        ``fixed_residues_fn(chain_letters, R_idx, icodes) -> list[str]`` returns the
+        residue tokens to hold fixed (NOT designed). ``featurize_pdb`` supplies the
+        config-level ``fixed_residues``; ``featurize_example`` computes the CDR-mask
+        complement from the dataset example.
+
+        ``gap`` (SPEC 6.8 step 3.5): when given — ``{"design_chain", "cdr_spans", "cdr_lengths"}``
+        — the native CDRs are excised and sampled-length gap nodes are spliced in
+        (:func:`cleo.design.data.gapping.apply_cdr_gaps`), which sets ``chain_mask`` itself
+        (gap nodes designable); ``fixed_residues_fn`` is then unused. Requires
+        ``coord_free_cdr_edges`` so the gap nodes' placeholder coordinates are never read.
+        """
 
         protein_dict, backbone, other_atoms, icodes, water_atoms = parse_PDB(
             pdb,
@@ -130,28 +265,33 @@ class PolicyMPNN:
             parse_all_atoms=self.ligand_mpnn_use_side_chain_context,
         )
 
-        R_idx_list = list(protein_dict["R_idx"].cpu().numpy())
-        chain_letters_list = list(protein_dict["chain_letters"])
-        encoded_residues = [
-            str(chain_letters_list[i]) + str(R_idx_list[i]) + icodes[i]
-            for i in range(len(R_idx_list))
-        ]
+        if gap is not None:
+            protein_dict = apply_cdr_gaps(
+                protein_dict, gap["design_chain"], gap["cdr_spans"], gap["cdr_lengths"]
+            )  # sets chain_mask (gap = designable) + side_chain_mask
+        else:
+            R_idx_list = list(protein_dict["R_idx"].cpu().numpy())
+            chain_letters_list = list(protein_dict["chain_letters"])
+            encoded_residues = [
+                str(chain_letters_list[i]) + str(R_idx_list[i]) + icodes[i]
+                for i in range(len(R_idx_list))
+            ]
 
-        chain_mask = torch.tensor(
-            np.array([True for _ in protein_dict["chain_letters"]], dtype=np.int32),
-            device=self.device,
-        )
-        protein_dict["chain_mask"] = chain_mask
+            chain_mask = torch.tensor(
+                np.array([True for _ in protein_dict["chain_letters"]], dtype=np.int32),
+                device=self.device,
+            )
+            protein_dict["chain_mask"] = chain_mask
 
-        fixed_residues = [item for item in self.cfg.fixed_residues.split()]
-        fixed_positions = torch.tensor(
-            [int(item not in fixed_residues) for item in encoded_residues],
-            device=self.device,
-        )
-        if fixed_residues:
-            protein_dict["chain_mask"] = protein_dict["chain_mask"] * fixed_positions
+            fixed_residues = fixed_residues_fn(chain_letters_list, R_idx_list, icodes)
+            fixed_positions = torch.tensor(
+                [int(item not in fixed_residues) for item in encoded_residues],
+                device=self.device,
+            )
+            if fixed_residues:
+                protein_dict["chain_mask"] = protein_dict["chain_mask"] * fixed_positions
 
-        protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
+            protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
 
         omit_AA_list = self.cfg.omit_AA if self.cfg.omit_AA is not None else []
         omit_AA = torch.tensor(
@@ -159,8 +299,9 @@ class PolicyMPNN:
             device=self.device,
         )
 
-        bias_AA_per_residue = torch.zeros([len(encoded_residues), 21], device=self.device, dtype=torch.float32)
-        omit_AA_per_residue = torch.zeros([len(encoded_residues), 21], device=self.device, dtype=torch.float32)
+        n_res = protein_dict["chain_mask"].shape[0]            # post-gapping length (gap != native)
+        bias_AA_per_residue = torch.zeros([n_res, 21], device=self.device, dtype=torch.float32)
+        omit_AA_per_residue = torch.zeros([n_res, 21], device=self.device, dtype=torch.float32)
 
         feature_dict = featurize(
             protein_dict,
@@ -189,12 +330,163 @@ class PolicyMPNN:
 
         return feature_dict
 
-    def encode_initial_state(self, feature_dict):
+    def featurize_pdb(self, pdb):
+        """Featurize a single PDB, holding ``cfg.fixed_residues`` fixed (single-target path)."""
+        return self._featurize(pdb, lambda cl, ri, ic: self.cfg.fixed_residues.split())
+
+    def featurize_example(self, example, mode="scaffold"):
+        """Featurize a dataset example, masking to its ``params.cdr_spans`` (SPEC 6.4).
+
+        ``fixed_residues`` = the CDR-mask complement computed by the data layer from
+        the example's ``design_chain`` + ``cdr_spans`` against this exact enumeration,
+        so the mask lines up 1:1 with the tokens ``_featurize`` builds.
+
+        ``mode`` (SPEC 6.8 forward-compat seam #2): ``"scaffold"`` = the Stage-1 gapped-framework
+        path (design chain only, CDRs masked); ``"complex"`` is reserved for Stage-2 pose
+        conditioning (framework + predicted CDR + epitope in one frame) and is not built yet.
         """
-        Run the MPNN model without gradient tracking.
+        if mode != "scaffold":
+            raise NotImplementedError(
+                f"featurize_example(mode={mode!r}) is a Stage-2 seam (SPEC 4.5/6.8); only "
+                f"'scaffold' is implemented."
+            )
+        # Stage-1 gapped-framework path (SPEC 6.8 step 3.5): excise native CDRs and splice in
+        # sampled-length gap nodes. Only when the coord-free surgery is on (so the gap nodes'
+        # placeholder coordinates are never read) and the example actually defines CDR spans.
+        gap = None
+        if (
+            self.conditioning_cfg.enabled
+            and self.conditioning_cfg.coord_free_cdr_edges
+            and example.cdr_spans
+        ):
+            gap = {
+                "design_chain": example.design_chain,
+                "cdr_spans": example.cdr_spans,
+                "cdr_lengths": sample_cdr_lengths(example.params),  # fresh per step (length diversity)
+            }
+        feature_dict = self._featurize(
+            example.structure,
+            lambda cl, ri, ic: self.dataset.fixed_residues(example, cl, ri, ic).split(),
+            gap=gap,
+        )
+        # CDR-type ids per segment (position order), for the step-5 CDR-identity node signal.
+        # Ignored downstream unless conditioning.node_init_cdr_identity is on.
+        if self.conditioning_cfg.enabled and example.cdr_spans:
+            feature_dict["cdr_ids"] = ordered_cdr_type_ids(example.design_chain, example.cdr_spans)
+        return feature_dict
+
+    def featurize_epitope(self, example):
+        """Build the epitope feature dict consumed by ``EpitopeConditioner.encode_epitope`` (SPEC 4.1).
+
+        Parses the **whole antigen chain T** (full structural context for message passing) with its
+        **known sequence** in ``S`` (path-b injection). Emits two masks:
+        - ``mask`` — all valid antigen residues; the encoder message-passes over this (whole fold).
+        - ``epitope_mask`` — the ``epitope_residues`` patch (matched by PDB residue number, the
+          reward's convention); ``encode_epitope`` returns THIS for ``pool_epitope`` + cross-attn,
+          so the CDR conditions on the epitope specifically, not the whole antigen (§4.1, 2026-07-04).
         """
-        with torch.no_grad():
+        # Invariant (SPEC §6.1, LOCKED 2026-07-04): the antigen/target chain is always 'T'. Assert
+        # it per item rather than trusting the manifest, so a mislabeled antigen fails loudly here.
+        antigen_chains = scan_chain_ids(example.epitope_source)
+        if "T" not in antigen_chains:
+            raise ValueError(
+                f"example {example.id}: antigen source {example.epitope_source} has no chain 'T' "
+                f"(found {sorted(antigen_chains)}); the antigen/target chain must be 'T'")
+
+        protein_dict, _bb, _oa, icodes, _wa = parse_PDB(
+            example.epitope_source,
+            device=self.device,
+            atom_context_num=self.atom_context_num,
+            chains=["T"],
+            parse_all_atoms=self.ligand_mpnn_use_side_chain_context,
+        )
+        if protein_dict["R_idx"].shape[0] == 0:
+            raise ValueError(f"example {example.id}: no antigen chain 'T' found in {example.epitope_source}")
+
+        # The epitope is fixed context (never designed); featurize() still requires these keys.
+        n_res = protein_dict["R_idx"].shape[0]
+        protein_dict["chain_mask"] = torch.ones(n_res, device=self.device)
+        protein_dict["side_chain_mask"] = protein_dict["chain_mask"]
+
+        feature_dict = featurize(
+            protein_dict,
+            cutoff_for_score=self.ligand_mpnn_cutoff_for_score,
+            use_atom_context=self.ligand_mpnn_use_atom_context,
+            number_of_ligand_atoms=self.atom_context_num,
+            model_type="protein_mpnn",
+        )
+
+        R_idx_list = [int(r) for r in protein_dict["R_idx"].cpu().numpy()]
+        epi_set = {int(r) for r in example.epitope_residues}
+        epitope_mask = torch.tensor(
+            [[1.0 if r in epi_set else 0.0 for r in R_idx_list]],
+            device=self.device,
+            dtype=torch.float32,
+        )
+        if float(epitope_mask.sum()) == 0.0:
+            raise ValueError(
+                f"example {example.id}: none of epitope_residues={sorted(epi_set)} matched chain-T "
+                f"residue numbers (are they PDB seqid.num, not positional indices?)"
+            )
+        feature_dict["epitope_mask"] = epitope_mask
+        return feature_dict
+
+    def attach_epitope(self, example, feature_dict):
+        """Encode the epitope once and stash its per-residue embeddings + patch mask into
+        ``feature_dict`` for the conditioning hooks (SPEC 4.1, slice-2 step 4).
+
+        No-op (returns ``feature_dict`` unchanged) when conditioning is disabled or the
+        example carries no ``epitope_residues``.
+
+        Always stashes the parsed epitope feature dict ``epi_fd`` so ``encode_initial_state``
+        can (re-)encode it. In the **step-4** regime (framework frozen) the embeddings are
+        precomputed here once under ``no_grad`` and cached; the downstream ``decoder_cross_attn``
+        still trains because ``epi_per_res`` enters it as a constant inside the grad-tracked
+        rollout. In the **step-6** regime (``train_framework_encoder``) they are left for
+        ``encode_initial_state`` to recompute grad-tracked each update, so the epitope encoder trains.
+
+        Keys written: ``epi_fd`` (parsed antigen feature dict), and — step-4 only — ``epi_per_res``
+        ``[1, M, H]`` + ``epi_mask`` ``[1, M]`` (the epitope patch from ``encode_epitope``).
+        """
+        if not (self.conditioning_cfg.enabled and example.epitope_residues):
+            return feature_dict
+        feature_dict["epi_fd"] = self.featurize_epitope(example)
+        if not self.train_framework_encoder:
+            with torch.no_grad():
+                epi_per_res, epi_mask = self.conditioner.encode_epitope(feature_dict["epi_fd"])
+            feature_dict["epi_per_res"] = epi_per_res
+            feature_dict["epi_mask"] = epi_mask
+        return feature_dict
+
+    def encode_initial_state(self, feature_dict, grad=False):
+        """Encode the framework structure and apply the post-encode framework-node conditioning
+        (node-init + encoder cross-attn) at CDR positions (SPEC 4.1 hook 1+2).
+
+        ``condition_nodes`` is an identity when conditioning is disabled, so the M1 baseline
+        path is byte-identical. ``grad=False`` (default) runs under ``no_grad`` — the step-4
+        cached-init-state path and every experience-collection rollout. ``grad=True`` (step 6)
+        keeps the graph so the framework + epitope encoders train; it (re)computes the epitope
+        embeddings grad-tracked from ``epi_fd``. When enabled but no embeddings are cached yet
+        (step-6 experience collection), they are computed here under the active context so the
+        experience and update rollouts see the *same* conditioning.
+        """
+        ctx = contextlib.nullcontext() if grad else torch.no_grad()
+        with ctx:
+            if self.conditioning_cfg.enabled and feature_dict.get("epi_fd") is not None:
+                if grad or feature_dict.get("epi_per_res") is None:
+                    epi_per_res, epi_mask = self.conditioner.encode_epitope(feature_dict["epi_fd"])
+                    feature_dict["epi_per_res"] = epi_per_res
+                    feature_dict["epi_mask"] = epi_mask
             h_V, h_E, E_idx = self.model.encode(feature_dict)
+            if self.conditioning_cfg.enabled:
+                h_V = self.conditioner.condition_nodes(
+                    h_V,
+                    feature_dict["chain_mask"],
+                    feature_dict.get("epi_per_res"),
+                    feature_dict.get("epi_mask"),
+                    cdr_ids=feature_dict.get("cdr_ids"),
+                    X=feature_dict.get("X"),
+                )
         return h_V, h_E, E_idx
 
     def gather_nodes(self, nodes, neighbor_idx):
@@ -332,6 +624,16 @@ class PolicyMPNN:
 
             h_V_t = torch.gather(h_V_stack[-1], 1, t[:, None, None].repeat(1, 1, h_V_stack[-1].shape[-1]))[:, 0]
 
+            # Hook 3 (SPEC 4.1): per-step decoder cross-attn to epitope residues, gated to the
+            # CDR decode steps (chain_mask_t == 1). Identity elsewhere and when conditioning /
+            # decoder_cross_attn is off. The delta's params sit in the grad-tracked path, so they
+            # train even while the encoder stays frozen (step 4).
+            if self.conditioning_cfg.enabled and feature_dict.get("epi_per_res") is not None:
+                h_V_t_cond = self.conditioner.decoder_cross_attn(
+                    h_V_t, feature_dict["epi_per_res"], feature_dict.get("epi_mask"),
+                )
+                h_V_t = torch.where(chain_mask_t[:, None] > 0.5, h_V_t_cond, h_V_t)
+
             logits = model.W_out(h_V_t)
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
 
@@ -375,22 +677,28 @@ class PolicyMPNN:
             sequences.append(seq_str)
         return sequences
 
-    def train_step(self, step, init_state, feature_dict):
+    def train_step(self, step, init_state, feature_dict, reward_fn=None):
         """Run one REINFORCE update: rollout -> reward -> policy gradient."""
 
+        reward_fn = reward_fn if reward_fn is not None else self.reward_fn
         to_log = {}
         self.optimizer.zero_grad()
 
-        h_V_in, h_E_in, E_idx_in = init_state
-        h_V_in.requires_grad = True
-        h_E_in.requires_grad = True
+        # init_state=None (step 6): re-encode grad-tracked so the encoders train. Else use the
+        # cached detached leaf and flip on grad (decoder-only path).
+        if init_state is None:
+            h_V_in, h_E_in, E_idx_in = self.encode_initial_state(feature_dict, grad=True)
+        else:
+            h_V_in, h_E_in, E_idx_in = init_state
+            h_V_in.requires_grad = True
+            h_E_in.requires_grad = True
 
         out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in)
 
         seq_mask = torch.nn.functional.one_hot(out["S"], num_classes=len(alphabet)).float()
         batched_log_probs = (out["log_probs"] * seq_mask).sum(dim=(-1))
 
-        batched_reward, metrics = self.reward_fn(step, out, feature_dict, self.device)
+        batched_reward, metrics = reward_fn(step, out, feature_dict, self.device)
         to_log.update(metrics)
 
         baseline = torch.tensor(self.reward_history, dtype=torch.float32, device=self.device).mean()
@@ -416,11 +724,30 @@ class PolicyMPNN:
         start_time = time.time()
         for step in tqdm(range(self.cfg.N_steps), desc="Training"):
             self.model.train()
-            feature_dict = self.featurize_pdb(self.cfg.pdb)
-            h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
-            init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
 
-            to_log = self.train_step(step, init_state, feature_dict)
+            # Dataset-driven: sample one example, featurize+mask it, bind its reward
+            # package. Single-PDB path (cfg.pdb + shared reward_fn) is the fallback.
+            if self.reward_registry is not None:
+                example = self.dataset.sample()
+                feature_dict = self.featurize_example(example)
+                feature_dict = self.attach_epitope(example, feature_dict)  # epitope hooks (step 4)
+                reward_fn = self.reward_registry.bind(example)
+            else:
+                feature_dict = self.featurize_pdb(self.cfg.pdb)
+                reward_fn = self.reward_fn
+
+            # Step 6: re-encode grad-tracked each update inside train_step (init_state=None).
+            # Otherwise cache a detached init-state leaf once (step-4 / stock decoder-only path).
+            if self.train_framework_encoder:
+                init_state = None
+            else:
+                h_V, h_E, E_idx = self.encode_initial_state(feature_dict)
+                init_state = (h_V.clone(), h_E.clone(), E_idx.clone())
+
+            to_log = self.train_step(step, init_state, feature_dict, reward_fn)
+            if self.reward_registry is not None:
+                to_log.update(self._epitope_log_fields(example))
+                self._log_provenance(step, example)
 
             runtime = time.time() - start_time
             self.log_metrics(step, runtime, to_log)
@@ -430,6 +757,40 @@ class PolicyMPNN:
 
         print("Training complete.")
         print(f"Best reward seen: {self.best_seen_reward:.4f} at step {self.step_at_best_seen_reward}")
+
+    def _epitope_log_fields(self, example):
+        """Per-rollout epitope metadata for the training CSV: epitope size and net charge,
+        so post-hoc analysis can surface any reward/size or reward/charge trends (SPEC 6.7).
+        Both keys are emitted on every dataset-driven step (0.0 / NaN when an example carries
+        no epitope) so the CSV columns stay stable across the run."""
+        nc = example.epitope_net_charge
+        fields = {
+            "epitope_size": float(example.n_epitope),
+            "epitope_net_charge": float(nc) if nc is not None else float("nan"),
+        }
+        # Composer rollouts also carry the scaffold modality (VHH vs Fv). Emit it as a float
+        # so post-hoc analysis can split reward by modality; absent (=> no column) for the
+        # JSONL path, keeping CSV columns stable within any single run.
+        kind = example.params.get("kind")
+        if kind is not None:
+            fields["is_vhh"] = 1.0 if kind == "vhh" else 0.0
+        return fields
+
+    def _log_provenance(self, step, example):
+        """Append this rollout's composed provenance (scaffold, target, sampled CDR lengths)
+        to ``{run_name}_provenance.csv``. Only the composer stamps ``scaffold_id`` into params;
+        the JSONL / single-PDB paths are no-ops. String-valued, so it lives outside the
+        float-only training-metrics CSV."""
+        p = example.params
+        if "scaffold_id" not in p:
+            return
+        log_path = os.path.join(self.output_dir, f"{self.run_name}_provenance.csv")
+        cdr_lengths = json.dumps(p.get("cdr_lengths", {}), separators=(",", ":"))
+        if not os.path.exists(log_path):
+            with open(log_path, "w") as f:
+                f.write("step,scaffold_id,kind,target_id,cdr_lengths\n")
+        with open(log_path, "a") as f:
+            f.write(f'{step},{p["scaffold_id"]},{p["kind"]},{p["target_id"]},"{cdr_lengths}"\n')
 
     def log_metrics(self, step, runtime, to_log):
         """Append one row to the CSV training log."""
@@ -450,6 +811,10 @@ class PolicyMPNN:
             "reward": curr_reward,
             "model_state_dict": self.model.state_dict(),
         }
+        # The conditioner carries trainable params (hooks + epitope encoder); persist them so a
+        # conditioned run is recoverable. Absent/no-op for the M1 baseline.
+        if self.conditioning_cfg.enabled:
+            ckpt["conditioner_state_dict"] = self.conditioner.state_dict()
 
         torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_last.pt"))
         torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_step_{step:04}.pt"))

@@ -1,0 +1,15 @@
+# CPU-only WIRING-SMOKE reward — no Protenix / no GPU. Exercises the full loop (composer ->
+# gapping -> conditioning -> rollout -> reward binding + aggregation -> GRPO update) using only the
+# structure-free CDR sequence-diversity metric. NOT a training reward — it has no interface signal.
+requires: [design_chains]
+
+steps:
+  - name: cdr_diversity
+    target_fn: cleo.design.utils.cdr_diversity.cdr_diversity_from_df
+    cfg:
+      structure_path_col: null           # no predicted structure -> structural diversity = 0.0
+    inputs:
+      design_chains: ${row.params.design_chains}
+
+reward_aggregation:
+  - {metric: cdr_diversity_cdr_seq_diversity, mode: max, lower_bound: 0.0, upper_bound: 1.0, weight: 1.0}

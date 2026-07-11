@@ -1,0 +1,38 @@
+# Antibody interface reward (SPEC 6.2/6.9) — the single reward package for VHH + Fv designs.
+#
+# Target-agnostic Protenix interface pipeline. Per-design geometry is carried by ONE
+# `design_chains` column: [{length, framework_msa_dir, cdr_spans}, ...] in chain order
+# (1 entry for VHH, 2 for Fv). The oracle splits the decoded sequence per chain and gaps each
+# chain's framework MSA independently (H at H1-H3, L at L1-L3), so this one package covers both
+# nanobodies and paired Fvs. Lengths are pinned by the composer at sample() time so they match
+# the featurizer's CDR-length draw.
+requires: [antigen_sequence, antigen_msa_dir, design_chains, epitope_residues]
+
+steps:
+  - name: protenix                       # ORACLE step (builds the per-design MSAs internally)
+    target_fn: cleo.design.utils.protenix_oracle.protenix_from_df
+    cfg:                                 # STATIC, shared across examples (rundir/step reserved)
+      cycle: 4
+      n_diffusion_step: 20
+      n_sample: 1
+      use_msa: true
+      need_atom_confidence: true         # residue-level PAE for protenix_cdr_interface_pae
+    inputs:                              # per-example -> resolved to df columns
+      antigen_sequence:  ${native.seq.T}            # co-crystal antigen = chain T (antigen file)
+      antigen_msa_dir:   ${row.params.antigen_msa_dir}
+      design_chains:     ${row.params.design_chains}  # [{length, framework_msa_dir, cdr_spans}, ...]
+      epitope_residues:  ${row.params.epitope_residues}
+
+  - name: cdr_diversity                  # BATCH-relative CDR-loop diversity (SPEC §8) — runs after
+    target_fn: cleo.design.utils.cdr_diversity.cdr_diversity_from_df   # the oracle so it can read
+    cfg:                                 # the predicted structures for the structural signal.
+      structure_path_col: protenix_path  # oracle cif per design; sequence signal needs no structure
+
+reward_aggregation:
+  - {metric: protenix_interface_iptm,       mode: max, lower_bound: 0.0, upper_bound: 0.8,  weight: 1.0}
+  - {metric: protenix_epitope_overlap,      mode: max, lower_bound: 0.0, upper_bound: 1.0,  weight: 1.0}  # precision
+  - {metric: protenix_epitope_cdr_coverage, mode: max, lower_bound: 0.0, upper_bound: 1.0,  weight: 1.0}  # recall
+  - {metric: protenix_cdr_interface_pae,    mode: min, lower_bound: 0.0, upper_bound: 30.0, weight: 1.0}  # paratope PAE
+  # batch CDR diversity — secondary shaping to keep proposals varied (SPEC §8); tune/zero the weights
+  - {metric: cdr_diversity_cdr_seq_diversity,    mode: max, lower_bound: 0.0, upper_bound: 1.0, weight: 0.5}
+  - {metric: cdr_diversity_cdr_struct_diversity, mode: max, lower_bound: 0.0, upper_bound: 8.0, weight: 0.5}

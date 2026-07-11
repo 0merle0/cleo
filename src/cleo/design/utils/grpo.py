@@ -2,10 +2,13 @@
 Group Relative Policy Optimization (GRPO) fine-tuning of ProteinMPNN.
 
 Extends :class:`PolicyMPNN` with a clipped surrogate objective
-(following DAPO — https://arxiv.org/pdf/2503.14476) and an optional
-KL penalty to a frozen reference ProteinMPNN model. Advantages are
+(following DAPO — https://arxiv.org/pdf/2503.14476). Advantages are
 computed relative to the batch mean (group-relative), and multiple
 gradient updates are performed per rollout batch.
+
+Drift is controlled by the learning rate + clipped surrogate; the KL to a frozen
+reference and the global grad-norm are logged as DIAGNOSTICS only (neither is added
+to the loss and grad-norm is not clipped), so we can watch them without penalizing.
 """
 
 import torch
@@ -19,7 +22,7 @@ from cleo.design.protein_mpnn_utils.model_utils import ProteinMPNN as ProteinMPN
 
 
 class PolicyMPNNvGRPO(PolicyMPNN):
-    """GRPO/DAPO variant of PolicyMPNN with clipped surrogate loss and optional KL penalty."""
+    """GRPO/DAPO variant of PolicyMPNN with clipped surrogate loss; KL + grad-norm are logged as diagnostics."""
 
     def __init__(self, cfg):
         super().__init__(cfg)
@@ -64,7 +67,7 @@ class PolicyMPNNvGRPO(PolicyMPNN):
         model.load_state_dict(ckpt["model_state_dict"], strict=False)
         return model.to(self.device)
 
-    def train_step(self, step, init_state, feature_dict):
+    def train_step(self, step, init_state, feature_dict, reward_fn=None):
         """GRPO/DAPO update: collect one rollout batch, then perform
         ``N_updates`` clipped-surrogate gradient steps on random sub-batches.
 
@@ -75,14 +78,20 @@ class PolicyMPNNvGRPO(PolicyMPNN):
         config flag.
         """
 
+        reward_fn = reward_fn if reward_fn is not None else self.reward_fn
         to_log = {}
 
         # --- Collect experience (no gradients) ---
         with torch.no_grad():
-            h_V_in, h_E_in, E_idx_in = init_state
+            # init_state=None (step 6): encode fresh under no_grad (also computes/caches the epitope
+            # embeddings so this rollout sees the SAME conditioning as the grad-tracked updates).
+            if init_state is None:
+                h_V_in, h_E_in, E_idx_in = self.encode_initial_state(feature_dict)
+            else:
+                h_V_in, h_E_in, E_idx_in = init_state
             out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in)
 
-            batched_rewards, metrics = self.reward_fn(step, out, feature_dict, self.device)
+            batched_rewards, metrics = reward_fn(step, out, feature_dict, self.device)
             to_log.update(metrics)
             to_log["reward"] = batched_rewards.mean().cpu().item()
 
@@ -102,9 +111,14 @@ class PolicyMPNNvGRPO(PolicyMPNN):
 
             self.optimizer.zero_grad()
 
-            h_V_in, h_E_in, E_idx_in = init_state
-            h_V_in.requires_grad = True
-            h_E_in.requires_grad = True
+            # init_state=None (step 6): re-encode grad-tracked each update so the framework +
+            # epitope encoders receive gradients. Else use the cached detached leaf (decoder-only).
+            if init_state is None:
+                h_V_in, h_E_in, E_idx_in = self.encode_initial_state(feature_dict, grad=True)
+            else:
+                h_V_in, h_E_in, E_idx_in = init_state
+                h_V_in.requires_grad = True
+                h_E_in.requires_grad = True
 
             if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
                 with torch.no_grad():
@@ -146,15 +160,22 @@ class PolicyMPNNvGRPO(PolicyMPNN):
 
             obj = torch.min(min_term1, min_term2).mean()
 
+            # KL is a DIAGNOSTIC only — it is tracked (never subtracted from the objective). Drift is
+            # controlled by learning rate + the grad-norm we log below (SPEC §training, 2026-07-10).
             if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
                 ref_batched_log_probs = (ref_batched_log_probs * seq_mask).sum(dim=-1)
                 kl_ratio = torch.exp(ref_batched_log_probs - batched_log_probs)
                 kl = kl_ratio - (ref_batched_log_probs - batched_log_probs) - 1
-                obj = obj - self.cfg.kl_weight * kl.mean()
-                to_log["kl_penalty"] = kl.mean().cpu().item()
+                to_log["kl"] = kl.mean().cpu().item()
 
             loss = -obj
             loss.backward()
+            # Track (do NOT clip) the global grad-norm as the other drift diagnostic.
+            params = [p for grp in self.optimizer.param_groups for p in grp["params"] if p.grad is not None]
+            if params:
+                to_log["grad_norm"] = float(
+                    torch.nn.utils.clip_grad_norm_(params, max_norm=float("inf"))
+                )
             self.optimizer.step()
 
         return to_log
