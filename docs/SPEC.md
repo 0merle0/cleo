@@ -915,9 +915,9 @@ and the diagonal−off-diagonal reward gap. `epitope_overlap` is the sharpest ch
 
 **Strategy bake-off — overfit-speed on a 3×3 matrix (added 2026-07-04, runs before the full ladder).**
 Before the expensive full ablation, rank the §4.1 conditioning strategies (pooled-only node-init /
-+interpolated anchors / +encoder cross-attn / +decoder cross-attn / both / seq-injection path a-vs-b)
-by **how fast each overfits a tiny conditioning-discriminative set** — convergence speed is a cheap,
-high-signal discriminator.
++interpolated anchors / +encoder cross-attn / +decoder cross-attn / both / **+CDR–epitope coupler**
+(step 5b, stacked on encoder cross-attn) / seq-injection path a-vs-b) by **how fast each overfits a
+tiny conditioning-discriminative set** — convergence speed is a cheap, high-signal discriminator.
 - **Design matrix = full cross-product (the crux).** 3 frameworks × 3 antigens/epitopes = **9 cells**,
   each framework paired with *every* antigen. This is deliberate: if framework identity alone (or
   antigen alone) predicts the answer, every strategy overfits without reading the epitope and the test
@@ -943,7 +943,8 @@ high-signal discriminator.
 - **Rung 3 — ablation (necessity).** *Zero/shuffle* the epitope at inference → reward must drop.
   *Toggle the cross-attn sites* (encoder-only / decoder-only / both / pooled-only / none, §4.1) and
   compare `epitope_overlap`; the none/pooled-only run is the control for what per-residue cross-attn
-  buys.
+  buys. Add a **coupler on-vs-off** pair on top of encoder cross-attn (step 5b) — isolates what the
+  iterated cross-chain CDR self-attn ↔ epitope organization buys over the one-shot pass.
 - **Rung 4 — interpretability.** Cross-attn weights: does the H3 apex put mass on the *true* epitope
   interface residues (from the native complex) vs. diffuse/uniform?
 - **Rung 5 — generalization (the real goal).** Matched > mismatched on **held-out** epitopes, and
