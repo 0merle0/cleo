@@ -71,8 +71,9 @@ def test_sequence_diversity_rewards_difference():
     s = out.set_index("name")["div_cdr_seq_diversity"]
     assert s["a"] == pytest.approx(s["b"])
     assert s["c"] > s["a"]
-    # no structure column -> structural diversity is NaN
-    assert np.isnan(out["div_cdr_struct_diversity"]).all()
+    # no structure column -> structural diversity is 0.0 (finite, never NaN — aggregator fails fast on NaN)
+    assert (out["div_cdr_struct_diversity"] == 0.0).all()
+    assert np.isfinite(out["div_cdr_struct_diversity"]).all()
 
 
 def test_singleton_type_has_zero_diversity():

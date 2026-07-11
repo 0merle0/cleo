@@ -52,6 +52,7 @@ dataset:
     reward: antibody_interface     # reward package name under reward_dir
     split: train                            # train | val (val = 140 held-out targets)
     vhh_fraction: 0.5                        # P(sample a VHH scaffold); 1-p = Fv. Tunable.
+    seed: null                               # data-draw seed; set an int to replay target/scaffold/length draws (null => unseeded)
     cdr_length_ranges: null                  # null => native span width (no length diversity yet);
                                              # e.g. {H3: [8, 20], H1: [5, 9]} to sample lengths per step
 

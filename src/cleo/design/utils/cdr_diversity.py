@@ -12,7 +12,8 @@ Two complementary signals (both computed; weight either/both in ``reward_aggrega
   ``cdr_spans`` (no structure), so it always works.
 - **structural** (``_cdr_struct_diversity``) — mean pairwise CA-RMSD (Kabsch-superposed) between
   same-type CDR loops, read from the oracle's predicted structures. Only same-length pairs are
-  comparable; when the structure is missing / gemmi is unavailable the value is NaN.
+  comparable; when the structure is missing / gemmi is unavailable the value is ``0.0`` (finite —
+  the reward aggregator fails fast on NaN, so this step never emits one).
 
 Per design, each signal is averaged over that design's CDR types (H1/H2/H3, L1-L3). Both are
 "higher = more diverse", so aggregate them with ``mode: max``.
@@ -165,7 +166,10 @@ def cdr_diversity_from_df(df_input, cfg, step_name="cdr_diversity"):
         rows.append({
             "name": d["name"],
             f"{step_name}_cdr_seq_diversity": float(np.mean(seq_scores)) if seq_scores else 0.0,
-            f"{step_name}_cdr_struct_diversity": float(np.mean(struct_scores)) if struct_scores else float("nan"),
+            # 0.0 (finite, = "no structural-diversity signal") rather than NaN when no structure is
+            # available / no equal-length pairs — the reward aggregator fails fast on NaN, so this
+            # step must never emit one in normal operation.
+            f"{step_name}_cdr_struct_diversity": float(np.mean(struct_scores)) if struct_scores else 0.0,
         })
 
     return pd.merge(df_input, pd.DataFrame(rows), on="name", how="inner")

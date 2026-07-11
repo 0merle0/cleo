@@ -105,9 +105,14 @@ class PolicyMPNN:
             if comp is not None:
                 # On-the-fly composer: sample target x scaffold x CDR-lengths per step
                 # (no materialized cross-product JSONL; SPEC 6.9).
+                import random as _random
+
                 from cleo.design.data.composer import ComposingDataset
 
                 ranges = comp.get("cdr_length_ranges", None)
+                # Data seed (SPEC 6.9): seeding the composer's own rng makes the target/scaffold/
+                # CDR-length draws deterministically replayable while staying online. None => unseeded.
+                data_seed = comp.get("seed", None)
                 self.dataset = ComposingDataset.load(
                     comp.targets_csv,
                     comp.scaffold_pool_csv,
@@ -116,6 +121,7 @@ class PolicyMPNN:
                     split=comp.get("split", None),
                     vhh_fraction=comp.get("vhh_fraction", 0.5),
                     cdr_length_ranges=OmegaConf.to_container(ranges) if ranges is not None else None,
+                    rng=_random.Random(data_seed) if data_seed is not None else None,
                 )
             else:
                 from cleo.design.data.dataset import DesignDataset

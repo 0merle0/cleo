@@ -872,9 +872,10 @@ backward-compatible via fallback. Per rollout the loop logs `is_vhh` into the tr
 full provenance (`scaffold_id`, `kind`, `target_id`, `cdr_lengths`) to `{run_name}_provenance.csv`.
 
 **Online + reproducible.** This is the runtime dataloading path — composition is fully online (no
-materialized cross-product on disk). All three draws go through the composer's own `rng`, so seeding
-it makes a run **deterministically replayable** while staying online; the provenance CSV records the
-exact (scaffold, target, CDR-length) draw per step for post-hoc audit.
+materialized cross-product on disk). All three draws go through the composer's own `rng`; the config
+key `dataset.composer.seed` (threaded into `random.Random(seed)` in `policy.py`) makes a run
+**deterministically replayable** while staying online (null => unseeded). The provenance CSV records
+the exact (scaffold, target, CDR-length) draw per step for post-hoc audit.
 Tests: `test_composer.py` (11). Config: `config/design/antibody_composed.yaml`.
 
 ## 7. Milestones

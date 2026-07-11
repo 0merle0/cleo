@@ -75,6 +75,45 @@ class UniversalReward():
         })
     
     
+    def _aggregate_rewards(self, df):
+        """Normalized weighted sum of the configured metrics -> per-design reward tensor.
+
+        Fails fast on non-finite metrics: a single NaN/Inf would poison the whole GRPO group
+        (mean/std -> NaN -> all advantages NaN), so surface it loudly instead of masking — we
+        should not be seeing NaNs; a failed structure prediction or a buggy reward step is the
+        usual cause and is worth investigating, not silently zeroing.
+        """
+        rewards, weights = [], []
+        for m in self.reward_aggregation:
+            print(f"Processing metric: {m.metric} with mode: {m.mode} and weight: {m.weight}")
+            _r = torch.tensor(df[m.metric].tolist())
+
+            _bad = ~torch.isfinite(_r)
+            if _bad.any():
+                _names = df["name"].tolist() if "name" in df.columns else list(range(len(_r)))
+                _offenders = [_names[i] for i in _bad.nonzero().flatten().tolist()]
+                raise ValueError(
+                    f"reward metric {m.metric!r} produced non-finite values (NaN/Inf) for designs "
+                    f"{_offenders}: {_r[_bad].tolist()}. This poisons the GRPO batch — investigate "
+                    f"(failed structure prediction? buggy reward step?) rather than masking.")
+
+            _r_clamped = torch.clamp(_r, min=m.lower_bound, max=m.upper_bound)
+            _r_norm = (_r_clamped - m.lower_bound) / (m.upper_bound - m.lower_bound + 1e-3)
+
+            if m.mode == "max":
+                _reward = _r_norm
+            elif m.mode == "min":
+                _reward = 1 - _r_norm
+            elif m.mode == "avg":
+                _reward = 1 - torch.abs(_r_norm - 0.5) * 2  # reward highest at 0.5
+            else:
+                raise ValueError(f"Unknown mode {m.mode} for metric {m.metric}")
+
+            rewards.append(_reward * m.weight)
+            weights.append(m.weight)
+
+        return torch.stack(rewards, dim=1).sum(dim=1) / sum(weights)
+
     @torch.no_grad()
     def __call__(self, step, policy_output, feature_dict, device):
         """Run the full reward pipeline: decode → metric steps → aggregate.
@@ -122,30 +161,8 @@ class UniversalReward():
         if os.path.exists(af3_out_dir):
             shutil.rmtree(af3_out_dir, ignore_errors=True)
 
-        rewards = []
-        weights = []
         print("********* aggregating rewards *********")
-        for m in self.reward_aggregation:
-            print(f"Processing metric: {m.metric} with mode: {m.mode} and weight: {m.weight}")
-            _r = torch.tensor(df[m.metric].tolist())
-
-            _r_clamped = torch.clamp(_r, min=m.lower_bound, max=m.upper_bound)
-            _r_norm = (_r_clamped - m.lower_bound) / (m.upper_bound - m.lower_bound + 1e-3)
-
-            if m.mode == "max":
-                _reward = _r_norm
-            elif m.mode == "min":
-                _reward = 1 - _r_norm
-            elif m.mode == "avg":
-                _reward = 1 - torch.abs(_r_norm - 0.5) * 2  # reward highest at 0.5
-            else:
-                raise ValueError(f"Unknown mode {m.mode} for metric {m.metric}")
-
-            rewards.append(_reward*m.weight)
-            weights.append(m.weight)
-
-        # get final rewards
-        reward = torch.stack(rewards, dim=1).sum(dim=1) / sum(weights)
+        reward = self._aggregate_rewards(df)
 
         # make sure reward is properly padded when designing multiple chains
         if len(reward.shape) == 2 and reward.shape[1] != chain_mask.shape[0]:
