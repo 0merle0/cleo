@@ -2,7 +2,7 @@
 # P0.5 pilot: GRPO fine-tune LigandMPNN on one AME backbone against the
 # published motif-RMSD criterion.
 #
-#   sbatch experiments/ame/submit_train.sh <backbone-stem> [N_steps] [batch_size]
+#   sbatch experiments/ame/submit_train.sh <backbone-stem> [N_steps] [batch_size] [config_dir]
 #
 # Folds dominate the cost: N_steps x batch_size AF3 calls. Sharded across the
 # GPUs allocated here.
@@ -19,9 +19,10 @@ set -euo pipefail
 
 CLEO=/home/jgershon/git/cleo
 AME=${CLEO}/experiments/ame
-BB=${1:?usage: submit_train.sh <backbone-stem> [N_steps] [batch_size]}
-STEPS=${2:-40}
+BB=${1:?usage: submit_train.sh <backbone-stem> [N_steps] [batch_size] [config_dir]}
+STEPS=${2:-200}
 BATCH=${3:-16}
+CFGDIR=${4:-${AME}/p9div/configs}
 
 mkdir -p "${AME}/logs"
 cd "${CLEO}"
@@ -29,7 +30,7 @@ cd "${CLEO}"
 export HYDRA_FULL_ERROR=1
 
 uv run cleo-design-train \
-    --config-path "${AME}/configs" \
+    --config-path "${CFGDIR}" \
     --config-name "${BB}" \
     N_steps="${STEPS}" \
     batch_size="${BATCH}"
