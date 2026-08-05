@@ -1,0 +1,66 @@
+run_name: run_M0500_1e3i_cond22_67
+output_dir: experiments/ame/runs9/run_M0500_1e3i_cond22_67
+pdb: experiments/ame/targets12/run_M0500_1e3i_cond22_67-atomized-bb-True.pdb
+checkpoint_path: null
+algorithm: grpo
+batch_size: 32
+N_steps: 200
+lr: 0.0001
+checkpoint_every_n_steps: 25
+kl_weight: 0.0
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+model_type: ligand_mpnn
+ligand_mpnn_use_side_chain_context: 1
+temperature: 1.0
+omit_AA: CX
+fixed_residues: A6 A84 A89 A90 A114 A117
+reward:
+  _target_: cleo.design.utils.reward.UniversalReward
+  output_dir: ${output_dir}
+  run_name: ${run_name}
+  steps:
+  - name: af3
+    target_fn: cleo.design.utils.oracle.af3_from_df
+    cfg:
+      rundir: experiments/ame/runs9/run_M0500_1e3i_cond22_67
+      template_path: experiments/ame/p9/templates/run_M0500_1e3i_cond22_67.json
+      af3_container: /net/software/containers/af3.sif
+      af3_script: /opt/alphafold3/run_alphafold.py
+      model_dir: /net/databases/alphafold
+  - name: ame
+    target_fn: cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df
+    cfg:
+      design_pdb: experiments/ame/targets12/run_M0500_1e3i_cond22_67-atomized-bb-True.pdb
+      trb: experiments/ame/targets12/run_M0500_1e3i_cond22_67-atomized-bb-True.trb
+      motif_atoms:
+        A90:
+        - SG
+        - CB
+        A89:
+        - CD
+        - N
+        - CG
+        A84:
+        - OG1
+        - CB
+        A6:
+        - NE2
+        - CD2
+        - CE1
+        A117:
+        - SG
+        - CB
+        - CA
+        A114:
+        - OG
+        - CB
+      structure_col: af3_path
+  reward_aggregation:
+  - metric: ame_motif_rmsd
+    lower_bound: 0.5
+    upper_bound: 6.0
+    weight: 1.0
+    mode: min

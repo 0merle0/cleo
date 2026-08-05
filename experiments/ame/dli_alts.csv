@@ -1,0 +1,5 @@
+benchmark,design_id,n_pred_pass,n_pred,clash_ok,best_rmsd,seq_pass_min,seq_equiv,islands,site_pass,pdb
+M0092_1dli,rfflow_fixed-ligand_run_M0092_1dli_cond6_43-atomized-bb-True,0,40,True,6.944880962371826,0,0.0,6.0,0.01,run_M0092_1dli_cond6_43-atomized-bb-True.pdb
+M0092_1dli,rfflow_fixed-ligand_run_M0092_1dli_cond6_8-atomized-bb-True,0,40,True,6.675748348236084,0,0.0,6.0,0.01,run_M0092_1dli_cond6_8-atomized-bb-True.pdb
+M0092_1dli,rfflow_fixed-ligand_run_M0092_1dli_cond6_28-atomized-bb-True,0,40,True,6.614898204803467,0,0.0,6.0,0.01,run_M0092_1dli_cond6_28-atomized-bb-True.pdb
+M0092_1dli,rfflow_fixed-ligand_run_M0092_1dli_cond6_35-atomized-bb-True,0,40,True,6.591305255889893,0,0.0,6.0,0.01,run_M0092_1dli_cond6_35-atomized-bb-True.pdb

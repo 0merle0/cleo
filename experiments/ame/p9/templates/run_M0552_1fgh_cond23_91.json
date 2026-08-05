@@ -1,0 +1,27 @@
+{
+  "name": "run_M0552_1fgh_cond23_91",
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "AAAAAAAAAAAHAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARAAASAAAAAAAAAAAAAAAAAAAAAAAAAAARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAAA",
+        "unpairedMsa": "",
+        "pairedMsa": "",
+        "templates": []
+      }
+    },
+    {
+      "ligand": {
+        "id": "B",
+        "ccdCodes": [
+          "ATH"
+        ]
+      }
+    }
+  ],
+  "modelSeeds": [
+    1
+  ],
+  "dialect": "alphafold3",
+  "version": 2
+}

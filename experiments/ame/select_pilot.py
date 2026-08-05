@@ -8,10 +8,14 @@ good sequence contributes up to 5. Their per-backbone budget is 8 sequences.
 
 Classes (RFdiffusion2 (fixed ligand) rows only)
 ----------------------------------------------
-    easy    n_pred_pass >= 30       >=6 of the 8 sequences pass. LigandMPNN
-                                    already solves it; question is whether we
-                                    add diversity without losing fidelity.
-    medium  10 <= n_pred_pass <= 29  ~2-6 of 8 pass. The most headroom.
+    pass_   n_pred_pass >= 10       At least ~2 of the 8 sequences pass, i.e.
+                                    LigandMPNN already finds something. One
+                                    backbone each at 4, 5 and 6 residue islands,
+                                    so motif complexity is the axis within the
+                                    class. Note 6 is the ceiling: exactly one
+                                    backbone in the entire benchmark has 6
+                                    islands and reaches this pass rate, and
+                                    none has 7.
     near    0 of 8 pass, best motif RMSD < 1.7 A
                                     Failed, but close. Cheapest rescue.
     hard    0 of 8 pass, best motif RMSD > 5.0 A
@@ -21,6 +25,14 @@ Classes (RFdiffusion2 (fixed ligand) rows only)
 `near` and `hard` both require `no_clash`: a backbone that buries the ligand
 cannot be repaired by any sequence, so including one would count a guaranteed
 failure against us.
+
+A selected backbone must also be clash-free under *our* implementation, not
+only theirs. Our `ligand_dist_des_ncac_min` disagrees with the deposited value
+by a median 0.38 A (max 1.76 A on this set) because they measure against the
+packed/unidealized design and we hold the idealized backbone. A backbone that
+we score as clashing can never report a composite pass in our own bookkeeping,
+so it must be excluded regardless of what their column says. See
+`verify_clash.py`.
 
 Selection rules
 ---------------
@@ -96,20 +108,45 @@ def _take(pool, n, sort_cols, ascending, exclude_sites=()):
     return pd.DataFrame(picked)
 
 
-def select(bb, n_each=3):
+def _excluded(path):
+    """design_ids that fail our own clash check; see clash_excluded.txt."""
+    if not Path(path).exists():
+        return set()
+    out = set()
+    for line in Path(path).read_text().splitlines():
+        line = line.split("#")[0].strip()
+        if line:
+            out.add(line)
+    return out
+
+
+def select(bb, n_each=3, exclude_file=None):
+    if exclude_file:
+        ex = _excluded(exclude_file)
+        if ex:
+            bb = bb[~bb.design_id.isin(ex)]
     fail = bb[(bb.n_pred_pass == 0) & bb.clash_ok]
-    classes = {
-        "easy":   bb[bb.n_pred_pass >= 30],
-        "medium": bb[bb.n_pred_pass.between(10, 29)],
-        "near":   fail[fail.best_rmsd < NEAR_MISS_MAX],
-        "hard":   fail[fail.best_rmsd > HARD_MISS_MIN],
-    }
     out, used = [], set()
-    for cls, pool in classes.items():
-        # islands descending; then hardest-first within the class so we are not
-        # quietly picking the friendliest member of each band.
-        asc = [False, cls in ("easy", "medium")]
-        sel = _take(pool, n_each, ["islands", "best_rmsd"], asc, exclude_sites=used)
+
+    # passing: one backbone per island count, hardest complexity first, so the
+    # class spans motif complexity rather than clustering at the easy end.
+    p = bb[bb.n_pred_pass >= 10]
+    picked = []
+    for isl in (6, 5, 4):
+        cand = p[(p.islands == isl) & ~p.benchmark.isin(used)]
+        if cand.empty:
+            cand = p[p.islands == isl]
+        if cand.empty:
+            continue
+        r = cand.sort_values("n_pred_pass", ascending=False).iloc[0]
+        picked.append(r)
+        used.add(r.benchmark)
+    out.append(pd.DataFrame(picked).assign(cls="pass"))
+
+    for cls, pool in (("near", fail[fail.best_rmsd < NEAR_MISS_MAX]),
+                      ("hard", fail[fail.best_rmsd > HARD_MISS_MIN])):
+        sel = _take(pool, n_each, ["islands", "best_rmsd"], [False, False],
+                    exclude_sites=used)
         sel = sel.assign(cls=cls)
         used |= set(sel.benchmark)
         out.append(sel)
@@ -125,10 +162,11 @@ def main():
     ap.add_argument("--summary", default=DEFAULT_SUMMARY)
     ap.add_argument("--n-each", type=int, default=3)
     ap.add_argument("--out", default=HERE / "pilot_backbones.csv")
+    ap.add_argument("--exclude", default=HERE / "clash_excluded.txt")
     a = ap.parse_args()
 
     bb = per_backbone(a.csv, a.summary)
-    sel = select(bb, a.n_each)
+    sel = select(bb, a.n_each, a.exclude)
     sel.to_csv(a.out, index=False)
 
     cols = ["cls", "benchmark", "islands", "site_pass", "n_pred_pass",

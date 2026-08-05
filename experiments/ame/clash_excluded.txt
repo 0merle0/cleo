@@ -1,0 +1,9 @@
+# Backbones excluded because they clash under OUR ligand_dist implementation
+# even though the deposited no_clash says otherwise. See verify_clash.py: the
+# deposit measures against the packed/unidealized design, we hold the idealized
+# backbone, and the two disagree by a median 0.38 A (max 1.76 A on this set).
+# A backbone we score as clashing can never report a composite pass in our own
+# bookkeeping, so it would enter the experiment as a guaranteed failure.
+#
+# design_id                                                  ours   published
+rfflow_fixed-ligand_run_M0092_1dli_cond6_43-atomized-bb-True  # 1.05    2.81
