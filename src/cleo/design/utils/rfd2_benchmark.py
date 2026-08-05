@@ -9,13 +9,34 @@ rather than inferred.
 The motif definition is read straight from the design's ``.trb``, so this works
 on any RFdiffusion2 output without per-target configuration.
 
+Reference structure
+-------------------
+We score against the design PDB we generated sequences for. Their pipeline
+compares each prediction against ``unideal``, ``packed`` (the LigandMPNN-packed
+design) and ``ref`` (the native active site), and the deposited
+``*_chai_motif`` column corresponds to one of those -- most likely not the
+idealized backbone we hold. So our absolute values need not equal theirs
+sequence-for-sequence even when the definition is matched. This is fine for a
+baseline-vs-CLEO comparison run through one pipeline, and is the reason
+``calibrate_metrics.py`` could never reproduce their numbers exactly.
+
 Criteria (names and cutoffs as published)
 -----------------------------------------
 ``chai_motif_pass``
-    ``backbone_aligned_allatom_rmsd_chai_motif < 1.5``. Superimpose the
-    predicted structure onto the design over protein backbone atoms, then take
-    all-atom RMSD over the constrained motif atoms. Sequence-dependent, and the
-    primary optimization target.
+    ``backbone_aligned_allatom_rmsd_chai_motif < 1.5``. Superimpose on the
+    N/CA/C/O of the **motif residues only**, then take RMSD over **all heavy
+    atoms of those residues**. Sequence-dependent, and the primary optimization
+    target.
+
+    Both halves are easy to get wrong, and getting either wrong makes good
+    designs look bad. The column name decodes as
+    ``{align_to}_aligned_{rmsd_to}_rmsd_{source}_{target}``
+    (``per_sequence_metrics.py``), with ``align_to='backbone'`` selecting
+    ``['N','CA','C','O']`` per motif residue -- a *local* superposition, not a
+    global one -- and ``rmsd_to='allatom'`` selecting every heavy atom of the
+    residue, not the ``.trb`` contig-atom subset. The paper states it as: a
+    success is RMSD of all heavy atoms in the catalytic residues < 1.5 A when
+    aligned on the backbone N, CA, C of those catalytic residues.
 
 ``no_clash``
     ``ligand_dist_des_ncac_min > 1.5``. Minimum distance from any ligand atom to
@@ -69,6 +90,20 @@ NCAC = {"N", "CA", "C"}
 MOTIF_RMSD_CUTOFF = 1.5   # fa_rmsd_cutoff; the only optimizable pass criterion
 CLASH_CUTOFF = 1.5        # no_clash thresh; property of the backbone alone
 
+# Side-chain atom pairs that are indistinguishable under a 180-degree flip of
+# the terminal group. Their pipeline resolves this (`sidechain_symmetry_resolved`,
+# `make_alternate_xyz_indexes`); without it an otherwise perfect carboxylate
+# scores ~1 A purely from an arbitrary naming choice. Asn/Gln are deliberately
+# excluded: OD1/ND2 differ in element, so the assignment is chemistry, not
+# nomenclature.
+SYMMETRIC_PAIRS = {
+    "ASP": [("OD1", "OD2")],
+    "GLU": [("OE1", "OE2")],
+    "ARG": [("NH1", "NH2")],
+    "PHE": [("CD1", "CD2"), ("CE1", "CE2")],
+    "TYR": [("CD1", "CD2"), ("CE1", "CE2")],
+}
+
 
 class _TrbShim(pickle.Unpickler):
     """Load a .trb without the rf_diffusion stack installed."""
@@ -93,6 +128,56 @@ def motif_atoms_from_trb(trb_path):
     for (chain, resnum), i0 in zip(t["con_hal_pdb_idx"], t["con_hal_idx0"]):
         out[f"{chain}{int(resnum)}"] = list(a2n.get(int(i0), []))
     return out
+
+
+def motif_residues_from_trb(trb_path):
+    """["A62", "A66", ...] -- the catalytic residues, ignoring atom subsets.
+
+    The published metric is over *all heavy atoms* of these residues, so only
+    the residue identity matters here. ``motif_atoms_from_trb`` remains for the
+    contig-atom variant.
+    """
+    t = _TrbShim(open(trb_path, "rb")).load()
+    return [f"{c}{int(r)}" for c, r in t["con_hal_pdb_idx"]]
+
+
+def _heavy_atoms_by_residue(arr, residues):
+    """{"A66": ["N","CA","C","O","CB",...]} -- heavy atoms present for each residue."""
+    out = {}
+    for key in residues:
+        chain, resnum = key[0], int(key[1:])
+        m = (arr.chain_id == chain) & (arr.res_id == resnum) & (arr.element != "H")
+        out[key] = sorted(set(arr.atom_name[m].tolist()))
+    return out
+
+
+def _residue_name(arr, key):
+    m = (arr.chain_id == key[0]) & (arr.res_id == int(key[1:]))
+    names = arr.res_name[m]
+    return str(names[0]) if len(names) else ""
+
+
+def _symmetry_variants(des, motif_residues, keys):
+    """Yield each symmetry-equivalent relabelling of `keys` on the design side.
+
+    Only the terminal-group swaps in SYMMETRIC_PAIRS are considered, and each
+    residue is flipped independently, so the returned list is the product over
+    residues that actually have a symmetric group. Returns a list of key lists
+    parallel to `keys`.
+    """
+    swaps = []
+    for key in motif_residues:
+        pairs = SYMMETRIC_PAIRS.get(_residue_name(des, key), [])
+        if pairs:
+            swaps.append((key, pairs))
+    variants = [list(keys)]
+    for key, pairs in swaps:
+        flip = {}
+        for a, b in pairs:
+            flip[(key[0], int(key[1:]), a)] = (key[0], int(key[1:]), b)
+            flip[(key[0], int(key[1:]), b)] = (key[0], int(key[1:]), a)
+        variants = variants + [[flip.get(k, k) for k in v] for v in variants]
+    return variants
 
 
 def _load(path):
@@ -155,24 +240,60 @@ def _ligand_mask(arr):
 
 
 def compute_metrics(design_pdb, pred_path, motif_atoms, pocket_cutoff=8.0):
-    """All benchmark metrics for one predicted structure. Returns a dict."""
+    """All benchmark metrics for one predicted structure. Returns a dict.
+
+    ``motif_atoms`` supplies the contig-atom subset for the secondary
+    ``motif_rmsd_contigatom`` variant; the headline ``motif_rmsd`` is over all
+    heavy atoms of those residues, per the published definition.
+    """
     des, pred = _load(design_pdb), _load(pred_path)
     out = {}
+    motif_residues = list(motif_atoms)
 
-    # --- chai_motif_pass: backbone-align prediction to design, RMSD on motif atoms
-    bb_keys = _backbone_keys(des)
-    bd, bp, _ = _paired_coords(des, pred, bb_keys)
-    if bd is None:
+    # --- backbone_aligned_allatom_rmsd_chai_motif.
+    # Superposition is on N/CA/C/O of the MOTIF RESIDUES ONLY -- not the whole
+    # protein backbone. RMSD is then over ALL heavy atoms of those residues, not
+    # the .trb contig-atom subset. Both follow per_sequence_metrics.py, where the
+    # column name decodes as {align_to}_aligned_{rmsd_to}_rmsd_{source}_{target}
+    # with align_to='backbone' -> ['N','CA','C','O'] per motif residue and
+    # rmsd_to='allatom' -> every heavy atom of the residue.
+    #
+    # A local alignment is much the stricter test: a global fit can absorb motif
+    # error into a small whole-body rotation, whereas aligning on the motif's own
+    # backbone leaves the side chains nowhere to hide.
+    heavy = _heavy_atoms_by_residue(des, motif_residues)
+    align_keys = [(r[0], int(r[1:]), a) for r in motif_residues
+                  for a in sorted(BACKBONE_ATOMS & set(heavy[r]))]
+    ad, ap, _ = _paired_coords(des, pred, align_keys)
+    if ad is None or len(ad) < 3:
         return {"motif_rmsd": np.nan}
-    to_design = _kabsch(bp, bd)
+    to_design = _kabsch(ap, ad)
 
-    motif_keys = [(r[0], int(r[1:]), a) for r, atoms in motif_atoms.items() for a in atoms]
-    md, mp, miss = _paired_coords(des, pred, motif_keys)
+    allatom_keys = [(r[0], int(r[1:]), a) for r in motif_residues for a in heavy[r]]
+    md, mp, miss = _paired_coords(des, pred, allatom_keys)
     if md is None:
         return {"motif_rmsd": np.nan}
-    out["motif_rmsd"] = _rmsd(to_design(mp), md)
+    # Symmetry is resolved on the design side by relabelling, so the prediction's
+    # coordinates are never permuted -- only which design atom each is compared to.
+    best = None
+    for variant in _symmetry_variants(des, motif_residues, allatom_keys):
+        vd, vp, _ = _paired_coords(des, pred, variant)
+        if vd is None:
+            continue
+        r = _rmsd(to_design(vp), vd)
+        best = r if best is None else min(best, r)
+    out["motif_rmsd"] = best if best is not None else _rmsd(to_design(mp), md)
     out["motif_atoms_missing"] = miss
+    out["motif_atoms_used"] = len(md)
     out["motif_pass"] = out["motif_rmsd"] < MOTIF_RMSD_CUTOFF
+
+    # Secondary: the constrained-atom subset under the same local alignment.
+    # Kept because it is what the .trb actually pins, so a large gap between the
+    # two says the constrained atoms are right and the rest of the residue is not.
+    contig_keys = [(r[0], int(r[1:]), a) for r, atoms in motif_atoms.items() for a in atoms]
+    cd, cp, _ = _paired_coords(des, pred, contig_keys)
+    if cd is not None:
+        out["motif_rmsd_contigatom"] = _rmsd(to_design(cp), cd)
 
     # --- no_clash: design-only, min ligand-to-N/CA/C distance. Constant per
     # backbone; computed here so a run is self-describing.

@@ -457,26 +457,25 @@ The gate ran two backbones from `M0664_2dhn` with opposite published outcomes
 (`cond29_29`, 40/40 passing under their Chai eval; `cond29_6`, 0/40), 8
 sequences each, sampled at T = 0.1 and folded with AF3:
 
-| backbone | side-chain ctx | motif RMSD min / median | passing | ligand RMSD med | AF3 ptm med |
-|---|---|---|---|---|---|
-| cond29_29 (their 40/40) | off | 1.82 / 2.68 | **0/8** | 4.60 | 0.90 |
-| cond29_29 | **on** | 1.32 / **1.53** | **3/8** | 4.62 | 0.90 |
-| cond29_6 (their 0/40) | off | 2.21 / 3.39 | 0/8 | 11.62 | 0.78 |
-| cond29_6 | **on** | 1.93 / 3.17 | **0/8** | 15.19 | 0.81 |
+Numbers below use the **corrected** motif metric (see next section). An earlier
+version of this table used a global superposition over the contig-atom subset
+and reported 0/8 -> 3/8; that overstated the effect and is superseded.
 
-With context off the positive control failed outright, and decomposing the RMSD
-showed why: AF3 reproduced the fold (global backbone RMSD 0.9 A) and the motif
-*backbone* almost exactly (0.15 A), while motif *all-atom* RMSD sat at 1.8-3.5 A.
-The pocket was right and the rotamer was not. The benchmark's motif RMSD is
-measured over side-chain atoms — here Glu OE2/CD and Lys NZ/CE/CD — so a policy
-shown only the motif backbone has no reason to hold the rotamer.
+| backbone | side-chain ctx | motif RMSD min / median | passing | AF3 ptm med |
+|---|---|---|---|---|
+| cond29_29 (their 40/40) | off | 1.17 / 1.45 | 5/8 | 0.90 |
+| cond29_29 | **on** | 0.75 / **0.80** | **8/8** | 0.90 |
+| cond29_6 (their 0/40) | off | 1.56 / 1.93 | 0/8 | 0.78 |
+| cond29_6 | **on** | 1.65 / 2.04 | **0/8** | 0.81 |
 
-Turning it on rescues the positive control (0/8 -> 3/8) and leaves the negative
-control at 0/8. That asymmetry is the useful part: the fix helps where the
-published data says it should and not where it says it should not, so it is
-correcting a real deficiency rather than inflating the metric. **AF3 ptm is
-unchanged at 0.90**, confirming the gain is rotamer placement and not better
-folding.
+Side-chain context takes the positive control from 5/8 to 8/8 and halves its
+median RMSD, while leaving the negative control at 0/8. That asymmetry is the
+useful part: the fix helps where the published data says it should and not where
+it says it should not, so it is correcting a real deficiency rather than
+inflating the metric. **AF3 ptm is unchanged at 0.90**, confirming the gain is
+rotamer placement and not better folding — the benchmark measures side-chain
+atoms, so a policy shown only the motif backbone has no reason to hold the
+rotamer.
 
 Implemented as `ligand_mpnn_use_side_chain_context`, now configurable in
 `PolicyMPNN` (default 0 to preserve existing runs) and set to 1 in every
@@ -484,10 +483,44 @@ generated AME config, so CLEO does not train under a handicap its baseline
 lacks. `--side-chain-context 0` is retained as an ablation: it isolates how much
 of this benchmark is rotamer placement, which is a result in its own right.
 
-One thing this does *not* close: we reach 3/8 where they report 40/40, and the
-remaining gap is unattributed — candidates are LigandMPNN side-chain packing
-(which they run and we do not), AF3-vs-Chai disagreement, and n = 8. It does not
-block pilots, since our head-to-head is baseline-vs-CLEO through one pipeline.
+### The motif metric, checked against their actual definition
+
+Reading the published *wording* rather than inferring from the CSV schema found
+two errors in our implementation, both of which made good designs look bad. The
+column name decodes in `per_sequence_metrics.py` as
+`{align_to}_aligned_{rmsd_to}_rmsd_{source}_{target}`, so
+`backbone_aligned_allatom_rmsd_chai_motif` means:
+
+1. **Superpose on N/CA/C/O of the motif residues only** — a *local* alignment.
+   We were aligning on the entire protein backbone.
+2. **RMSD over all heavy atoms of those residues** — we were using the `.trb`
+   contig-atom subset (often just 2-3 tip atoms).
+
+The paper states the same thing in prose: a success is RMSD of all heavy atoms
+in the catalytic residues < 1.5 A when aligned on the backbone N, CA, C of those
+catalytic residues.
+
+Local alignment is the stricter of the two conventions — a global fit can absorb
+motif error into a whole-body rotation — but scoring only tip atoms was harsher
+still, and that dominated. Correcting both, and adding terminal-group symmetry
+resolution (Asp/Glu/Arg/Phe/Tyr, as their `sidechain_symmetry_resolved` does):
+
+| backbone | their published | ours, corrected metric |
+|---|---|---|
+| cond29_29 | 40/40 pass | **8/8** pass, median 0.80 A |
+| cond29_6 | 0/40 pass | **0/8** pass, median 2.04 A |
+
+**Both controls now agree with the published outcome.** The 3/8-vs-40/40 gap was
+our metric, not our designs, and it is closed — no appeal to packing, oracle
+disagreement or sample size required.
+
+One caveat on absolute values. Their pipeline compares each prediction against
+`unideal`, `packed` (the LigandMPNN-packed design) and `ref` (the native active
+site); the deposited `*_chai_motif` column is one of those, most likely not the
+idealized backbone we hold. So our numbers need not equal theirs
+sequence-for-sequence even with the definition matched. That is acceptable for a
+baseline-vs-CLEO comparison run through one pipeline, and it explains why
+`calibrate_metrics.py` was never going to reproduce their values.
 
 ### Ligand placement is not part of the benchmark — resolved, not a blocker
 
