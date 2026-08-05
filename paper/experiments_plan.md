@@ -68,22 +68,44 @@ Two things follow immediately:
   published basis for choosing the P1 subset across the difficulty range,
   rather than picking sites that flatter us.
 
-### Blocker: we need the actual backbone PDBs
+### RESOLVED: everything is on local IPD storage
 
-The `rfd2_ame_41_backbones.tar.gz` link is dead. Three routes, in order of
-preference:
+The public `rfd2_ame_41_backbones.tar.gz` URL 404s, but the file itself is on
+the lab share. Nothing needs to be downloaded.
 
-1. **Ask the authors.** Woody Ahern and several co-authors are at IPD. A dead
-   link on a CC-BY deposit is a one-email fix and by far the cheapest path.
-2. **Pull the 177 GB `enzyme_bench_n41.tar`** and extract the AME designs.
-   Live and confirmed reachable; costly but self-service.
-3. **Regenerate** with public RFdiffusion2 inference code + `mcsa_41.json`.
-   Fully reproducible, but our backbones then differ from theirs, so the
-   published pass/fail labels no longer apply directly and the baseline has to
-   be re-established ourselves.
+```
+/net/lab/pub/rfdiffusion2/
+  ame_results/rfd2_ame_41_backbones.tar.gz     12.6 GB  ← the 404'd file
+  model_weights/RFD_140.pt, RFD_173.pt          2.3 GB  ← RFdiffusion2 weights
+  sifs/chai.sif                                 8.4 GB  ← the Chai-1 oracle
+  sifs/rfdiffusion.sif, mlfold.sif
+  2024-12-16_08-11-34_enzyme_bench_n41.tar       52 GB  (apparent 177 GB, sparse)
+  2025-03-17_ablation_subsampled_designs.tar    102 GB
+  rfd2_active_designs.zip                        36 MB
+```
 
-Route 1 or 2 preserves the strongest version of the claim: rescue measured
-against *their* published designs and *their* published failure labels.
+**Verified join, 2026-08-04.** The tarball holds 8,200 members: 4,100 `.pdb`
+backbones plus 4,100 matching `.trb` files. Member names map to the results CSV
+by stripping the `rfflow_fixed-ligand_` prefix from `design_id`:
+
+```
+design_id  rfflow_fixed-ligand_run_M0024_1nzy_cond0_0-atomized-bb-True
+tar member                     run_M0024_1nzy_cond0_0-atomized-bb-True.pdb
+```
+
+**4,100 / 4,100 backbones matched, 0 missing. All 3,136 rescue targets are
+present and individually addressable.** The index is committed at
+`paper/figures/data/rfd2_AME_backbone_index.csv` (site, design_id, pdb member,
+n_pass, n_seq, rescue_target).
+
+The `.trb` files matter as much as the PDBs — they carry the contig mapping, so
+motif positions are recoverable per backbone and can be handed straight to
+CLEO's `fixed_residues`. Without them, motif indices would have to be inferred.
+
+Consequence for the paper: rescue is measured against **their** published
+backbones and **their** published failure labels, using **their** success
+criterion, with **their** oracle container. That is the strongest available
+version of the claim, and it is now unblocked end to end.
 
 ---
 
