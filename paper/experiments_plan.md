@@ -442,7 +442,8 @@ workaround for that — it is the correct design either way.
 
 | Phase | Work | Purpose |
 |---|---|---|
-| **P0** | Extract and freeze filter thresholds from benchmark source; verify CLEO's LigandMPNN mode matches theirs; reproduce A0 on 3–5 sites | Prove we can hit their published numbers before claiming to beat them |
+| **P0** | **Metric calibration gate (§3b)** — confirm every metric we intend to report computes end-to-end; verify CLEO's LigandMPNN matches their motif-rotamer-aware + packing mode | Prove we can *measure* before claiming to *improve* |
+| **P0.5** | **Pilot runs** — a few backbones per class through the full loop (sample → AF3 → metrics → reward → GRPO step) | Shake out wiring at small scale before committing GPU time |
 | **P1** | E1 + E2 on a stratified subset (8–12 sites spanning chemistry and difficulty) | The core claim, cheaply |
 | **P2** | E3 rescue on the same subset; E4 accounting throughout | The headline |
 | **P3** | Scale to all 41 sites; E5 oracle swap; E6 transfer; E7 | Breadth and credibility |
