@@ -152,6 +152,14 @@ class UniversalReward():
             padding = torch.zeros(chain_mask.shape[0] - reward.shape[1]).unsqueeze(0).repeat(reward.shape[0], 1)
             reward = torch.cat([reward, padding], dim=1)
 
+        # Persist the aggregated scalar alongside the metrics it came from.
+        # Without it the per-step record shows what was measured but not what
+        # was optimized, so reward shaping cannot be audited after the fact.
+        # Guarded: in the multi-chain case `reward` has been padded to a 2D
+        # per-position tensor and no longer aligns with the rows.
+        if reward.dim() == 1 and reward.shape[0] == len(df):
+            df["reward"] = reward.tolist()
+
         # save df to output dir
         df.to_csv(os.path.join(rundir, f"metrics.csv"), index=False)
 

@@ -11,7 +11,7 @@
 #SBATCH --nodes=1
 #SBATCH -c 16
 #SBATCH --mem=96g
-#SBATCH -t 12:00:00
+#SBATCH -t 2-00:00:00
 #SBATCH -J ame_train
 #SBATCH -o /home/jgershon/git/cleo/experiments/ame/logs/%x_%j.out
 
