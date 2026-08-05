@@ -17,14 +17,18 @@ Motif residues are pinned via ``fixed_residues`` from the ``.trb``; the design
 PDB carries their native identities (everything else is poly-ALA), so the
 rollout's ``S_true`` substitution reproduces them exactly.
 
-Known divergence from the published baseline
---------------------------------------------
-RFdiffusion2 runs LigandMPNN motif-rotamer-aware (side-chain context on) with
-packing. CLEO's policy sets ``ligand_mpnn_use_side_chain_context = 0``. Our
-baseline may therefore be slightly weaker than theirs. It does not bias the
-comparison we actually report -- both our arms share the setting -- but it does
-mean "our baseline" and "their published baseline" are not interchangeable, and
-figures must not mix them.
+Side-chain context
+------------------
+Defaults to **on**, matching RFdiffusion2's motif-rotamer-aware LigandMPNN. This
+is not a detail. The benchmark's motif RMSD is dominated by side-chain tip
+placement (Lys NZ, Glu OE2 and the like), so a policy that sees only the motif
+backbone designs a pocket that has no reason to hold the rotamer. Measured on
+``M0664_2dhn_cond29_29``: with context off, AF3 reproduced the fold (backbone
+RMSD 0.9 A) and the motif backbone (0.15 A) while motif all-atom RMSD sat at
+1.8-3.5 A against a 1.5 A cutoff -- the pocket was right and the rotamer was not.
+
+``--side-chain-context 0`` reproduces the old behaviour and is worth keeping as
+an ablation: it isolates how much of the benchmark is rotamer placement.
 
 Usage
 -----
@@ -77,7 +81,8 @@ class BaselineSampler(PolicyMPNN):
         return seqs[:n]
 
 
-def build_cfg(pdb, fixed_residues, temperature, model_type="ligand_mpnn", omit_AA="CX"):
+def build_cfg(pdb, fixed_residues, temperature, model_type="ligand_mpnn", omit_AA="CX",
+              side_chain_context=1):
     return OmegaConf.create({
         "pdb": str(pdb),
         "model_type": model_type,
@@ -86,11 +91,12 @@ def build_cfg(pdb, fixed_residues, temperature, model_type="ligand_mpnn", omit_A
         "fixed_residues": fixed_residues,
         "batch_size": 1,
         "checkpoint_path": None,
+        "ligand_mpnn_use_side_chain_context": side_chain_context,
     })
 
 
 def sample_backbone(pdb, n=40, temperature=0.1, batch_size=32, model_type="ligand_mpnn",
-                    omit_AA="CX", name_prefix=None):
+                    omit_AA="CX", name_prefix=None, side_chain_context=1):
     """-> DataFrame[name, sequence, backbone, temperature]. Deduplicated is NOT
     applied: collision rate at low temperature is itself a reported quantity."""
     pdb = Path(pdb)
@@ -100,9 +106,10 @@ def sample_backbone(pdb, n=40, temperature=0.1, batch_size=32, model_type="ligan
     fixed, _, _ = parse_trb(trb)
 
     stem = pdb.name.replace("-atomized-bb-True.pdb", "").replace(".pdb", "")
-    prefix = name_prefix or f"base_T{temperature}_{stem}"
+    sc = int(side_chain_context)
+    prefix = name_prefix or f"base_T{temperature}_sc{sc}_{stem}"
 
-    sampler = BaselineSampler(build_cfg(pdb, fixed, temperature, model_type, omit_AA))
+    sampler = BaselineSampler(build_cfg(pdb, fixed, temperature, model_type, omit_AA, sc))
     seqs = sampler.sample(n, batch_size=batch_size)
 
     return pd.DataFrame({
@@ -110,6 +117,7 @@ def sample_backbone(pdb, n=40, temperature=0.1, batch_size=32, model_type="ligan
         "sequence": seqs,
         "backbone": stem,
         "temperature": temperature,
+        "side_chain_context": sc,
         "arm": "baseline",
     })
 
@@ -125,6 +133,8 @@ def main():
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--model-type", default="ligand_mpnn", choices=["ligand_mpnn", "protein_mpnn"])
     ap.add_argument("--omit-AA", default="CX")
+    ap.add_argument("--side-chain-context", type=int, default=1, choices=[0, 1],
+                    help="show fixed motif rotamers to the model (RFdiffusion2's mode)")
     ap.add_argument("--out", default=None, help="output CSV (default <out-dir>/baseline_seqs.csv)")
     ap.add_argument("--out-dir", default=HERE / "baseline")
     a = ap.parse_args()
@@ -133,7 +143,8 @@ def main():
     if not pdbs:
         raise SystemExit(f"no .pdb files in {a.pdb_dir}")
 
-    dfs = [sample_backbone(p, a.n, a.temperature, a.batch_size, a.model_type, a.omit_AA)
+    dfs = [sample_backbone(p, a.n, a.temperature, a.batch_size, a.model_type, a.omit_AA,
+                           side_chain_context=a.side_chain_context)
            for p in pdbs]
     df = pd.concat(dfs, ignore_index=True)
 

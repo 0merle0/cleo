@@ -172,10 +172,13 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
         "clip_eps_low": 0.2,
         "clip_eps_high": 0.28,
         # Every AME target has a ligand.
-        # NOTE: the RFdiffusion2 baseline runs LigandMPNN motif-rotamer-aware
-        # with packing. Confirm CLEO's ligand_mpnn path matches that mode before
-        # treating the head-to-head as apples-to-apples.
         "model_type": "ligand_mpnn",
+        # Motif-rotamer-aware, as in the RFdiffusion2 baseline. Required for a
+        # fair head-to-head, and required to do well at all: the benchmark's
+        # motif RMSD is measured over side-chain atoms, so a policy shown only
+        # the motif backbone cannot learn to hold the rotamer. Empirically this
+        # is the difference between ~2-3 A and passing.
+        "ligand_mpnn_use_side_chain_context": 1,
         "temperature": 1.0,
         "omit_AA": "CX",
         "fixed_residues": fixed_residues,

@@ -445,22 +445,53 @@ workaround for that — it is the correct design either way.
       selection and the superposition agree with the structure
 - [x] Baseline sampler reproduces the pinned motif exactly (D78/D81/R114/K138 on
       `M0058_1cju_cond4_45`, 8/8 sequences) at full backbone length
-- [ ] Motif RMSD is stable and sane on a handful of AF3 predictions (correct
-      magnitude, correlates with pass/fail on backbones whose published outcome
-      we know) — **in flight:** `run_M0664_2dhn_cond29_29` (40/40 passing under
-      their Chai eval) and `run_M0664_2dhn_cond29_6` (0/40), 8 sequences each.
-      Same site, opposite published outcome, so the metric has to separate them
+- [x] Motif RMSD sane on AF3 predictions and discriminating between backbones of
+      known opposite outcome (below)
+- [x] One backbone end-to-end through AF3 -> metrics -> per-sequence CSV
 - [ ] Rerun `calibrate_metrics.py` if the design-PDB provenance is ever
       resolved; document the residual discrepancy in Methods if not
-- [ ] One backbone end-to-end through AF3 -> metrics -> reward scalar
 
-**Known divergence, deliberately accepted.** RFdiffusion2 runs LigandMPNN
-motif-rotamer-aware (side-chain context on) with packing; `PolicyMPNN` sets
-`ligand_mpnn_use_side_chain_context = 0`. Our baseline may therefore be somewhat
-weaker than their published one. This does not bias the comparison we report —
-both our arms share the setting — but it does mean *our* baseline and *their*
-published baseline are not interchangeable, and no figure may mix them. Worth
-revisiting as a knob (`parse_all_atoms` in `featurize_pdb`) once the pilots land.
+### Side-chain context is not a detail — it is most of the benchmark
+
+The gate ran two backbones from `M0664_2dhn` with opposite published outcomes
+(`cond29_29`, 40/40 passing under their Chai eval; `cond29_6`, 0/40), 8
+sequences each, sampled at T = 0.1 and folded with AF3:
+
+| backbone | side-chain ctx | motif RMSD min / median | passing | ligand RMSD med | AF3 ptm med |
+|---|---|---|---|---|---|
+| cond29_29 (their 40/40) | off | 1.82 / 2.68 | **0/8** | 4.60 | 0.90 |
+| cond29_29 | **on** | 1.32 / **1.53** | **3/8** | 4.62 | 0.90 |
+| cond29_6 (their 0/40) | off | 2.21 / 3.39 | 0/8 | 11.62 | 0.78 |
+| cond29_6 | **on** | 1.93 / 3.17 | **0/8** | 15.19 | 0.81 |
+
+With context off the positive control failed outright, and decomposing the RMSD
+showed why: AF3 reproduced the fold (global backbone RMSD 0.9 A) and the motif
+*backbone* almost exactly (0.15 A), while motif *all-atom* RMSD sat at 1.8-3.5 A.
+The pocket was right and the rotamer was not. The benchmark's motif RMSD is
+measured over side-chain atoms — here Glu OE2/CD and Lys NZ/CE/CD — so a policy
+shown only the motif backbone has no reason to hold the rotamer.
+
+Turning it on rescues the positive control (0/8 -> 3/8) and leaves the negative
+control at 0/8. That asymmetry is the useful part: the fix helps where the
+published data says it should and not where it says it should not, so it is
+correcting a real deficiency rather than inflating the metric. **AF3 ptm is
+unchanged at 0.90**, confirming the gain is rotamer placement and not better
+folding.
+
+Implemented as `ligand_mpnn_use_side_chain_context`, now configurable in
+`PolicyMPNN` (default 0 to preserve existing runs) and set to 1 in every
+generated AME config, so CLEO does not train under a handicap its baseline
+lacks. `--side-chain-context 0` is retained as an ablation: it isolates how much
+of this benchmark is rotamer placement, which is a result in its own right.
+
+Two things this does *not* yet close. We reach 3/8 where they report 40/40, and
+the remaining gap is unattributed — candidates are LigandMPNN side-chain packing
+(which they run and we do not), AF3-vs-Chai disagreement, and n = 8. And the
+ligand RMSD on the positive control (4.62 A median) is far above the 2.5 A
+cutoff even for sequences whose motif passes, which points at our pocket
+definition rather than at the designs, since their `chai_pocket_aligned_*`
+columns come from Chai's own evaluation. Neither blocks pilots; both must be
+resolved before any ligand-placement number is reported.
 
 ---
 

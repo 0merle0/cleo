@@ -69,15 +69,29 @@ class PolicyMPNN:
 
         model_type = self.cfg.model_type
 
+        # Side-chain context: the fixed residues' side chains are shown to the
+        # model as context (designed residues' side chains are masked out in
+        # ProteinFeaturesLigand). For motif scaffolding this is what lets the
+        # policy design a pocket around the *rotamer* rather than only around
+        # the motif backbone. The shipped LigandMPNN weights contain all the
+        # required parameters, so it costs nothing but is off by default to
+        # preserve existing runs' behaviour. ProteinMPNN has no ligand feature
+        # module and so cannot use it.
+        use_sc = int(self.cfg.get("ligand_mpnn_use_side_chain_context", 0) or 0)
+
         if model_type == "protein_mpnn":
             self.atom_context_num = 1
             k_neighbors = 48
+            if use_sc:
+                raise ValueError(
+                    "ligand_mpnn_use_side_chain_context requires model_type='ligand_mpnn'"
+                )
             self.ligand_mpnn_use_side_chain_context = 0
             ckpt_path = PROTEIN_MPNN_CKPT_PATH
         elif model_type == "ligand_mpnn":
             self.atom_context_num = 25
             k_neighbors = 32
-            self.ligand_mpnn_use_side_chain_context = 0
+            self.ligand_mpnn_use_side_chain_context = use_sc
             ckpt_path = LIGAND_MPNN_CKPT_PATH
         else:
             raise ValueError("Invalid model type specified. Choose 'ligand_mpnn' or 'protein_mpnn'.")
@@ -103,7 +117,18 @@ class PolicyMPNN:
 
         is_default_checkpoint = ckpt_path in [PROTEIN_MPNN_CKPT_PATH, LIGAND_MPNN_CKPT_PATH]
         ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=is_default_checkpoint)
-        model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        incompatible = model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        # strict=False is kept so checkpoints with extra keys still load, but a
+        # *missing* key means that submodule silently keeps its random
+        # initialisation -- which looks like a merely mediocre model rather than
+        # a broken one. Never let that pass quietly.
+        if incompatible.missing_keys:
+            raise RuntimeError(
+                f"{ckpt_path} is missing {len(incompatible.missing_keys)} parameter(s) "
+                f"required by this model configuration, which would leave them randomly "
+                f"initialised: {incompatible.missing_keys[:10]}"
+                + (" ..." if len(incompatible.missing_keys) > 10 else "")
+            )
         return model.to(self.device)
 
     def get_optimizer(self):

@@ -69,7 +69,13 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seqs", required=True, help="CSV with name, sequence, backbone")
     ap.add_argument("--targets", default=HERE / "targets")
-    ap.add_argument("--rundir", default=HERE / "runs" / "fold_and_score")
+    # Default keyed to the sequence set. af3_from_df reads every output folder
+    # under its rundir, so sharing one across sequence sets silently mixes folds
+    # from different configurations -- or, as here, fails to merge because the
+    # names moved. Keying on the input file makes that impossible by
+    # construction rather than by remembering to pass --rundir.
+    ap.add_argument("--rundir", default=None,
+                    help="default: runs/<seqs-file-stem>, which keeps runs disjoint")
     ap.add_argument("--out", default=None, help="default: alongside --seqs, *_scored.csv")
     ap.add_argument("--skip-run", action="store_true", help="reuse existing AF3 outputs")
     ap.add_argument("--pocket-cutoff", type=float, default=8.0)
@@ -82,11 +88,13 @@ def main():
     if df.empty:
         raise SystemExit("no sequences selected")
 
+    rundir = Path(a.rundir) if a.rundir else HERE / "runs" / Path(a.seqs).stem
+
     out_rows = []
     for bb, sub in df.groupby("backbone"):
         print(f"\n=== {bb}: {len(sub)} sequences ===", flush=True)
         out_rows.append(run_backbone(sub.reset_index(drop=True), bb, a.targets,
-                                     a.rundir, a.skip_run, a.pocket_cutoff))
+                                     rundir, a.skip_run, a.pocket_cutoff))
     res = pd.concat(out_rows, ignore_index=True)
 
     out = Path(a.out) if a.out else Path(a.seqs).with_name(Path(a.seqs).stem + "_scored.csv")
