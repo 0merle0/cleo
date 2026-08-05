@@ -191,6 +191,11 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
         "fixed_residues": fixed_residues,
         "reward": {
             "_target_": "cleo.design.utils.reward.UniversalReward",
+            # UniversalReward builds its per-step rundir from these; omitting
+            # them leaves output_dir None and the run dies on the first reward
+            # call. Interpolated so they cannot drift from the top-level values.
+            "output_dir": "${output_dir}",
+            "run_name": "${run_name}",
             "steps": [
                 pred,
                 {"name": "ame",
@@ -204,13 +209,17 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
                          "structure_col": f"{pred['name']}_path"}},
             ],
             # Single term: motif RMSD is the benchmark's only optimizable
-            # criterion (no_clash is fixed by the backbone). Bounds bracket the
-            # range actually observed on AME backbones -- ~0.7 A for a good
-            # design, ~3 A for a bad one -- so the reward has usable gradient
-            # around the 1.5 A cutoff instead of saturating.
+            # criterion (no_clash is fixed by the backbone).
+            #
+            # Upper bound 6.0, not 3.0. At the T=1.0 training temperature a
+            # step-0 batch spans 1.5-12.3 A with a 3.8 A median, so a 3.0 A
+            # clip flattens roughly half the batch to exactly zero and the
+            # policy cannot tell a 4 A design from a 12 A one. Widening keeps
+            # gradient across the range the policy actually occupies early,
+            # while still resolving the 1.5 A cutoff region.
             "reward_aggregation": [
                 {"metric": "ame_motif_rmsd", "lower_bound": 0.5,
-                 "upper_bound": 3.0, "weight": 1.0, "mode": "min"},
+                 "upper_bound": 6.0, "weight": 1.0, "mode": "min"},
             ],
         },
     }

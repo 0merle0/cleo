@@ -19,6 +19,8 @@ omit_AA: CX
 fixed_residues: A52 A69 A118 A119
 reward:
   _target_: cleo.design.utils.reward.UniversalReward
+  output_dir: ${output_dir}
+  run_name: ${run_name}
   steps:
   - name: af3
     target_fn: cleo.design.utils.oracle.af3_from_df
@@ -57,6 +59,6 @@ reward:
   reward_aggregation:
   - metric: ame_motif_rmsd
     lower_bound: 0.5
-    upper_bound: 3.0
+    upper_bound: 6.0
     weight: 1.0
     mode: min
