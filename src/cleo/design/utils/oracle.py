@@ -23,6 +23,18 @@ from omegaconf import DictConfig, OmegaConf
 _AF3_CONF_SUFFIX = "_summary_confidences.json"
 
 
+def _min_not_none(values):
+    """min() over values, ignoring None; NaN if nothing is left.
+
+    AF3 confidence summaries carry nulls for chains it cannot score pairwise
+    (a lone metal ion, for instance). Returning NaN keeps the row -- losing an
+    otherwise good prediction to a missing diagnostic would be worse than
+    reporting the diagnostic as absent.
+    """
+    vals = [v for v in values if v is not None]
+    return min(vals) if vals else float("nan")
+
+
 def _af3_name_and_paths_from_output_folder(folder: str) -> tuple[str, str, str] | None:
     """
     Resolve design ``name`` and file paths for one AF3 output subfolder.
@@ -431,19 +443,30 @@ def af3_from_df(df_input, cfg, step_name="af3"):
         output_data[f"{step_name}_ptm"].append(conf_data["ptm"])
         output_data[f"{step_name}_iptm"].append(conf_data["iptm"])
         output_data[f"{step_name}_ranking_score"].append(conf_data["ranking_score"])
+        # Chain 0 is the protein; every other chain is a ligand entity. With a
+        # single ligand this is exactly the old `[1]` behaviour; with several
+        # (metal + cofactor + substrate) it summarises the worst-confidence
+        # ligand rather than silently reporting only chain B.
         output_data[f"{step_name}_chain_ptm_protein"].append(conf_data["chain_ptm"][0])
-        output_data[f"{step_name}_chain_ptm_ligand"].append(conf_data["chain_ptm"][1])
+        output_data[f"{step_name}_chain_ptm_ligand"].append(
+            _min_not_none(conf_data["chain_ptm"][1:]))
         output_data[f"{step_name}_chain_iptm_protein"].append(conf_data["chain_iptm"][0])
-        output_data[f"{step_name}_chain_iptm_ligand"].append(conf_data["chain_iptm"][1])
+        output_data[f"{step_name}_chain_iptm_ligand"].append(
+            _min_not_none(conf_data["chain_iptm"][1:]))
         output_data[f"{step_name}_fraction_disordered"].append(conf_data["fraction_disordered"])
         output_data[f"{step_name}_has_clash"].append(conf_data["has_clash"])
 
         # Minimum PAE across off-diagonal (inter-chain) entries of chain_pair_pae_min.
         # For a 2-chain complex this is min(mat[0][1], mat[1][0]).
+        #
+        # Entries can be null. AF3 emits an all-None row for chains it cannot
+        # score pairwise -- single-atom ligands such as a lone metal ion. Any
+        # target with a metal plus a cofactor hits this, so the Nones must be
+        # dropped rather than passed to min(), which raises on None.
         pae_mat = conf_data["chain_pair_pae_min"]
         n_chains = len(pae_mat)
         off_diag = [pae_mat[i][j] for i in range(n_chains) for j in range(n_chains) if i != j]
-        output_data[f"{step_name}_interaction_pae_min"].append(min(off_diag))
+        output_data[f"{step_name}_interaction_pae_min"].append(_min_not_none(off_diag))
 
     df_output = pd.DataFrame(output_data)
     df_output = _af3_canonicalize_output_names_to_input(df_input, df_output)
