@@ -8,3 +8,8 @@ outputs/
 cleo.egg-info/
 # Claude Code personal settings
 .claude/settings.local.json
+
+# AME pilot: extracted benchmark structures and run outputs (regenerate with
+# experiments/ame/select_targets.py + tar extraction from /net/lab/pub)
+experiments/ame/targets/
+experiments/ame/runs/

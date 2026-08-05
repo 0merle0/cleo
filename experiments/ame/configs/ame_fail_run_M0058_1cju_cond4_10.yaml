@@ -1,0 +1,56 @@
+run_name: ame_fail_run_M0058_1cju_cond4_10
+output_dir: /home/jgershon/git/cleo/experiments/ame/runs/ame_fail_run_M0058_1cju_cond4_10
+pdb: /home/jgershon/git/cleo/experiments/ame/targets/run_M0058_1cju_cond4_10-atomized-bb-True.pdb
+checkpoint_path: null
+algorithm: grpo
+batch_size: 32
+N_steps: 200
+lr: 0.0001
+kl_weight: 0.0
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+model_type: ligand_mpnn
+temperature: 1.0
+omit_AA: CX
+fixed_residues: A25 A57 A85 A103
+reward:
+  _target_: cleo.design.utils.reward.UniversalReward
+  steps:
+  - name: boltz
+    target_fn: cleo.design.utils.oracle.boltz_from_df
+    cfg:
+      template_path: /home/jgershon/git/cleo/experiments/ame/templates/run_M0058_1cju_cond4_10.yaml
+  - name: ame
+    target_fn: cleo.design.utils.ame.ame_metrics_from_df
+    cfg:
+      design_pdb: /home/jgershon/git/cleo/experiments/ame/targets/run_M0058_1cju_cond4_10-atomized-bb-True.pdb
+      motif_atoms:
+        A25:
+        - OD2
+        - CG
+        A77:
+        - O
+        - C
+        - CA
+        A57:
+        - OD2
+        - CG
+        A103:
+        - NH1
+        - CZ
+        - NE
+        - NH2
+        A85:
+        - NZ
+        - CE
+        - CD
+      structure_col: boltz_path
+      rmsd_threshold: 1.5
+  reward_aggregation:
+  - metric: ame_motif_rmsd
+    lower_bound: 0.5
+    upper_bound: 4.0
+    weight: 1.0
+    mode: min
