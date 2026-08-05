@@ -3,29 +3,36 @@ output_dir: experiments/ame/runs/run_M0664_2dhn_cond29_88
 pdb: experiments/ame/targets/run_M0664_2dhn_cond29_88-atomized-bb-True.pdb
 checkpoint_path: null
 algorithm: grpo
-batch_size: 32
-N_steps: 200
+batch_size: 16
+N_steps: 40
 lr: 0.0001
+checkpoint_every_n_steps: 20
 kl_weight: 0.0
 N_updates: 16
 update_batch_size: 8
 clip_eps_low: 0.2
 clip_eps_high: 0.28
 model_type: ligand_mpnn
+ligand_mpnn_use_side_chain_context: 1
 temperature: 1.0
 omit_AA: CX
 fixed_residues: A21 A82
 reward:
   _target_: cleo.design.utils.reward.UniversalReward
   steps:
-  - name: boltz
-    target_fn: cleo.design.utils.oracle.boltz_from_df
+  - name: af3
+    target_fn: cleo.design.utils.oracle.af3_from_df
     cfg:
-      template_path: experiments/ame/templates/run_M0664_2dhn_cond29_88.yaml
+      rundir: experiments/ame/runs/run_M0664_2dhn_cond29_88
+      template_path: experiments/ame/templates/run_M0664_2dhn_cond29_88.json
+      af3_container: /net/software/containers/af3.sif
+      af3_script: /opt/alphafold3/run_alphafold.py
+      model_dir: /net/databases/alphafold
   - name: ame
-    target_fn: cleo.design.utils.ame.ame_metrics_from_df
+    target_fn: cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df
     cfg:
       design_pdb: experiments/ame/targets/run_M0664_2dhn_cond29_88-atomized-bb-True.pdb
+      trb: experiments/ame/targets/run_M0664_2dhn_cond29_88-atomized-bb-True.trb
       motif_atoms:
         A21:
         - OE2
@@ -34,11 +41,10 @@ reward:
         - NZ
         - CE
         - CD
-      structure_col: boltz_path
-      rmsd_threshold: 1.5
+      structure_col: af3_path
   reward_aggregation:
   - metric: ame_motif_rmsd
     lower_bound: 0.5
-    upper_bound: 4.0
+    upper_bound: 3.0
     weight: 1.0
     mode: min

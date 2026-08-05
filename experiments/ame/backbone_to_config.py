@@ -136,7 +136,8 @@ def af3_template(name, seq, chain, ligands):
 
 
 def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
-                 n_steps=200, batch_size=32, oracle="boltz"):
+                 n_steps=200, batch_size=32, oracle="boltz",
+                 checkpoint_every_n_steps=25):
     """CLEO design-training config.
 
     oracle="boltz" puts Boltz in the reward loop and leaves AF3/Chai for
@@ -166,6 +167,12 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
         "batch_size": batch_size,
         "N_steps": n_steps,
         "lr": 1e-4,
+        # Hard attribute access in PolicyMPNN.__init__ -- omitting it crashes at
+        # startup rather than falling back to a default. Kept infrequent (10 MB
+        # per snapshot) because the experimental artifact is the folded sequence
+        # record accumulated during training, not the policy weights; best/last
+        # are saved regardless.
+        "checkpoint_every_n_steps": checkpoint_every_n_steps,
         "kl_weight": 0.0,
         "N_updates": 16,
         "update_batch_size": 8,
@@ -187,21 +194,30 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
             "steps": [
                 pred,
                 {"name": "ame",
-                 "target_fn": "cleo.design.utils.ame.ame_metrics_from_df",
+                 "target_fn": "cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df",
                  "cfg": {"design_pdb": str(pdb),
+                         "trb": str(Path(pdb).with_suffix(".trb")),
+                         # Keys are the catalytic residues; the metric uses all
+                         # their heavy atoms, so the atom lists here only feed
+                         # the secondary contigatom variant.
                          "motif_atoms": motif_atoms,
-                         "structure_col": f"{pred['name']}_path",
-                         "rmsd_threshold": MOTIF_RMSD_THRESHOLD}},
+                         "structure_col": f"{pred['name']}_path"}},
             ],
+            # Single term: motif RMSD is the benchmark's only optimizable
+            # criterion (no_clash is fixed by the backbone). Bounds bracket the
+            # range actually observed on AME backbones -- ~0.7 A for a good
+            # design, ~3 A for a bad one -- so the reward has usable gradient
+            # around the 1.5 A cutoff instead of saturating.
             "reward_aggregation": [
                 {"metric": "ame_motif_rmsd", "lower_bound": 0.5,
-                 "upper_bound": 4.0, "weight": 1.0, "mode": "min"},
+                 "upper_bound": 3.0, "weight": 1.0, "mode": "min"},
             ],
         },
     }
 
 
-def convert(pdb_path, out_dir, run_root, oracle="boltz", n_steps=200, batch_size=32):
+def convert(pdb_path, out_dir, run_root, oracle="boltz", n_steps=200, batch_size=32,
+            checkpoint_every_n_steps=25):
     """One backbone -> config + Boltz template + AF3 template. Returns a summary."""
     pdb_path = Path(pdb_path)
     trb = pdb_path.with_suffix(".trb")
@@ -221,7 +237,8 @@ def convert(pdb_path, out_dir, run_root, oracle="boltz", n_steps=200, batch_size
     (out_dir / "templates" / f"{name}.json").write_text(
         json.dumps(af3_template(name, seq, chain, ligands), indent=2))
     cfg = build_config(name, pdb_path, fixed, motif_atoms, out_dir, run_root,
-                       n_steps=n_steps, batch_size=batch_size, oracle=oracle)
+                       n_steps=n_steps, batch_size=batch_size, oracle=oracle,
+                       checkpoint_every_n_steps=checkpoint_every_n_steps)
     (out_dir / "configs" / f"{name}.yaml").write_text(
         yaml.safe_dump(cfg, sort_keys=False, default_flow_style=False))
 
@@ -245,6 +262,8 @@ def main():
                     help="in-loop reward oracle; boltz keeps AF3/Chai held out")
     ap.add_argument("--n-steps", type=int, default=200)
     ap.add_argument("--batch-size", type=int, default=32)
+    ap.add_argument("--checkpoint-every", type=int, default=25,
+                    help="policy snapshots are 10 MB each and are not the artifact")
     a = ap.parse_args()
 
     out = Path(a.out)
@@ -253,7 +272,8 @@ def main():
     if not pdbs:
         raise SystemExit(f"no .pdb files found in {a.pdb_dir}")
 
-    rows = [convert(p, out, run_root, a.oracle, a.n_steps, a.batch_size) for p in pdbs]
+    rows = [convert(p, out, run_root, a.oracle, a.n_steps, a.batch_size,
+                    a.checkpoint_every) for p in pdbs]
     print(f"converted {len(rows)} backbone(s) -> {out}/configs, {out}/templates")
     for r in rows[:5]:
         print(f"  {r['name']}: len={r['length']} lig={r['ligands']} "
