@@ -3,8 +3,8 @@ output_dir: experiments/ame/runs/run_M0058_1cju_cond4_54
 pdb: experiments/ame/targets/run_M0058_1cju_cond4_54-atomized-bb-True.pdb
 checkpoint_path: null
 algorithm: grpo
-batch_size: 16
-N_steps: 40
+batch_size: 32
+N_steps: 200
 lr: 0.0001
 checkpoint_every_n_steps: 20
 kl_weight: 0.0

@@ -1,0 +1,13 @@
+benchmark,design_id,n_pred_pass,n_pred,clash_ok,best_rmsd,seq_pass_min,seq_equiv,islands,site_pass,cls,pdb
+M0097_1ctt,rfflow_fixed-ligand_run_M0097_1ctt_cond9_14-atomized-bb-True,32,40,True,0.9173867106437684,7,6.4,4.0,0.45,easy,run_M0097_1ctt_cond9_14-atomized-bb-True.pdb
+M0315_1ey3,rfflow_fixed-ligand_run_M0315_1ey3_cond18_25-atomized-bb-True,31,40,True,0.9831913709640504,7,6.2,4.0,0.15,easy,run_M0315_1ey3_cond18_25-atomized-bb-True.pdb
+M0500_1e3i,rfflow_fixed-ligand_run_M0500_1e3i_cond22_67-atomized-bb-True,32,40,True,1.1435465812683103,7,6.4,4.0,0.14,easy,run_M0500_1e3i_cond22_67-atomized-bb-True.pdb
+M0904_1qgx,rfflow_fixed-ligand_run_M0904_1qgx_cond39_95-atomized-bb-True,10,40,True,1.2455371618270874,2,2.0,6.0,0.03,medium,run_M0904_1qgx_cond39_95-atomized-bb-True.pdb
+M0870_1oh9,rfflow_fixed-ligand_run_M0870_1oh9_cond38_2-atomized-bb-True,18,40,True,0.8342233300209045,4,3.6,5.0,0.08,medium,run_M0870_1oh9_cond38_2-atomized-bb-True.pdb
+M0907_1rbl,rfflow_fixed-ligand_run_M0907_1rbl_cond40_74-atomized-bb-True,28,40,True,1.0727617740631104,6,5.6,5.0,0.07,medium,run_M0907_1rbl_cond40_74-atomized-bb-True.pdb
+M0375_4ts9,rfflow_fixed-ligand_run_M0375_4ts9_cond21_4-atomized-bb-True,0,40,True,1.606845498085022,0,0.0,7.0,0.01,near,run_M0375_4ts9_cond21_4-atomized-bb-True.pdb
+M0050_1dbt,rfflow_fixed-ligand_run_M0050_1dbt_cond2_6-atomized-bb-True,0,40,True,1.6883808374404907,0,0.0,6.0,0.03,near,run_M0050_1dbt_cond2_6-atomized-bb-True.pdb
+M0365_1pfk,rfflow_fixed-ligand_run_M0365_1pfk_cond20_37-atomized-bb-True,0,40,True,1.68485426902771,0,0.0,6.0,0.01,near,run_M0365_1pfk_cond20_37-atomized-bb-True.pdb
+M0024_1nzy,rfflow_fixed-ligand_run_M0024_1nzy_cond0_8-atomized-bb-True,0,40,True,7.357576370239258,0,0.0,6.0,0.01,hard,run_M0024_1nzy_cond0_8-atomized-bb-True.pdb
+M0157_1qh5,rfflow_fixed-ligand_run_M0157_1qh5_cond13_74-atomized-bb-True,0,40,True,6.996744632720947,0,0.0,6.0,0.09,hard,run_M0157_1qh5_cond13_74-atomized-bb-True.pdb
+M0092_1dli,rfflow_fixed-ligand_run_M0092_1dli_cond6_43-atomized-bb-True,0,40,True,6.944880962371826,0,0.0,6.0,0.01,hard,run_M0092_1dli_cond6_43-atomized-bb-True.pdb

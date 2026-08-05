@@ -137,7 +137,7 @@ def af3_template(name, seq, chain, ligands):
 
 def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
                  n_steps=200, batch_size=32, oracle="boltz",
-                 checkpoint_every_n_steps=25):
+                 checkpoint_every_n_steps=25, ref_seq=None, diversity_weight=0.0):
     """CLEO design-training config.
 
     oracle="boltz" puts Boltz in the reward loop and leaves AF3/Chai for
@@ -157,6 +157,43 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
         pred = {"name": "boltz",
                 "target_fn": "cleo.design.utils.oracle.boltz_from_df",
                 "cfg": {"template_path": str(tdir / f"{name}.yaml")}}
+
+    steps = [
+        pred,
+        {"name": "ame",
+         "target_fn": "cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df",
+         "cfg": {"design_pdb": str(pdb),
+                 "trb": str(Path(pdb).with_suffix(".trb")),
+                 # Keys are the catalytic residues; the metric uses all their
+                 # heavy atoms, so the atom lists here only feed the secondary
+                 # contigatom variant.
+                 "motif_atoms": motif_atoms,
+                 "structure_col": f"{pred['name']}_path"}},
+    ]
+    aggregation = [
+        {"metric": "ame_motif_rmsd", "lower_bound": 0.5,
+         "upper_bound": 6.0, "weight": 1.0, "mode": "min"},
+    ]
+
+    if diversity_weight:
+        # Batch-level rarity of (position, AA) choices, reference-free: every
+        # position counts, so this is pairwise diversity across the batch with
+        # no privileged parent. A reference is deliberately NOT passed -- the
+        # design PDB is poly-ALA away from the motif, so using it would make
+        # every alanine choice invisible and silently reduce this to
+        # non-alanine diversity.
+        #
+        # `fractional_normalized` is the mean 1/k over positions, so it already
+        # lies in [0,1] like the RMSD term; equal `weight` therefore means equal
+        # influence, which would not be true of the raw counts.
+        steps.insert(0, {
+            "name": "div",
+            "target_fn": "cleo.design.utils.mutation_diversity.mutation_diversity_from_df",
+            "cfg": {},
+        })
+        aggregation.append(
+            {"metric": "div_fractional_normalized", "lower_bound": 0.0,
+             "upper_bound": 1.0, "weight": diversity_weight, "mode": "max"})
 
     return {
         "run_name": name,
@@ -196,20 +233,9 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
             # call. Interpolated so they cannot drift from the top-level values.
             "output_dir": "${output_dir}",
             "run_name": "${run_name}",
-            "steps": [
-                pred,
-                {"name": "ame",
-                 "target_fn": "cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df",
-                 "cfg": {"design_pdb": str(pdb),
-                         "trb": str(Path(pdb).with_suffix(".trb")),
-                         # Keys are the catalytic residues; the metric uses all
-                         # their heavy atoms, so the atom lists here only feed
-                         # the secondary contigatom variant.
-                         "motif_atoms": motif_atoms,
-                         "structure_col": f"{pred['name']}_path"}},
-            ],
-            # Single term: motif RMSD is the benchmark's only optimizable
-            # criterion (no_clash is fixed by the backbone).
+            "steps": steps,
+            # Motif RMSD is the benchmark's only optimizable criterion
+            # (no_clash is fixed by the backbone).
             #
             # Upper bound 6.0, not 3.0. At the T=1.0 training temperature a
             # step-0 batch spans 1.5-12.3 A with a 3.8 A median, so a 3.0 A
@@ -217,16 +243,16 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
             # policy cannot tell a 4 A design from a 12 A one. Widening keeps
             # gradient across the range the policy actually occupies early,
             # while still resolving the 1.5 A cutoff region.
-            "reward_aggregation": [
-                {"metric": "ame_motif_rmsd", "lower_bound": 0.5,
-                 "upper_bound": 6.0, "weight": 1.0, "mode": "min"},
-            ],
+            #
+            # UniversalReward divides by the summed weights, so weights are
+            # relative: 1.0 and 1.0 means each term contributes half.
+            "reward_aggregation": aggregation,
         },
     }
 
 
 def convert(pdb_path, out_dir, run_root, oracle="boltz", n_steps=200, batch_size=32,
-            checkpoint_every_n_steps=25):
+            checkpoint_every_n_steps=25, diversity_weight=0.0):
     """One backbone -> config + Boltz template + AF3 template. Returns a summary."""
     pdb_path = Path(pdb_path)
     trb = pdb_path.with_suffix(".trb")
@@ -247,7 +273,8 @@ def convert(pdb_path, out_dir, run_root, oracle="boltz", n_steps=200, batch_size
         json.dumps(af3_template(name, seq, chain, ligands), indent=2))
     cfg = build_config(name, pdb_path, fixed, motif_atoms, out_dir, run_root,
                        n_steps=n_steps, batch_size=batch_size, oracle=oracle,
-                       checkpoint_every_n_steps=checkpoint_every_n_steps)
+                       checkpoint_every_n_steps=checkpoint_every_n_steps,
+                       ref_seq=seq, diversity_weight=diversity_weight)
     (out_dir / "configs" / f"{name}.yaml").write_text(
         yaml.safe_dump(cfg, sort_keys=False, default_flow_style=False))
 
@@ -273,6 +300,8 @@ def main():
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--checkpoint-every", type=int, default=25,
                     help="policy snapshots are 10 MB each and are not the artifact")
+    ap.add_argument("--diversity-weight", type=float, default=0.0,
+                    help="weight on batch mutation diversity; 1.0 matches the RMSD term")
     a = ap.parse_args()
 
     out = Path(a.out)
@@ -282,7 +311,7 @@ def main():
         raise SystemExit(f"no .pdb files found in {a.pdb_dir}")
 
     rows = [convert(p, out, run_root, a.oracle, a.n_steps, a.batch_size,
-                    a.checkpoint_every) for p in pdbs]
+                    a.checkpoint_every, a.diversity_weight) for p in pdbs]
     print(f"converted {len(rows)} backbone(s) -> {out}/configs, {out}/templates")
     for r in rows[:5]:
         print(f"  {r['name']}: len={r['length']} lig={r['ligands']} "

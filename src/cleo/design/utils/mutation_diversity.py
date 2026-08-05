@@ -20,13 +20,23 @@ from collections import Counter
 import pandas as pd
 
 
-def _get_mutation_sets(sequences, ref_seq):
-    """Build per-sequence sets of (position, amino_acid) mutations vs reference."""
-    mutation_sets = []
-    for seq in sequences:
-        muts = {(i, aa) for i, aa in enumerate(seq) if aa != ref_seq[i]}
-        mutation_sets.append(muts)
-    return mutation_sets
+def _get_mutation_sets(sequences, ref_seq=None):
+    """Build per-sequence sets of (position, amino_acid) pairs.
+
+    With ``ref_seq``, only positions differing from the reference count, which
+    measures diversity *among mutations away from a known parent*.
+
+    With ``ref_seq=None`` every position counts, giving reference-free pairwise
+    diversity across the batch: how rare each of a sequence's choices is among
+    its peers, with no privileged parent. Prefer this when there is no
+    meaningful parent -- e.g. de novo backbones, whose design PDB is poly-ALA,
+    where a reference would silently make every alanine choice invisible and
+    turn the metric into non-alanine diversity only.
+    """
+    if ref_seq is None:
+        return [{(i, aa) for i, aa in enumerate(seq)} for seq in sequences]
+    return [{(i, aa) for i, aa in enumerate(seq) if aa != ref_seq[i]}
+            for seq in sequences]
 
 
 def _mutation_counts(mutation_sets):
@@ -45,8 +55,13 @@ def mutation_diversity_from_df(df_input, cfg, step_name="mutation_diversity"):
     mutation contribution scores relative to the rest of the batch.
 
     Config fields:
-        ref_seq (str): Parent/reference amino acid sequence. Mutations are
-            defined as positions where a sequence differs from this reference.
+        ref_seq (str, optional): Parent/reference amino acid sequence. Mutations
+            are positions where a sequence differs from it. Omit (or set None)
+            for reference-free pairwise diversity over the batch, where every
+            position counts -- the right choice for de novo backbones with no
+            meaningful parent. Reference-free, ``_fractional_normalized`` is the
+            mean 1/k over all positions: 1.0 for a sequence unique everywhere,
+            1/batch_size for one identical to all its peers.
 
     Output columns (prefixed by step_name):
         _total_muts: Total number of mutations vs the reference.
@@ -59,7 +74,7 @@ def mutation_diversity_from_df(df_input, cfg, step_name="mutation_diversity"):
         _fractional_normalized: Fractional score divided by total mutations
             (average 1/k across this sequence's mutations).
     """
-    ref_seq = cfg.ref_seq
+    ref_seq = cfg.get("ref_seq", None) if hasattr(cfg, "get") else getattr(cfg, "ref_seq", None)
     sequences = df_input["sequence"].tolist()
 
     mutation_sets = _get_mutation_sets(sequences, ref_seq)
