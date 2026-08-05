@@ -1,27 +1,47 @@
-% --- Methods: Overview ---
-% Shared methodology that underlies all three applications. Per-application
-% method specifics live in methods/{heme,petase,protease}.tex.
+\section{Methods: shared pipeline}
+\label{sec:met:overview}
 
-% Block 1 — RL fine-tuning of ProteinMPNN with GRPO.
-%   - Reference cleo.design.train_policy + cleo.design.utils.grpo.
-%   - Reward pipeline composition (UniversalReward, ordered metric steps,
-%     normalized weighted aggregation).
-\todo{methods overview — GRPO + reward pipeline}
+\plan{Shared methodology underlying all three applications. Per-application
+specifics live in the following subsections. Do not write this out in detail
+before the Results numbers exist --- Methods text written against placeholder
+numbers gets rewritten.}
 
-% Block 2 — Fragment-based combinatorial libraries.
-%   - Sampling, fragment splitting, combinatorial recombination.
-%   - DNA assembly via Golden Gate adapters.
-\todo{methods overview — fragment library construction}
+\subsection*{Block 1 --- RL fine-tuning of ProteinMPNN with GRPO}
+\begin{planlist}
+  \item Reference \texttt{cleo.design.train\_policy} and
+        \texttt{cleo.design.utils.grpo}.
+  \item Reward pipeline composition (\texttt{UniversalReward}, ordered metric
+        steps, normalized weighted aggregation).
+  \item Cite GRPO~\cite{shao2024deepseekmath} and
+        ProteinMPNN~\cite{dauparas2022proteinmpnn}.
+\end{planlist}
+\todo{methods overview --- GRPO + reward pipeline}
 
-% Block 3 — Surrogate models for closed-loop optimization.
-%   - MLP ensemble with Gaussian NLL.
-%   - Acquisition function (BatchUCB + diversity).
-%   - Used as a reward step inside the RL pipeline.
-\todo{methods overview — surrogate ensemble + acquisition}
+\subsection*{Block 2 --- Fragment-based combinatorial libraries}
+\begin{planlist}
+  \item Sampling, fragment splitting, combinatorial recombination.
+  \item DNA assembly via Golden Gate adapters.
+\end{planlist}
+\todo{methods overview --- fragment library construction}
 
-% Block 4 — Batch-consensus mutation-diversity reward.
-%   - Per-position modal AA across the batch (ties multi-modal).
-%   - Two metrics: consensus_divergence (count) and fractional_divergence
-%     (1/k weighted, penalizes secondary-mode collapse).
-%   - Reference cleo.design.utils.mutation_diversity.
-\todo{methods overview — diversity reward definition}
+\subsection*{Block 3 --- Surrogate models for closed-loop optimization}
+\begin{planlist}
+  \item MLP ensemble with Gaussian NLL.
+  \item Acquisition function (BatchUCB + diversity).
+  \item Used as a reward step inside the RL pipeline.
+\end{planlist}
+\todo{methods overview --- surrogate ensemble + acquisition}
+
+\subsection*{Block 4 --- Batch-consensus mutation-diversity reward}
+\begin{planlist}
+  \item Per-position modal AA across the batch (ties multi-modal).
+  \item Two metrics: \texttt{consensus\_divergence} (count) and
+        \texttt{fractional\_divergence} ($1/k$ weighted, penalizes
+        secondary-mode collapse).
+  \item Reference \texttt{cleo.design.utils.mutation\_diversity}.
+  \item Contrast with the embedding-level diversity regularizer of
+        ProteinZero~\cite{wang2025proteinzero} and diversity-regularized
+        DPO~\cite{park2024divdpo}: ours acts in mutation space against a
+        named reference sequence, theirs in embedding space.
+\end{planlist}
+\todo{methods overview --- diversity reward definition}

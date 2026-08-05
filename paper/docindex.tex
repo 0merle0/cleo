@@ -1,0 +1,66 @@
+\section*{Document index}
+\addcontentsline{toc}{section}{Document index}
+\label{sec:docindex}
+
+Every source file in \texttt{paper/}, what it holds, and how far along it is.
+\statusdone{} means real prose exists; \statusscaffold{} means planning notes
+only; \statusblocked{} means the section cannot be written until data lands.
+
+\bigskip
+\noindent
+\begin{tabular}{@{}p{0.30\textwidth} p{0.44\textwidth} l@{}}
+\toprule
+\textbf{File} & \textbf{Contents} & \textbf{Status} \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Build}} \\
+\texttt{main.tex}      & Compile order; \textbackslash input's everything     & \statusdone \\
+\texttt{preamble.tex}  & Packages, palette, \texttt{\textbackslash plan} /
+                         \texttt{\textbackslash todo} macros, draft-mode switch & \statusdone \\
+\texttt{Makefile}      & \texttt{make pdf}; SVG$\rightarrow$PDF via Inkscape  & \statusdone \\
+\texttt{refs.bib}      & Bibliography; all entries machine-retrieved          & \statusdone \\
+\addlinespace
+\multicolumn{3}{@{}l}{\textit{Front matter}} \\
+\texttt{abstract.tex}  & $\sim$125-word abstract, written last                & \statusscaffold \\
+\texttt{intro.tex}     & Four-paragraph introduction arc                      & \statusscaffold \\
+\texttt{related\_work.tex} & Status quo: backbone generation, filtering,
+                         RL for inverse folding, library design, the gap      & \statusdone \\
+\addlinespace
+\multicolumn{3}{@{}l}{\textit{Results} --- compile order is risk order} \\
+\texttt{results/heme.tex}     & Three-arm head-to-head; foundational claim    & \statusblocked \\
+\texttt{results/petase.tex}   & Closed-loop iteration; strongest data         & \statusscaffold \\
+\texttt{results/protease.tex} & Diversity-reward ablation; highest risk       & \statusblocked \\
+\addlinespace
+\multicolumn{3}{@{}l}{\textit{Methods}} \\
+\texttt{methods/overview.tex} & GRPO, fragment libraries, surrogate,
+                                diversity reward                              & \statusscaffold \\
+\texttt{methods/heme.tex}     & Design config, three-arm protocol, assay      & \statusscaffold \\
+\texttt{methods/petase.tex}   & Two libraries, surrogate, assays              & \statusscaffold \\
+\texttt{methods/protease.tex} & Design config, two-arm ablation, assay        & \statusscaffold \\
+\addlinespace
+\multicolumn{3}{@{}l}{\textit{Back matter}} \\
+\texttt{conclusion.tex} & Four-paragraph discussion and outlook               & \statusscaffold \\
+\bottomrule
+\end{tabular}
+
+\bigskip
+\noindent
+Two companion files live in \texttt{paper/} but are deliberately \emph{not}
+part of this build:
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item \texttt{outline\_computational.md} --- working brainstorm for a
+        computational-first version of the paper: landscape analysis, the
+        three candidate framings, seven proposed experiments (E1--E7), figure
+        plan, and risk register. Section~\ref{sec:related} is the LaTeX
+        rendering of its landscape half.
+  \item \texttt{figures/palette.py} --- the plotting counterpart to the
+        \texttt{cleo*} colors defined in \texttt{preamble.tex}.
+\end{itemize}
+
+\bigskip
+\noindent
+\textbf{Draft mode.} This document currently compiles with
+\texttt{\textbackslash draftmodetrue} in \texttt{preamble.tex}, which renders
+all planning notes in gray and all \texttt{\textbackslash todo} markers in red.
+Setting \texttt{\textbackslash draftmodefalse} hides every one of them, leaving
+only submission prose --- useful for checking how much real text actually
+exists.

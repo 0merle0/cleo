@@ -4,14 +4,29 @@
 
 \title{TITLE PLACEHOLDER}
 \author{AUTHORS PLACEHOLDER}
-\date{}
+\date{Working draft --- compiled \today}
 
 \begin{document}
 \maketitle
 
 \input{abstract}
 
+% --- Reading aids (draft only) ---
+% The table of contents and document index exist so collaborators can navigate
+% a paper that is still mostly scaffold. Delete both before submission.
+\ifdraftmode
+  \setcounter{tocdepth}{1}
+  \tableofcontents
+  \bigskip
+  \input{docindex}
+  \clearpage
+\fi
+
 \input{intro}
+
+% --- Status quo / related work ---
+% Written as real prose because it does not depend on our unfinished data.
+\input{related_work}
 
 % --- Results ---
 % Note on Science formatting: Science articles run results inline with the

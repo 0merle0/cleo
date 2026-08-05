@@ -1,0 +1,161 @@
+\section{Status quo: where the field stands and where the gap is}
+\label{sec:related}
+
+\plan{This section is written as real prose (not scaffold) because it is the
+part of the paper that does not depend on our own unfinished data. Every
+citation here was verified against Crossref, the arXiv API, or Europe PMC on
+2026-08-04; the retrieval procedure is documented at the top of
+\texttt{refs.bib}. Quantitative claims attributed to other groups are taken
+verbatim from their abstracts.}
+
+\subsection{Backbone generation is solved well enough that sequence design is
+now the bottleneck}
+\label{sec:related:backbones}
+
+Deep generative models now produce enzyme backbones for a wide range of
+chemistries. RFdiffusion established de novo design of protein structure and
+function by denoising diffusion over backbone
+coordinates~\cite{watson2023rfdiffusion}. RFdiffusion2 removed the requirement
+that catalytic geometry be specified at the residue level: it designs enzymes
+directly from functional-group geometries without specifying residue order or
+performing inverse rotamer generation, and generates scaffolds for all 41
+active sites in a diverse in-silico benchmark, compared with 16 for previous
+methods~\cite{ahern2025rfdiffusion2}. Parallel efforts have produced designed
+serine hydrolases~\cite{lauko2025serinehydrolases}, metallohydrolases with
+designed metal sites~\cite{kim2025metallohydrolases}, and enzymes built by
+catalytic motif scaffolding~\cite{braun2025motifscaffolding}.
+
+\plan{The rhetorical work of this subsection is to concede generously. These
+are strong papers and several share our senior author. The point is not that
+backbone generation is inadequate --- it is that its success relocates the
+bottleneck downstream, to sequence design and to what happens after the first
+96 designs come back weakly active.}
+
+Two features of this literature matter for what follows. First, the
+sequence-design step is treated as a solved subroutine: backbones are passed to
+ProteinMPNN~\cite{dauparas2022proteinmpnn} or
+LigandMPNN~\cite{dauparas2025ligandmpnn} sampled at low temperature, and the
+resulting sequences are filtered against structure-prediction and geometric
+criteria. Second, the experimental readout is a small, one-shot test set:
+RFdiffusion2 reports active candidates after testing fewer than 96 sequences
+per catalytic mechanism~\cite{ahern2025rfdiffusion2}. Both features are
+appropriate for demonstrating that a backbone generator works. Neither
+addresses what to do when the resulting enzymes are, as they almost always
+are, orders of magnitude less active than useful.
+
+\subsection{Filtering is not search}
+\label{sec:related:filtering}
+
+The prevailing sequence-design protocol is generate-then-filter. Sequences are
+sampled from a functionally blind inverse-folding prior, then scored against
+structure-prediction confidence, backbone recapitulation, catalytic-geometry
+and preorganization criteria --- AlphaFold3~\cite{abramson2024alphafold3},
+Boltz~\cite{wohlwend2024boltz}, and ensemble methods such as PLACER, whose
+introduction substantially improved experimental success rates in serine
+hydrolase design~\cite{lauko2025serinehydrolases}.
+
+\plan{This is the paper's central rhetorical move, so state it plainly and
+early, and make sure the phrasing survives review: a filter is a selection
+operator, not a search operator.}
+
+A filter cannot create a sequence that passes; it can only surface the
+sequences that a functionally blind prior happened to emit. This has two
+consequences that the field has largely left implicit. Sampling temperature is
+lowered to raise the pass rate, which means pass rate is purchased directly
+with diversity: ProteinMPNN's own report notes that sequence diversity can be
+increased considerably at higher temperature with only a small decrease in
+recovery~\cite{dauparas2022proteinmpnn}, and the corresponding pass-rate cost
+is why production pipelines sit near $T = 0.1$. And because the survivors are
+drawn from a narrow neighborhood of the prior's mode, they are strongly
+correlated with one another --- so a library's nominal size overstates the
+number of genuinely independent attempts it represents.
+
+\subsection{Reinforcement learning has reached inverse folding, but not
+libraries}
+\label{sec:related:rl}
+
+Aligning generative models to objectives via reinforcement learning is now
+standard practice, and Group Relative Policy Optimization
+(GRPO)~\cite{shao2024deepseekmath} in particular has proven to be a
+memory-efficient fit for the regime where rewards are computed by an external
+oracle rather than learned. This machinery has begun to reach protein sequence
+design. ProteinZero is an online RL framework for inverse folding that combines
+structural guidance from ESMFold with a self-derived $\Delta\Delta G$
+predictor, adds an embedding-level diversity regularizer to mitigate mode
+collapse, and reports reducing design failure rates by 36--48\% relative to
+ProteinMPNN, ESM-IF~\cite{hsu2022esmif}, and InstructPLM on the CATH-4.3
+benchmark, with success rates above 90\% across diverse
+folds~\cite{wang2025proteinzero}. Diversity-regularized direct preference
+optimization has been applied to peptide inverse folding with related
+motivation~\cite{park2024divdpo}.
+
+\plan{ProteinZero is the closest prior art to our mechanism and must be
+confronted in the first paragraph a reviewer reads on this topic, not buried.
+The differentiation is real but it is about the \emph{objective}, not the
+optimizer: (i) general folds on CATH vs.\ enzyme active sites with ligands and
+catalytic geometry; (ii) sequence-level metrics --- designability, recovery,
+stability --- vs.\ a library-level objective; (iii) a diversity
+\emph{regularizer} defended as anti-mode-collapse hygiene vs.\ diversity as a
+first-class design goal justified by screening economics; (iv) no physical
+library. If compute allows, running ProteinZero as a baseline arm is the
+strongest possible version of this argument. \todo{decide whether ProteinZero
+is runnable as a baseline}}
+
+What this line of work does not address is the library. Its objectives and
+benchmarks are defined per sequence: is \emph{this} sequence designable, stable,
+recovered. The quantity that determines an experimental outcome is a property
+of the set --- how many distinct, genuinely different candidates clear the bar,
+and how far apart they are.
+
+\subsection{Library design assumes a natural enzyme}
+\label{sec:related:libraries}
+
+A mature literature does optimize libraries, but from the opposite starting
+point. MODIFY learns from natural protein sequences to infer evolutionarily
+plausible mutations and predict enzyme fitness, and explicitly co-optimizes
+predicted fitness and sequence diversity of starting libraries, prioritizing
+high-fitness variants while ensuring broad sequence
+coverage~\cite{ding2024modify}. Active Learning-assisted Directed Evolution
+(ALDE) uses uncertainty quantification over an epistatic five-residue active
+site and improved the yield of a non-native cyclopropanation product from 12\%
+to 93\% in three rounds of wet-lab experimentation~\cite{yang2025alde}.
+Machine-learning-guided cell-free expression platforms scale the assay side,
+mapping fitness across large variant sets~\cite{landwehr2025cellfree}.
+
+\plan{MODIFY is the single most important citation for our diversity claim,
+because it proves the field already accepts that fitness and diversity should
+be co-optimized in a library. That is helpful --- we are not arguing for
+diversity from scratch. What we are arguing is that every existing method for
+doing so is unavailable in the de novo regime.}
+
+Every one of these methods presupposes what a de novo enzyme lacks. MODIFY's
+fitness prior is evolutionary, learned from natural homologs; a de novo
+backbone has no homologs and no alignment. ALDE and active-learning methods
+require a measurable starting fitness to bootstrap from; de novo designs
+typically start at or near the detection limit. And both operate over a handful
+of positions, whereas the mutations that rescue a de novo enzyme are, in our
+hands, tens of substitutions from the starting design --- a combinatorial
+volume that site-saturation and few-position libraries cannot reach.
+
+\subsection{The gap}
+\label{sec:related:gap}
+
+Nobody has addressed library design for de novo enzymes. The regime is defined
+by three simultaneous absences: no evolutionary prior, so MSA-based fitness
+models do not apply; no starting activity, so active-learning loops have
+nothing to condition on; and a target region of sequence space too far away for
+local mutagenesis. The field's current answer --- low-temperature inverse
+folding plus hard filters --- is not a search procedure at all, and it responds
+to the difficulty of the regime by narrowing the search precisely when it
+should be widening it.
+
+\plan{Close on the thesis so the reader carries it into the results. Draft
+formulation, to be tightened once F2 exists: function-aligned online RL
+converts in-silico filters from a rejection step into a design objective,
+producing de novo enzyme libraries that simultaneously pass the community's own
+fidelity criteria at higher rates and span far more sequence space ---
+increasing the number of independent experimental bets per unit of screening
+effort.}
+
+\todo{gap paragraph --- final phrasing of the thesis sentence, once the
+headline figure is built}

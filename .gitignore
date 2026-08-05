@@ -6,3 +6,5 @@ lightning_logs/
 outputs/
 ._*
 cleo.egg-info/
+# Claude Code personal settings
+.claude/settings.local.json

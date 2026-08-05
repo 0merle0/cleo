@@ -16,9 +16,14 @@
 *.run.xml
 *.bcf
 
-# Compiled PDF output (kept untracked; CI will publish)
-main.pdf
+# Compiled PDF output
+# main.pdf is intentionally TRACKED: the build_and_publish.sh hook commits it
+# to origin/paper so collaborators can read the current draft without a TeX
+# install. Other PDF output stays untracked.
 supplement.pdf
+
+# Hook build log
+.build.log
 
 # SVG → PDF build output
 figures/pdf/

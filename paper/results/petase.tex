@@ -1,31 +1,43 @@
-% --- Results: PETase (closed-loop iteration) ---
-% Claim: experimental data from an initial library can be used to train a
-% surrogate that becomes a reward signal for a second library, producing
-% substantially improved designs.
-%
-% This is the iterative-loop claim. The risk is the second library has to
-% be meaningfully better than the first — not just predicted-better.
+\section{Results: PETase (closed-loop iteration)}
+\label{sec:res:petase}
 
-% Block 1 — Initial library.
-%   - De novo PETase backbone, RF-diffusion origin.
-%   - Library 1: function-aligned RL sampling without surrogate.
-%   - ~6k designs tested; activity distribution on PET-trimer fluorogenic probe.
-\todo{petase results — library 1 setup and outcomes}
+\plan{\textbf{Claim.} Experimental data from an initial library can be used to
+train a surrogate that becomes a reward signal for a second library, producing
+substantially improved designs. \textbf{Risk.} The second library has to be
+meaningfully better than the first --- not just predicted-better. Status:
+strongest data of the three applications.}
 
-% Block 2 — Surrogate training.
-%   - MLP ensemble trained on (sequence, activity) pairs from library 1.
-%   - Validation behavior; calibration of predicted activity vs measured.
-\todo{petase results — surrogate training}
+\subsection*{Block 1 --- Initial library}
+\begin{planlist}
+  \item De novo PETase backbone, RFdiffusion origin.
+  \item Library 1: function-aligned RL sampling without surrogate.
+  \item $\sim$6k designs tested; activity distribution on the PET-trimer
+        fluorogenic probe.
+\end{planlist}
+\todo{petase results --- library 1 setup and outcomes}
 
-% Block 3 — Library 2 with surrogate-as-reward.
-%   - Surrogate added as a reward step in the RL pipeline for library 2.
-%   - Library 2 size, mutation-distance distribution from starting design.
-%   - Activity distribution comparison: library 1 vs library 2.
-\todo{petase results — library 2 design and outcome}
+\subsection*{Block 2 --- Surrogate training}
+\begin{planlist}
+  \item MLP ensemble trained on (sequence, activity) pairs from library 1.
+  \item Validation behavior; calibration of predicted vs.\ measured activity.
+\end{planlist}
+\todo{petase results --- surrogate training}
 
-% Block 4 — Best-variant deep dive.
-%   - XXX-fold kcat improvement over starting design on PET-trimer probe.
-%   - Comparison to optimized natural PETases on the same substrate.
-%   - PET-dimer activity confirmed.
-%   - Honest framing of bulk PET gap (substrate accessibility, not catalysis).
-\todo{petase results — best variant kinetics + PET-dimer + bulk-PET caveat}
+\subsection*{Block 3 --- Library 2 with surrogate-as-reward}
+\begin{planlist}
+  \item Surrogate added as a reward step in the RL pipeline for library 2.
+  \item Library 2 size, mutation-distance distribution from starting design.
+  \item Activity distribution comparison: library 1 vs.\ library 2.
+\end{planlist}
+\todo{petase results --- library 2 design and outcome}
+
+\subsection*{Block 4 --- Best-variant deep dive}
+\begin{planlist}
+  \item XXX-fold $k_\mathrm{cat}$ improvement over starting design on the
+        PET-trimer probe.
+  \item Comparison to optimized natural PETases on the same substrate.
+  \item PET-dimer activity confirmed.
+  \item Honest framing of the bulk PET gap (substrate accessibility, not
+        catalysis).
+\end{planlist}
+\todo{petase results --- best variant kinetics + PET-dimer + bulk-PET caveat}

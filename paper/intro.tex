@@ -1,45 +1,59 @@
-% --- Introduction ---
-% Science research articles do not use \section labels in the main narrative,
-% but we keep paragraph-level scaffolding here as comments so collaborators
-% can see the intended arc.
+\section{Introduction}
+\label{sec:intro}
 
-% Paragraph 1 — The promise and the bottleneck.
-%   - RFdiffusion + MPNN make it possible to design enzyme backbones from
-%     scratch for diverse chemistries.
-%   - First-pass designs are typically weak; the bottleneck is optimization,
-%     not initial design.
-\todo{p1 — frame de novo enzyme design + the optimization bottleneck}
+\plan{Science research articles do not use \texttt{\textbackslash section} labels
+in the main narrative. The headings here exist so that this draft has a usable
+table of contents; strip them at submission time. Paragraph-level scaffolding is
+kept visible so collaborators can see the intended arc.}
 
-% Paragraph 2 — Why existing optimization tools fall short.
-%   - Site-saturation mutagenesis (SSM): local; cannot escape the
-%     neighborhood of the starting design.
-%   - Vanilla MPNN re-sampling: structurally informed but functionally blind;
-%     biased toward sequences MPNN's prior favors, not sequences that
-%     catalyze.
-%   - The active-variant region for a de novo backbone often lies tens of
-%     mutations away — out of reach of either tool.
-\todo{p2 — limits of SSM and vanilla MPNN re-sampling}
+\subsection*{P1 --- The promise and the bottleneck}
+\begin{planlist}
+  \item RFdiffusion + MPNN make it possible to design enzyme backbones from
+        scratch for diverse chemistries.
+  \item First-pass designs are typically weak; the bottleneck is optimization,
+        not initial design.
+\end{planlist}
+\todo{p1 --- frame de novo enzyme design + the optimization bottleneck}
 
-% Paragraph 3 — What we contribute (three orthogonal capabilities).
-%   - Function-aligned RL fine-tuning of ProteinMPNN (GRPO over reward
-%     pipelines) + fragment-based combinatorial libraries that can physically
-%     test combinatorially-large candidate sets.
-%   - Three distinct claims, each demonstrated on a separate enzyme:
-%       (i)  Method foundation — heme oxidation: fine-tuned MPNN beats SSM
-%            and vanilla MPNN on matched experimental effort.
-%       (ii) Closed-loop iteration — PETase: an initial experimental library
-%            trains a surrogate that becomes a reward signal for the next
-%            library, producing substantially improved designs.
-%       (iii) Diversity-aware search — protease: a batch-consensus
-%             mutation-diversity reward accesses rarer mutations and
-%             improves catalytic activity over an otherwise-matched library.
-\todo{p3 — three contributions, framed as separate claims}
+\subsection*{P2 --- Why existing optimization tools fall short}
+\begin{planlist}
+  \item Site-saturation mutagenesis (SSM): local; cannot escape the
+        neighborhood of the starting design.
+  \item Vanilla MPNN re-sampling: structurally informed but functionally blind;
+        biased toward sequences MPNN's prior favors, not sequences that
+        catalyze.
+  \item The active-variant region for a de novo backbone often lies tens of
+        mutations away --- out of reach of either tool.
+  \item Cross-reference Section~\ref{sec:related} for the full treatment;
+        this paragraph is the compressed version.
+\end{planlist}
+\todo{p2 --- limits of SSM and vanilla MPNN re-sampling}
 
-% Paragraph 4 — Headline numbers + roadmap.
-%   - Heme: <delta over SSM / vanilla MPNN at matched library size>.
-%   - PETase: XXX-fold kcat improvement on PET-trimer probe; best variant
-%     ~30 mutations from starting; exceeds optimized natural enzymes on
-%     the same substrate.
-%   - Protease: <delta in activity for diversity-reward arm vs baseline arm>.
-%   - Together: a generalizable recipe for de novo enzyme optimization.
-\todo{p4 — headline results across the three applications}
+\subsection*{P3 --- What we contribute (three orthogonal capabilities)}
+\begin{planlist}
+  \item Function-aligned RL fine-tuning of ProteinMPNN (GRPO over reward
+        pipelines) + fragment-based combinatorial libraries that can physically
+        test combinatorially large candidate sets.
+  \item \textbf{(i) Method foundation} --- heme oxidation: fine-tuned MPNN
+        beats SSM and vanilla MPNN at matched experimental effort.
+  \item \textbf{(ii) Closed-loop iteration} --- PETase: an initial experimental
+        library trains a surrogate that becomes a reward signal for the next
+        library, producing substantially improved designs.
+  \item \textbf{(iii) Diversity-aware search} --- protease: a batch-consensus
+        mutation-diversity reward accesses rarer mutations and improves
+        catalytic activity over an otherwise-matched library.
+\end{planlist}
+\todo{p3 --- three contributions, framed as separate claims}
+
+\subsection*{P4 --- Headline numbers + roadmap}
+\begin{planlist}
+  \item Heme: $\langle$delta over SSM / vanilla MPNN at matched library
+        size$\rangle$.
+  \item PETase: XXX-fold $k_\mathrm{cat}$ improvement on PET-trimer probe; best
+        variant $\sim$30 mutations from starting; exceeds optimized natural
+        enzymes on the same substrate.
+  \item Protease: $\langle$delta in activity for diversity-reward arm vs.\
+        baseline arm$\rangle$.
+  \item Together: a generalizable recipe for de novo enzyme optimization.
+\end{planlist}
+\todo{p4 --- headline results across the three applications}

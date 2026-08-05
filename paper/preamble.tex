@@ -30,3 +30,36 @@
 % --- Convenience macros ---
 \newcommand{\cleo}{\textsc{cleo}}
 \newcommand{\todo}[1]{\textcolor{cleoRed}{\textbf{[TODO: #1]}}}
+
+% --- Draft / outline mode ---
+% While the paper is a scaffold, the planning content is the document. Set
+% \draftmodefalse to hide every \plan block and \todo marker in one shot,
+% leaving only real prose — do that when preparing a submission draft.
+\newif\ifdraftmode
+\draftmodetrue
+
+% \plan{...} renders a planning note. In draft mode it is visible and set in
+% gray; otherwise it vanishes.
+\newcommand{\plan}[1]{%
+  \ifdraftmode
+    \par\vspace{0.3em}%
+    \begingroup\small\color{cleoGray}\setlength{\leftskip}{1.2em}%
+    #1\par\endgroup\vspace{0.3em}%
+  \fi}
+
+% planlist: bulleted planning notes. Same visibility rules as \plan.
+\usepackage{comment}
+\newenvironment{planlistbody}%
+  {\begingroup\small\color{cleoGray}%
+   \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}%
+  {\end{itemize}\endgroup}
+\ifdraftmode
+  \newenvironment{planlist}{\begin{planlistbody}}{\end{planlistbody}}
+\else
+  \excludecomment{planlist}
+\fi
+
+% --- Status tags for the document index ---
+\newcommand{\statusdone}{\textcolor{cleoGreen}{\textbf{drafted}}}
+\newcommand{\statusscaffold}{\textcolor{cleoOrange}{\textbf{scaffold}}}
+\newcommand{\statusblocked}{\textcolor{cleoRed}{\textbf{needs data}}}

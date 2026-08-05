@@ -1,33 +1,42 @@
-% --- Results: Heme oxidation enzyme ---
-% Claim: fine-tuned ProteinMPNN beats SSM and vanilla MPNN re-sampling at
-% finding active variants under matched experimental effort.
-%
-% This is the foundational claim of the paper. If the comparison is not
-% clean, the entire methods narrative is in trouble — this section needs
-% the cleanest, most defensible head-to-head.
+\section{Results: heme oxidation enzyme (method foundation)}
+\label{sec:res:heme}
 
-% Block 1 — Setup.
-%   - Backbone: <de novo heme oxidation enzyme, RF-diffusion origin>.
-%   - Starting design: <activity baseline>.
-%   - Three arms, matched library budget (N variants ordered/tested):
-%       (i)  SSM around starting design.
-%       (ii) Vanilla MPNN re-sampling on backbone.
-%       (iii) Fine-tuned MPNN (this work) + fragment library.
-\todo{heme results — setup paragraph}
+\plan{\textbf{Claim.} Fine-tuned ProteinMPNN beats SSM and vanilla MPNN
+re-sampling at finding active variants under matched experimental effort.
+\textbf{Risk.} This is the foundational claim of the paper. If the comparison
+is not clean, the entire methods narrative is in trouble --- this section needs
+the cleanest, most defensible head-to-head. Status: \statusblocked.}
 
-% Block 2 — Headline figure.
-%   - Activity distribution across all three arms.
-%   - Hit rate (fraction above starting design / above background).
-%   - Best-variant comparison.
-\todo{heme results — main comparison figure + numbers}
+\subsection*{Block 1 --- Setup}
+\begin{planlist}
+  \item Backbone: $\langle$de novo heme oxidation enzyme, RFdiffusion
+        origin$\rangle$.
+  \item Starting design: $\langle$activity baseline$\rangle$.
+  \item Three arms, matched library budget ($N$ variants ordered/tested):
+        (i) SSM around starting design; (ii) vanilla MPNN re-sampling on
+        backbone; (iii) fine-tuned MPNN (this work) + fragment library.
+\end{planlist}
+\todo{heme results --- setup paragraph}
 
-% Block 3 — Mutation distance / sequence-space analysis.
-%   - Where in sequence space the best variants from each arm live.
-%   - Demonstrate the SSM/vanilla-MPNN arms are confined to a near
-%     neighborhood while fine-tuned MPNN reaches farther.
-\todo{heme results — sequence-space analysis}
+\subsection*{Block 2 --- Headline figure}
+\begin{planlist}
+  \item Activity distribution across all three arms.
+  \item Hit rate (fraction above starting design / above background).
+  \item Best-variant comparison.
+\end{planlist}
+\todo{heme results --- main comparison figure + numbers}
 
-% Block 4 — Mechanism check (if available).
-%   - Structural / spectroscopic / kinetic confirmation that the
-%     improvement is real catalysis, not artifact.
-\todo{heme results — mechanism check}
+\subsection*{Block 3 --- Mutation distance / sequence-space analysis}
+\begin{planlist}
+  \item Where in sequence space the best variants from each arm live.
+  \item Demonstrate the SSM and vanilla-MPNN arms are confined to a near
+        neighborhood while fine-tuned MPNN reaches farther.
+\end{planlist}
+\todo{heme results --- sequence-space analysis}
+
+\subsection*{Block 4 --- Mechanism check (if available)}
+\begin{planlist}
+  \item Structural / spectroscopic / kinetic confirmation that the improvement
+        is real catalysis, not artifact.
+\end{planlist}
+\todo{heme results --- mechanism check}

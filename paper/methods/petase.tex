@@ -1,16 +1,19 @@
-% --- Methods: PETase ---
+\subsection{Methods: PETase}
+\label{sec:met:petase}
 
-% Block 1 — Backbone, fixed catalytic residues, library 1 reward pipeline
-%   (Boltz oracle + petase metrics + Hamming distance to reference).
-\todo{petase methods — library 1 design configuration}
-
-% Block 2 — Surrogate training.
-%   - Featurization, train/val split, ensemble size, calibration check.
-\todo{petase methods — surrogate}
-
-% Block 3 — Library 2 with surrogate-as-reward.
-%   - Reward pipeline composition for library 2.
-\todo{petase methods — library 2 design configuration}
-
-% Block 4 — Activity assays (PET-trimer probe, PET-dimer, bulk PET attempt).
-\todo{petase methods — assays}
+\begin{planlist}
+  \item \textbf{Block 1 --- Library 1 design configuration.} Backbone, fixed
+        catalytic residues, library 1 reward pipeline (Boltz
+        oracle~\cite{wohlwend2024boltz} + PETase metrics + Hamming distance to
+        reference).
+  \item \textbf{Block 2 --- Surrogate training.} Featurization, train/val
+        split, ensemble size, calibration check.
+  \item \textbf{Block 3 --- Library 2 with surrogate-as-reward.} Reward
+        pipeline composition for library 2.
+  \item \textbf{Block 4 --- Activity assays.} PET-trimer probe, PET-dimer,
+        bulk PET attempt.
+\end{planlist}
+\todo{petase methods --- library 1 design configuration}
+\todo{petase methods --- surrogate}
+\todo{petase methods --- library 2 design configuration}
+\todo{petase methods --- assays}
