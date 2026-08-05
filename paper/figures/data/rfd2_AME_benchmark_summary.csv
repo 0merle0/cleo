@@ -1,0 +1,83 @@
+benchmark,source,chai_motif_pass_and_no_clash,Number of Residue Islands
+M0024_1nzy,RFdiffusion1 (sampled index and inverse rotamers),0.0,6.0
+M0024_1nzy,RFdiffusion2 (fixed ligand),0.01,6.0
+M0040_13pk,RFdiffusion1 (sampled index and inverse rotamers),0.01,4.0
+M0040_13pk,RFdiffusion2 (fixed ligand),0.13,4.0
+M0050_1dbt,RFdiffusion1 (sampled index and inverse rotamers),0.0,6.0
+M0050_1dbt,RFdiffusion2 (fixed ligand),0.03,6.0
+M0054_1qfe,RFdiffusion1 (sampled index and inverse rotamers),0.01,3.0
+M0054_1qfe,RFdiffusion2 (fixed ligand),0.23,3.0
+M0058_1cju,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0058_1cju,RFdiffusion2 (fixed ligand),0.05,4.0
+M0078_1al6,RFdiffusion1 (sampled index and inverse rotamers),0.0,5.0
+M0078_1al6,RFdiffusion2 (fixed ligand),0.07,5.0
+M0092_1dli,RFdiffusion1 (sampled index and inverse rotamers),0.0,6.0
+M0092_1dli,RFdiffusion2 (fixed ligand),0.01,6.0
+M0093_1dqa,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0093_1dqa,RFdiffusion2 (fixed ligand),0.12,4.0
+M0096_1chm,RFdiffusion1 (sampled index and inverse rotamers),0.01,3.0
+M0096_1chm,RFdiffusion2 (fixed ligand),0.47,3.0
+M0097_1ctt,RFdiffusion1 (sampled index and inverse rotamers),0.01,4.0
+M0097_1ctt,RFdiffusion2 (fixed ligand),0.45,4.0
+M0110_1c0p,RFdiffusion1 (sampled index and inverse rotamers),0.0,3.0
+M0110_1c0p,RFdiffusion2 (fixed ligand),0.06,3.0
+M0129_1os7,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0129_1os7,RFdiffusion2 (fixed ligand),0.2,4.0
+M0151_1q0n,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0151_1q0n,RFdiffusion2 (fixed ligand),0.08,4.0
+M0157_1qh5,RFdiffusion1 (sampled index and inverse rotamers),0.0,6.0
+M0157_1qh5,RFdiffusion2 (fixed ligand),0.09,6.0
+M0179_1q3s,RFdiffusion1 (sampled index and inverse rotamers),0.0,3.0
+M0179_1q3s,RFdiffusion2 (fixed ligand),0.16,3.0
+M0188_1xel,RFdiffusion1 (sampled index and inverse rotamers),0.0,3.0
+M0188_1xel,RFdiffusion2 (fixed ligand),0.25,3.0
+M0209_1lij,RFdiffusion1 (sampled index and inverse rotamers),0.01,2.0
+M0209_1lij,RFdiffusion2 (fixed ligand),0.36,2.0
+M0255_1mg5,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0255_1mg5,RFdiffusion2 (fixed ligand),0.23,4.0
+M0315_1ey3,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0315_1ey3,RFdiffusion2 (fixed ligand),0.15,4.0
+M0349_1e3v,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0349_1e3v,RFdiffusion2 (fixed ligand),0.13,4.0
+M0365_1pfk,RFdiffusion1 (sampled index and inverse rotamers),0.0,6.0
+M0365_1pfk,RFdiffusion2 (fixed ligand),0.01,6.0
+M0375_4ts9,RFdiffusion1 (sampled index and inverse rotamers),0.0,7.0
+M0375_4ts9,RFdiffusion2 (fixed ligand),0.01,7.0
+M0500_1e3i,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0500_1e3i,RFdiffusion2 (fixed ligand),0.14,4.0
+M0552_1fgh,RFdiffusion1 (sampled index and inverse rotamers),0.0,5.0
+M0552_1fgh,RFdiffusion2 (fixed ligand),0.02,5.0
+M0555_1f8r,RFdiffusion1 (sampled index and inverse rotamers),0.02,2.0
+M0555_1f8r,RFdiffusion2 (fixed ligand),0.53,2.0
+M0584_1ldm,RFdiffusion1 (sampled index and inverse rotamers),0.0,4.0
+M0584_1ldm,RFdiffusion2 (fixed ligand),0.12,4.0
+M0630_1j79,RFdiffusion1 (sampled index and inverse rotamers),0.62,1.0
+M0630_1j79,RFdiffusion2 (fixed ligand),0.94,1.0
+M0636_1uaq,RFdiffusion1 (sampled index and inverse rotamers),0.11,3.0
+M0636_1uaq,RFdiffusion2 (fixed ligand),0.51,3.0
+M0663_1rk2,RFdiffusion1 (sampled index and inverse rotamers),0.79,1.0
+M0663_1rk2,RFdiffusion2 (fixed ligand),0.37,1.0
+M0664_2dhn,RFdiffusion1 (sampled index and inverse rotamers),0.18,2.0
+M0664_2dhn,RFdiffusion2 (fixed ligand),0.84,2.0
+M0674_1uf7,RFdiffusion1 (sampled index and inverse rotamers),0.1,3.0
+M0674_1uf7,RFdiffusion2 (fixed ligand),0.4,3.0
+M0710_1ra0,RFdiffusion1 (sampled index and inverse rotamers),0.06,2.0
+M0710_1ra0,RFdiffusion2 (fixed ligand),0.7,2.0
+M0711_2esd,RFdiffusion1 (sampled index and inverse rotamers),0.03,3.0
+M0711_2esd,RFdiffusion2 (fixed ligand),0.3,3.0
+M0717_1x7d,RFdiffusion1 (sampled index and inverse rotamers),0.13,2.0
+M0717_1x7d,RFdiffusion2 (fixed ligand),0.6,2.0
+M0731_1mt5,RFdiffusion1 (sampled index and inverse rotamers),0.0,3.0
+M0731_1mt5,RFdiffusion2 (fixed ligand),0.04,3.0
+M0732_1xs1,RFdiffusion1 (sampled index and inverse rotamers),0.0,5.0
+M0732_1xs1,RFdiffusion2 (fixed ligand),0.05,5.0
+M0738_1o98,RFdiffusion1 (sampled index and inverse rotamers),0.01,3.0
+M0738_1o98,RFdiffusion2 (fixed ligand),0.31,3.0
+M0739_1knp,RFdiffusion1 (sampled index and inverse rotamers),0.0,3.0
+M0739_1knp,RFdiffusion2 (fixed ligand),0.29,3.0
+M0870_1oh9,RFdiffusion1 (sampled index and inverse rotamers),0.0,5.0
+M0870_1oh9,RFdiffusion2 (fixed ligand),0.08,5.0
+M0904_1qgx,RFdiffusion1 (sampled index and inverse rotamers),0.0,6.0
+M0904_1qgx,RFdiffusion2 (fixed ligand),0.03,6.0
+M0907_1rbl,RFdiffusion1 (sampled index and inverse rotamers),0.0,5.0
+M0907_1rbl,RFdiffusion2 (fixed ligand),0.07,5.0
