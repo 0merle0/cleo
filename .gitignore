@@ -13,3 +13,4 @@ cleo.egg-info/
 # experiments/ame/select_targets.py + tar extraction from /net/lab/pub)
 experiments/ame/targets/
 experiments/ame/runs/
+experiments/ame/templates/

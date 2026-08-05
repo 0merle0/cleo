@@ -1,0 +1,66 @@
+run_name: run_M0157_1qh5_cond13_22
+output_dir: experiments/ame/runs/run_M0157_1qh5_cond13_22
+pdb: experiments/ame/targets/run_M0157_1qh5_cond13_22-atomized-bb-True.pdb
+checkpoint_path: null
+algorithm: grpo
+batch_size: 32
+N_steps: 200
+lr: 0.0001
+kl_weight: 0.0
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+model_type: ligand_mpnn
+temperature: 1.0
+omit_AA: CX
+fixed_residues: A7 A32 A36 A37 A90 A92 A97
+reward:
+  _target_: cleo.design.utils.reward.UniversalReward
+  steps:
+  - name: boltz
+    target_fn: cleo.design.utils.oracle.boltz_from_df
+    cfg:
+      template_path: experiments/ame/templates/run_M0157_1qh5_cond13_22.yaml
+  - name: ame
+    target_fn: cleo.design.utils.ame.ame_metrics_from_df
+    cfg:
+      design_pdb: experiments/ame/targets/run_M0157_1qh5_cond13_22-atomized-bb-True.pdb
+      motif_atoms:
+        A97:
+        - NE2
+        - CD2
+        - CE1
+        A36:
+        - ND1
+        - CG
+        - CE1
+        - CB
+        - CD2
+        - NE2
+        A37:
+        - OD2
+        - CG
+        A32:
+        - NE2
+        - CD2
+        - CE1
+        A92:
+        - NE2
+        - CD2
+        - CE1
+        A90:
+        - OD2
+        - CG
+        A7:
+        - NE2
+        - CD2
+        - CE1
+      structure_col: boltz_path
+      rmsd_threshold: 1.5
+  reward_aggregation:
+  - metric: ame_motif_rmsd
+    lower_bound: 0.5
+    upper_bound: 4.0
+    weight: 1.0
+    mode: min

@@ -61,8 +61,7 @@ def pick_sites(d, n_sites, n_each):
     if len(ok) < n_sites:
         raise SystemExit(f"only {len(ok)} sites have >={n_each} of each class")
     # Evenly spaced quantiles across the difficulty range: hard -> easy.
-    idx = [round(i * (len(ok) - 1) / (n_sites - 1)) for i in range(n_sites)]
-    return ok.iloc[idx].reset_index(drop=True)
+    return ok.iloc[_spread(len(ok), n_sites)].reset_index(drop=True)
 
 
 def main():
@@ -70,10 +69,23 @@ def main():
     ap.add_argument("--n-sites", type=int, default=3)
     ap.add_argument("--n-each", type=int, default=5, help="backbones per class per site")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument(
+        "--extra-sites", nargs="*", default=["M0157_1qh5"],
+        help="Sites to include regardless of the difficulty spread. Default adds "
+             "M0157_1qh5, a 7-motif-residue site (GSH+ZN, 22 constrained atoms) -- "
+             "the most complex active sites in the benchmark are also the hardest "
+             "(motif size vs backbone success rate: r = -0.81), and M0157_1qh5 is "
+             "the only 7-residue site with enough passing backbones to serve both "
+             "the diversity and the rescue panels.")
     a = ap.parse_args()
 
     d = pd.read_csv(INDEX)
     sites = pick_sites(d, a.n_sites, a.n_each)
+    for name in a.extra_sites:
+        if name in set(sites.benchmark):
+            continue
+        row = pick_sites(d[d.benchmark == name], 1, a.n_each)
+        sites = pd.concat([sites, row], ignore_index=True)
 
     rows = []
     for _, s in sites.iterrows():

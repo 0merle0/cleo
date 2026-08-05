@@ -32,9 +32,26 @@ usable sequence.
 | **1A** | Per-site sequence pass rate, 41 sites sorted, RFd2 vs RFd1 | Enormous spread: 0.02 % → 57 %. Most sites are very hard |
 | **1B** | Histogram of passing sequences per backbone (0–40) | **The motivating panel.** A spike at zero holding 76.5 % of backbones |
 | **1C** | Success collapse across levels: site 41/41 → backbone 23.5 % → sequence 5.8 % | The gap the paper occupies, in one figure |
+| **1D** | Motif size (1–7 residues) vs. backbone success rate | **Difficulty is predicted by active-site complexity**, r = −0.81 |
 
 **1C is the thesis panel.** Three bars, or a funnel. It reframes a solved-looking
 problem as an open one without contradicting anyone.
+
+**1D justifies the whole project.** Measured from their deposit:
+
+| Motif residues | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| Sites | 1 | 5 | 9 | 11 | 4 | 7 | 4 |
+| Mean backbone success | 94 % | 61 % | 31 % | 20 % | 6 % | 4 % | 4 % |
+
+Correlation of motif size with success: **r = −0.805** (atom count: −0.784). The
+sequence-search problem gets monotonically harder exactly as active sites get
+more chemically interesting. One-residue motifs essentially always work and are
+not where enzyme design is hard; the 7-residue sites — real multi-residue
+catalytic constellations — sit at ~4 %.
+
+This is why the pilot forces in a 7-residue site. Rescuing a 2-residue motif is
+a curiosity; rescuing a 7-residue Zn/GSH site is the result that matters.
 
 **Unconvincing if:** the zero-spike in 1B turns out to be concentrated in a few
 pathological sites rather than spread across the benchmark. Check this before
@@ -160,8 +177,26 @@ Panels drive the pilot set:
 - **2A/2B** need enough backbones per site for curves to be smooth, not enough
   to bankrupt us
 
-**Pilot: 3 sites × (5 PASS + 5 FAIL) = 30 backbones.** Sites chosen to span
-difficulty, restricted to the 36 of 41 that have ≥ 3 backbones of each class.
+**Pilot: 4 sites × (5 PASS + 5 FAIL) = 40 backbones.** Three chosen to span
+difficulty, plus one forced complex site.
+
+| Site | Motif | Ligands | Backbone success | Role |
+|---|---|---|---|---|
+| M0058_1cju | 5 res / 14 atoms | MG, DAD | 5 % | hard |
+| M0255_1mg5 | 4 res / 10 atoms | ACT, NAI | 23 % | mid |
+| M0664_2dhn | 2 res / 5 atoms | PH2 | 84 % | easy |
+| **M0157_1qh5** | **7 res / 22 atoms** | **GSH, ZN** | 9 % | **complex active site** |
+
+M0157_1qh5 is the only 7-residue site with enough passing backbones (9) to serve
+both the diversity and the rescue panels — the other three have 1, 3 and 4. Its
+motif is four His plus two Asp around a Zn/glutathione site, i.e. a genuine
+multi-residue catalytic constellation rather than a two-point anchor.
+
+**Compute is denominated in folds** (structure-prediction calls), not wall time
+or GPU-hours, in every panel. Folds transfer across hardware and schedulers,
+they are what the baseline's published budget is expressed in (40 per backbone),
+and they are the quantity a lab actually plans around. GPU-hours go in the
+supplement for completeness only.
 
 Scale-up after the pilot survives 2A and 3A.
 

@@ -29,3 +29,13 @@ M0664_2dhn,84.0,fail,rfflow_fixed-ligand_run_M0664_2dhn_cond29_55-atomized-bb-Tr
 M0664_2dhn,84.0,fail,rfflow_fixed-ligand_run_M0664_2dhn_cond29_40-atomized-bb-True,run_M0664_2dhn_cond29_40-atomized-bb-True.pdb,0,40,True
 M0664_2dhn,84.0,fail,rfflow_fixed-ligand_run_M0664_2dhn_cond29_88-atomized-bb-True,run_M0664_2dhn_cond29_88-atomized-bb-True.pdb,0,40,True
 M0664_2dhn,84.0,fail,rfflow_fixed-ligand_run_M0664_2dhn_cond29_31-atomized-bb-True,run_M0664_2dhn_cond29_31-atomized-bb-True.pdb,0,40,True
+M0157_1qh5,9.0,pass,rfflow_fixed-ligand_run_M0157_1qh5_cond13_35-atomized-bb-True,run_M0157_1qh5_cond13_35-atomized-bb-True.pdb,1,40,True
+M0157_1qh5,9.0,pass,rfflow_fixed-ligand_run_M0157_1qh5_cond13_65-atomized-bb-True,run_M0157_1qh5_cond13_65-atomized-bb-True.pdb,1,40,True
+M0157_1qh5,9.0,pass,rfflow_fixed-ligand_run_M0157_1qh5_cond13_86-atomized-bb-True,run_M0157_1qh5_cond13_86-atomized-bb-True.pdb,1,40,True
+M0157_1qh5,9.0,pass,rfflow_fixed-ligand_run_M0157_1qh5_cond13_94-atomized-bb-True,run_M0157_1qh5_cond13_94-atomized-bb-True.pdb,2,40,True
+M0157_1qh5,9.0,pass,rfflow_fixed-ligand_run_M0157_1qh5_cond13_16-atomized-bb-True,run_M0157_1qh5_cond13_16-atomized-bb-True.pdb,4,40,True
+M0157_1qh5,9.0,fail,rfflow_fixed-ligand_run_M0157_1qh5_cond13_10-atomized-bb-True,run_M0157_1qh5_cond13_10-atomized-bb-True.pdb,0,40,True
+M0157_1qh5,9.0,fail,rfflow_fixed-ligand_run_M0157_1qh5_cond13_22-atomized-bb-True,run_M0157_1qh5_cond13_22-atomized-bb-True.pdb,0,40,True
+M0157_1qh5,9.0,fail,rfflow_fixed-ligand_run_M0157_1qh5_cond13_62-atomized-bb-True,run_M0157_1qh5_cond13_62-atomized-bb-True.pdb,0,40,True
+M0157_1qh5,9.0,fail,rfflow_fixed-ligand_run_M0157_1qh5_cond13_50-atomized-bb-True,run_M0157_1qh5_cond13_50-atomized-bb-True.pdb,0,40,True
+M0157_1qh5,9.0,fail,rfflow_fixed-ligand_run_M0157_1qh5_cond13_76-atomized-bb-True,run_M0157_1qh5_cond13_76-atomized-bb-True.pdb,0,40,True
