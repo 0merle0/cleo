@@ -43,6 +43,14 @@
 \newif\ifdraftmode
 \draftmodetrue
 
+% Internal links (table of contents, cross-references) render in blue while
+% drafting so the contents page reads as clickable. linktoc=all makes both the
+% entry text and its page number active, not just the number. Submission mode
+% keeps them black — see the \hypersetup on the hyperref line above.
+\ifdraftmode
+  \hypersetup{linktoc=all, linkcolor=cleoBlue}
+\fi
+
 % \plan{...} renders a planning note. In draft mode it is visible and set in
 % gray; otherwise it vanishes.
 \newcommand{\plan}[1]{%

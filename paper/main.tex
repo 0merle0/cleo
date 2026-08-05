@@ -7,17 +7,20 @@
 \date{Working draft --- compiled \today}
 
 \begin{document}
+
+% --- Page 1: title + abstract only ---
 \maketitle
-
 \input{abstract}
+\thispagestyle{empty}
+\clearpage
 
-% --- Reading aids (draft only) ---
-% The table of contents and document index exist so collaborators can navigate
-% a paper that is still mostly scaffold. Delete both before submission.
+% --- Page 2: table of contents, then the document index ---
+% Reading aids for a paper that is still mostly scaffold. Both are wrapped in
+% draft mode; delete the block before submission.
 \ifdraftmode
-  \setcounter{tocdepth}{1}
+  \setcounter{tocdepth}{2}
   \tableofcontents
-  \bigskip
+  \clearpage
   \input{docindex}
   \clearpage
 \fi
@@ -49,6 +52,8 @@
 
 \input{conclusion}
 
+\clearpage
+\addcontentsline{toc}{section}{References}
 \bibliographystyle{unsrt}
 \bibliography{refs}
 
