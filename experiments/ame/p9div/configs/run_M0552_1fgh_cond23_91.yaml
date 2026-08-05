@@ -69,8 +69,10 @@ reward:
     upper_bound: 6.0
     weight: 1.0
     mode: min
-  - metric: div_fractional_normalized
-    lower_bound: 0.0
-    upper_bound: 1.0
+    normalize: zscore
+  - metric: div_marginal_fraction
+    lower_bound: 0.05
+    upper_bound: 0.35
     weight: 1.0
     mode: max
+    normalize: zscore

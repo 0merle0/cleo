@@ -1,9 +1,9 @@
-run_name: run_M0500_1e3i_cond22_67
-output_dir: experiments/ame/runs9div/run_M0500_1e3i_cond22_67
-pdb: experiments/ame/targets12/run_M0500_1e3i_cond22_67-atomized-bb-True.pdb
+run_name: run_M0904_1qgx_cond39_95
+output_dir: experiments/ame/runs9div/run_M0904_1qgx_cond39_95
+pdb: experiments/ame/targets12/run_M0904_1qgx_cond39_95-atomized-bb-True.pdb
 checkpoint_path: null
 algorithm: grpo
-batch_size: 32
+batch_size: 16
 N_steps: 200
 lr: 0.0001
 checkpoint_every_n_steps: 25
@@ -16,7 +16,7 @@ model_type: ligand_mpnn
 ligand_mpnn_use_side_chain_context: 1
 temperature: 1.0
 omit_AA: CX
-fixed_residues: A6 A84 A89 A90 A114 A117
+fixed_residues: A18 A36 A38 A44 A116 A145
 reward:
   _target_: cleo.design.utils.reward.UniversalReward
   output_dir: ${output_dir}
@@ -28,38 +28,49 @@ reward:
   - name: af3
     target_fn: cleo.design.utils.oracle.af3_from_df
     cfg:
-      rundir: experiments/ame/runs9div/run_M0500_1e3i_cond22_67
-      template_path: experiments/ame/p9div/templates/run_M0500_1e3i_cond22_67.json
+      rundir: experiments/ame/runs9div/run_M0904_1qgx_cond39_95
+      template_path: experiments/ame/p9div/templates/run_M0904_1qgx_cond39_95.json
       af3_container: /net/software/containers/af3.sif
       af3_script: /opt/alphafold3/run_alphafold.py
       model_dir: /net/databases/alphafold
   - name: ame
     target_fn: cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df
     cfg:
-      design_pdb: experiments/ame/targets12/run_M0500_1e3i_cond22_67-atomized-bb-True.pdb
-      trb: experiments/ame/targets12/run_M0500_1e3i_cond22_67-atomized-bb-True.trb
+      design_pdb: experiments/ame/targets12/run_M0904_1qgx_cond39_95-atomized-bb-True.pdb
+      trb: experiments/ame/targets12/run_M0904_1qgx_cond39_95-atomized-bb-True.trb
       motif_atoms:
-        A90:
-        - SG
-        - CB
-        A89:
-        - CD
-        - N
+        A18:
+        - OD2
         - CG
-        A84:
+        - CB
+        - OD1
+        A44:
+        - OE1
+        - CD
+        - CG
+        - OE2
+        A36:
+        - OD1
+        - CG
+        - CB
+        - OD2
+        A115:
+        - O
+        - C
+        - CA
+        A116:
+        - CA
+        - 'N'
+        - C
+        - CB
+        - O
+        - CG
+        A145:
         - OG1
         - CB
-        A6:
-        - NE2
-        - CD2
-        - CE1
-        A117:
-        - SG
-        - CB
-        - CA
-        A114:
-        - OG
-        - CB
+        A38:
+        - OD2
+        - CG
       structure_col: af3_path
   reward_aggregation:
   - metric: ame_motif_rmsd
@@ -67,10 +78,8 @@ reward:
     upper_bound: 6.0
     weight: 1.0
     mode: min
-    normalize: zscore
-  - metric: div_marginal_fraction
-    lower_bound: 0.05
-    upper_bound: 0.35
+  - metric: div_fractional_normalized
+    lower_bound: 0.0
+    upper_bound: 1.0
     weight: 1.0
     mode: max
-    normalize: zscore

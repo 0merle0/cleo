@@ -17,7 +17,43 @@ Two scoring strategies are provided:
 
 from collections import Counter
 
+import numpy as np
 import pandas as pd
+
+
+def pairwise_hamming(sequences):
+    """Per-sequence mean fractional Hamming distance to every other batch member.
+
+    Returns an array in [0,1]: 0 if a sequence is identical to all its peers,
+    1 if it differs from all of them at every position.
+
+    Computed per position rather than over pairs. At one position, if k of the
+    B sequences carry your residue, then k-1 of your B-1 peers match you there,
+    so mean pairwise identity is the average of (k-1)/(B-1) over positions and
+    the distance is one minus that. Identical to enumerating all pairs, at O(B*L)
+    instead of O(B^2*L).
+
+    Distinct from the 1/k rarity score also computed here. 1/k is convex and so
+    rewards being a *singleton* very steeply (k=1 -> 1.0, k=2 -> 0.5), whereas
+    pairwise distance is linear in k and measures spread. For a batch of 16 with
+    three identical members, the two disagree by 2.46x vs 1.14x on how much
+    better a unique sequence is.
+
+    All positions count, including any pinned by ``fixed_residues``. Those are
+    constant across the batch and contribute zero distance, so they scale every
+    sequence identically and do not affect ranking.
+    """
+    arr = np.array([list(s) for s in sequences])
+    B, L = arr.shape
+    if B < 2:
+        return np.zeros(B)
+    identity = np.zeros(B)
+    for j in range(L):
+        col = arr[:, j]
+        _, inv, counts = np.unique(col, return_inverse=True, return_counts=True)
+        k = counts[inv]
+        identity += (k - 1) / (B - 1)
+    return 1.0 - identity / L
 
 
 def _get_mutation_sets(sequences, ref_seq=None):
@@ -80,6 +116,8 @@ def mutation_diversity_from_df(df_input, cfg, step_name="mutation_diversity"):
     mutation_sets = _get_mutation_sets(sequences, ref_seq)
     global_counts = _mutation_counts(mutation_sets)
 
+    pw = pairwise_hamming(sequences)
+
     metrics_list = []
     for idx in range(len(sequences)):
         my_muts = mutation_sets[idx]
@@ -96,6 +134,7 @@ def mutation_diversity_from_df(df_input, cfg, step_name="mutation_diversity"):
             f"{step_name}_marginal_fraction": marginal_count / max(total_muts, 1),
             f"{step_name}_fractional_score": fractional_score,
             f"{step_name}_fractional_normalized": fractional_score / max(total_muts, 1),
+            f"{step_name}_pairwise_hamming": float(pw[idx]),
         })
 
     output_df = pd.DataFrame(metrics_list)

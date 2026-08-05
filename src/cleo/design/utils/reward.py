@@ -141,6 +141,31 @@ class UniversalReward():
             else:
                 raise ValueError(f"Unknown mode {m.mode} for metric {m.metric}")
 
+            # Optional per-metric batch standardisation.
+            #
+            # `weight` alone does not control influence. GRPO consumes
+            # *within-batch* differences, so a metric that barely varies across
+            # a batch contributes almost nothing however it is weighted. On a
+            # 16-sequence AME batch the motif-RMSD term has sd ~0.33 while batch
+            # mutation diversity has sd ~0.03: nominally equal weights give the
+            # diversity term under a fifth of the actual influence, and no
+            # choice of fixed bounds fixes that robustly, since the spreads move
+            # as training proceeds.
+            #
+            # With `normalize: zscore` each term is standardised over the batch
+            # before weighting, so equal weight means equal influence by
+            # construction. Off by default: it changes reward semantics, and
+            # single-metric rewards do not need it (GRPO already standardises
+            # the aggregate).
+            if str(getattr(m, "normalize", "") or "") == "zscore":
+                _sd = _reward.std()
+                if _sd > 1e-8:
+                    _reward = (_reward - _reward.mean()) / _sd
+                else:
+                    # Degenerate batch: every sequence identical on this metric.
+                    # Contribute nothing rather than amplifying float noise.
+                    _reward = torch.zeros_like(_reward)
+
             rewards.append(_reward*m.weight)
             weights.append(m.weight)
 

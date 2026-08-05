@@ -174,26 +174,38 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
         {"metric": "ame_motif_rmsd", "lower_bound": 0.5,
          "upper_bound": 6.0, "weight": 1.0, "mode": "min"},
     ]
+    # Standardise each term over the batch when there is more than one, so
+    # `weight` actually controls influence. See UniversalReward.
+    if diversity_weight:
+        aggregation[0]["normalize"] = "zscore"
 
     if diversity_weight:
-        # Batch-level rarity of (position, AA) choices, reference-free: every
-        # position counts, so this is pairwise diversity across the batch with
-        # no privileged parent. A reference is deliberately NOT passed -- the
-        # design PDB is poly-ALA away from the motif, so using it would make
-        # every alanine choice invisible and silently reduce this to
-        # non-alanine diversity.
+        # "Unique mutations" = a (position, residue) choice carried by exactly
+        # one sequence in the batch. Reference-free, so total_muts is just the
+        # sequence length and `marginal_fraction` reads directly as "fraction of
+        # positions where my residue is unique among my peers".
         #
-        # `fractional_normalized` is the mean 1/k over positions, so it already
-        # lies in [0,1] like the RMSD term; equal `weight` therefore means equal
-        # influence, which would not be true of the raw counts.
+        # Bounds are NOT [0,1]. GRPO consumes within-batch differences, and on a
+        # 16-sequence T=1.0 batch this metric spans only ~0.13-0.25 (sd 0.029)
+        # against the RMSD term's sd of ~0.34. Left on [0,1] a nominal
+        # `weight: 1.0` would deliver a few percent of the actual influence.
+        # Bounds set to the measured operating range, widened for headroom, so
+        # equal weight means equal influence in practice. Re-measure if the
+        # sampling temperature or batch size changes.
+        #
+        # pairwise_hamming is also logged but deliberately not used as the
+        # reward: at sd 0.013 across a batch it is nearly constant and would
+        # supply almost no gradient. It is the better *reporting* measure of
+        # library spread.
         steps.insert(0, {
             "name": "div",
             "target_fn": "cleo.design.utils.mutation_diversity.mutation_diversity_from_df",
             "cfg": {},
         })
         aggregation.append(
-            {"metric": "div_fractional_normalized", "lower_bound": 0.0,
-             "upper_bound": 1.0, "weight": diversity_weight, "mode": "max"})
+            {"metric": "div_marginal_fraction", "lower_bound": 0.05,
+             "upper_bound": 0.35, "weight": diversity_weight, "mode": "max",
+             "normalize": "zscore"})
 
     return {
         "run_name": name,
