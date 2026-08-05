@@ -327,6 +327,115 @@ because their members are near-duplicates whose successes and failures are
 correlated. This is the deepest version of the paper's claim and the bridge to
 the wet-lab sections.
 
+### E8 — Mutation-diversity reward (optional reward term)
+
+Add the batch mutation-diversity reward
+(`cleo.design.utils.mutation_diversity`) as an optional term alongside the
+benchmark metric, and run it as its own arm (A6).
+
+Both variants are already implemented: marginal/exclusive (credit only for
+mutations no other batch member carries — sparse, strong pressure) and
+fractional 1/k (smoother, robust to batch size). Sweep the weight; report both.
+
+The interesting question is not whether it raises diversity — it will — but
+whether it raises **passing** diversity: unique mutations among designs that
+clear the 1.5 A motif cutoff. A diversity term that buys sequence spread at the
+cost of pass rate is a worse trade than simply raising temperature, and panel 2B
+is where that shows up.
+
+### E9 — Oversample cheap, fold expensive  ★ highest value per unit effort
+
+The asymmetry the whole project runs on: **sampling from LigandMPNN is nearly
+free; folding is essentially the entire cost.** The baseline spends its budget
+folding 8-40 sequences per backbone chosen with no regard to redundancy — and at
+low temperature many are near-duplicates, so folds are spent re-testing the same
+hypothesis.
+
+Protocol: sample far more sequences than the fold budget (10^2-10^4 per
+backbone), then fold only a maximally diverse subset of size N.
+
+- **Selection rules to compare:** random (control); greedy max-min Hamming;
+  cluster at an identity threshold and take representatives; diversity subject
+  to a policy-likelihood floor.
+- **Budget:** N folds per backbone, identical across arms. The comparison is
+  entirely about *which* N you fold.
+- **Arms (2x2):** {baseline LigandMPNN, CLEO} x {random N, diverse N}. This
+  factorizes selection from policy, so we learn whether the gain comes from a
+  better policy, better selection, or both.
+
+Directly optimizes the headline quantity — unique passing mutations **per
+fold** — and it is cheap because the expensive half is capped by construction.
+It also applies to the baseline, so it is an honest improvement offered to both
+arms rather than an advantage reserved for ours. If diverse-N lifts the baseline
+substantially, that is a real result and belongs in the paper either way.
+
+Composes with E8: the diversity *reward* shapes what the policy proposes, the
+diversity *selection* decides what gets folded. Either alone may suffice; the
+2x2 says which.
+
+---
+
+## 3b. Metric calibration: status and resolution
+
+**Gate: no pilot runs until we can compute every metric we intend to report.**
+
+### What was checked
+
+`ligand_dist_des_ncac_min` depends only on the design — no predictor — so it is
+the one benchmark quantity checkable against their published values without
+running an oracle. Our implementation does **not** reproduce it: median absolute
+error 0.42 A, max 1.68 A, 0/40 exact, `no_clash` boolean agreement 38/40
+(`experiments/ame/calibrate_metrics.py`).
+
+Ruled out, none reproducing the published number:
+
+- ligand atom subsets: all / DAD only / MG only / `partially_fixed_ligand`
+  members / non-members
+- excluding motif residues from the N/CA/C set; CA-only; N/CA/C/O
+- the `unidealized/` PDB variant from `enzyme_bench_n41.tar` (median error 0.47 A
+  — slightly worse than the idealized one)
+- `metrics_cache/*.csv` in that tar holds only `IdealizedResidueRMSD.*`, not the
+  ligand distance
+
+### Resolution: compute both arms ourselves, one implementation
+
+This turns out not to block the work, for two reasons.
+
+1. **`no_clash` never needs recomputing.** It is constant across all 40
+   sequences of a backbone, so it is a per-backbone constant we can simply read
+   from their published CSV. We already do — it is how the 2,837 true rescue
+   targets were defined. Nothing in the reward depends on our version of it.
+
+2. **The comparison must be internally consistent, not externally identical.**
+   Scoring CLEO designs with our implementation while taking baseline numbers
+   from theirs would be an apples-to-oranges comparison regardless of whether our
+   implementation matched. The fix is to recompute *both* arms with one
+   implementation and one oracle.
+
+That is now possible: the baseline sequences are recoverable from
+`ligmpnn/backbones/` in `enzyme_bench_n41.tar` (32,801 files = 4,100 x 8). So:
+
+- fold baseline sequences and CLEO sequences with the **same** predictor (AF3)
+- score both with the **same** module (`rfd2_benchmark.py`)
+- use their published pass/fail labels as an independent cross-check and to
+  define the rescue partition, never as the basis of the head-to-head
+
+Their Chai-1 predicted structures are not in the deposit (only `backbones/` and
+`packed/` under `ligmpnn/`), so calibrating the sequence-dependent motif RMSD
+against their exact values is not possible. Recomputing both arms is not a
+workaround for that — it is the correct design either way.
+
+### Remaining pre-pilot checks
+
+- [ ] Motif RMSD is stable and sane on a handful of AF3 predictions (correct
+      magnitude, correlates with pass/fail on backbones whose published outcome
+      we know)
+- [ ] Rerun `calibrate_metrics.py` if the design-PDB provenance is ever
+      resolved; document the residual discrepancy in Methods if not
+- [ ] Confirm CLEO's `ligand_mpnn` matches their motif-rotamer-aware + packing
+      mode
+- [ ] One backbone end-to-end through AF3 -> metrics -> reward scalar
+
 ---
 
 ## 4. Staging
