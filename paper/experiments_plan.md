@@ -412,8 +412,21 @@ This turns out not to block the work, for two reasons.
    implementation matched. The fix is to recompute *both* arms with one
    implementation and one oracle.
 
-That is now possible: the baseline sequences are recoverable from
-`ligmpnn/backbones/` in `enzyme_bench_n41.tar` (32,801 files = 4,100 x 8). So:
+That is now possible, and by the simplest route available: **we regenerate the
+baseline ourselves.** MPNN sampling is cheap — the expensive step is folding, and
+we have to fold our own designs anyway. `experiments/ame/sample_baseline.py`
+samples from the vanilla LigandMPNN weights shipped in the repo
+(`src/cleo/design/protein_mpnn_utils/ligand_protein_mpnn_weights.pt`) at their
+published T = 0.1, with motif residues pinned from the `.trb`.
+
+It does this by subclassing `PolicyMPNN` and removing only the training
+machinery, so the baseline is **the same code path as CLEO with zero gradient
+steps**. Any difference between the arms is then attributable to training rather
+than to two different implementations of "sample from MPNN". Their deposited
+sequences under `ligmpnn/backbones/` (32,801 files = 4,100 x 8) remain available
+as a cross-check on our sampler, but are not needed for the comparison.
+
+So:
 
 - fold baseline sequences and CLEO sequences with the **same** predictor (AF3)
 - score both with the **same** module (`rfd2_benchmark.py`)
@@ -427,14 +440,27 @@ workaround for that — it is the correct design either way.
 
 ### Remaining pre-pilot checks
 
+- [x] Metric implementation self-consistent: scoring a design PDB against itself
+      gives motif RMSD 4e-7 A with 0 missing motif atoms, so the `.trb` atom
+      selection and the superposition agree with the structure
+- [x] Baseline sampler reproduces the pinned motif exactly (D78/D81/R114/K138 on
+      `M0058_1cju_cond4_45`, 8/8 sequences) at full backbone length
 - [ ] Motif RMSD is stable and sane on a handful of AF3 predictions (correct
       magnitude, correlates with pass/fail on backbones whose published outcome
-      we know)
+      we know) — **in flight:** `run_M0664_2dhn_cond29_29` (40/40 passing under
+      their Chai eval) and `run_M0664_2dhn_cond29_6` (0/40), 8 sequences each.
+      Same site, opposite published outcome, so the metric has to separate them
 - [ ] Rerun `calibrate_metrics.py` if the design-PDB provenance is ever
       resolved; document the residual discrepancy in Methods if not
-- [ ] Confirm CLEO's `ligand_mpnn` matches their motif-rotamer-aware + packing
-      mode
 - [ ] One backbone end-to-end through AF3 -> metrics -> reward scalar
+
+**Known divergence, deliberately accepted.** RFdiffusion2 runs LigandMPNN
+motif-rotamer-aware (side-chain context on) with packing; `PolicyMPNN` sets
+`ligand_mpnn_use_side_chain_context = 0`. Our baseline may therefore be somewhat
+weaker than their published one. This does not bias the comparison we report —
+both our arms share the setting — but it does mean *our* baseline and *their*
+published baseline are not interchangeable, and no figure may mix them. Worth
+revisiting as a knob (`parse_all_atoms` in `featurize_pdb`) once the pilots land.
 
 ---
 
