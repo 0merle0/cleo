@@ -17,6 +17,11 @@
 
 \usepackage{authblk}
 
+% Allow hyphenation inside \texttt{}. Without this, snake_case identifiers
+% (mutation_diversity, consensus_divergence, ...) are unbreakable and push
+% lines into the margin. [htt] enables breaking in typewriter text.
+\usepackage[htt]{hyphenat}
+
 \graphicspath{{figures/pdf/}}
 
 % --- Shared color palette ---
