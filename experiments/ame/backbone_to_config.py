@@ -174,10 +174,15 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
         {"metric": "ame_motif_rmsd", "lower_bound": 0.5,
          "upper_bound": 6.0, "weight": 1.0, "mode": "min"},
     ]
-    # Standardise each term over the batch when there is more than one, so
-    # `weight` actually controls influence. See UniversalReward.
+    # Rank-normalise each term over the batch when there is more than one, so
+    # `weight` actually controls influence. Rank rather than zscore because the
+    # metrics' ranges move by an order of magnitude during training and fixed
+    # bounds cannot track that: a step-0 batch on a 4-chain target had motif
+    # RMSD 9-37 A, which a 6 A bound clipped entirely flat. Ranks are uniform
+    # by construction, so both terms carry identical spread and equal weight
+    # means equal influence at every stage. See UniversalReward.
     if diversity_weight:
-        aggregation[0]["normalize"] = "zscore"
+        aggregation[0]["normalize"] = "rank"
 
     if diversity_weight:
         # "Unique mutations" = a (position, residue) choice carried by exactly
@@ -205,7 +210,7 @@ def build_config(name, pdb, fixed_residues, motif_atoms, out_dir, run_root,
         aggregation.append(
             {"metric": "div_marginal_fraction", "lower_bound": 0.05,
              "upper_bound": 0.35, "weight": diversity_weight, "mode": "max",
-             "normalize": "zscore"})
+             "normalize": "rank"})
 
     return {
         "run_name": name,

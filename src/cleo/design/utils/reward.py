@@ -128,9 +128,36 @@ class UniversalReward():
         for m in self.reward_aggregation:
             print(f"Processing metric: {m.metric} with mode: {m.mode} and weight: {m.weight}")
             _r = torch.tensor(df[m.metric].tolist())
+            _norm_mode = str(getattr(m, "normalize", "") or "")
 
-            _r_clamped = torch.clamp(_r, min=m.lower_bound, max=m.upper_bound)
-            _r_norm = (_r_clamped - m.lower_bound) / (m.upper_bound - m.lower_bound + 1e-3)
+            if _norm_mode == "rank":
+                # Within-batch rank, ties averaged, mapped to [0,1]. Bounds are
+                # deliberately ignored.
+                #
+                # Fixed bounds cannot survive training. They must be calibrated
+                # to the metric's range, but that range moves by an order of
+                # magnitude: a step-0 T=1.0 batch on a 4-chain target had motif
+                # RMSD 9-37 A, so a 6 A upper bound clipped 100% of it, leaving
+                # the term exactly constant and the reward driven entirely by
+                # the other metric. Rank is invariant to scale and to outliers,
+                # so it yields usable gradient at every stage of training, which
+                # is all GRPO's group-relative advantage needs.
+                _finite = torch.isfinite(_r)
+                _r_norm = torch.full_like(_r, 0.5, dtype=torch.float32)
+                if _finite.sum() > 1:
+                    vals = _r[_finite]
+                    # average ranks so tied values receive identical credit
+                    order = vals.argsort()
+                    ranks = torch.empty_like(order, dtype=torch.float32)
+                    ranks[order] = torch.arange(len(vals), dtype=torch.float32)
+                    for v in torch.unique(vals):
+                        tie = vals == v
+                        if tie.sum() > 1:
+                            ranks[tie] = ranks[tie].mean()
+                    _r_norm[_finite] = ranks / max(len(vals) - 1, 1)
+            else:
+                _r_clamped = torch.clamp(_r, min=m.lower_bound, max=m.upper_bound)
+                _r_norm = (_r_clamped - m.lower_bound) / (m.upper_bound - m.lower_bound + 1e-3)
 
             if m.mode == "max":
                 _reward = _r_norm
