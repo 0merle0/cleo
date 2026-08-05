@@ -484,14 +484,56 @@ generated AME config, so CLEO does not train under a handicap its baseline
 lacks. `--side-chain-context 0` is retained as an ablation: it isolates how much
 of this benchmark is rotamer placement, which is a result in its own right.
 
-Two things this does *not* yet close. We reach 3/8 where they report 40/40, and
-the remaining gap is unattributed — candidates are LigandMPNN side-chain packing
-(which they run and we do not), AF3-vs-Chai disagreement, and n = 8. And the
-ligand RMSD on the positive control (4.62 A median) is far above the 2.5 A
-cutoff even for sequences whose motif passes, which points at our pocket
-definition rather than at the designs, since their `chai_pocket_aligned_*`
-columns come from Chai's own evaluation. Neither blocks pilots; both must be
-resolved before any ligand-placement number is reported.
+One thing this does *not* close: we reach 3/8 where they report 40/40, and the
+remaining gap is unattributed — candidates are LigandMPNN side-chain packing
+(which they run and we do not), AF3-vs-Chai disagreement, and n = 8. It does not
+block pilots, since our head-to-head is baseline-vs-CLEO through one pipeline.
+
+### Ligand placement is not part of the benchmark — resolved, not a blocker
+
+Recorded here because it was briefly mistaken for a calibration problem. The
+deposited results have exactly these columns:
+
+```
+backbone_aligned_allatom_rmsd_chai_motif, ligand_dist_des_ncac_min,
+chai_motif_pass, no_clash, chai_motif_pass_and_no_clash,
+benchmark, source, design_id, Number of Residue Islands
+```
+
+There is **no ligand-pose metric**. `ligand_dist_des_ncac_min` is the clash
+check, nothing more. Across all 328,000 rows, `chai_motif_pass` is exactly
+`rmsd < 1.5`, `no_clash` is exactly `dist > 1.5`, and the composite is exactly
+their conjunction. The `chai_pocket_aligned_ligand_{i}_rmsd < 2.5` criterion
+noted earlier in this plan came from their *source*, not their results: a
+quantity their pipeline can compute but that they neither report nor score on.
+There were never any published values to calibrate against.
+
+The high ligand RMSD we saw (4.62 A median on the positive control) is real and
+is not ours to fix:
+
+- atom matching is complete (14/14 PH2 atoms in both structures), so it is not
+  a silently shrunken comparison set
+- it is insensitive to the alignment used — global backbone 4.88 A vs pocket
+  4.89 A — so it is not our pocket definition, which is what was first suspected
+- it is uncorrelated with motif accuracy: the best motif (1.32 A, passing) had
+  the worst ligand RMSD (5.61 A); a failing motif (1.55 A) had the best (1.98 A)
+
+So AF3 places the ligand several angstroms from the design pose more or less
+independently of how well it reproduces the motif — consistent with the known
+unreliability of ligand placement on de novo designs with empty MSAs, though we
+have no independent evidence either way.
+
+**Decision: reward on motif RMSD only.** `no_clash` is read from the design
+(per-backbone constant, no sequence can change it). Ligand RMSD is logged as a
+diagnostic under the neutral name `ligand_rmsd_max`, with no pass/fail boolean
+so that no future reward can pick it up by accident, and is never reported as a
+benchmark number. Optimizing a quantity that has no ground truth, under an
+oracle whose ligand placement is unvalidated here, is a reward-hacking risk with
+no upside for the headline claim.
+
+Ligand placement does matter for real enzyme design even though AME does not
+score it. Revisit later as an explicitly CLEO-defined metric with its own
+validation — never smuggled in as though it were theirs.
 
 ---
 

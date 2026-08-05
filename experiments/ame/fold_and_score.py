@@ -101,8 +101,9 @@ def main():
     res.to_csv(out, index=False)
 
     print(f"\nwrote {len(res)} rows -> {out}")
+    # ligand_rmsd_max is printed as a diagnostic; it is not an AME criterion.
     cols = [c for c in ("rfd2_motif_rmsd", "rfd2_motif_pass", "rfd2_no_clash",
-                        "rfd2_pocket_aligned_ligand_rmsd_max", "rfd2_motif_pass_and_no_clash")
+                        "rfd2_motif_pass_and_no_clash", "rfd2_ligand_rmsd_max")
             if c in res.columns]
     for bb, sub in res.groupby("backbone"):
         print(f"  {bb}:")

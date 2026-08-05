@@ -23,12 +23,28 @@ Criteria (names and cutoffs as published)
     constant across all 40 sequences of a backbone in the deposited results, so
     no sequence can repair it. Reported for bookkeeping; never optimized.
 
-``chai_largest_ligand_pass`` / ``chai_all_ligands_pass``
-    ``chai_pocket_aligned_ligand_{i}_rmsd < 2.5``. Ligand placement after
-    pocket alignment. See the caveat on ``pocket_cutoff`` below.
+Composite ``chai_motif_pass_and_no_clash`` is a strict AND. Verified against all
+328,000 rows of the deposited ``AME_benchmark_results_all.csv``: the two
+booleans are exactly the cutoffs above and the composite is exactly their
+conjunction.
 
-Composite ``chai_motif_pass_and_no_clash`` is a strict AND, matching the
-deposited ``AME_benchmark_results_all.csv``.
+Ligand placement is NOT a benchmark criterion
+---------------------------------------------
+``ligand_rmsd`` below is a CLEO diagnostic, not an AME metric. The deposit
+carries no ligand-pose column at all -- only ``ligand_dist_des_ncac_min``, which
+is the clash check. A pocket-aligned ligand RMSD is computable from the
+RFdiffusion2 source, but they neither report it nor score on it, so there are no
+published values to calibrate against.
+
+It is therefore logged and never optimized. Two reasons beyond the missing
+ground truth. On ``M0664_2dhn_cond29_29`` it is uncorrelated with motif
+accuracy -- the best motif (1.32 A, passing) had the worst ligand RMSD (5.61 A)
+and a failing motif (1.55 A) had the best (1.98 A) -- and it is insensitive to
+the alignment used (global backbone 4.88 A vs pocket 4.89 A), so the large
+values reflect the predictor placing the ligand elsewhere rather than a choice
+of superposition. Rewarding a quantity with no ground truth, under an oracle
+whose ligand placement is unvalidated on de novo designs, is a reward-hacking
+risk with no benchmark upside.
 
 Oracle independence
 -------------------
@@ -50,9 +66,8 @@ import biotite.structure.io as strucio
 BACKBONE_ATOMS = {"N", "CA", "C", "O"}
 NCAC = {"N", "CA", "C"}
 
-MOTIF_RMSD_CUTOFF = 1.5   # fa_rmsd_cutoff
-CLASH_CUTOFF = 1.5        # no_clash thresh
-POCKET_RMSD_CUTOFF = 2.5  # pocket_rmsd_cutoff
+MOTIF_RMSD_CUTOFF = 1.5   # fa_rmsd_cutoff; the only optimizable pass criterion
+CLASH_CUTOFF = 1.5        # no_clash thresh; property of the backbone alone
 
 
 class _TrbShim(pickle.Unpickler):
@@ -171,12 +186,13 @@ def compute_metrics(design_pdb, pred_path, motif_atoms, pocket_cutoff=8.0):
         out["ligand_dist_des_ncac_min"] = np.nan
         out["no_clash"] = False
 
-    # --- ligand placement: align on pocket residues, then ligand RMSD.
-    # CAVEAT: the published chai_pocket_aligned_* columns come from Chai's own
-    # evaluation, whose pocket definition is not in the RFdiffusion2 repo. Here
-    # the pocket is protein backbone within `pocket_cutoff` A of any design
-    # ligand atom. Directionally the same quantity; do not report it as
-    # numerically identical to theirs.
+    # --- ligand placement: DIAGNOSTIC ONLY, not an AME criterion (see module
+    # docstring). Pocket = protein backbone within `pocket_cutoff` A of any
+    # design ligand atom. No pass/fail is emitted and nothing here feeds the
+    # composite: there is no published value to threshold against, so a boolean
+    # would invent a standard and invite it into a reward by accident.
+    # `ligand_atoms_matched` is recorded because an unnoticed atom-name mismatch
+    # would silently shrink the comparison set and flatter the RMSD.
     lig_pred_mask = _ligand_mask(pred)
     if len(lig_des) and lig_pred_mask.any():
         bbm = _protein_mask(des) & np.isin(des.atom_name, list(BACKBONE_ATOMS))
@@ -187,7 +203,7 @@ def compute_metrics(design_pdb, pred_path, motif_atoms, pocket_cutoff=8.0):
         pd_, pp_, _ = _paired_coords(des, pred, pocket_keys)
         if pd_ is not None and len(pd_) >= 3:
             to_pocket = _kabsch(pp_, pd_)
-            rmsds = []
+            rmsds, n_matched, n_total = [], 0, 0
             for res in np.unique(pred.res_name[lig_pred_mask]):
                 sel_p = lig_pred_mask & (pred.res_name == res)
                 sel_d = _ligand_mask(des) & (des.res_name == res)
@@ -199,11 +215,14 @@ def compute_metrics(design_pdb, pred_path, motif_atoms, pocket_cutoff=8.0):
                     if an in names_d:
                         a.append(pred.coord[i])
                         b.append(names_d[an])
+                n_matched += len(a)
+                n_total += len(keys)
                 if len(a) >= 1:
                     rmsds.append(_rmsd(to_pocket(np.array(a)), np.array(b)))
             if rmsds:
-                out["pocket_aligned_ligand_rmsd_max"] = float(max(rmsds))
-                out["ligand_pass"] = out["pocket_aligned_ligand_rmsd_max"] < POCKET_RMSD_CUTOFF
+                out["ligand_rmsd_max"] = float(max(rmsds))
+                out["ligand_atoms_matched"] = n_matched
+                out["ligand_atoms_total"] = n_total
 
     out["motif_pass_and_no_clash"] = bool(out.get("motif_pass", False) and out.get("no_clash", False))
     return out
