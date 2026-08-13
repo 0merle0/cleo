@@ -133,7 +133,8 @@ so it is recorded here rather than removed from the record.}
 \textbf{ID} & \textbf{Status} & \textbf{Experiment} & \textbf{Result} \\
 \midrule
 E1  & \statusscaffold & Matched-fold head-to-head &
-      M0097: $T{=}0.1$ 5.0 passing / 1.0 cluster per 8 folds; \cleo{} 3.1 / 3.1 \\
+      M0097 per 8 folds: $T{=}0.1$ 5.0 passing, \cleo{} 3.1 --- but see E10,
+      the comparison must be made at matched diversity \\
 E2  & \statusscaffold & Diversity yield curves &
       \cleo{} 3200 folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters,
       still climbing \\
@@ -147,8 +148,11 @@ E8  & ---             & Mutation-diversity reward &
 E9  & \statusdone     & Selection rules, retrospective &
       \textbf{Negative:} every rule loses to random, \numrange{2.5}{8}$\times$ \\
 \addlinespace
-E10 & \statusblocked  & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
-      builds the incumbent frontier & \todoresult \\
+E10 & \statusdone     & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
+      builds the incumbent frontier &
+      \textbf{Frontier shift confirmed:} at matched diversity \cleo{} passes
+      $1.75\times$ the baseline; at matched pass rate it is $1.46\times$ more
+      diverse \\
 E11 & \statusblocked  & Reward shaping: rank normalisation & \todoresult \\
 E12 & \statusblocked  & Early stopping at ${\sim}75$ steps & \todoresult \\
 E13 & \statusblocked  & Consensus anchoring of the search & \todoresult \\
@@ -236,3 +240,60 @@ since those designs are separate clusters at any threshold tested.
 
 Caveat on $n$: passing subsets are 5 and 15 designs, so the correlation
 figures in particular are noisy. The ratio comparison is the robust part.}
+
+\subsection*{E10 result --- \cleo{} sits above the temperature frontier}
+
+\plan{The experiment the section was gated on. LigandMPNN sampled at six
+temperatures, 24 sequences per backbone, folded best-of-5, and scored by the
+same code path as \cleo{}. M0097, at the benchmark's 8-fold budget, averaged
+over 300 random draws of 8.}
+
+\begin{center}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Arm} & \textbf{Mean pairwise} & \textbf{Variable} &
+\textbf{Passing} & \\
+             & \textbf{Hamming}       & \textbf{positions} & \textbf{/ 8 folds} & \\
+\midrule
+LigandMPNN $T{=}0.1$ & 39.1  & 81    & 5.00 & \\
+LigandMPNN $T{=}0.2$ & 48.7  & 102   & 4.81 & \\
+LigandMPNN $T{=}0.3$ & 58.7  & 116   & 4.42 & \\
+LigandMPNN $T{=}0.5$ & 78.2  & 135   & 2.23 & \\
+LigandMPNN $T{=}0.7$ & 104.8 & 159   & 1.72 & \\
+LigandMPNN $T{=}1.0$ & 123.8 & 170   & 0.00 & \\
+\midrule
+\textbf{\cleo{}-GRPO} & \textbf{103.3} & \textbf{163} & \textbf{3.06} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Temperature traces a clean monotone trade-off: diversity rises from 39 to 124
+mean pairwise substitutions while the pass rate falls from 5.0 to 0.0 per eight
+folds. That curve is the incumbent frontier, and it is the thing every claim in
+this section has to beat.
+
+\cleo{} sits above it. Interpolating the baseline curve:
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item at \cleo{}'s diversity (Hamming 103.3), the baseline passes
+        $1.75$ per 8; \cleo{} passes $\mathbf{3.06}$ --- $\mathbf{1.75\times}$.
+  \item at \cleo{}'s pass rate ($3.06$ per 8), the baseline reaches Hamming
+        $70.8$; \cleo{} reaches $\mathbf{103.3}$ --- $\mathbf{1.46\times}$.
+\end{itemize}
+
+The two dangerous points named in advance, $T{=}0.2$ and $T{=}0.3$, do not
+threaten the claim: they buy very little diversity (48.7 and 58.7) for the pass
+rate they retain, landing far below \cleo{}'s coverage. The nearest baseline
+arm by diversity is $T{=}0.7$, which matches \cleo{} on both diversity measures
+(104.8 vs.\ 103.3 Hamming; 159 vs.\ 163 variable positions) and passes
+\emph{half} as often.
+
+\plan{\textbf{Correction to carry through the rest of the paper.} Earlier
+drafts reported ``$T{=}0.1$ yields 1.0 cluster per 8 folds against \cleo{}'s
+3.1''. That used a \SI{70}{\percent}-identity clustering threshold; at
+\SI{90}{\percent} identity every arm's passing designs are separate clusters
+and the cluster count simply equals the passing count. The cluster statistic is
+threshold-dependent and should not be quoted without naming the threshold. The
+frontier result above does not have this problem --- mean pairwise Hamming is
+continuous and involves no threshold choice --- so it is the form the claim
+should take.}
