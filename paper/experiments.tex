@@ -134,16 +134,17 @@ so it is recorded here rather than removed from the record.}
 \midrule
 E1  & \statusscaffold & Matched-fold head-to-head &
       Superseded by the per-sequence success rate (see \emph{Scoring protocol});
-      M0097 best-of-5: $T{=}0.1$ \SI{62.5}{\percent}, \cleo{} \SI{20.0}{\percent}
-      --- but at $2.4\times$ the spread, so E10 is the comparison that counts \\
+      M0097 best-of-5: $T{=}0.1$ \SI{62.5}{\percent} at spread 38.5, \cleo{} peak
+      \SI{37.5}{\percent} at 98.8. E10 is the comparison that counts \\
 E2  & \statusscaffold & Diversity yield curves &
       \cleo{} 3200 folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters,
       still climbing \\
 E3  & \statusblocked  & Rescue of the three near-miss backbones
       (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) & \todoresult \\
 E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
-E7  & \statusscaffold & Effective library size &
-      Among passing designs, cluster count equals design count \\
+E7  & \statusdone     & Effective library size &
+      Unique mutations rarefied to $k{=}5$: \cleo{} 347 vs.\ $T{=}0.7$ 316
+      ($1.10\times$); per fold budget $2.0\times$ \\
 E8  & ---             & Mutation-diversity reward &
       \textbf{Retired}, superseded by trajectory-as-library \\
 E9  & \statusdone     & Selection rules, retrospective &
@@ -151,13 +152,19 @@ E9  & \statusdone     & Selection rules, retrospective &
 \addlinespace
 E10 & \statusscaffold & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
       builds the incumbent frontier &
-      Frontier shift present but modest on the per-sequence rate: at ${\sim}20\%$
-      success \cleo{} reaches spread 132 vs.\ $1.26\times$ less at $T{=}0.7$.
+      \textbf{Frontier shift confirmed} on passing-set spread: \cleo{}'s peak
+      window succeeds $1.7\times$ as often as the baseline at matched diversity
+      (\SI{37.5}{\percent} vs.\ ${\sim}\SI{22}{\percent}$ at spread 98.8).
       Rerunning all six $T$ at $n{=}96$ \\
 E11 & \statusdone     & Reward shaping: rank normalisation &
       Folded into every new arm; E15 trains stably under it \\
-E12 & \statusdone     & Early stopping at ${\sim}75$ steps &
-      Folded in; all E15 arms converge well inside 75 steps \\
+E12 & \statusscaffold & Early stopping at ${\sim}75$ steps &
+      \textbf{Rule was fitted to a broken config} (see E17); rank-normalised
+      runs are still improving at step 75 \\
+E17 & \statusscaffold & \textbf{Convergence}: why the policy degrades after
+      its peak &
+      Reward dynamic range misallocated; entropy \emph{rises} 1.42$\to$1.85.
+      Rank normalisation fixes it; 200-step run in flight \\
 E13 & \statusblocked  & Consensus anchoring of the search & \todoresult \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
@@ -189,6 +196,31 @@ the benchmark's criterion. The step instead takes the min motif RMSD as the
 continuous signal and OR-s the per-prediction conjunction for the pass flag ---
 separately reducing ``motif passed'' and ``no clash'' and then AND-ing them
 would credit a design for two different predictions and overcount.
+
+\textbf{Metrics are reported on filtered designs.} A library contains only the
+designs that survived filtering, so diversity among sequences that failed is
+diversity nobody gets to use. Every diversity number below is computed on the
+passing subset $\mathcal{P}$, not on everything sampled. Where the two differ
+materially the sampled figure is given alongside, because the gap is itself
+diagnostic --- it says whether an arm's successes concentrate.
+
+\textbf{Unique mutations.} Mean pairwise Hamming measures how far apart a
+library's members are; it does not measure how much of mutational space they
+collectively reach. Two libraries can have identical spread while one explores
+twice as many distinct substitutions. So we also report
+\[
+  U(\mathcal{P}) \;=\; \bigl|\{\, (i, a) : \exists\, s \in \mathcal{P},\;
+  s_i = a \neq a^{\mathrm{ref}}_i \,\}\bigr|,
+\]
+the number of distinct (position, residue) substitutions appearing anywhere in
+the library, each counted once no matter how many designs carry it. The ceiling
+is $19L = 3420$.
+
+$U$ grows with $|\mathcal{P}|$, so arms with different numbers of passing
+designs cannot be compared on it directly --- doing so measures sample size as
+much as coverage. We rarefy: subsample every arm to a common $k$ designs,
+average over 400 draws, and compare at matched $k$, the same construction as a
+species-accumulation curve.
 
 \textbf{Per-sequence success rate, not best-of-8.} The published unit (fraction
 of backbones with a hit among 8 sequences) saturates and discards resolution:
@@ -279,23 +311,35 @@ success rate under the \emph{Scoring protocol} above. The $n$ per arm is
 uneven here --- 8 for $T{=}0.1$ and $T{=}1.0$, 24 for the rest, 80 for \cleo{}
 --- which is why all six are being resampled at $n{=}96$.}
 
+\textbf{Which set spread is measured over.} Spread is the mean pairwise Hamming
+distance --- for every pair in a set, the number of positions at which the two
+sequences differ, averaged over all $\binom{n}{2}$ pairs, as a raw substitution
+count out of $L = 180$. No threshold, no clustering. The set it is measured over
+has to be the \emph{passing} designs, not everything sampled: a library contains
+only the designs that survived filtering, so diversity among sequences that
+failed is diversity nobody gets to use. Both columns are given below because the
+gap between them is itself informative.
+
 \begin{center}
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-\textbf{Arm} & $n$ & \textbf{Mean pairwise} & \textbf{Success} &
+\textbf{Arm} & $n$ & \textbf{Success} & \multicolumn{2}{c}{\textbf{Mean pairwise Hamming}} &
 \textbf{Median best} \\
-             &     & \textbf{Hamming}       & \textbf{rate}    &
+\cmidrule(lr){4-5}
+             &     & \textbf{rate}    & \textbf{sampled} & \textbf{passing} &
 \textbf{RMSD (\si{\angstrom})} \\
 \midrule
-LigandMPNN $T{=}0.1$ & 8  & 39.1  & \SI{62.5}{\percent} & 1.3 \\
-LigandMPNN $T{=}0.2$ & 24 & 48.7  & \SI{58.3}{\percent} & 1.3 \\
-LigandMPNN $T{=}0.3$ & 24 & 58.9  & \SI{54.2}{\percent} & 1.3 \\
-LigandMPNN $T{=}0.5$ & 24 & 78.3  & \SI{29.2}{\percent} & 1.8 \\
-LigandMPNN $T{=}0.7$ & 24 & 104.8 & \SI{20.8}{\percent} & 1.8 \\
-LigandMPNN $T{=}1.0$ & 8  & 123.8 & \SI{0.0}{\percent}  & 4.4 \\
+LigandMPNN $T{=}0.1$ & 8  & \SI{62.5}{\percent} & 39.1  & 38.5  & 1.3 \\
+LigandMPNN $T{=}0.2$ & 24 & \SI{58.3}{\percent} & 48.7  & 48.6  & 1.3 \\
+LigandMPNN $T{=}0.3$ & 24 & \SI{54.2}{\percent} & 58.9  & 57.3  & 1.3 \\
+LigandMPNN $T{=}0.5$ & 24 & \SI{29.2}{\percent} & 78.3  & 75.9  & 1.8 \\
+LigandMPNN $T{=}0.7$ & 24 & \SI{20.8}{\percent} & 104.8 & 103.1 & 1.8 \\
+LigandMPNN $T{=}1.0$ & 8  & \SI{0.0}{\percent}  & 123.8 & ---   & 4.4 \\
 \midrule
-\textbf{\cleo{}-GRPO (peak)} & 80 & \textbf{132.0} & \textbf{\SI{20.0}{\percent}}
-  & \textbf{1.9} \\
+\textbf{\cleo{} peak window} & 40 & \textbf{\SI{37.5}{\percent}} & 103.1 &
+  \textbf{98.8} & 1.7 \\
+\cleo{} final window         & 40 & \SI{2.5}{\percent}  & 127.0 & ---   & 2.6 \\
+\cleo{} both windows pooled  & 80 & \SI{20.0}{\percent} & 132.0 & 105.2 & 1.9 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -303,36 +347,92 @@ LigandMPNN $T{=}1.0$ & 8  & 123.8 & \SI{0.0}{\percent}  & 4.4 \\
 Temperature traces a clean monotone trade-off --- diversity rises from 39 to 124
 mean pairwise substitutions as the success rate falls from \SI{62.5}{\percent}
 to zero --- and that curve is the incumbent frontier every claim here has to
-beat.
+beat. For the baseline arms the two spread columns are within 3 of each other:
+filtering removes designs roughly at random with respect to sequence identity,
+so it does not concentrate the library.
 
-\cleo{} sits above it, but by less than the earlier best-of-8 framing suggested.
-At a matched success rate of ${\sim}\SI{20}{\percent}$, \cleo{} reaches spread
-132.0 against $T{=}0.7$'s 104.8: $\mathbf{1.26\times}$ more diverse, not the
-$1.46\times$ previously reported. $T{=}1.0$ remains the point that carries the
-qualitative claim --- it is the only baseline arm approaching \cleo{}'s
-diversity, and it succeeds never.
+\cleo{}'s peak window sits above the frontier. Interpolating the baseline curve
+on the passing-set column:
 
-\plan{\textbf{Two corrections to carry through the rest of the paper.}
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item at \cleo{}'s diversity (98.8), the baseline succeeds
+        ${\sim}\SI{22}{\percent}$ of the time; \cleo{} succeeds
+        \SI{37.5}{\percent} --- $\mathbf{1.7\times}$.
+  \item at \cleo{}'s success rate (\SI{37.5}{\percent}), the baseline reaches
+        spread ${\sim}69.7$; \cleo{} reaches $98.8$ --- $\mathbf{1.4\times}$.
+\end{itemize}
+
+The two dangerous points named in advance, $T{=}0.2$ and $T{=}0.3$, do not
+threaten this: they buy little diversity for the success they retain. $T{=}1.0$
+is the only baseline arm reaching \cleo{}'s diversity, and it succeeds never.
+
+\textbf{Unique mutations, rarefied.} Spread and mutational coverage do not say
+the same thing, so both are reported. $U$ is the count of distinct
+(position, residue) substitutions in the passing library; $U_k$ rarefies it to
+$k$ passing designs.
+
+\begin{center}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Arm} & $|\mathcal{P}|$ & $U$ & $U_3$ & $U_5$ & $U_7$ & $U_{15}$ \\
+\midrule
+LigandMPNN $T{=}0.1$ & 5  & 90  & 65  & 90  & ---  & --- \\
+LigandMPNN $T{=}0.2$ & 14 & 205 & 87  & 121 & 146 & --- \\
+LigandMPNN $T{=}0.3$ & 13 & 252 & 106 & 150 & 184 & --- \\
+LigandMPNN $T{=}0.5$ & 7  & 260 & 145 & 209 & 260 & --- \\
+LigandMPNN $T{=}0.7$ & 5  & 316 & 211 & 316 & ---  & --- \\
+\midrule
+\textbf{\cleo{} peak} & 15 & \textbf{632} & 254 & 347 & 421 & 632 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Read at matched $k$ the advantage is modest: $U_5 = 347$ against $T{=}0.7$'s
+$316$, a factor of $1.10$. Per passing design, \cleo{} and a high-temperature
+baseline explore mutational space at comparable rates. The gain is that \cleo{}
+\emph{sustains} it --- 15 passing designs from 40 folds where $T{=}0.7$ yields 5
+from 24 --- so the library actually obtained for a fixed fold budget covers
+$632$ substitutions against $316$, a factor of $2.0$.
+
+This is the more honest decomposition of the diversity claim than spread alone.
+\cleo{} is not sampling more exotically per design; it is keeping a
+high-temperature-like exploration rate while passing the filter often enough
+that the exploration survives into the library.
+
+\plan{\textbf{Three corrections to carry through the rest of the paper.}
 
 First, the earlier $1.75\times$ / $1.46\times$ figures came from averaging over
-300 random draws of 8 sequences, the published best-of-8 unit. On the plain
-per-sequence rate the advantage is a single ratio, $1.26\times$ at matched
-success. The best-of-8 statistic flatters whichever arm has the higher variance
-across draws; the per-sequence rate does not, and it is the number to quote.
+300 random draws of 8 sequences, the published best-of-8 unit. That statistic
+flatters whichever arm has the higher variance across draws. The per-sequence
+rate does not, and it is the number to quote.
 
-Second, earlier drafts reported ``$T{=}0.1$ yields 1.0 cluster per 8 folds
-against \cleo{}'s 3.1''. That used a \SI{70}{\percent}-identity clustering
-threshold; at \SI{90}{\percent} identity every arm's passing designs are
-separate clusters and the cluster count simply equals the passing count. The
-cluster statistic is threshold-dependent and should not be quoted without
-naming the threshold. Mean pairwise Hamming is continuous and threshold-free,
-so it is the form the claim should take.
+Second, spread was previously measured over \emph{all} sampled sequences rather
+than the passing subset. For the baseline arms this makes almost no difference,
+but for \cleo{} it does, and in the flattering direction --- the policy's
+failures are scattered while its successes concentrate. All diversity metrics
+are now reported on filtered designs only.
 
-The $n{=}96$ rerun is the thing that decides whether $1.26\times$ survives: at
-the current $n$, \cleo{}'s \SI{20.0}{\percent} and $T{=}0.7$'s \SI{20.8}{\percent}
-are indistinguishable, which is exactly the matched-success condition the
-comparison needs, but the spread difference is the only part currently measured
-tightly.}
+Third, the row previously labelled ``\cleo{} peak'' pooled two disjoint training
+windows, steps 36--45 and 190--199. The second contributes 40 sequences and one
+success, so pooling halved the reported success rate (\SIrange{37.5}{20.0}{\percent})
+while inflating spread with the drift \emph{between} the windows
+(\numrange{103.1}{132.0}) --- an artefact of the same PC1-versus-step drift
+documented in the PCA panel. The windows are reported separately above.
+
+The two errors partly cancelled, which is why the pooled row looks superficially
+reasonable. Corrected on the right set and the right window, the peak-window
+advantage is $1.7\times$ in success at matched diversity --- larger than the
+$1.26\times$ the pooled row implied, and resting on a different comparison.
+
+\textbf{What is not yet settled.} Using the peak window is a post-hoc choice
+unless the stopping rule is fixed in advance; E12's ${\sim}75$-step rule does
+contain it, but that rule was set after seeing these runs. The
+trajectory-as-library framing instead takes the whole run, which is the pooled
+row --- and there the extra spread is drift, not diversity available from any
+one policy. These are different libraries answering different questions and the
+results section must not quote one number for both. The $n{=}96$ rerun is what
+gives either claim usable error bars: the passing subsets here are 15 designs
+for \cleo{} and 5 for $T{=}0.7$.}
 
 \subsection*{E15 result --- the centering weight is a single continuous dial}
 
@@ -348,32 +448,39 @@ they are a lower bound on the same quantity. Within the sweep they are
 comparable to each other, which is what the experiment is for.}
 
 \begin{center}
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-\textbf{Weight} & \textbf{Mean dist.} & \textbf{Mean pairwise} &
-\textbf{Variable} & \textbf{Success} \\
-                & \textbf{to ref.}    & \textbf{Hamming}       &
-\textbf{positions} & \textbf{(1 sample)} \\
+\textbf{Weight} & \textbf{Mean dist.} & \textbf{Success} &
+\multicolumn{2}{c}{\textbf{Mean pairwise Hamming}} & \textbf{Passing} \\
+\cmidrule(lr){4-5}
+                & \textbf{to ref.}    & \textbf{(1 sample)} &
+\textbf{sampled} & \textbf{passing} & $n$ \\
 \midrule
-$W = -1.00$ & 31.5  & 32.9  & 175 & \SI{66.5}{\percent} \\
-$W = -0.50$ & 53.7  & 43.3  & 176 & \SI{78.8}{\percent} \\
-$W = -0.25$ & 79.2  & 75.3  & 176 & \SI{62.3}{\percent} \\
-$W = 0$     & 111.4 & 90.7  & 176 & \SI{8.2}{\percent}  \\
-$W = +0.25$ & 134.7 & 97.2  & 176 & \SI{5.2}{\percent}  \\
-$W = +0.50$ & 161.6 & 109.6 & 176 & \SI{0.2}{\percent}  \\
-$W = +1.00$ & 172.4 & 123.0 & 176 & \SI{0.0}{\percent}  \\
+$W = -1.00$ & 31.5  & \SI{66.5}{\percent} & 32.9  & 31.6 & 266 \\
+$W = -0.50$ & 53.7  & \SI{78.8}{\percent} & 43.3  & 42.4 & 315 \\
+$W = -0.25$ & 79.2  & \SI{62.3}{\percent} & 75.3  & 73.9 & 249 \\
+$W = 0$     & 111.4 & \SI{8.2}{\percent}  & 90.7  & 88.0 & 33  \\
+$W = +0.25$ & 134.7 & \SI{5.2}{\percent}  & 97.2  & 94.9 & 21  \\
+$W = +0.50$ & 161.6 & \SI{0.2}{\percent}  & 109.6 & ---  & 1   \\
+$W = +1.00$ & 172.4 & \SI{0.0}{\percent}  & 123.0 & ---  & 0   \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 Both distance columns are monotone in $W$ across the full range, with no
 plateau or inversion: mean distance to the reference moves \numrange{31.5}{172.4}
-out of $L = 180$, and library spread moves \numrange{32.9}{123.0}. A single
+out of $L = 180$, and passing-set spread moves \numrange{31.6}{94.9}. A single
 scalar therefore places the library anywhere between ``a tight shell around a
 known-good sequence'' and ``as far from it as the backbone permits''. That is
 the knob the diversity narrative needs, and it is one the temperature baseline
 does not have --- temperature controls entropy around whatever mode the base
 model already prefers, whereas $W$ names the centre explicitly.
+
+Unlike the E10 \cleo{} arm, these libraries do not concentrate under filtering:
+passing-set spread tracks sampled spread to within 3 substitutions in every arm.
+Each arm is a single policy sampled over one 25-step window, so there is no
+between-window drift inflating the sampled column --- which is the control that
+makes the E10 pooling artefact legible as an artefact.
 
 Two further readings. The variable-position count is pinned at 175--176 in every
 arm including the most tightly centered one, so $W$ is moving the
@@ -399,3 +506,110 @@ threshold-dependent and should not be quoted without naming the threshold. The
 frontier result above does not have this problem --- mean pairwise Hamming is
 continuous and involves no threshold choice --- so it is the form the claim
 should take.}
+
+\subsection*{E17 result --- why the run diverges after its peak}
+
+\plan{Prompted by the E10 window split: the M0097 200-step run peaks at steps
+36--45 and is essentially dead by step 190. Diagnosis on the full trajectory,
+20-step bins.}
+
+\begin{center}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Steps} & \textbf{Reward} & \textbf{Median RMSD} & \textbf{Pass} &
+\textbf{Spread} & \textbf{Entropy} \\
+\midrule
+0--19    & 0.78 & 3.87 & \SI{2.2}{\percent}  & 119 & 1.67 \\
+20--39   & 0.88 & 2.08 & \SI{6.9}{\percent}  & 105 & 1.42 \\
+40--59   & 0.86 & 2.10 & \SI{10.9}{\percent} & 108 & 1.46 \\
+80--99   & 0.86 & 2.22 & \SI{2.2}{\percent}  & 122 & 1.70 \\
+120--139 & 0.82 & 2.57 & \SI{0.0}{\percent}  & 125 & 1.79 \\
+180--199 & 0.85 & 2.09 & \SI{0.6}{\percent}  & 129 & 1.85 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This is not mode collapse, which is the failure RL fine-tuning is usually
+watched for. It is the opposite: entropy \emph{rises} monotonically after the
+peak, from 1.42 to 1.85, and spread rises with it. The policy is diffusing
+outward and getting worse while the mean reward sits flat at ${\approx}0.86$
+throughout --- the reward cannot see the degradation at all.
+
+\textbf{Mechanism: the reward's dynamic range is misallocated.} With
+normalisation bounds $[0.5, 20.0]$ on motif RMSD, a passing design at
+\SI{1.4}{\angstrom} scores $0.954$ and a clearly failing one at
+\SI{2.0}{\angstrom} scores $0.923$. The entire pass/fail distinction is worth
+$0.031$ of reward, against a within-batch standard deviation of $0.126$ that is
+dominated by rare catastrophic folds scoring near zero. GRPO divides its
+group-relative advantage by exactly that standard deviation. So the gradient
+answers ``did this batch contain a blow-up'', a question that is settled by
+step ${\sim}20$ once median RMSD falls to \SI{2.1}{\angstrom}, and thereafter
+carries almost no information about the boundary where all the value is. With
+\texttt{kl\_weight: 0.0} nothing anchors the policy once the signal goes flat,
+and it random-walks.
+
+\textbf{Rank normalisation fixes it.} Replacing value normalisation with
+within-batch rank (\texttt{normalize: rank}) makes the advantage invariant to
+how compressed the raw values are: the \SI{1.4}{\angstrom} and
+\SI{2.0}{\angstrom} designs are adjacent in RMSD but a full rank step apart, so
+the pass/fail ordering always yields gradient, and a \SI{37}{\angstrom} blow-up
+is merely rank 0 rather than an outlier that sets the batch scale.
+
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Steps} & \textbf{Pass rate} & \textbf{Median RMSD} & \textbf{Entropy} \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{value normalisation, bounds $[0.5, 20]$}} \\
+30--44   & \SI{13.8}{\percent} & 2.02 & 1.39 \\
+120--134 & \SI{0.0}{\percent}  & 2.56 & 1.77 \\
+180--194 & \SI{0.8}{\percent}  & 2.04 & 1.84 \\
+\addlinespace
+\multicolumn{4}{@{}l}{\emph{rank normalisation}} \\
+0--14    & \SI{1.3}{\percent} & 4.22 & 1.64 \\
+30--44   & \SI{4.6}{\percent} & 2.16 & 1.30 \\
+60--74   & \SI{9.6}{\percent} & 1.89 & 1.17 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Under rank normalisation every quantity moves the right way and keeps moving:
+entropy falls monotonically, pass rate rises monotonically, median RMSD reaches
+\SI{1.89}{\angstrom}. The run was stopped at 75 steps and was still improving,
+so E12's ${\sim}75$-step early-stopping rule was fitted to the \emph{broken}
+configuration and should not be carried over. A 200-step rank-normalised run is
+in flight.
+
+\plan{\textbf{Two implementation findings this turned up, both of which affect
+how these runs should be read.}
+
+\emph{Reward logging is vacuous under rank normalisation.} With a single metric,
+rank maps the batch to a fixed uniform distribution on $[0,1]$, so mean reward
+is exactly $0.5$ at every step by construction --- measured across all 75 steps
+of the E15 arms, $\mathrm{std} = 0$ to float precision. ``Best reward seen:
+0.5000'' in those logs is not a coincidence, and any checkpoint selection or
+early stopping keyed on reward is selecting an arbitrary step. Progress must be
+tracked on the raw metric (median motif RMSD, pass rate) instead.
+
+\emph{The KL penalty is gated on \texttt{use\_ref\_kl}, not on
+\texttt{kl\_weight}.} Setting a non-zero \texttt{kl\_weight} without
+\texttt{use\_ref\_kl: true} silently does nothing --- no reference model is even
+loaded. The estimator itself is correct where it does run: $\hat{k}_3 = \rho -
+\log\rho - 1$ with $\rho = \pi_{\mathrm{ref}}/\pi_\theta$, non-negative and
+applied with the right sign.
+
+\textbf{A third finding, not yet acted on, because fixing it invalidates every
+run above.} The clipped surrogate computes $\min\bigl(\sum_t \rho_t A,
+\sum_t \mathrm{clip}(\rho_t) A\bigr)$ --- a minimum of sums --- where PPO and
+GRPO specify $\sum_t \min\bigl(\rho_t A, \mathrm{clip}(\rho_t) A\bigr)$, a sum
+of minima. These are not equal, and the difference is not cosmetic: the
+implemented form makes one clip/no-clip decision for an entire 180-token
+sequence, so a single token past the clip boundary switches every other token in
+that sequence onto the clipped branch and zeroes its gradient. On a two-token
+example with $\rho = (5.0, 0.1)$ and $A > 0$, the correct objective is $1.38$
+with gradient $(0, 0.1)$; the implemented one gives $2.08$ with gradient
+$(0, 0)$. With $L = 180$ the clip is triggered by some token almost always, so
+the trust region is applied far more bluntly than intended. This is a plausible
+additional contributor to the drift, independent of the reward-scaling problem,
+and it should be fixed --- but it changes the objective, so every result in this
+section would need regenerating.}
