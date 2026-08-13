@@ -144,8 +144,8 @@ E3  & \statusscaffold & Rescue of the three near-miss backbones
       (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) &
       \textbf{M0365 \texttt{hit00} replicates 22/40}, median
       \SI{1.470}{\angstrom} (published 0/40, best \SI{1.69}{\angstrom}). Of 7
-      training hits only 1 survives $N{=}40$; M0050 fails (1/40). 1 backbone
-      left \\
+      training hits only 1 survives $N{=}40$; M0050 fails (1/40). All 3
+      backbones trained; M0375 replication running \\
 E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
 E7  & \statusdone     & Effective library size &
       Unique mutations rarefied to $k{=}5$: \cleo{} 347 vs.\ $T{=}0.7$ 316
@@ -821,21 +821,32 @@ M0050\_1dbt & 0/40, \SI{1.61}{\angstrom} & 1 / 1200 & \SI{1.477}{\angstrom} &
   \SI{0.023}{\angstrom} & \SI{2.81}{\angstrom} \\
 M0365\_1pfk & 0/40, \SI{1.69}{\angstrom} & \textbf{6 / 1200} &
   \textbf{\SI{1.273}{\angstrom}} & \SI{0.227}{\angstrom} & \SI{3.12}{\angstrom} \\
-M0375\_4ts9 & 0/40 & \multicolumn{4}{c}{\emph{running}} \\
+M0375\_4ts9 & 0/40 & 2 / 1200 & \SI{1.493}{\angstrom} &
+  \SI{0.007}{\angstrom} & \SI{3.00}{\angstrom} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The two differ by more than their counts suggest. M0050 contributes a single
+The three differ by more than their counts suggest. M0050 contributes a single
 design \SI{0.023}{\angstrom} inside the cutoff --- one draw from a distribution
 sitting on the threshold. M0365 contributes six distinct sequences, the best at
 \SI{1.273}{\angstrom}, a margin ten times larger and well clear of the
-prediction noise that makes M0050 unreadable. If either becomes a rescue claim
-it is M0365.
+prediction noise that makes M0050 unreadable. M0375 contributes two designs at \SI{1.4926}{\angstrom} and
+\SI{1.4968}{\angstrom} --- margins of \SI{0.007}{\angstrom} and
+\SI{0.003}{\angstrom}, thinner even than M0050's, and on the replication
+evidence below almost certainly tail draws (their $N = 40$ check is running).
+If any of the three becomes a rescue claim it is M0365.
 
-On both targets the clash term is never binding (\SI{100}{\percent} clash-free
-throughout), so the composite criterion reduces to motif RMSD alone and the
-no-clash half of the reward contributes nothing on these backbones.
+On all three targets the clash term is never binding (\SI{100}{\percent}
+clash-free throughout), so the composite criterion reduces to motif RMSD alone
+and the no-clash half of the reward contributes nothing on these backbones.
+
+There is a pattern across the three: median RMSD is \SIrange{2.8}{3.1}{\angstrom}
+everywhere, far from the cutoff, and every hit sits in the extreme tail of its
+own run's distribution. These are hard targets on which the policy is not
+close in general, and the hits are excursions rather than a shifted mode ---
+which is exactly the regime in which a best-of-$N$ filter selects tail draws,
+and exactly what the replication below shows.
 
 \textbf{Replication at $N = 40$ settles it, mostly against us.} Every one of the
 seven hits was refolded 40 times --- the published per-backbone budget --- and
