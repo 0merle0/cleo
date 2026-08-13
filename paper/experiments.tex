@@ -613,3 +613,58 @@ the trust region is applied far more bluntly than intended. This is a plausible
 additional contributor to the drift, independent of the reward-scaling problem,
 and it should be fixed --- but it changes the objective, so every result in this
 section would need regenerating.}
+
+\subsection*{Algorithm audit}
+
+\plan{A line-by-line read of \texttt{grpo.py} against the GRPO/DAPO
+specifications, prompted by the E17 divergence. Recorded in full because two of
+the findings change the objective, and any result in this section predating a
+fix has to be read in that light.}
+
+\textbf{Verified correct.} The reference-KL estimator is the standard
+low-variance form $\hat{k}_3 = \rho - \log\rho - 1$ with
+$\rho = \pi_{\mathrm{ref}}/\pi_\theta$, non-negative and applied with the right
+sign. $\pi_{\mathrm{old}}$ is stored from the rollout and the update is
+teacher-forced through the same decoding order and sampled actions, so the
+importance ratio is exactly 1 on the first inner update, as it must be. The
+encoder is deliberately frozen --- only \texttt{decoder\_layers} and
+\texttt{W\_out} receive gradient --- and computing the encoding under
+\texttt{no\_grad} is consistent with that rather than an omission. Asymmetric
+clipping follows DAPO.
+
+\textbf{Finding 1: the trust region is applied per sequence, not per token.}
+The surrogate computes $\min\bigl(\sum_t \rho_t A, \sum_t \mathrm{clip}(\rho_t) A\bigr)$
+where PPO and GRPO specify $\sum_t \min\bigl(\rho_t A, \mathrm{clip}(\rho_t) A\bigr)$.
+A minimum of sums is not a sum of minima: the implemented form takes one
+clip/no-clip decision for an entire $L = 180$ token sequence, so a single token
+past the boundary switches every other token onto the clipped branch and zeroes
+its gradient. On $\rho = (5.0, 0.1)$ with $A > 0$ the correct objective is
+$1.38$ with gradient $(0, 0.1)$; the implemented one gives $2.08$ with gradient
+$(0,0)$. With 180 tokens some token triggers the clip nearly always.
+
+\textbf{Finding 2: the advantage is normalised over the wrong group.} GRPO's
+defining feature is that the baseline is the mean reward over the group sampled
+from one prompt. Here the advantage is recomputed inside the inner loop on each
+randomly drawn sub-batch of \texttt{update\_batch\_size} $= 8$ out of $B = 16$,
+rather than once over the full rollout. The same sequence therefore receives a
+different advantage on each of the 16 inner updates, and sequences near the
+median receive advantages of \emph{both signs} --- 3 of 16 in a representative
+draw --- so the update pushes the same rollout up and down within one step. The
+fix is to compute the advantage once, before the loop.
+
+\textbf{Finding 3: no length normalisation.} $\sum_t \rho_t$ scales with
+sequence length, and the sum runs over all $L$ positions including residues held
+fixed by \texttt{fixed\_residues}, which contribute $\rho \approx 1$ each. The
+effective step size therefore depends on how long the protein is and how much of
+it is designable. The standard form is a mean over designed tokens.
+
+\plan{Findings 1 and 2 are both plausible additional contributors to the E17
+drift, independent of the reward-scaling problem: together they mean the trust
+region is blunt and the baseline is noisy. Neither has been fixed, because doing
+so changes the objective and every number in this section would need
+regenerating. Finding 3 is a step-size scaling issue and matters mainly for
+comparing across targets of different length.
+
+The KL gating defect noted under E17 \emph{has} been fixed --- a non-zero
+\texttt{kl\_weight} now implies the reference model --- since that one only ever
+silenced a penalty the config asked for.}

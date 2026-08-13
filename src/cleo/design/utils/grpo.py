@@ -24,10 +24,25 @@ class PolicyMPNNvGRPO(PolicyMPNN):
     def __init__(self, cfg):
         super().__init__(cfg)
 
-        if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
+        if self.use_ref_kl:
             self.ref_mpnn = self.load_ref_mpnn_model()
 
         self.avg_reward_history = []
+
+    @property
+    def use_ref_kl(self):
+        """Whether to apply the KL penalty to the frozen reference model.
+
+        A non-zero ``kl_weight`` is enough to turn it on. Gating solely on a
+        separate ``use_ref_kl`` flag meant a config could set ``kl_weight: 0.02``,
+        load no reference model, compute no penalty, and report nothing amiss --
+        an anchored run and an unanchored one were indistinguishable from their
+        configs. Requiring both flags to agree is a trap with no upside, so the
+        weight now implies the flag.
+        """
+        if float(getattr(self.cfg, "kl_weight", 0.0) or 0.0) > 0.0:
+            return True
+        return bool(getattr(self.cfg, "use_ref_kl", False))
 
     def load_ref_mpnn_model(self):
         """Load a frozen copy of the base ProteinMPNN as a KL reference."""
@@ -183,7 +198,7 @@ class PolicyMPNNvGRPO(PolicyMPNN):
             h_V_in.requires_grad = True
             h_E_in.requires_grad = True
 
-            if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
+            if self.use_ref_kl:
                 with torch.no_grad():
                     ref_out = self.rollout(
                         feature_dict, h_V_in, h_E_in, E_idx_in,
@@ -223,7 +238,7 @@ class PolicyMPNNvGRPO(PolicyMPNN):
 
             obj = torch.min(min_term1, min_term2).mean()
 
-            if hasattr(self.cfg, "use_ref_kl") and self.cfg.use_ref_kl:
+            if self.use_ref_kl:
                 ref_batched_log_probs = (ref_batched_log_probs * seq_mask).sum(dim=-1)
                 kl_ratio = torch.exp(ref_batched_log_probs - batched_log_probs)
                 kl = kl_ratio - (ref_batched_log_probs - batched_log_probs) - 1
