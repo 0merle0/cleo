@@ -177,6 +177,49 @@ diversity claims use Hamming distance and cluster counts directly. And the
 baseline arms currently hold 8 sequences each, so their apparent compactness is
 partly small-$n$; the temperature sweep in Block 5 is what makes the clouds
 comparable.}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{ame_pca}
+  \caption{\textbf{Sequence space occupied by each design method on the AME
+  pilot backbones.} One PCA per backbone, fit on every sequence that backbone
+  contributes across all three arms, so the arms share one projection and the
+  clouds are directly comparable. Faint points are sampled designs, solid
+  points are designs that pass the benchmark criterion (motif all-atom RMSD
+  $<$ \SI{1.5}{\angstrom}, no ligand clash). \cleo{} is restricted to its
+  peak-performing 10-step window so that three \emph{policies} are compared at
+  one point in training. On M0097 the low-temperature arm (orange) forms a
+  tight knot displaced far along PC1 --- five passing designs that are a single
+  cluster at every identity threshold down to \SI{50}{\percent} --- while
+  \cleo{}'s passing designs are spread throughout a broad cloud. $T{=}1.0$
+  (grey) reaches comparable spread with zero passing designs.
+  Projections are deliberately \emph{not} shared across backbones: a global fit
+  places \SI{99}{\percent} of PC1 variance on backbone identity, collapsing
+  each backbone to its own blob and hiding the arm differences entirely.
+  Explained variance is low (PC1 \SIrange{5}{9}{\percent}), as expected for
+  one-hot encoded protein sequence; the projection is a visual aid and every
+  quantitative claim in the text uses Hamming distance and cluster counts
+  directly. Baseline arms hold 8 sequences each, so part of their compactness
+  is small-$n$.}
+  \label{fig:ame-pca}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{ame_pca_drift}
+  \caption{\textbf{Most of PC1 is drift over training, not diversity available
+  at any one step.} The full GRPO trajectory for each backbone, in the same
+  projection as Figure~\ref{fig:ame-pca}, coloured by training step; passing
+  designs are circled. PC1 correlates with training step at $r = +0.92$ to
+  $+0.94$ on all three backbones. This distinction is load-bearing rather than
+  cosmetic: spread accumulated by drifting across training is genuine library
+  diversity when the library is assembled from the whole run, which is how ours
+  is assembled, but it is \emph{not} evidence that any single policy is
+  diverse. Presenting the pooled projection alone would conflate the two and
+  overstate the result, so the axis is shown rather than hidden.}
+  \label{fig:ame-pca-drift}
+\end{figure}
+
 \todo{ame --- rebuild PCA panels once the temperature sweep supplies matched $n$}
 
 \subsection*{Block 5 --- The temperature frontier}

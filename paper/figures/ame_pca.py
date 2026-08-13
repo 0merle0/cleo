@@ -46,6 +46,7 @@ from sklearn.decomposition import PCA
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from figio import save  # noqa: E402
 from palette import PALETTE  # noqa: E402
 
 AME = HERE.parents[1] / "experiments" / "ame"
@@ -137,7 +138,8 @@ def _panel(ax, d, arms, title, Z):
         # subject. Alpha scales up for the small baseline arms, which would
         # otherwise be invisible at the alpha that suits 3200 rollout points.
         ax.scatter(f.pc1, f.pc2, s=5, c=color, linewidths=0,
-                   alpha=min(0.6, max(0.08, 40 / max(len(f), 1))))
+                   alpha=min(0.6, max(0.08, 40 / max(len(f), 1))),
+                   rasterized=True)
         ax.scatter(p.pc1, p.pc2, s=34, c=color, alpha=0.95, linewidths=0.6,
                    edgecolors="white", label=f"{arm} ({len(p)} pass)")
     v = Z.explained_variance_ratio_
@@ -182,10 +184,7 @@ def main():
     fig.suptitle("Sequence space of a single policy "
                  "(faint = sampled, solid = passing)", fontsize=11)
     fig.tight_layout()
-    out = HERE / "svg" / "ame_pca.svg"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, bbox_inches="tight")
-    print(f"wrote {out}")
+    save(fig, "ame_pca")
 
     # --- Figure 2: the drift axis, shown rather than hidden ---
     # Same projection as Figure 1, so the two panels can be read against each
@@ -199,7 +198,7 @@ def main():
         P = Z.transform(onehot(list(traj.sequence)))
         r = np.corrcoef(P[:, 0], traj.step)[0, 1]
         sc = ax.scatter(P[:, 0], P[:, 1], c=traj.step, s=5, cmap="viridis",
-                        alpha=0.5, linewidths=0)
+                        alpha=0.5, linewidths=0, rasterized=True)
         m = traj.passing.values
         ax.scatter(P[m, 0], P[m, 1], s=30, facecolors="none",
                    edgecolors=PALETTE["red"], linewidths=0.8, label="passing")
@@ -214,9 +213,7 @@ def main():
     fig.suptitle("Most of PC1 is drift over training, not diversity available "
                  "at any one step", fontsize=11)
     fig.tight_layout()
-    out = HERE / "svg" / "ame_pca_drift.svg"
-    fig.savefig(out, bbox_inches="tight")
-    print(f"wrote {out}")
+    save(fig, "ame_pca_drift")
 
 
 if __name__ == "__main__":
