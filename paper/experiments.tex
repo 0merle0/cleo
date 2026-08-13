@@ -658,6 +658,59 @@ fixed by \texttt{fixed\_residues}, which contribute $\rho \approx 1$ each. The
 effective step size therefore depends on how long the protein is and how much of
 it is designable. The standard form is a mean over designed tokens.
 
+\textbf{Deeper pass: the rest of the loop.} A second audit covering the rollout,
+the training loop and checkpointing found the following.
+
+\emph{Clean.} Dropout is constructed at $p = 0$ throughout, so
+\texttt{model.train()} injects no stochasticity and the importance ratio is
+genuinely 1 on the first inner update rather than only nominally so. Sampling
+probabilities are taken from \texttt{logits.detach()}, correctly keeping the
+sampling step out of the gradient. Row counts in the per-step metrics are a
+constant 16 across all 275 logged steps of the two completed runs, so no fold
+failure has silently dropped a design; were one to, the inner merge would
+shorten the reward vector and the indexing would raise rather than misalign.
+
+\emph{Finding 4: the behaviour policy is not the policy being scored.} Actions
+are drawn from $\mathrm{softmax}\bigl((\ell + b)/T\bigr)$ renormalised over the
+20 residue tokens, where $b = -10^{8}$ at amino acids excluded by
+\texttt{omit\_AA}. The log-probabilities used for the ratio are
+$\log\mathrm{softmax}(\ell)$ over all 21 tokens --- no bias, no temperature. The
+two differ by $\log P(\text{allowed})$, which depends on $\theta$ and therefore
+does not cancel between $\pi_{\mathrm{new}}$ and $\pi_{\mathrm{old}}$: the true
+ratio is the implemented one times
+$P_{\mathrm{old}}(\text{allowed}) / P_{\mathrm{new}}(\text{allowed})$. While the
+mass the model places on C and X stays put this factor is 1 and nothing is
+wrong; if the policy drifts mass onto the omitted tokens --- which nothing in
+the objective discourages, since they are merely never sampled --- the error
+grows with the drift and is not currently monitored. A policy putting
+\SI{2}{\percent} on omitted tokens where it once put \SI{1}{\percent} carries a
+\SI{1}{\percent} systematic error in every ratio.
+
+The same mismatch makes \texttt{temperature} a trap rather than a knob. At
+$T = 1$ the scored and sampled log-probabilities differ by ${\sim}0.05$ nats; at
+$T = 0.5$ by $1.3$; at $T = 0.1$ by $17.8$. Training at any temperature other
+than 1 silently optimises a different distribution from the one it samples.
+\texttt{CLAUDE.md} already advises keeping $T = 1$ to avoid mode collapse; this
+is a second and stronger reason.
+
+\emph{Finding 5: the final policy was never saved.} \texttt{\_last.pt} was
+written only inside the ``every $n$ steps'' branch, so a 75-step run left it at
+step 50 and a 200-step run would leave it at 175. Confirmed directly from the
+E15 artefacts: the four checkpoints on disk are steps 25, 50, \texttt{\_best}
+(25) and \texttt{\_last} (50), for a run that trained to step 74. Under rank
+normalisation those runs were still improving when they ended, so the discarded
+tail was the best part of the run.
+
+\emph{Finding 6: \texttt{\_best.pt} selects on a constant.} Best-checkpoint
+selection compared \texttt{to\_log["reward"]}, which under a rank-normalised
+single-metric reward is exactly $0.5$ at every step. With a strict $>$ test the
+first checkpoint written wins permanently --- which is why every E15 arm reports
+its best at step 25 or 50 and never later. \textbf{Both are fixed}:
+\texttt{\_last.pt} is now written after the loop at the true final step, and
+selection runs on a configurable \texttt{checkpoint\_metric}
+(\texttt{ame\_motif\_rmsd\_batch\_mean}, mode \texttt{min}) with a warning
+emitted if the tracked quantity never varies.
+
 \plan{\textbf{All three are now fixed}, and the pre-fix objective is retained
 behind \texttt{legacy\_surrogate: true} so the fix can be measured rather than
 merely asserted. The surrogate takes a per-token minimum and averages it over

@@ -60,8 +60,13 @@ class PolicyMPNN:
         self.reward_fn = hydra.utils.instantiate(cfg.reward)
 
         self.checkpoint_every_n_steps = self.cfg.checkpoint_every_n_steps
-        self.best_seen_reward = 0
+        # -inf, not 0: with `mode: min` or a z-scored reward the tracked quantity
+        # is routinely negative, and a floor of 0 would reject every checkpoint.
+        self.best_seen_reward = float("-inf")
         self.step_at_best_seen_reward = 0
+        self.checkpoint_metric = self.cfg.get("checkpoint_metric", "reward")
+        self.checkpoint_metric_mode = self.cfg.get("checkpoint_metric_mode", "max")
+        self._ckpt_metric_history = []
 
 
     def load_mpnn_model(self):
@@ -453,8 +458,26 @@ class PolicyMPNN:
             if step > 0 and step % self.checkpoint_every_n_steps == 0:
                 self.checkpoint_model(step, to_log)
 
+        # The final policy is the one the run actually produced, and it is not
+        # generally at a multiple of checkpoint_every_n_steps. Writing _last only
+        # inside the interval branch above silently discarded every step after
+        # the last multiple -- a 75-step run left _last at step 50, throwing away
+        # the 24 steps that a still-improving run cares most about.
+        self.checkpoint_model(step, to_log, final=True)
+
         print("Training complete.")
-        print(f"Best reward seen: {self.best_seen_reward:.4f} at step {self.step_at_best_seen_reward}")
+        print(f"Best {self.checkpoint_metric} seen: {self.best_seen_reward:.4f} "
+              f"at step {self.step_at_best_seen_reward}")
+        if len(set(self._ckpt_metric_history)) <= 1 and self._ckpt_metric_history:
+            print(
+                f"WARNING: '{self.checkpoint_metric}' never varied across "
+                f"{len(self._ckpt_metric_history)} checkpoints, so _best.pt is "
+                "simply the first one saved and carries no selection signal. "
+                "This is what a single rank-normalised metric looks like: rank "
+                "maps each batch onto the same fixed distribution, so the mean "
+                "is constant by construction. Set `checkpoint_metric` to a raw "
+                "quantity (e.g. ame_motif_rmsd_batch_mean) to select on."
+            )
 
     def log_metrics(self, step, runtime, to_log):
         """Append one row to the CSV training log."""
@@ -466,18 +489,39 @@ class PolicyMPNN:
         with open(log_path, 'a') as f:
             f.write(f"{step},{runtime:.4f}," + ",".join([f"{to_log[m]:.4f}" for m in metrics_to_log]) + '\n')
     
-    def checkpoint_model(self, step, to_log):
-        """Save ``_last``, ``_step_NNNN``, and (if improved) ``_best`` checkpoints."""
-        curr_reward = to_log["reward"]
+    def checkpoint_model(self, step, to_log, final=False):
+        """Save ``_last``, ``_step_NNNN``, and (if improved) ``_best`` checkpoints.
+
+        ``final`` marks the end-of-training call, which refreshes ``_last`` and
+        may update ``_best`` but does not write a numbered checkpoint (the step
+        is whatever the run ended on, not a checkpoint interval).
+
+        Selection for ``_best`` uses ``cfg.checkpoint_metric``, defaulting to the
+        aggregate reward. The default is only meaningful when the reward varies
+        between steps, which a rank-normalised single-metric reward does not --
+        see the warning emitted at the end of `train`.
+        """
+        curr_reward = to_log.get(self.checkpoint_metric)
+        if curr_reward is None:
+            raise KeyError(
+                f"checkpoint_metric {self.checkpoint_metric!r} not in the step log; "
+                f"available: {sorted(k for k, v in to_log.items() if isinstance(v, float))}"
+            )
+        if self.checkpoint_metric_mode == "min":
+            curr_reward = -curr_reward
+        self._ckpt_metric_history.append(curr_reward)
+
         ckpt = {
             "config": dict(self.cfg),
             "step": step,
-            "reward": curr_reward,
+            "reward": to_log.get("reward"),
+            self.checkpoint_metric: to_log.get(self.checkpoint_metric),
             "model_state_dict": self.model.state_dict(),
         }
 
         torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_last.pt"))
-        torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_step_{step:04}.pt"))
+        if not final:
+            torch.save(ckpt, os.path.join(self.output_dir, f"{self.run_name}_step_{step:04}.pt"))
 
         if curr_reward > self.best_seen_reward:
             self.best_seen_reward = curr_reward
