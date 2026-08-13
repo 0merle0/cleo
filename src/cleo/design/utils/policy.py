@@ -425,7 +425,15 @@ class PolicyMPNN:
             "log_probs": all_log_probs,
             "decoding_order": decoding_order,
             "state_features": h_V_stack[-1].detach(),
-            "chain_mask": chain_mask,
+            # Sliced to B_decoder: in the teacher-forced branch `chain_mask`,
+            # `mask`, `bias` and `S_true` are each repeated twice -- once when
+            # unpacked from feature_dict and again below -- so they carry
+            # B_decoder**2 rows. Every use inside the decode loop is a
+            # torch.gather with a (B_decoder, 1) index, which legally reads just
+            # the leading rows, and since all rows are identical copies the
+            # decode has always been correct. Only the tensor handed back was
+            # the wrong shape, which went unnoticed until something consumed it.
+            "chain_mask": chain_mask[:B_decoder],
             "p_omit": omit_num / omit_den.clamp(min=1.0),
         }
 
