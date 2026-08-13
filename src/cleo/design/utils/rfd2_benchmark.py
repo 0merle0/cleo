@@ -387,3 +387,74 @@ def rfd2_metrics_from_df(df_input, cfg, step_name="rfd2"):
     met = pd.DataFrame(records).add_prefix(f"{step_name}_")
     met.index = df_input.index
     return pd.concat([df_input, met], axis=1)
+
+
+def best_of_n_from_df(df_input, cfg, step_name="best_of_n"):
+    """Reward step: collapse per-sample rows to one row per sequence, best-of-N.
+
+    Pair this with ``af3_from_df`` run at ``num_diffusion_samples: N`` *and*
+    ``per_sample_rows: true``, which emits one row per (sequence, sample). A
+    reward step must return one row per sampled sequence, so something has to
+    collapse those rows before aggregation -- this is that something.
+
+    Why not let ``af3_from_df`` collapse them itself: left to its own devices it
+    keeps the top-ranked sample, ranked by AF3's confidence score. That is a
+    best-of-N by *confidence*, which is not the benchmark's unit and correlates
+    only loosely with motif accuracy. The benchmark counts a design as a success
+    if any one of its predictions clears the motif-RMSD cutoff and is clash-free,
+    so the reduction has to be over the benchmark's own criterion.
+
+    Two reductions, deliberately not the same one:
+
+    ``{metric_prefix}_motif_rmsd``  min over samples -- the continuous training
+        signal, the best geometry the sequence proved able to reach.
+    ``{metric_prefix}_motif_pass_and_no_clash``  OR over samples of the
+        per-prediction AND. Computed from the per-sample conjunction rather than
+        from the reduced columns, because the sample with the lowest RMSD is not
+        always one that avoids the clash; reducing each column separately and
+        then AND-ing them would score a design as passing on the strength of two
+        different predictions, and would overcount.
+
+    Remaining columns are taken from the min-RMSD row. Row order follows first
+    appearance of each group, so the collapsed frame stays aligned with the
+    order sequences were sampled in -- which is what the reward tensor assumes.
+
+    Config
+    ------
+    group_col      Column identifying a sequence across its samples ("name").
+    metric_prefix  Prefix the metric step used ("ame").
+    """
+    group_col = cfg.get("group_col", "name")
+    pfx = cfg.get("metric_prefix", "ame")
+    rmsd_col, pass_col = f"{pfx}_motif_rmsd", f"{pfx}_motif_pass_and_no_clash"
+
+    for col in (group_col, rmsd_col):
+        if col not in df_input.columns:
+            raise KeyError(
+                f"{step_name}: '{col}' not in dataframe; available: "
+                f"{sorted(df_input.columns)}."
+            )
+    if df_input[group_col].duplicated().sum() == 0:
+        warnings.warn(
+            f"{step_name}: every {group_col!r} is unique, so there is nothing to "
+            "reduce. Set per_sample_rows: true on the af3 step (and "
+            "num_diffusion_samples > 1) or drop this step."
+        )
+        return df_input
+
+    d = df_input.copy()
+    # NaN RMSDs are failed predictions; they must never win the idxmin, but a
+    # group that is *all* failures still has to survive as a row.
+    order = d[group_col].drop_duplicates().tolist()
+    keep = d.loc[d.groupby(group_col)[rmsd_col].transform(
+        lambda s: s.isna().all() or s.eq(s.min())).fillna(False)]
+    out = keep.groupby(group_col, sort=False).head(1).set_index(group_col)
+
+    if pass_col in d.columns:
+        out[pass_col] = d.groupby(group_col)[pass_col].any()
+    for c in (f"{pfx}_motif_pass", f"{pfx}_no_clash"):
+        if c in d.columns:
+            out[c] = d.groupby(group_col)[c].any()
+    out[f"{step_name}_n_samples"] = d.groupby(group_col).size()
+
+    return out.loc[order].reset_index()

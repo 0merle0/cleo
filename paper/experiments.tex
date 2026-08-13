@@ -133,8 +133,9 @@ so it is recorded here rather than removed from the record.}
 \textbf{ID} & \textbf{Status} & \textbf{Experiment} & \textbf{Result} \\
 \midrule
 E1  & \statusscaffold & Matched-fold head-to-head &
-      M0097 per 8 folds: $T{=}0.1$ 5.0 passing, \cleo{} 3.1 --- but see E10,
-      the comparison must be made at matched diversity \\
+      Superseded by the per-sequence success rate (see \emph{Scoring protocol});
+      M0097 best-of-5: $T{=}0.1$ \SI{62.5}{\percent}, \cleo{} \SI{20.0}{\percent}
+      --- but at $2.4\times$ the spread, so E10 is the comparison that counts \\
 E2  & \statusscaffold & Diversity yield curves &
       \cleo{} 3200 folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters,
       still climbing \\
@@ -148,25 +149,54 @@ E8  & ---             & Mutation-diversity reward &
 E9  & \statusdone     & Selection rules, retrospective &
       \textbf{Negative:} every rule loses to random, \numrange{2.5}{8}$\times$ \\
 \addlinespace
-E10 & \statusdone     & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
+E10 & \statusscaffold & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
       builds the incumbent frontier &
-      \textbf{Frontier shift confirmed:} at matched diversity \cleo{} passes
-      $1.75\times$ the baseline; at matched pass rate it is $1.46\times$ more
-      diverse \\
-E11 & \statusblocked  & Reward shaping: rank normalisation & \todoresult \\
-E12 & \statusblocked  & Early stopping at ${\sim}75$ steps & \todoresult \\
+      Frontier shift present but modest on the per-sequence rate: at ${\sim}20\%$
+      success \cleo{} reaches spread 132 vs.\ $1.26\times$ less at $T{=}0.7$.
+      Rerunning all six $T$ at $n{=}96$ \\
+E11 & \statusdone     & Reward shaping: rank normalisation &
+      Folded into every new arm; E15 trains stably under it \\
+E12 & \statusdone     & Early stopping at ${\sim}75$ steps &
+      Folded in; all E15 arms converge well inside 75 steps \\
 E13 & \statusblocked  & Consensus anchoring of the search & \todoresult \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
       $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
-E15 & \statusblocked  & Centering-weight sweep, $W$ in both directions & \todoresult \\
-E16 & \statusblocked  & In-training selection: no-oversample /
-      oversample+random / oversample+diverse & \todoresult \\
+E15 & \statusdone     & Centering-weight sweep, $W$ in both directions &
+      \textbf{Clean monotone dial:} $W$ from $-1$ to $+1$ moves mean distance to
+      reference \numrange{31.5}{172.4} and library spread \numrange{32.9}{123.0},
+      trading success \numrange{79}{0}\% \\
+E16 & \statusscaffold & In-training selection: no-oversample /
+      oversample+random / oversample+diverse & Running \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\todo{experiments --- run E10; it gates the central claim}
+\subsection*{Scoring protocol}
+
+Two conventions changed partway through the pilot, and results reported before
+the change are not directly comparable to results reported after it.
+
+\textbf{Five diffusion samples everywhere.} The benchmark's unit of success is
+a best-of-$N$: a design counts if \emph{any} of its predictions clears the motif
+cutoff and is clash-free. Early training runs folded each sequence once
+(\texttt{num\_diffusion\_samples: 1}), which understates their success rate
+relative to any best-of-$N$ baseline. All runs from this point fold at
+\texttt{num\_diffusion\_samples: 5}. Getting this right in training needed a
+reduction step, \texttt{rfd2\_benchmark.best\_of\_n\_from\_df}: the oracle's own
+collapse keeps the sample AF3 ranks highest by \emph{confidence}, which is not
+the benchmark's criterion. The step instead takes the min motif RMSD as the
+continuous signal and OR-s the per-prediction conjunction for the pass flag ---
+separately reducing ``motif passed'' and ``no clash'' and then AND-ing them
+would credit a design for two different predictions and overcount.
+
+\textbf{Per-sequence success rate, not best-of-8.} The published unit (fraction
+of backbones with a hit among 8 sequences) saturates and discards resolution:
+at $n{=}8$ a rate near \SI{20}{\percent} carries a \SI{95}{\percent} interval of
+${\pm}\SI{28}{pp}$, wide enough to swallow every difference in this paper. We
+now sample $n{=}96$ per backbone per arm (${\pm}\SI{8}{pp}$) and report the
+plain fraction of sequences that succeed. This is a strictly harder number to
+move than the best-of-8 statistic, and it shrank the E10 claim --- see below.
 
 \subsection*{E15 --- Centering weight: one knob from centered to diverse}
 
@@ -241,52 +271,124 @@ since those designs are separate clusters at any threshold tested.
 Caveat on $n$: passing subsets are 5 and 15 designs, so the correlation
 figures in particular are noisy. The ratio comparison is the robust part.}
 
-\subsection*{E10 result --- \cleo{} sits above the temperature frontier}
+\subsection*{E10 result --- the frontier shift is real but smaller than first reported}
 
-\plan{The experiment the section was gated on. LigandMPNN sampled at six
-temperatures, 24 sequences per backbone, folded best-of-5, and scored by the
-same code path as \cleo{}. M0097, at the benchmark's 8-fold budget, averaged
-over 300 random draws of 8.}
+\plan{LigandMPNN sampled at six temperatures, folded best-of-5, and scored by
+the same code path as \cleo{}, on M0097. Reported as the plain per-sequence
+success rate under the \emph{Scoring protocol} above. The $n$ per arm is
+uneven here --- 8 for $T{=}0.1$ and $T{=}1.0$, 24 for the rest, 80 for \cleo{}
+--- which is why all six are being resampled at $n{=}96$.}
 
 \begin{center}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Arm} & \textbf{Mean pairwise} & \textbf{Variable} &
-\textbf{Passing} & \\
-             & \textbf{Hamming}       & \textbf{positions} & \textbf{/ 8 folds} & \\
+\textbf{Arm} & $n$ & \textbf{Mean pairwise} & \textbf{Success} &
+\textbf{Median best} \\
+             &     & \textbf{Hamming}       & \textbf{rate}    &
+\textbf{RMSD (\si{\angstrom})} \\
 \midrule
-LigandMPNN $T{=}0.1$ & 39.1  & 81    & 5.00 & \\
-LigandMPNN $T{=}0.2$ & 48.7  & 102   & 4.81 & \\
-LigandMPNN $T{=}0.3$ & 58.7  & 116   & 4.42 & \\
-LigandMPNN $T{=}0.5$ & 78.2  & 135   & 2.23 & \\
-LigandMPNN $T{=}0.7$ & 104.8 & 159   & 1.72 & \\
-LigandMPNN $T{=}1.0$ & 123.8 & 170   & 0.00 & \\
+LigandMPNN $T{=}0.1$ & 8  & 39.1  & \SI{62.5}{\percent} & 1.3 \\
+LigandMPNN $T{=}0.2$ & 24 & 48.7  & \SI{58.3}{\percent} & 1.3 \\
+LigandMPNN $T{=}0.3$ & 24 & 58.9  & \SI{54.2}{\percent} & 1.3 \\
+LigandMPNN $T{=}0.5$ & 24 & 78.3  & \SI{29.2}{\percent} & 1.8 \\
+LigandMPNN $T{=}0.7$ & 24 & 104.8 & \SI{20.8}{\percent} & 1.8 \\
+LigandMPNN $T{=}1.0$ & 8  & 123.8 & \SI{0.0}{\percent}  & 4.4 \\
 \midrule
-\textbf{\cleo{}-GRPO} & \textbf{103.3} & \textbf{163} & \textbf{3.06} & \\
+\textbf{\cleo{}-GRPO (peak)} & 80 & \textbf{132.0} & \textbf{\SI{20.0}{\percent}}
+  & \textbf{1.9} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Temperature traces a clean monotone trade-off: diversity rises from 39 to 124
-mean pairwise substitutions while the pass rate falls from 5.0 to 0.0 per eight
-folds. That curve is the incumbent frontier, and it is the thing every claim in
-this section has to beat.
+Temperature traces a clean monotone trade-off --- diversity rises from 39 to 124
+mean pairwise substitutions as the success rate falls from \SI{62.5}{\percent}
+to zero --- and that curve is the incumbent frontier every claim here has to
+beat.
 
-\cleo{} sits above it. Interpolating the baseline curve:
+\cleo{} sits above it, but by less than the earlier best-of-8 framing suggested.
+At a matched success rate of ${\sim}\SI{20}{\percent}$, \cleo{} reaches spread
+132.0 against $T{=}0.7$'s 104.8: $\mathbf{1.26\times}$ more diverse, not the
+$1.46\times$ previously reported. $T{=}1.0$ remains the point that carries the
+qualitative claim --- it is the only baseline arm approaching \cleo{}'s
+diversity, and it succeeds never.
 
-\begin{itemize}\setlength{\itemsep}{0pt}
-  \item at \cleo{}'s diversity (Hamming 103.3), the baseline passes
-        $1.75$ per 8; \cleo{} passes $\mathbf{3.06}$ --- $\mathbf{1.75\times}$.
-  \item at \cleo{}'s pass rate ($3.06$ per 8), the baseline reaches Hamming
-        $70.8$; \cleo{} reaches $\mathbf{103.3}$ --- $\mathbf{1.46\times}$.
-\end{itemize}
+\plan{\textbf{Two corrections to carry through the rest of the paper.}
 
-The two dangerous points named in advance, $T{=}0.2$ and $T{=}0.3$, do not
-threaten the claim: they buy very little diversity (48.7 and 58.7) for the pass
-rate they retain, landing far below \cleo{}'s coverage. The nearest baseline
-arm by diversity is $T{=}0.7$, which matches \cleo{} on both diversity measures
-(104.8 vs.\ 103.3 Hamming; 159 vs.\ 163 variable positions) and passes
-\emph{half} as often.
+First, the earlier $1.75\times$ / $1.46\times$ figures came from averaging over
+300 random draws of 8 sequences, the published best-of-8 unit. On the plain
+per-sequence rate the advantage is a single ratio, $1.26\times$ at matched
+success. The best-of-8 statistic flatters whichever arm has the higher variance
+across draws; the per-sequence rate does not, and it is the number to quote.
+
+Second, earlier drafts reported ``$T{=}0.1$ yields 1.0 cluster per 8 folds
+against \cleo{}'s 3.1''. That used a \SI{70}{\percent}-identity clustering
+threshold; at \SI{90}{\percent} identity every arm's passing designs are
+separate clusters and the cluster count simply equals the passing count. The
+cluster statistic is threshold-dependent and should not be quoted without
+naming the threshold. Mean pairwise Hamming is continuous and threshold-free,
+so it is the form the claim should take.
+
+The $n{=}96$ rerun is the thing that decides whether $1.26\times$ survives: at
+the current $n$, \cleo{}'s \SI{20.0}{\percent} and $T{=}0.7$'s \SI{20.8}{\percent}
+are indistinguishable, which is exactly the matched-success condition the
+comparison needs, but the spread difference is the only part currently measured
+tightly.}
+
+\subsection*{E15 result --- the centering weight is a single continuous dial}
+
+\plan{Seven GRPO arms on M0097, identical but for the weight $W$ on
+\texttt{dist\_to\_ref\_min} against a low-temperature consensus reference:
+$\text{mode}{=}\min$ pulls toward it ($W < 0$ below), $\text{mode}{=}\max$ pushes
+away ($W > 0$), $W{=}0$ omits the term. 75 steps, batch 16, rank normalisation.
+Statistics over the last 25 steps (400 sequences per arm).
+
+These runs predate the five-sample protocol and fold once per sequence, so
+their success rates are \emph{not} comparable to the best-of-5 numbers in E10 ---
+they are a lower bound on the same quantity. Within the sweep they are
+comparable to each other, which is what the experiment is for.}
+
+\begin{center}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Weight} & \textbf{Mean dist.} & \textbf{Mean pairwise} &
+\textbf{Variable} & \textbf{Success} \\
+                & \textbf{to ref.}    & \textbf{Hamming}       &
+\textbf{positions} & \textbf{(1 sample)} \\
+\midrule
+$W = -1.00$ & 31.5  & 32.9  & 175 & \SI{66.5}{\percent} \\
+$W = -0.50$ & 53.7  & 43.3  & 176 & \SI{78.8}{\percent} \\
+$W = -0.25$ & 79.2  & 75.3  & 176 & \SI{62.3}{\percent} \\
+$W = 0$     & 111.4 & 90.7  & 176 & \SI{8.2}{\percent}  \\
+$W = +0.25$ & 134.7 & 97.2  & 176 & \SI{5.2}{\percent}  \\
+$W = +0.50$ & 161.6 & 109.6 & 176 & \SI{0.2}{\percent}  \\
+$W = +1.00$ & 172.4 & 123.0 & 176 & \SI{0.0}{\percent}  \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Both distance columns are monotone in $W$ across the full range, with no
+plateau or inversion: mean distance to the reference moves \numrange{31.5}{172.4}
+out of $L = 180$, and library spread moves \numrange{32.9}{123.0}. A single
+scalar therefore places the library anywhere between ``a tight shell around a
+known-good sequence'' and ``as far from it as the backbone permits''. That is
+the knob the diversity narrative needs, and it is one the temperature baseline
+does not have --- temperature controls entropy around whatever mode the base
+model already prefers, whereas $W$ names the centre explicitly.
+
+Two further readings. The variable-position count is pinned at 175--176 in every
+arm including the most tightly centered one, so $W$ is moving the
+\emph{concentration} of the distribution, not the set of positions it is willing
+to touch --- the two diversity measures come apart here, and mean pairwise
+Hamming is the one with resolution. And the success column shows the same
+trade-off as temperature, running \SIrange{79}{0}{\percent}, which makes E10 and
+E15 two sweeps of the same frontier from opposite sides: E10 turns the
+incumbent's knob, E15 turns ours.
+
+\plan{The comparison this sets up is the one worth making in the results section,
+and it cannot be made from these numbers as they stand --- the E15 arms are
+single-sample and the E10 arms are best-of-5. Rerunning the sweep under the
+five-sample protocol would put both curves on one axis and let us say directly
+whether our knob dominates theirs, rather than only that we have one.}
 
 \plan{\textbf{Correction to carry through the rest of the paper.} Earlier
 drafts reported ``$T{=}0.1$ yields 1.0 cluster per 8 folds against \cleo{}'s
