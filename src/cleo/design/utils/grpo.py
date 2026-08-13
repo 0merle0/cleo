@@ -215,6 +215,12 @@ class PolicyMPNNvGRPO(PolicyMPNN):
             batched_rewards, metrics = self.reward_fn(step, out, feature_dict, self.device)
             to_log.update(metrics)
             to_log["reward"] = batched_rewards.mean().cpu().item()
+            if "p_omit" in out:
+                # Mass the policy places on tokens omit_AA forbids. Should stay
+                # flat; a rising trace means the ratio correction is being
+                # skipped on a growing share of the distribution.
+                to_log["p_omit_mean"] = out["p_omit"].mean().cpu().item()
+                to_log["p_omit_max"] = out["p_omit"].max().cpu().item()
 
         all_log_probs = torch.clone(out["log_probs"])
         all_S = torch.clone(out["S"])

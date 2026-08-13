@@ -535,6 +535,27 @@ peak, from 1.42 to 1.85, and spread rises with it. The policy is diffusing
 outward and getting worse while the mean reward sits flat at ${\approx}0.86$
 throughout --- the reward cannot see the degradation at all.
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{ame_convergence}
+  \caption{\textbf{The AME policy diffuses rather than collapses, and rank
+  normalisation reverses it.} All panels read off the per-step rollout metrics
+  training already writes; no additional folding. \textbf{Top:} under value
+  normalisation the pass rate peaks near step 40 and decays to zero while
+  positional entropy \emph{rises} monotonically from 1.39 to 1.85 --- the
+  opposite direction from the mode collapse RL fine-tuning is usually watched
+  for. Under rank normalisation both move the right way and are still moving
+  when the run ends at step 75. \textbf{Bottom left:} the mechanism. With bounds
+  $[0.5, 20]$ on motif RMSD, a passing design at \SI{1.4}{\angstrom} and a
+  failing one at \SI{2.0}{\angstrom} are separated by $0.031$ of reward, well
+  inside the shaded batch interquartile range whose width is set by rare
+  catastrophic folds --- and GRPO divides its advantage by that spread.
+  \textbf{Bottom right:} the same trajectories in the entropy--success plane,
+  coloured by step on one shared scale. Value normalisation walks right and
+  down, rank normalisation left and up.}
+  \label{fig:ame-convergence}
+\end{figure}
+
 \textbf{Mechanism: the reward's dynamic range is misallocated.} With
 normalisation bounds $[0.5, 20.0]$ on motif RMSD, a passing design at
 \SI{1.4}{\angstrom} scores $0.954$ and a clearly failing one at
@@ -670,7 +691,8 @@ constant 16 across all 275 logged steps of the two completed runs, so no fold
 failure has silently dropped a design; were one to, the inner merge would
 shorten the reward vector and the indexing would raise rather than misalign.
 
-\emph{Finding 4: the behaviour policy is not the policy being scored.} Actions
+\emph{Finding 4 (\textbf{now fixed}): the behaviour policy is not the policy
+being scored.} Actions
 are drawn from $\mathrm{softmax}\bigl((\ell + b)/T\bigr)$ renormalised over the
 20 residue tokens, where $b = -10^{8}$ at amino acids excluded by
 \texttt{omit\_AA}. The log-probabilities used for the ratio are
@@ -692,6 +714,17 @@ $T = 0.5$ by $1.3$; at $T = 0.1$ by $17.8$. Training at any temperature other
 than 1 silently optimises a different distribution from the one it samples.
 \texttt{CLAUDE.md} already advises keeping $T = 1$ to avoid mode collapse; this
 is a second and stronger reason.
+
+Scoring now uses
+$\log\mathrm{softmax}\bigl(((\ell + b)/T)_{1:20}\bigr)$, padded to 21
+channels --- exactly the distribution actions are drawn from, verified equal to
+the true sampling log-probability to float precision at $T \in \{1, 0.5, 0.1\}$
+where the previous form was off by $0.17$, $4.3$ and $44.2$ nats respectively.
+The pre-fix behaviour is retained behind \texttt{legacy\_logprobs} for the
+ablation. Separately, every run now logs \texttt{p\_omit}, the probability mass
+the policy places on tokens \texttt{omit\_AA} forbids, since that is precisely
+the quantity whose drift makes the omitted correction bite and nothing in the
+objective holds it down.
 
 \emph{Finding 5: the final policy was never saved.} \texttt{\_last.pt} was
 written only inside the ``every $n$ steps'' branch, so a 75-step run left it at
@@ -720,12 +753,28 @@ $\rho = 1$ apiece and make the step size depend on how much of the protein is
 held fixed, which disposes of Finding 3 as well. The advantage is computed once
 over the full rollout group before the update loop.
 
-Three 200-step arms on M0097 are in flight as the direct comparison: the
-corrected objective, the corrected objective with a reference-KL anchor
-($\texttt{kl\_weight} = 0.02$), and \texttt{legacy\_surrogate} as the control.
-If the entropy climb in E17 is caused by the blunt trust region and the noisy
-baseline rather than by reward scaling alone, the legacy arm should reproduce it
-and the corrected arms should not.
+\textbf{The A/B ladder.} Four 200-step arms on M0097, each turning on exactly
+one more fix than the last, so any effect can be attributed:
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Arm} & \textbf{Surrogate} & \textbf{Log-probs} & \textbf{KL} \\
+\midrule
+\texttt{conv200\_legacy} & legacy & legacy & --- \\
+\texttt{conv200\_surr}   & fixed  & legacy & --- \\
+\texttt{conv200}         & fixed  & fixed  & --- \\
+\texttt{conv200\_kl}     & fixed  & fixed  & $0.02$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All four log \texttt{p\_omit} and all four checkpoint on
+\texttt{ame\_motif\_rmsd\_batch\_mean}. The prediction under test: if the
+entropy climb is driven by the blunt trust region and the noisy baseline rather
+than by reward scaling alone, \texttt{conv200\_legacy} should reproduce it and
+the corrected arms should not. Figure~\ref{fig:ame-convergence} is the panel
+these land in --- it discovers arms on disk, so it fills out as they finish.
 
 The KL gating defect noted under E17 \emph{has} been fixed --- a non-zero
 \texttt{kl\_weight} now implies the reference model --- since that one only ever

@@ -64,6 +64,8 @@ class PolicyMPNN:
         # is routinely negative, and a floor of 0 would reject every checkpoint.
         self.best_seen_reward = float("-inf")
         self.step_at_best_seen_reward = 0
+        # Restores the pre-fix scoring distribution, for A/B only. See rollout.
+        self.legacy_logprobs = bool(self.cfg.get("legacy_logprobs", False))
         self.checkpoint_metric = self.cfg.get("checkpoint_metric", "reward")
         self.checkpoint_metric_mode = self.cfg.get("checkpoint_metric_mode", "max")
         self._ckpt_metric_history = []
@@ -333,6 +335,9 @@ class PolicyMPNN:
         S = 20 * torch.ones((B_decoder, L), dtype=torch.int64, device=self.device)
         h_V_stack = [h_V] + [torch.zeros_like(h_V, device=self.device) for _ in range(len(model.decoder_layers))]
 
+        omit_num = torch.zeros(B_decoder, device=self.device)
+        omit_den = torch.zeros(B_decoder, device=self.device)
+
         h_EX_encoder = self.cat_neighbors_nodes(torch.zeros_like(h_S), h_E, E_idx)
         h_EXV_encoder = self.cat_neighbors_nodes(h_V, h_EX_encoder, E_idx)
         h_EXV_encoder_fw = mask_fw * h_EXV_encoder
@@ -363,10 +368,42 @@ class PolicyMPNN:
             h_V_t = torch.gather(h_V_stack[-1], 1, t[:, None, None].repeat(1, 1, h_V_stack[-1].shape[-1]))[:, 0]
 
             logits = model.W_out(h_V_t)
-            log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
 
             probs = torch.nn.functional.softmax((logits.detach() + bias_t) / temperature, dim=-1)
             probs_sample = probs[:, :20] / torch.sum(probs[:, :20], dim=-1, keepdim=True)
+
+            if self.legacy_logprobs:
+                log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+            else:
+                # Score the distribution actions were actually drawn from.
+                #
+                # Sampling uses softmax((logits + bias)/T) renormalised over the
+                # 20 residue tokens; scoring under log_softmax(logits) over all
+                # 21 is a different distribution. The two differ by
+                # log P(allowed), which depends on theta and so does NOT cancel
+                # between pi_new and pi_old -- the true importance ratio is the
+                # implemented one times P_old(allowed)/P_new(allowed). It also
+                # made `temperature` silently wrong for anything but T = 1.
+                #
+                # bias is finite (-1e8 at omitted residues), so the log_softmax
+                # stays finite and the masked-out channel 20 can be padded with
+                # zero rather than -inf, which would poison the 0 * x product at
+                # fixed positions.
+                lp20 = torch.nn.functional.log_softmax(
+                    ((logits + bias_t) / temperature)[:, :20], dim=-1
+                )
+                log_probs = torch.nn.functional.pad(lp20, (0, 1), value=0.0)
+
+            # Drift monitor: how much probability mass the *model* puts on tokens
+            # sampling is forbidden from choosing. Nothing in the objective
+            # discourages this mass from growing -- omitted tokens are simply
+            # never drawn -- so without this it grows unobserved, and it is
+            # exactly the quantity that makes the ratio correction above bite.
+            with torch.no_grad():
+                p_omit_t = (torch.softmax(logits, dim=-1)
+                            * (bias_t <= -1e7).to(logits.dtype)).sum(dim=-1)
+                omit_num = omit_num + p_omit_t * chain_mask_t
+                omit_den = omit_den + chain_mask_t
 
             if sampled_actions is None:
                 S_t = torch.multinomial(probs_sample, 1)[:, 0]
@@ -389,6 +426,7 @@ class PolicyMPNN:
             "decoding_order": decoding_order,
             "state_features": h_V_stack[-1].detach(),
             "chain_mask": chain_mask,
+            "p_omit": omit_num / omit_den.clamp(min=1.0),
         }
 
         return output_dict
