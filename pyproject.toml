@@ -36,6 +36,7 @@ dependencies = [
     "matplotlib",
     "seaborn",
     "jupyter",
+    "transformers>=5.15.0",
 ]
 
 [project.scripts]
@@ -54,3 +55,10 @@ cuda = ["boltz[cuda]"]
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.165.5",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]

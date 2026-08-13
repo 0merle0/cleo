@@ -48,7 +48,16 @@ def embed_sequences(seqs, model_name=DEFAULT_MODEL, batch_size=8, device=None,
     seqs = list(seqs)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     tok = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name).to(device).eval()
+    try:
+        # ESM checkpoints carry no pooler; AutoModel would otherwise attach a
+        # randomly initialised one and warn about it. We never read
+        # pooler_output -- pooling happens below over last_hidden_state -- so
+        # the head is pure noise in the logs, but suppressing the warning by
+        # not creating the weights is better than teaching readers to ignore it.
+        model = AutoModel.from_pretrained(model_name, add_pooling_layer=False)
+    except TypeError:
+        model = AutoModel.from_pretrained(model_name)
+    model = model.to(device).eval()
     if fp16 and device.startswith("cuda"):
         model = model.half()
 
