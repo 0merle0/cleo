@@ -1,0 +1,158 @@
+\section{Experimental programme and selection algorithms}
+\label{sec:experiments}
+
+\plan{This section exists so that every arm, rule and planned experiment is
+written down in one place with a fixed name, and so that results reported
+elsewhere in the paper can be traced to a defined procedure. Much of it will
+move to Materials and Methods at submission; keeping it in the main build for
+now makes disagreements visible early.}
+
+\subsection*{Notation}
+
+A design is a sequence $s \in \mathcal{A}^L$ over the 20 canonical amino acids.
+Distance is Hamming,
+\[
+  d(s, t) \;=\; \bigl|\{\, i : s_i \neq t_i \,\}\bigr|,
+\]
+which is the metric behind every diversity number we report. One-hot encoding
+$\phi(s) \in \{0,1\}^{20L}$ satisfies
+$\lVert \phi(s) - \phi(t) \rVert_2 = \sqrt{2\, d(s,t)}$, so the PCA projections
+in the figures are a linear embedding of exactly this distance rather than a
+second, competing notion of similarity. Where an ESM embedding is used instead,
+$d$ is replaced by Euclidean distance between mean-pooled representations; this
+is reported as a diagnostic and, optionally, as a secondary library metric.
+
+A design \emph{passes} when its motif all-atom RMSD is below
+\SI{1.5}{\angstrom} and no backbone atom clashes with the ligand. $\mathcal{P}$
+denotes the passing subset of a pool $\mathcal{S}$. The
+\emph{anchor} $a$ is the position-wise consensus of low-temperature LigandMPNN
+samples --- the single sequence best representing the mode the base model's
+likelihood concentrates on.
+
+\subsection*{Selection rules}
+
+\plan{All implemented in \texttt{src/cleo/design/utils/selection.py}, all
+sharing one distance backend so the comparison is between rules rather than
+between implementations. Benchmarked by
+\texttt{paper/figures/ame\_selection\_bench.py}.}
+
+Given a pool $\mathcal{S}$ of $M$ sampled sequences and a budget of $k \ll M$
+folds, each rule returns the subset to fold.
+
+\begin{description}
+  \item[\texttt{random}] Uniform without replacement. \textbf{This is the
+        control, and it is the bar.} Diversity is trivially won and worthless
+        alone: a rule that doubles spread while halving passing designs has made
+        the library worse.
+  \item[\texttt{maxmin}] Greedy farthest-point (k-center) traversal. Having
+        selected $\mathcal{T}$, repeatedly add
+        $\arg\max_{s \in \mathcal{S} \setminus \mathcal{T}}
+         \min_{t \in \mathcal{T}} d(s,t)$.
+        The inner \emph{minimum} is what distinguishes this from max-sum
+        selection: it prevents accepting a tight cluster that happens to sit far
+        from everything already chosen.
+  \item[\texttt{maxmin\_anchor}] As above, scoring
+        $w_{\mathrm{self}} \min_{t \in \mathcal{T}} d(s,t) + w_{\mathrm{anchor}}\, d(s,a)$.
+        Selects designs novel relative to the incumbent low-temperature
+        solution, not merely relative to the rest of the library.
+  \item[\texttt{anchor\_far}] Rank by $d(s,a)$ descending. The pure
+        ``maximally unlike vanilla MPNN'' rule.
+  \item[\texttt{anchor\_band}] Restrict to the shell
+        $\{\, s : q_{\mathrm{lo}} \le d(s,a) \le q_{\mathrm{hi}} \,\}$ for
+        quantiles of the pool's anchor-distance distribution, then run
+        \texttt{maxmin} inside it. Designed as the correction to
+        \texttt{maxmin}: bounded above as well as below, so the traversal cannot
+        walk out to sequences that are distant because they are degenerate.
+  \item[\texttt{cluster\_rep}] Average-linkage clustering cut to $k$ clusters,
+        one representative sampled per cluster. Draws from the pool's density
+        rather than its edges.
+\end{description}
+
+\subsection*{Result: diversity-first acquisition does not work}
+
+\plan{Reported here rather than buried, because it was a starred hypothesis and
+because the negative result is informative. Retrospective evaluation on the
+M0097 trajectory pool: every sampled sequence already carries a pass label, so
+any rule can be scored without folding anything.}
+
+Passing designs recovered, relative to \texttt{random}, at a budget of 400 folds:
+
+\begin{center}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Rule} & \textbf{Passing designs / random} \\
+\midrule
+as-sampled          & 2.04 \\
+\texttt{random}     & 1.00 \\
+\texttt{cluster\_rep}   & 0.40 \\
+\texttt{anchor\_band}   & 0.36 \\
+\texttt{maxmin}         & 0.36 \\
+\texttt{maxmin\_anchor} & 0.24 \\
+\texttt{anchor\_far}    & 0.12 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every diversity-directed rule loses to uniform random selection, by factors of
+\numrange{2.5}{8}. The mechanism is visible in the spread: no rule moves mean
+pairwise distance beyond \numrange{135}{144} residues against random's 135. The
+pool is already near-saturated on diversity, so a selection rule has almost
+nothing to gain and a great deal to lose --- any systematic deviation from
+random correlates with selecting sequences that fail. Banding helps relative to
+raw farthest-point traversal ($0.36$ vs.\ $0.07$ at $k = 200$) but does not
+approach the control.
+
+\plan{Two honest caveats. The as-sampled row beats random because the pool is
+time-ordered and later policies are better --- that is a policy-quality effect,
+not a selection effect, and it must not be reported as one. And absolute counts
+are small (33 passing in a 1200-design pool), so individual cells are noisy;
+what carries the conclusion is that the direction is consistent across six
+rules and three budgets.}
+
+\textbf{Consequence for the paper.} Selection is not where the gain is. The
+defensible use of these rules is post-hoc: choosing a physically orderable
+subset from designs \emph{already known to pass}, where the labels exist and
+only the diversity trade-off is live. Deciding what to fold should be left to
+the policy.
+
+\subsection*{Experiment slate}
+
+\plan{Status as of the pilot. \statusdone{} = measured, \statusscaffold{} =
+partial, \statusblocked{} = not started. Full protocol detail lives in
+\texttt{paper/experiments\_plan.md}.}
+
+\begin{center}
+\begin{tabular}{@{}llp{0.52\textwidth}@{}}
+\toprule
+\textbf{ID} & \textbf{Status} & \textbf{Experiment and current reading} \\
+\midrule
+E1  & \statusscaffold & Matched-fold head-to-head. M0097 only: $T{=}0.1$ gives
+      5.0 passing / 1.0 cluster per 8 folds; \cleo{} 3.1 / 3.1 \\
+E2  & \statusscaffold & Diversity yield curves. \cleo{} half measured: 3200
+      folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters, still climbing \\
+E3  & \statusblocked  & Rescue. Target set: the three near-miss backbones
+      (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) \\
+E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 \\
+E5  & \statusblocked  & \textbf{Held-out oracle --- the top risk.} Reward is AF3
+      motif RMSD and evaluation is AF3 motif RMSD: the pilot is circular as run \\
+E6  & \statusblocked  & Policy transfer / amortization \\
+E7  & \statusscaffold & Effective library size. Among passing designs, cluster
+      count already equals design count \\
+E8  & ---             & Mutation-diversity reward: \textbf{retired}, superseded
+      by trajectory-as-library \\
+E9  & \statusdone     & Selection rules: \textbf{negative}, see above \\
+\addlinespace
+E10 & \statusblocked  & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$.
+      The blocking experiment: builds the incumbent frontier. If an intermediate
+      $T$ matches our coverage at our pass rate, the narrative collapses \\
+E11 & \statusblocked  & Reward shaping: rank-normalised, saturating at the
+      \SI{1.5}{\angstrom} threshold \\
+E12 & \statusblocked  & Early stopping. Peak at step ${\sim}40$; 5/5
+      budget-matched draws pass at peak vs.\ 1/5 at step 200 \\
+E13 & \statusblocked  & Consensus anchoring of the search itself \\
+E14 & \statusblocked  & ESM embedding view; optional secondary library metric \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\todo{experiments --- run E10; it gates the central claim}

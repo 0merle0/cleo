@@ -615,3 +615,39 @@ seconds by component.
 Per-sequence fold-count provenance is what makes every curve in §1 and §3
 reconstructable after the fact. Retrofitting it later means re-running
 everything.
+
+---
+
+## 7. Status board — updated 2026-08-12
+
+What the pilot has actually settled, per experiment. Three entries changed
+materially and one is newly at risk; read those before planning compute.
+
+| ID | Experiment | Status | What we now know |
+|---|---|---|---|
+| **E1** | Matched-fold head-to-head | **partial** | Done on M0097 only. At the 8-fold benchmark budget: T=0.1 → 5.0 passing / **1.0** cluster; CLEO peak → 3.1 passing / **3.1** clusters. We lose on hit rate, win 3× on independent solutions. Blocked on A2 for the frontier. |
+| **E2** | Diversity yield curves | **CLEO half done** | M0097 trajectory: 3200 folds → 97 passing → 97 clusters @90 % id, 33 % mean identity, still climbing. Baseline curves need A2. |
+| **E3** | Rescue | **not started** | Target picked: the three *near-miss* backbones (1.61–1.69 Å best-of-40, 0/40 published). Clean because there is no positive result of theirs to fail to reproduce. Current hint only: 4/3200 passing on two backbones where all baselines give 0. |
+| **E4** | Compute efficiency | **blocked on E1/E2** | — |
+| **E5** | Held-out oracle | **not started — now the top risk** | Reward is AF3 motif RMSD and evaluation is AF3 motif RMSD. The pilot is **fully circular** as run. Every headline number is contestable until an oracle swap exists. |
+| **E6** | Policy transfer | **not started** | — |
+| **E7** | Effective library size | **partially answered** | Among passing designs, cluster count already *equals* passing count. Effective size ≈ nominal for CLEO; for T=0.1 it is 1 regardless of nominal size. |
+| **E8** | Mutation-diversity reward | **DROPPED** | Superseded: the training trajectory *is* the library, so diversity comes free without a reward term to tune and defend. Arm A6 retired. |
+| **E9** | Oversample cheap, fold expensive | **answered — negative** | Greedy max-min selection is **worse than random** at every budget (800 folds: 51 as-sampled / 25 random / **6** max-min). It selects outliers, which fail. Gating on quality narrows but does not close the gap. Diversity-first acquisition is not viable; the defensible use is post-hoc subsetting of known-passing designs (`select_library.py`). |
+
+### New experiments this pilot implies
+
+| ID | Experiment | Why | Cost |
+|---|---|---|---|
+| **E10** | **Temperature sweep**, T ∈ {0.1, 0.2, 0.3, 0.5, 0.7, 1.0}, matched folds | **The blocking experiment.** Builds the incumbent frontier that every claim is measured against. If an intermediate T reaches CLEO's coverage at CLEO's pass rate there is no frontier shift and the narrative collapses. T=0.2/0.3 are the dangerous points. | med |
+| **E11** | **Reward shaping**: rank-normalised + saturating at the 1.5 Å pass threshold | Fixed bounds 0.5–20 Å collapse the within-batch reward spread once median RMSD hits 2–3 Å, which is exactly when the policy starts drifting (diversity bottoms at the performance peak, then rises as pass rate falls). A hinge at threshold also stops the gradient pulling every passing design onto one mode. Expected to raise pass rate *and* diversity. | low |
+| **E12** | **Early stopping / trajectory length** | Peak is at step ~40; steps 46–200 are decay. 5/5 budget-matched draws pass at peak vs 1/5 at final. | free |
+| **E13** | **Consensus anchoring** — seed/anchor search at the low-T consensus | Backbone-dependent by construction: on M0097 the passing designs sit ≥104 mutations from the low-T mode, so anchoring there suppresses the win. On backbones where nothing passes at all it may supply the basin the search never finds. Run as a control on M0097, a candidate fix on M0904/M0907. | low |
+| **E14** | **ESM embedding view** of the passing libraries | One-hot PCA answers "how far apart in Hamming", not "how different biochemically". ESM mean-pooled embeddings answer the second. Presentation/diagnostic only — quantitative claims stay on Hamming so figure and tables agree. | low |
+
+### Reading of the whole board
+
+The narrative is now **diversity at matched fidelity**, not pass rate. E10 decides
+whether that narrative survives; E5 decides whether anyone believes the numbers;
+E11/E12 are cheap and likely to improve every downstream result, so they should
+land before the expensive arms are run.
