@@ -101,8 +101,12 @@ def main():
         "rank norm (75 steps)": AME / "centering" / "run_M0097_1ctt_cond9_14_centre_w0.0",
     }
     # Any A/B arms that have started writing metrics.
+    # The ablation ladder, each rung one fix further than the last.
+    LABEL = {"legacy": "legacy objective", "surr": "+ surrogate fix",
+             "": "+ log-prob fix", "kl": "+ KL anchor (0.02)"}
     for p in sorted(AME.glob("centering/run_M0097_1ctt_cond9_14_conv200*")):
-        runs[p.name.split("conv200")[-1].strip("_") or "fixed"] = p
+        key = p.name.split("conv200")[-1].strip("_")
+        runs[LABEL.get(key, key)] = p
 
     # A run needs a few bins before its trajectory means anything; arms that
     # have only just started would otherwise contribute a single point and, via
@@ -118,8 +122,12 @@ def main():
     if not data:
         raise SystemExit("no runs found")
 
-    colors = [PALETTE["red"], PALETTE["blue"], PALETTE["green"],
-              PALETTE["orange"], PALETTE["gray"]]
+    # One colour per arm, and enough of them: zip() silently drops arms when the
+    # palette runs short, which quietly removed a whole ablation rung.
+    colors = [PALETTE["red"], PALETTE["blue"], PALETTE["gray"],
+              PALETTE["orange"], PALETTE["green"], "#7B4FA8", "#00868B"]
+    if len(data) > len(colors):
+        raise SystemExit(f"{len(data)} arms but only {len(colors)} colours")
     fig, axes = plt.subplots(2, 2, figsize=(11, 8.4))
 
     # --- the failure, and its signature ------------------------------------
@@ -131,8 +139,8 @@ def main():
         ax.set_ylabel(lab)
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
-    axes[0][0].set_title("Pass rate peaks early, then decays")
-    axes[0][1].set_title("Entropy $\\it{rises}$: diffusion, not collapse")
+    axes[0][0].set_title("Fixing the objective converts collapse into convergence")
+    axes[0][1].set_title("...and inverts the failure mode: entropy now $\\it{falls}$")
     axes[0][0].legend(frameon=False)
 
     # --- the mechanism ------------------------------------------------------
@@ -168,16 +176,19 @@ def main():
         ax.plot(t.entropy, t.pass_pct, "-", color=c, lw=1.5, alpha=0.7)
         ax.scatter(t.entropy, t.pass_pct, c=t.step, cmap="viridis", norm=nrm,
                    s=42, zorder=3, edgecolors=c, linewidths=1.2)
+        ax.annotate(k, (t.entropy.iloc[-1], t.pass_pct.iloc[-1]),
+                    textcoords="offset points", xytext=(6, -4), fontsize=8,
+                    color=c, fontweight="bold")
     fig.colorbar(matplotlib.cm.ScalarMappable(norm=nrm, cmap="viridis"),
                  ax=ax, label="training step", fraction=0.046)
     ax.set_xlabel("positional entropy (nats)")
     ax.set_ylabel("passing designs (%)")
-    ax.set_title("Value norm drifts right and down", pad=10)
+    ax.set_title("Only the KL anchor holds entropy open", pad=10)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
 
-    fig.suptitle("The AME policy diffuses rather than collapses, "
-                 "and rank normalisation reverses it")
+    fig.suptitle("Correcting the objective fixes the divergence and exposes "
+                 "mode collapse; the KL anchor is the knob against it")
     fig.tight_layout()
     save(fig, "ame_convergence")
 

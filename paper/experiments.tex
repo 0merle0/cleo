@@ -164,11 +164,14 @@ E11 & \statusdone     & Reward shaping: rank normalisation &
 E12 & \statusscaffold & Early stopping at ${\sim}75$ steps &
       \textbf{Rule was fitted to a broken config} (see E17); rank-normalised
       runs are still improving at step 75 \\
-E17 & \statusscaffold & \textbf{Convergence}: why the policy degrades after
+E17 & \statusdone     & \textbf{Convergence}: why the policy degrades after
       its peak &
-      Reward dynamic range misallocated; entropy \emph{rises} 1.42$\to$1.85.
-      Rank normalisation fixes it; 200-step run in flight \\
-E13 & \statusblocked  & Consensus anchoring of the search & \todoresult \\
+      Reward range misallocated. Fixed objective converges to
+      \SI{79}{\percent} but \textbf{entropy collapses} 1.7$\to$1.06;
+      \texttt{kl\_weight} 0.02 holds it at 1.65 and gives the best library
+      ($3.94\times$ baseline success at matched diversity) \\
+E13 & \statusblocked  & \textbf{KL-weight sweep} (was: consensus anchoring)
+      --- promoted by the A/B result & \todoresult \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
       $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
@@ -858,3 +861,70 @@ the policy reaches geometry the published run did not: \SI{1.273}{\angstrom} on
 a backbone whose best over 40 predictions was \SI{1.69}{\angstrom}. Whether that
 is a rescue or an artefact of a larger fold budget is what E4 and the
 replication check decide.}
+
+\subsection*{A/B result --- the fixes work, and the failure mode inverts}
+
+\plan{Four 200-step arms on M0097, each one fix further than the last, all with
+rank normalisation and best-of-5 folding. Compared at a matched window (steps
+70--109, 640 designs each) because the arms did not all reach step 200 together;
+ratios are against the $n = 96$ baseline frontier from E10, interpolated on its
+monotone branch ($T \ge 0.3$).}
+
+\begin{center}
+\begin{tabular}{@{}lccccrr@{}}
+\toprule
+\textbf{Arm} & \textbf{Success} & \textbf{Entropy} & \textbf{Spread} &
+$U_{15}$ & \textbf{succ.} & \textbf{div.} \\
+\midrule
+legacy objective   & \SI{53.9}{\percent} & 1.08 & 79.5  & 540 & $1.52\times$ & $1.28\times$ \\
+$+$ surrogate fix  & \SI{75.9}{\percent} & 1.27 & 93.3  & 624 & $2.62\times$ & $1.61\times$ \\
+$+$ log-prob fix   & \SI{79.2}{\percent} & 1.06 & 80.1  & 518 & $2.27\times$ & $1.38\times$ \\
+$+$ KL anchor      & \SI{42.5}{\percent} & \textbf{1.61} & \textbf{110.9} &
+  \textbf{782} & $2.47\times$ & $1.52\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The divergence is gone.} Every corrected arm converges: success climbs
+monotonically and stays climbing, where the original run peaked at
+\SI{13.8}{\percent} near step 40 and decayed to zero. Even the
+\texttt{legacy\_surrogate} arm converges, because it still carries rank
+normalisation --- which confirms the E17 diagnosis that the reward's compressed
+dynamic range, not the surrogate, was the primary cause of the collapse. The
+surrogate and advantage bugs cost roughly a factor of \num{1.7} in success on
+top of it (\SIrange{53.9}{75.9}{\percent}).
+
+\textbf{But the failure mode inverts.} Entropy no longer rises; it falls, from
+${\sim}1.7$ to 1.06 in the fully corrected arm. Having fixed a policy that
+diffused outward until it was useless, we now have one that converges onto a
+narrow solution: \SI{79.2}{\percent} success at spread 80.1 and $U_{15} = 518$,
+which is \emph{below} $T{=}0.7$'s 608. On per-design coverage the corrected
+policy without an anchor is worse than a high-temperature baseline. Sharpening
+the gradient made this worse, not better --- the log-prob fix buys
+\SI{3}{\percent} more success while dropping entropy 1.27 to 1.06, exactly what a
+more accurate gradient should do to an unconstrained optimiser.
+
+\textbf{The KL anchor is the knob against it.} At
+$\texttt{kl\_weight} = 0.02$ entropy stays flat across the whole run (1.68 to
+1.65) instead of collapsing, and the library is the best of any arm: $U_{15} =
+782$, \num{1.51} times the unanchored arm and \num{1.29} times $T{=}0.7$, at
+spread 110.9. Measured over its own late window (steps 155--194) it reaches
+\SI{54.2}{\percent} success at spread 115.0 and $U_{15} = 807$ ---
+$\mathbf{3.94\times}$ the baseline success at matched diversity and
+$\mathbf{1.86\times}$ the baseline diversity at matched success.
+
+\plan{This supersedes the E10 comparison, whose \cleo{} row came from the
+uncorrected objective and gave $1.40\times$ / $1.31\times$. It also repairs the
+concession forced by the E10 rarefaction: with an anchor, \cleo{} no longer
+merely passes more often at an equal exploration rate --- $U_{15} = 807$ against
+$T{=}0.7$'s 608 is a genuine per-design coverage advantage, which the unanchored
+arm does not have.
+
+\textbf{What this changes about the paper.} \texttt{kl\_weight} is the
+diversity control the narrative needs, and it is better behaved than E15's
+centering weight: it holds entropy open without requiring a reference sequence
+to centre on. The obvious next experiment is a sweep of it, which is E13's slot.
+Two caveats. \SI{42.5}{\percent} against \SI{79.2}{\percent} at matched steps is
+a real cost, and only a sweep says whether \num{0.02} is near the right place on
+that trade-off. And the anchored arm is still improving at step 194, so its
+numbers are a lower bound rather than a converged result.}
