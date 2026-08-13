@@ -141,8 +141,9 @@ E2  & \statusscaffold & Diversity yield curves &
       still climbing \\
 E3  & \statusscaffold & Rescue of the three near-miss backbones
       (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) &
-      M0050: 1/1200 clears at \SI{1.477}{\angstrom}. \textbf{Marginal} ---
-      unreplicated, \num{30}$\times$ the fold budget. 2 backbones running \\
+      M0365: \textbf{6/1200} clear, best \SI{1.273}{\angstrom} (published 0/40,
+      \SI{1.69}{\angstrom}); M0050 1/1200, marginal. Replication at $N{=}40$
+      running; 1 backbone left \\
 E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
 E7  & \statusdone     & Effective library size &
       Unique mutations rarefied to $k{=}5$: \cleo{} 347 vs.\ $T{=}0.7$ 316
@@ -828,25 +829,47 @@ say the same thing: deciding what to fold should be left to the policy. The
 defensible use of these rules remains post-hoc, choosing an orderable subset from
 designs already known to pass.
 
-\subsection*{E3 result --- a marginal rescue, not yet a claim}
+\subsection*{E3 result --- two backbones reach the cutoff, one convincingly}
 
 \plan{M0050\_1dbt\_cond2\_6, one of the three near-miss backbones the published
 benchmark scores at 0/40 with a best-of-40 motif RMSD of
 \SIrange{1.61}{1.69}{\angstrom}. 75 steps, batch 16, best-of-5.}
 
-Out of 1200 designs, \textbf{one} clears the benchmark criterion: motif RMSD
-\SI{1.477}{\angstrom}, no ligand clash. Median RMSD over the run is
-\SI{2.81}{\angstrom} and the clash term is never binding (\SI{100}{\percent}
-clash-free throughout, so it contributes nothing to the reward on this target).
+\begin{center}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Backbone} & \textbf{Published} & \textbf{Passing} & \textbf{Best RMSD} &
+\textbf{Margin} & \textbf{Median} \\
+\midrule
+M0050\_1dbt & 0/40, \SI{1.61}{\angstrom} & 1 / 1200 & \SI{1.477}{\angstrom} &
+  \SI{0.023}{\angstrom} & \SI{2.81}{\angstrom} \\
+M0365\_1pfk & 0/40, \SI{1.69}{\angstrom} & \textbf{6 / 1200} &
+  \textbf{\SI{1.273}{\angstrom}} & \SI{0.227}{\angstrom} & \SI{3.12}{\angstrom} \\
+M0375\_4ts9 & 0/40 & \multicolumn{4}{c}{\emph{running}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The two differ by more than their counts suggest. M0050 contributes a single
+design \SI{0.023}{\angstrom} inside the cutoff --- one draw from a distribution
+sitting on the threshold. M0365 contributes six distinct sequences, the best at
+\SI{1.273}{\angstrom}, a margin ten times larger and well clear of the
+prediction noise that makes M0050 unreadable. If either becomes a rescue claim
+it is M0365.
+
+On both targets the clash term is never binding (\SI{100}{\percent} clash-free
+throughout), so the composite criterion reduces to motif RMSD alone and the
+no-clash half of the reward contributes nothing on these backbones.
 
 \plan{\textbf{This should not be reported as a rescue yet, for three reasons.}
 
-The margin is \SI{0.023}{\angstrom} inside a \SI{1.5}{\angstrom} cutoff, on a
-single design out of 1200. Nothing establishes that the same sequence re-folded
-under different AF3 seeds still clears it; the obvious check --- refold that one
-sequence at high $N$ and see what fraction of predictions pass --- has not been
-run, and until it has, this is one draw from a distribution straddling the
-threshold.
+Replication is not yet established. A single AF3 prediction landing near the
+threshold says little about the sequence; what matters is the fraction of
+predictions of the \emph{same} sequence that clear it. All seven hits are being
+refolded 40 times each --- the published per-backbone budget --- and the pass
+fraction is what decides this. Near 1 and the geometry is real; near $1/40$ and
+we sampled a tail draw. M0050's \SI{0.023}{\angstrom} margin makes it the one
+most likely not to survive.
 
 The compute is not matched. The published 0/40 is 8 sequences $\times$ 5 models
 on one backbone. We folded 1200 designs at best-of-5, roughly \num{30} times the
@@ -859,7 +882,8 @@ against the unidealised packed design; we score against the idealised
 \texttt{-atomized-bb-True.pdb}. That discrepancy already blocks M0904 and M0907
 from carrying any claim and it applies here too.
 
-What the result does support is the weaker and still useful statement that the
-policy reaches \SI{1.477}{\angstrom} on a backbone whose published best over 40
-predictions was \SI{1.61}{\angstrom} --- the geometry is reachable. Two further
-near-miss backbones are still running.}
+What the results already support is the weaker and still useful statement that
+the policy reaches geometry the published run did not: \SI{1.273}{\angstrom} on
+a backbone whose best over 40 predictions was \SI{1.69}{\angstrom}. Whether that
+is a rescue or an artefact of a larger fold budget is what E4 and the
+replication check decide.}
