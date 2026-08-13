@@ -119,39 +119,43 @@ the policy.
 
 \plan{Status as of the pilot. \statusdone{} = measured, \statusscaffold{} =
 partial, \statusblocked{} = not started. Full protocol detail lives in
-\texttt{paper/experiments\_plan.md}.}
+\texttt{paper/experiments\_plan.md}. The \textbf{Result} column is filled in
+as each run lands, so the table doubles as the run log.
+
+E5 (held-out oracle) and E6 (policy transfer) are \emph{deliberately deferred},
+not dropped. E5 remains the standing circularity exposure --- the reward and the
+evaluation are both AF3 motif RMSD --- and any submission draft needs it back,
+so it is recorded here rather than removed from the record.}
 
 \begin{center}
-\begin{tabular}{@{}llp{0.52\textwidth}@{}}
+\begin{tabular}{@{}llp{0.40\textwidth}p{0.22\textwidth}@{}}
 \toprule
-\textbf{ID} & \textbf{Status} & \textbf{Experiment and current reading} \\
+\textbf{ID} & \textbf{Status} & \textbf{Experiment} & \textbf{Result} \\
 \midrule
-E1  & \statusscaffold & Matched-fold head-to-head. M0097 only: $T{=}0.1$ gives
-      5.0 passing / 1.0 cluster per 8 folds; \cleo{} 3.1 / 3.1 \\
-E2  & \statusscaffold & Diversity yield curves. \cleo{} half measured: 3200
-      folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters, still climbing \\
-E3  & \statusblocked  & Rescue. Target set: the three near-miss backbones
-      (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) \\
-E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 \\
-E5  & \statusblocked  & \textbf{Held-out oracle --- the top risk.} Reward is AF3
-      motif RMSD and evaluation is AF3 motif RMSD: the pilot is circular as run \\
-E6  & \statusblocked  & Policy transfer / amortization \\
-E7  & \statusscaffold & Effective library size. Among passing designs, cluster
-      count already equals design count \\
-E8  & ---             & Mutation-diversity reward: \textbf{retired}, superseded
-      by trajectory-as-library \\
-E9  & \statusdone     & Selection rules: \textbf{negative}, see above \\
+E1  & \statusscaffold & Matched-fold head-to-head &
+      M0097: $T{=}0.1$ 5.0 passing / 1.0 cluster per 8 folds; \cleo{} 3.1 / 3.1 \\
+E2  & \statusscaffold & Diversity yield curves &
+      \cleo{} 3200 folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters,
+      still climbing \\
+E3  & \statusblocked  & Rescue of the three near-miss backbones
+      (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) & \todoresult \\
+E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
+E7  & \statusscaffold & Effective library size &
+      Among passing designs, cluster count equals design count \\
+E8  & ---             & Mutation-diversity reward &
+      \textbf{Retired}, superseded by trajectory-as-library \\
+E9  & \statusdone     & Selection rules, retrospective &
+      \textbf{Negative:} every rule loses to random, \numrange{2.5}{8}$\times$ \\
 \addlinespace
-E10 & \statusblocked  & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$.
-      The blocking experiment: builds the incumbent frontier. If an intermediate
-      $T$ matches our coverage at our pass rate, the narrative collapses \\
-E11 & \statusblocked  & Reward shaping: rank-normalised, saturating at the
-      \SI{1.5}{\angstrom} threshold \\
-E12 & \statusblocked  & Early stopping. Peak at step ${\sim}40$; 5/5
-      budget-matched draws pass at peak vs.\ 1/5 at step 200 \\
-E13 & \statusblocked  & Consensus anchoring of the search itself \\
-E14 & \statusblocked  & ESM embedding view; optional secondary library metric \\
-E15 & \statusblocked  & \textbf{Centering-weight sweep} --- see below \\
+E10 & \statusblocked  & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
+      builds the incumbent frontier & \todoresult \\
+E11 & \statusblocked  & Reward shaping: rank normalisation & \todoresult \\
+E12 & \statusblocked  & Early stopping at ${\sim}75$ steps & \todoresult \\
+E13 & \statusblocked  & Consensus anchoring of the search & \todoresult \\
+E14 & \statusblocked  & ESM embedding view of the passing libraries & \todoresult \\
+E15 & \statusblocked  & Centering-weight sweep, $W$ in both directions & \todoresult \\
+E16 & \statusblocked  & In-training selection: no-oversample /
+      oversample+random / oversample+diverse & \todoresult \\
 \bottomrule
 \end{tabular}
 \end{center}
