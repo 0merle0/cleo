@@ -658,12 +658,21 @@ fixed by \texttt{fixed\_residues}, which contribute $\rho \approx 1$ each. The
 effective step size therefore depends on how long the protein is and how much of
 it is designable. The standard form is a mean over designed tokens.
 
-\plan{Findings 1 and 2 are both plausible additional contributors to the E17
-drift, independent of the reward-scaling problem: together they mean the trust
-region is blunt and the baseline is noisy. Neither has been fixed, because doing
-so changes the objective and every number in this section would need
-regenerating. Finding 3 is a step-size scaling issue and matters mainly for
-comparing across targets of different length.
+\plan{\textbf{All three are now fixed}, and the pre-fix objective is retained
+behind \texttt{legacy\_surrogate: true} so the fix can be measured rather than
+merely asserted. The surrogate takes a per-token minimum and averages it over
+designed tokens only --- \texttt{chain\_mask} is zero at fixed residues, whose
+log-probs the rollout already zeroes, so including them would contribute
+$\rho = 1$ apiece and make the step size depend on how much of the protein is
+held fixed, which disposes of Finding 3 as well. The advantage is computed once
+over the full rollout group before the update loop.
+
+Three 200-step arms on M0097 are in flight as the direct comparison: the
+corrected objective, the corrected objective with a reference-KL anchor
+($\texttt{kl\_weight} = 0.02$), and \texttt{legacy\_surrogate} as the control.
+If the entropy climb in E17 is caused by the blunt trust region and the noisy
+baseline rather than by reward scaling alone, the legacy arm should reproduce it
+and the corrected arms should not.
 
 The KL gating defect noted under E17 \emph{has} been fixed --- a non-zero
 \texttt{kl\_weight} now implies the reference model --- since that one only ever
