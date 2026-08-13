@@ -152,7 +152,9 @@ E10 & \statusblocked  & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
 E11 & \statusblocked  & Reward shaping: rank normalisation & \todoresult \\
 E12 & \statusblocked  & Early stopping at ${\sim}75$ steps & \todoresult \\
 E13 & \statusblocked  & Consensus anchoring of the search & \todoresult \\
-E14 & \statusblocked  & ESM embedding view of the passing libraries & \todoresult \\
+E14 & \statusdone     & ESM embedding view of the passing libraries &
+      Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
+      $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
 E15 & \statusblocked  & Centering-weight sweep, $W$ in both directions & \todoresult \\
 E16 & \statusblocked  & In-training selection: no-oversample /
       oversample+random / oversample+diverse & \todoresult \\
@@ -205,3 +207,32 @@ method's frontier against another's single point is the mistake the temperature
 sweep exists to avoid, and it would be the same mistake in reverse to report
 our best $W$ against their swept $T$.}
 \todo{experiments --- run E15 on M0097 once E11 rank-normalisation is validated}
+
+\subsection*{E14 result --- the embedding view qualifies the Hamming view}
+
+\plan{Mean-pooled ESM-2 650M, one vector per design, computed for every arm.}
+
+Within a set, ESM distance and Hamming distance are close to \emph{uncorrelated}
+($r$ between $-0.17$ and $0.56$ across arms), so the embedding is genuinely
+measuring something the Hamming numbers do not. That makes the agreement in
+ordering meaningful rather than automatic: on M0097's passing designs,
+\cleo{} is more spread than $T{=}0.1$ under both metrics.
+
+But the size of the advantage does not survive the change of metric. The ratio
+of \cleo{}'s passing-set spread to the low-temperature arm's is
+$\mathbf{2.57\times}$ in Hamming and only $\mathbf{1.31\times}$ in ESM space.
+A substantial share of the extra sequence distance \cleo{} buys is
+biochemically conservative --- positions that differ in identity but not much
+in what ESM considers the residue to be doing.
+
+\plan{This should be stated in the paper, not left for a referee to find.
+Reporting ``2.6$\times$ more diverse'' with a metric chosen because it is the
+larger number is exactly the move the temperature sweep exists to prevent us
+from making about temperature. The defensible claim is that the advantage is
+robust to the choice of metric while its magnitude is not, and that the
+library-relevant quantity --- distinct passing clusters per fold, where
+\cleo{} wins $3.1$ to $1.0$ --- does not depend on either distance at all,
+since those designs are separate clusters at any threshold tested.
+
+Caveat on $n$: passing subsets are 5 and 15 designs, so the correlation
+figures in particular are noisy. The ratio comparison is the robust part.}
