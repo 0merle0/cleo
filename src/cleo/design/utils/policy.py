@@ -42,6 +42,14 @@ alphabet = list(restype_STRtoINT)
 class PolicyMPNN:
     """ProteinMPNN wrapper for RL fine-tuning with vanilla REINFORCE."""
 
+    # Class-level default so subclasses that deliberately skip __init__ still
+    # resolve it -- BaselineSampler does exactly that, dropping the reward
+    # function and optimizer it does not need, and would otherwise raise
+    # AttributeError inside rollout the moment a new instance attribute is
+    # referenced there.
+    legacy_logprobs = False
+
+
     def __init__(self, cfg):
         self.cfg = cfg
         self.device = DEVICE
