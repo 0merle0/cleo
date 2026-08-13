@@ -134,8 +134,9 @@ so it is recorded here rather than removed from the record.}
 \midrule
 E1  & \statusscaffold & Matched-fold head-to-head &
       Superseded by the per-sequence success rate (see \emph{Scoring protocol});
-      M0097 best-of-5: $T{=}0.1$ \SI{62.5}{\percent} at spread 38.5, \cleo{} peak
-      \SI{37.5}{\percent} at 98.8. E10 is the comparison that counts \\
+      M0097 best-of-5 at $n{=}96$: $T{=}0.2$ \SI{66.7}{\percent} at spread 47.8,
+      \cleo{} peak \SI{37.5}{\percent} at 98.8. E10 is the comparison that
+      counts \\
 E2  & \statusscaffold & Diversity yield curves &
       \cleo{} 3200 folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters,
       still climbing \\
@@ -153,12 +154,11 @@ E8  & ---             & Mutation-diversity reward &
 E9  & \statusdone     & Selection rules, retrospective &
       \textbf{Negative:} every rule loses to random, \numrange{2.5}{8}$\times$ \\
 \addlinespace
-E10 & \statusscaffold & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
+E10 & \statusdone     & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
       builds the incumbent frontier &
-      \textbf{Frontier shift confirmed} on passing-set spread: \cleo{}'s peak
-      window succeeds $1.7\times$ as often as the baseline at matched diversity
-      (\SI{37.5}{\percent} vs.\ ${\sim}\SI{22}{\percent}$ at spread 98.8).
-      Rerunning all six $T$ at $n{=}96$ \\
+      At $n{=}96$: \cleo{} $1.40\times$ the success at matched diversity,
+      $1.31\times$ the diversity at matched success. But $U_{15}$ ties $T{=}0.7$
+      ($1.04\times$) --- the edge is pass rate, not exploration \\
 E11 & \statusdone     & Reward shaping: rank normalisation &
       Folded into every new arm; E15 trains stably under it \\
 E12 & \statusscaffold & Early stopping at ${\sim}75$ steps &
@@ -329,81 +329,52 @@ gap between them is itself informative.
 \begin{center}
 \begin{tabular}{@{}lccccc@{}}
 \toprule
-\textbf{Arm} & $n$ & \textbf{Success} & \multicolumn{2}{c}{\textbf{Mean pairwise Hamming}} &
-\textbf{Median best} \\
-\cmidrule(lr){4-5}
-             &     & \textbf{rate}    & \textbf{sampled} & \textbf{passing} &
-\textbf{RMSD (\si{\angstrom})} \\
+\textbf{Arm} & $n$ & \textbf{Success} & \textbf{Passing} &
+\textbf{Spread} & $U_{15}$ \\
 \midrule
-LigandMPNN $T{=}0.1$ & 8  & \SI{62.5}{\percent} & 39.1  & 38.5  & 1.3 \\
-LigandMPNN $T{=}0.2$ & 24 & \SI{58.3}{\percent} & 48.7  & 48.6  & 1.3 \\
-LigandMPNN $T{=}0.3$ & 24 & \SI{54.2}{\percent} & 58.9  & 57.3  & 1.3 \\
-LigandMPNN $T{=}0.5$ & 24 & \SI{29.2}{\percent} & 78.3  & 75.9  & 1.8 \\
-LigandMPNN $T{=}0.7$ & 24 & \SI{20.8}{\percent} & 104.8 & 103.1 & 1.8 \\
-LigandMPNN $T{=}1.0$ & 8  & \SI{0.0}{\percent}  & 123.8 & ---   & 4.4 \\
+LigandMPNN $T{=}0.1$ & 96 & \SI{58.3}{\percent} & 56 & 40.6  & 162 \\
+LigandMPNN $T{=}0.2$ & 96 & \SI{66.7}{\percent} & 64 & 47.8  & 205 \\
+LigandMPNN $T{=}0.3$ & 96 & \SI{58.3}{\percent} & 56 & 57.9  & 274 \\
+LigandMPNN $T{=}0.5$ & 96 & \SI{34.4}{\percent} & 33 & 80.5  & 438 \\
+LigandMPNN $T{=}0.7$ & 96 & \SI{26.0}{\percent} & 25 & 100.5 & 608 \\
+LigandMPNN $T{=}1.0$ & 96 & \SI{4.2}{\percent}  & 4  & 126.3 & --- \\
 \midrule
-\textbf{\cleo{} peak window} & 40 & \textbf{\SI{37.5}{\percent}} & 103.1 &
-  \textbf{98.8} & 1.7 \\
-\cleo{} final window         & 40 & \SI{2.5}{\percent}  & 127.0 & ---   & 2.6 \\
-\cleo{} both windows pooled  & 80 & \SI{20.0}{\percent} & 132.0 & 105.2 & 1.9 \\
+\textbf{\cleo{} peak window}$^{*}$ & 40 & \textbf{\SI{37.5}{\percent}} & 15 &
+  \textbf{98.8} & \textbf{632} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Temperature traces a clean monotone trade-off --- diversity rises from 39 to 124
-mean pairwise substitutions as the success rate falls from \SI{62.5}{\percent}
-to zero --- and that curve is the incumbent frontier every claim here has to
-beat. For the baseline arms the two spread columns are within 3 of each other:
-filtering removes designs roughly at random with respect to sequence identity,
-so it does not concentrate the library.
+$^{*}$\,The \cleo{} row predates the objective fixes recorded in the algorithm
+audit and is a post-hoc peak window; it is provisional until the corrected
+200-step arms land. Every baseline row is $n = 96$ on the same code path.
 
-\cleo{}'s peak window sits above the frontier. Interpolating the baseline curve
-on the passing-set column:
+Temperature trades success for diversity, but not monotonically at the low end:
+$T{=}0.2$ is the \emph{most} successful arm at \SI{66.7}{\percent}, above
+$T{=}0.1$'s \SI{58.3}{\percent}, while also being more diverse. Anyone tuning
+only temperature should therefore not be at $T{=}0.1$, and $T{=}0.2$ is the
+honest incumbent to beat at the low-diversity end. From $T{=}0.3$ upward the
+trade-off is clean and steep: diversity rises 58 to 126 while success falls
+\SIrange{58}{4}{\percent}.
+
+\cleo{}'s peak window sits above that curve, by less than the small-$n$ data
+suggested:
 
 \begin{itemize}\setlength{\itemsep}{0pt}
   \item at \cleo{}'s diversity (98.8), the baseline succeeds
-        ${\sim}\SI{22}{\percent}$ of the time; \cleo{} succeeds
-        \SI{37.5}{\percent} --- $\mathbf{1.7\times}$.
+        \SI{26.7}{\percent}; \cleo{} \SI{37.5}{\percent} --- $\mathbf{1.40\times}$.
   \item at \cleo{}'s success rate (\SI{37.5}{\percent}), the baseline reaches
-        spread ${\sim}69.7$; \cleo{} reaches $98.8$ --- $\mathbf{1.4\times}$.
+        spread $75.3$; \cleo{} $98.8$ --- $\mathbf{1.31\times}$.
 \end{itemize}
 
-The two dangerous points named in advance, $T{=}0.2$ and $T{=}0.3$, do not
-threaten this: they buy little diversity for the success they retain. $T{=}1.0$
-is the only baseline arm reaching \cleo{}'s diversity, and it succeeds never.
-
-\textbf{Unique mutations, rarefied.} Spread and mutational coverage do not say
-the same thing, so both are reported. $U$ is the count of distinct
-(position, residue) substitutions in the passing library; $U_k$ rarefies it to
-$k$ passing designs.
-
-\begin{center}
-\begin{tabular}{@{}lcccccc@{}}
-\toprule
-\textbf{Arm} & $|\mathcal{P}|$ & $U$ & $U_3$ & $U_5$ & $U_7$ & $U_{15}$ \\
-\midrule
-LigandMPNN $T{=}0.1$ & 5  & 90  & 65  & 90  & ---  & --- \\
-LigandMPNN $T{=}0.2$ & 14 & 205 & 87  & 121 & 146 & --- \\
-LigandMPNN $T{=}0.3$ & 13 & 252 & 106 & 150 & 184 & --- \\
-LigandMPNN $T{=}0.5$ & 7  & 260 & 145 & 209 & 260 & --- \\
-LigandMPNN $T{=}0.7$ & 5  & 316 & 211 & 316 & ---  & --- \\
-\midrule
-\textbf{\cleo{} peak} & 15 & \textbf{632} & 254 & 347 & 421 & 632 \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Read at matched $k$ the advantage is modest: $U_5 = 347$ against $T{=}0.7$'s
-$316$, a factor of $1.10$. Per passing design, \cleo{} and a high-temperature
-baseline explore mutational space at comparable rates. The gain is that \cleo{}
-\emph{sustains} it --- 15 passing designs from 40 folds where $T{=}0.7$ yields 5
-from 24 --- so the library actually obtained for a fixed fold budget covers
-$632$ substitutions against $316$, a factor of $2.0$.
-
-This is the more honest decomposition of the diversity claim than spread alone.
-\cleo{} is not sampling more exotically per design; it is keeping a
-high-temperature-like exploration rate while passing the filter often enough
-that the exploration survives into the library.
+\textbf{The rarefied coverage says something the ratios hide.} At a matched 15
+passing designs, \cleo{} reaches $U_{15} = 632$ distinct substitutions against
+$T{=}0.7$'s 608 --- a factor of $1.04$, which is no advantage at all. Per
+passing design \cleo{} explores mutational space at essentially the same rate as
+a high-temperature baseline. Its entire edge is that it \emph{passes more often
+while doing so}, which is what converts an equal exploration rate into a larger
+library for a fixed fold budget. That is a narrower and more defensible claim
+than ``more diverse'', and it is the one the data supports.
 
 \plan{\textbf{Three corrections to carry through the rest of the paper.}
 
