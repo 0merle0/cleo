@@ -142,9 +142,10 @@ E2  & \statusscaffold & Diversity yield curves &
       still climbing \\
 E3  & \statusscaffold & Rescue of the three near-miss backbones
       (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) &
-      M0365: \textbf{6/1200} clear, best \SI{1.273}{\angstrom} (published 0/40,
-      \SI{1.69}{\angstrom}); M0050 1/1200, marginal. Replication at $N{=}40$
-      running; 1 backbone left \\
+      \textbf{M0365 \texttt{hit00} replicates 22/40}, median
+      \SI{1.470}{\angstrom} (published 0/40, best \SI{1.69}{\angstrom}). Of 7
+      training hits only 1 survives $N{=}40$; M0050 fails (1/40). 1 backbone
+      left \\
 E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
 E7  & \statusdone     & Effective library size &
       Unique mutations rarefied to $k{=}5$: \cleo{} 347 vs.\ $T{=}0.7$ 316
@@ -170,8 +171,9 @@ E17 & \statusdone     & \textbf{Convergence}: why the policy degrades after
       \SI{79}{\percent} but \textbf{entropy collapses} 1.7$\to$1.06;
       \texttt{kl\_weight} 0.02 holds it at 1.65 and gives the best library
       ($3.94\times$ baseline success at matched diversity) \\
-E13 & \statusblocked  & \textbf{KL-weight sweep} (was: consensus anchoring)
-      --- promoted by the A/B result & \todoresult \\
+E13 & \statusscaffold & \textbf{KL-weight sweep} (was: consensus anchoring)
+      --- promoted by the A/B result &
+      $w \in \{0, 0.005, 0.01, 0.02, 0.05, 0.1\}$; 0 and 0.02 done, 4 running \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
       $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
@@ -835,32 +837,56 @@ On both targets the clash term is never binding (\SI{100}{\percent} clash-free
 throughout), so the composite criterion reduces to motif RMSD alone and the
 no-clash half of the reward contributes nothing on these backbones.
 
-\plan{\textbf{This should not be reported as a rescue yet, for three reasons.}
+\textbf{Replication at $N = 40$ settles it, mostly against us.} Every one of the
+seven hits was refolded 40 times --- the published per-backbone budget --- and
+the pass fraction counted.
 
-Replication is not yet established. A single AF3 prediction landing near the
-threshold says little about the sequence; what matters is the fraction of
-predictions of the \emph{same} sequence that clear it. All seven hits are being
-refolded 40 times each --- the published per-backbone budget --- and the pass
-fraction is what decides this. Near 1 and the geometry is real; near $1/40$ and
-we sampled a tail draw. M0050's \SI{0.023}{\angstrom} margin makes it the one
-most likely not to survive.
+\begin{center}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Design} & \textbf{Backbone} & \textbf{Passing / 40} &
+\textbf{Min RMSD} & \textbf{Median RMSD} \\
+\midrule
+\texttt{hit00} & M0365 & \textbf{22} & \SI{1.196}{\angstrom} & \SI{1.470}{\angstrom} \\
+\texttt{hit01} & M0365 & 2  & \SI{1.410}{\angstrom} & \SI{1.818}{\angstrom} \\
+\texttt{hit04} & M0365 & 1  & \SI{1.454}{\angstrom} & \SI{2.327}{\angstrom} \\
+\texttt{hit05} & M0050 & 1  & \SI{1.456}{\angstrom} & \SI{1.920}{\angstrom} \\
+\texttt{hit03} & M0365 & 0  & \SI{1.514}{\angstrom} & \SI{1.926}{\angstrom} \\
+\texttt{hit06} & M0365 & 0  & \SI{1.638}{\angstrom} & \SI{2.019}{\angstrom} \\
+\texttt{hit02} & M0365 & 0  & \SI{1.729}{\angstrom} & \SI{2.430}{\angstrom} \\
+\bottomrule
+\end{tabular}
+\end{center}
 
-The compute is not matched. The published 0/40 is 8 sequences $\times$ 5 models
-on one backbone. We folded 1200 designs at best-of-5, roughly \num{30} times the
-budget. ``Found one hit with \num{30}$\times$ the folds'' is a much weaker claim
-than a rescue, and the compute-matched comparison (E4) is the one that would
-settle it.
+Of seven designs that cleared the criterion during training, \textbf{one}
+reproduces robustly. \texttt{hit00} passes \num{22} of \num{40} predictions with
+a \emph{median} RMSD of \SI{1.470}{\angstrom} --- below the cutoff, not merely
+touching it --- on a backbone the published benchmark scores 0/40 with a best of
+\SI{1.69}{\angstrom}. That is a real result and the one worth reporting.
 
-The reference-structure question is still open. The published benchmark scores
-against the unidealised packed design; we score against the idealised
-\texttt{-atomized-bb-True.pdb}. That discrepancy already blocks M0904 and M0907
-from carrying any claim and it applies here too.
+Three of the seven pass \emph{zero} of 40 on refolding. M0050's single hit
+passes 1/40, exactly the tail draw its \SI{0.023}{\angstrom} margin predicted;
+the M0050 rescue does not survive and should be dropped.
 
-What the results already support is the weaker and still useful statement that
-the policy reaches geometry the published run did not: \SI{1.273}{\angstrom} on
-a backbone whose best over 40 predictions was \SI{1.69}{\angstrom}. Whether that
-is a rescue or an artefact of a larger fold budget is what E4 and the
-replication check decide.}
+\plan{\textbf{The general lesson matters more than the rescue.} These seven were
+selected \emph{because} they passed, so they are the winners of a noisy filter
+and regression on refolding is expected --- but the size of it is the point. A
+design passing 1/40 of the time is flagged by a best-of-5 training filter about
+\SI{12}{\percent} of the time it is folded, so a best-of-5 label is a weak
+indicator of reproducible success, and the in-training pass rates reported
+throughout this section (\SI{83}{\percent} for the corrected arm,
+\SI{57}{\percent} for the anchored one) are counts of best-of-5 events rather
+than of designs that would survive this test.
+
+They are not \emph{wrong} --- best-of-$N$ is the benchmark's own definition, and
+by that definition four of these seven clear it where the published run cleared
+none. But the two quantities should not be conflated, and any headline number
+that leaves this section ought to be replicated the way \texttt{hit00} was. The
+cheap version is to raise \texttt{num\_diffusion\_samples} at evaluation time
+only; the honest version is to report both.
+
+Still open: the compute is not matched (E4), and the idealised-versus-unidealised
+reference-structure question still blocks M0904 and M0907.}
 
 \subsection*{A/B result --- the fixes work, and the failure mode inverts}
 
@@ -908,10 +934,12 @@ more accurate gradient should do to an unconstrained optimiser.
 $\texttt{kl\_weight} = 0.02$ entropy stays flat across the whole run (1.68 to
 1.65) instead of collapsing, and the library is the best of any arm: $U_{15} =
 782$, \num{1.51} times the unanchored arm and \num{1.29} times $T{=}0.7$, at
-spread 110.9. Measured over its own late window (steps 155--194) it reaches
-\SI{54.2}{\percent} success at spread 115.0 and $U_{15} = 807$ ---
-$\mathbf{3.94\times}$ the baseline success at matched diversity and
-$\mathbf{1.86\times}$ the baseline diversity at matched success.
+spread 110.9. Both arms have now finished 200 steps; over their final 40 the anchored arm
+reaches \SI{56.7}{\percent} success at spread 114.4 with $U_{15} = 804$ ---
+$\mathbf{3.98\times}$ the baseline success at matched diversity and
+$\mathbf{1.93\times}$ the baseline diversity at matched success --- against the
+unanchored arm's \SI{83.1}{\percent} at spread 76.6, $U_{15} = 507$
+($2.16\times$ / $1.32\times$). Entropy settles at 1.65 versus 0.99.
 
 \plan{This supersedes the E10 comparison, whose \cleo{} row came from the
 uncorrected objective and gave $1.40\times$ / $1.31\times$. It also repairs the
