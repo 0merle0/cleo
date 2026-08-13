@@ -12,8 +12,11 @@ this module rather than duplicated elsewhere.
 """
 
 import os
+import warnings
+
 import torch
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 import time
 import hydra
@@ -526,14 +529,35 @@ class PolicyMPNN:
             )
 
     def log_metrics(self, step, runtime, to_log):
-        """Append one row to the CSV training log."""
-        metrics_to_log = [k for k, v in to_log.items() if isinstance(v, float)]
+        """Append one row to the CSV training log, reconciling the column set.
+
+        The header used to be written once, from whichever step created the
+        file, while every later row was written from *its own* list of float
+        keys. That silently misaligns the moment the two differ -- which happens
+        whenever a rerun lands in an output_dir left behind by an earlier run
+        with a different metric set (a new reward step, or a newly added
+        diagnostic such as ``p_omit_mean``). The row count still looks right, so
+        nothing complains; the columns are simply wrong from that point on.
+
+        Instead the union of columns is maintained: new metrics are added to the
+        header and back-filled as blank on historical rows, and metrics that
+        have gone away are written blank rather than shifting everything left.
+        """
+        row = {"step": step, "runtime": round(runtime, 4)}
+        row.update({
+            k: v for k, v in to_log.items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool)
+        })
         log_path = os.path.join(self.output_dir, f"{self.run_name}_train_metrics.csv")
-        if not os.path.exists(log_path):
-            with open(log_path, 'w') as f:
-                f.write("step,runtime," + ",".join(metrics_to_log) + '\n')
-        with open(log_path, 'a') as f:
-            f.write(f"{step},{runtime:.4f}," + ",".join([f"{to_log[m]:.4f}" for m in metrics_to_log]) + '\n')
+
+        frames = []
+        if os.path.exists(log_path):
+            try:
+                frames.append(pd.read_csv(log_path))
+            except Exception as e:   # unreadable log must not kill a training run
+                warnings.warn(f"could not read {log_path} ({e}); starting a new one")
+        frames.append(pd.DataFrame([row]))
+        pd.concat(frames, ignore_index=True).to_csv(log_path, index=False)
     
     def checkpoint_model(self, step, to_log, final=False):
         """Save ``_last``, ``_step_NNNN``, and (if improved) ``_best`` checkpoints.
