@@ -64,6 +64,83 @@ class PolicyMPNNvGRPO(PolicyMPNN):
         model.load_state_dict(ckpt["model_state_dict"], strict=False)
         return model.to(self.device)
 
+    def collect_rollout(self, init_state, feature_dict):
+        """Sample one rollout batch, optionally oversampling and selecting from it.
+
+        Sampling from MPNN is nearly free; folding is essentially the entire
+        cost of a step. So we can draw ``oversample x batch_size`` designs and
+        fold only ``batch_size`` of them, choosing which by one of the rules in
+        :mod:`cleo.design.utils.selection`. Configure with::
+
+            selection:
+              rule: maxmin          # or random / anchor_band / cluster_rep / ...
+              oversample: 4
+              ref_seqs: [...]       # required by the anchor-based rules
+              w_anchor: 1.0
+
+        Absent a ``selection`` block this is an ordinary rollout, so existing
+        configs are unaffected.
+
+        IMPORTANT -- this biases the gradient, deliberately. GRPO's advantage is
+        group-relative: the baseline is the mean reward over a batch drawn from
+        the current policy. A selected batch is not drawn from the policy, and
+        because the selection depends on the sampled actions themselves, the
+        importance ratios apply to a distribution we did not sample from. This
+        is a heuristic, not a correction, and the ``random`` rule at the same
+        oversample factor is the control that separates "diversity selection
+        helped" from "oversampling helped" -- without it the arm is
+        uninterpretable. Retrospective scoring on a finished run found every
+        diversity rule *worse than random* at recovering passing designs, so
+        the prior here is not favourable; the reason to run it anyway is that
+        GRPO wants reward variance within the group, which is a different
+        objective from library quality.
+        """
+        from cleo.design.utils.selection import RULES, Distances, consensus
+
+        h_V_in, h_E_in, E_idx_in = init_state
+        sel = getattr(self.cfg, "selection", None)
+        over = int(getattr(sel, "oversample", 1)) if sel else 1
+        rule = str(getattr(sel, "rule", "random")) if sel else None
+        if not sel or over <= 1:
+            return self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in), {}
+        if rule not in RULES:
+            raise ValueError(f"unknown selection rule {rule!r}; have {sorted(RULES)}")
+
+        B = self.cfg.batch_size
+        pool = B * over
+        # Only batch_size and randn are batch-shaped here; the rest are size-1
+        # and repeated inside rollout. Copy so the caller's dict is untouched.
+        fd = dict(feature_dict)
+        fd["batch_size"] = pool
+        fd["randn"] = torch.randn(
+            [pool, feature_dict["mask"].shape[1]], device=self.device
+        )
+        out = self.rollout(fd, h_V_in, h_E_in, E_idx_in)
+
+        chain_mask = (feature_dict["chain_labels"] == 0)[0]
+        seqs = self.reward_fn.get_sequences(out, chain_mask)
+
+        # Reseed per step: the stochastic rules pick an arbitrary first point,
+        # and a fixed seed would start every step's traversal from the same
+        # place in an otherwise different pool.
+        kw = {"seed": int(torch.randint(0, 2**31 - 1, (1,)).item())}
+        D = Distances(seqs)
+        if rule != "random":
+            refs = list(getattr(sel, "ref_seqs", []) or [])
+            if refs:
+                kw["anchor_d"] = D.to_seq(consensus(refs))
+            elif "anchor" in rule:
+                raise ValueError(f"selection rule {rule!r} needs `ref_seqs`")
+            kw["w_anchor"] = float(getattr(sel, "w_anchor", 1.0))
+        idx = torch.as_tensor(RULES[rule](D, B, **kw), device=self.device).long()
+
+        # Subset every batch-shaped tensor; leave scalars and size-1 entries.
+        out = {
+            k: (v[idx] if torch.is_tensor(v) and v.dim() and v.shape[0] == pool else v)
+            for k, v in out.items()
+        }
+        return out, {"selection_pool": pool, "selection_rule_is_random": rule == "random"}
+
     def train_step(self, step, init_state, feature_dict):
         """GRPO/DAPO update: collect one rollout batch, then perform
         ``N_updates`` clipped-surrogate gradient steps on random sub-batches.
@@ -79,8 +156,8 @@ class PolicyMPNNvGRPO(PolicyMPNN):
 
         # --- Collect experience (no gradients) ---
         with torch.no_grad():
-            h_V_in, h_E_in, E_idx_in = init_state
-            out = self.rollout(feature_dict, h_V_in, h_E_in, E_idx_in)
+            out, sel_log = self.collect_rollout(init_state, feature_dict)
+            to_log.update(sel_log)
 
             batched_rewards, metrics = self.reward_fn(step, out, feature_dict, self.device)
             to_log.update(metrics)
