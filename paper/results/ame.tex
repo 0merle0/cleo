@@ -1,0 +1,223 @@
+\section{Results: the AME benchmark (diversity at matched fidelity)}
+\label{sec:res:ame}
+
+\plan{\textbf{Claim.} On an established public benchmark, \cleo{} produces
+libraries with the sequence coverage of high-temperature LigandMPNN and the
+pass rate of low-temperature LigandMPNN --- a combination no single temperature
+achieves. \textbf{Why this section exists.} The three application sections rest
+on experimental assays that take months and cannot be re-run by a referee. This
+one is fully computational, uses a published benchmark and a published
+deposit, and can be reproduced end to end. It is the section that makes the
+method credible before any wet-lab claim is evaluated. Status:
+\statusscaffold{} --- the \cleo{} arm is measured, the temperature sweep is
+not yet run.}
+
+\subsection*{Block 1 --- Setup and the unit of comparison}
+
+We evaluate on the atomized motif enforcement (AME) benchmark introduced with
+RFdiffusion2, comprising 41 catalytic sites scaffolded into 100 backbones
+each. The published protocol assigns 8 LigandMPNN sequences per backbone and
+predicts each with 5 Chai models; a prediction succeeds when the motif
+all-atom RMSD to the design is below \SI{1.5}{\angstrom} and no backbone atom
+clashes with the ligand.
+
+\plan{The aggregation rule matters more than it looks and is easy to get wrong.
+We verified it against the deposit rather than assuming: the per-site number
+reported in \texttt{AME\_benchmark\_summary.csv} is the fraction of the 100
+backbones with \emph{at least one} passing prediction out of the 40, matching
+to zero error across all 41 sites and both methods. It is a best-of-40, not a
+mean over predictions. Scoring one prediction per sequence and comparing rates
+therefore understates a comparable method by roughly threefold --- in the
+deposit, only 36\,\% of the sequences that pass on some Chai model pass on all
+five. Every number below is on their unit.}
+
+\begin{planlist}
+  \item Pilot backbones: three drawn from the \texttt{pass} class, at
+        32/40, 28/40 and 10/40 passing predictions in the deposit.
+  \item Our predictor is AlphaFold3 rather than Chai; best-of-$N$ uses 5
+        diffusion samples per sequence.
+  \item \textbf{Caveat to resolve before submission.} RFdiffusion2 scores
+        against the unidealized, packed design; we score against the idealized
+        backbone. This is the leading explanation for two of the three pilot
+        backbones failing in our pipeline at the published temperature despite
+        passing in the deposit. Until it is closed, only the backbone that
+        reproduces (M0097) supports a head-to-head claim.
+\end{planlist}
+\todo{ame --- close the idealized/unidealized reference-structure discrepancy}
+
+\subsection*{Block 2 --- Low-temperature sampling returns one solution,
+sampled repeatedly}
+
+The incumbent protocol samples LigandMPNN at low temperature. On M0097 this
+yields a high pass rate --- 5 of 8 sequences --- but the five passing designs
+are \SI{79}{\percent} identical to one another and \SI{87}{\percent} identical
+to their own consensus. Under complete-linkage clustering they collapse to a
+\emph{single} cluster at every threshold down to \SI{50}{\percent} identity.
+The library is one solution measured five times, and the folding budget spent
+distinguishing its members buys nothing.
+
+Raising the temperature removes the redundancy and the signal together. At
+$T=1.0$ the same backbone yields sequences at \SI{31}{\percent} mutual identity
+and \emph{zero} passing designs out of eight. Diversity alone is not the
+objective; a library that cannot be filtered is not a library.
+
+\subsection*{Block 3 --- \cleo{} occupies the corner neither temperature
+reaches}
+
+\plan{Numbers below are measured. Best-of-5 AF3 diffusion samples, 8-sequence
+draws to match the benchmark unit, M0097.}
+
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Arm} & \textbf{Passing / 8} & \textbf{Distinct clusters / 8} &
+\textbf{Coverage vs.\ $T=1.0$} \\
+\midrule
+LigandMPNN $T=0.1$ & 5.0 & 1.0 & \SI{48}{\percent} \\
+LigandMPNN $T=1.0$ & 0.0 & --- & \SI{100}{\percent} \\
+\cleo{}-GRPO       & 3.1 & 3.1 & \SI{96}{\percent} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\plan{Coverage is the count of variable sequence positions at matched $n=8$,
+as a fraction of the $T=1.0$ value; the same ordering holds for per-position
+amino-acid count and entropy, where \cleo{} reaches \SIrange{72}{81}{\percent}
+and \SIrange{68}{78}{\percent} of $T=1.0$ across the three backbones. Report
+positional coverage rather than entropy in the main text and both in the
+supplement --- ``comparable coverage'' is defensible at
+\SIrange{90}{96}{\percent}, ``same coverage'' is not.}
+
+Two features of this table carry the claim. First, \cleo{} explores
+\SI{96}{\percent} of the sequence positions that $T=1.0$ explores while
+converting an unfilterable library into a filterable one. Second, for
+\cleo{} the passing count and the cluster count coincide: every passing design
+is its own solution, whereas the low-temperature arm returns five designs and
+one solution. Per unit of folding compute, \cleo{} returns roughly threefold
+more independent solutions.
+
+The two arms are not exploring the same region. Every passing \cleo{} design
+lies at least 104 mutations --- \SI{58}{\percent} of a 180-residue protein ---
+from the nearest passing low-temperature design, and the best \cleo{} design
+scores marginally better than the best low-temperature design
+(\SI{1.14}{\angstrom} vs.\ \SI{1.16}{\angstrom}). The neighborhood that
+LigandMPNN's likelihood concentrates on is one satisfying region among many,
+and there is no evidence it is the best one.
+
+\subsection*{Block 4 --- The training trajectory is the library}
+
+\plan{This is the reframing that removes a hyperparameter. Rather than adding
+an explicit diversity term to the reward, we treat every rollout sampled during
+training as a library candidate. Those sequences were already folded and scored
+to compute the reward, so the candidate pool is free: the library is a
+byproduct of training, not an additional expense.}
+
+Across 200 GRPO steps at 16 sequences per step, M0097 accumulates 3200 scored
+designs, of which 97 pass. Those 97 are \SI{33}{\percent} identical on average
+and resolve into 97 distinct clusters at \SI{90}{\percent} identity --- no two
+passing designs are near-duplicates. The count is still rising at the end of
+training rather than saturating.
+
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Cumulative folds} & \textbf{Unique passing} &
+\textbf{Clusters @\,\SI{90}{\percent} id} & \textbf{Distinct residue identities} \\
+\midrule
+400  & 14 & 14 & 848 \\
+800  & 51 & 51 & 1395 \\
+1600 & 85 & 85 & 1887 \\
+2400 & 90 & 90 & 1962 \\
+3200 & 97 & 97 & 2121 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\plan{Honest reading of the deceleration: the curve flattens between 1600 and
+2400 folds, but the cause is policy decay rather than exhaustion of sequence
+space. Batch diversity bottoms out at the performance peak (steps 36--45) and
+then rises while pass rate falls --- with \texttt{kl\_weight} at zero and a
+fixed-bounds reward whose within-batch spread collapses once median RMSD
+reaches \SIrange{2}{3}{\angstrom}, the policy drifts off its optimum rather
+than continuing to search. Rank-normalised rewards and early stopping are
+expected to keep the curve climbing; this is the ablation to run before the
+figure is final.}
+
+\plan{Pool numbers in this block are single-sample AF3 scores, because that is
+what training computed. They are \emph{not} interchangeable with the
+best-of-5 numbers in Block 3 and must not be placed on the same axis.}
+
+\subsection*{Block 4b --- Where in sequence space the passing designs sit}
+
+\plan{Generated by \texttt{paper/figures/ame\_pca.py}, which writes two
+figures because one projection cannot honestly carry both claims.
+
+\texttt{ame\_pca.svg} projects all arms into a single shared PCA of one-hot
+encoded sequences, with \cleo{} restricted to its peak window so that three
+\emph{policies} are compared at one point in training. The low-temperature arm
+appears as a tight knot displaced far along PC1; \cleo{} occupies a broad cloud
+whose passing designs are spread throughout it rather than concentrated at one
+edge.
+
+\texttt{ame\_pca\_drift.svg} is the control that keeps the first figure honest.
+PC1 of the \emph{pooled} trajectory correlates with training step at
+$r = +0.92$ to $+0.94$ on all three backbones, so most of the spread along that
+axis is drift over training, not diversity available from any single policy.
+That distinction is load-bearing: drift-derived spread is genuine library
+diversity when the library is assembled from the whole run, which is how we
+assemble ours (Block 4), but it is \emph{not} evidence that one policy is
+diverse. Reporting the pooled projection alone would conflate the two and
+overstate the result. Fit the shared projection across arms --- a per-arm PCA
+places every cloud at the origin and destroys the comparison.
+
+Two limitations to state in the caption. Explained variance is low
+(PC1 \SIrange{5}{9}{\percent}), which is expected for one-hot protein sequence
+and means the projection is a visual aid, not a metric --- all quantitative
+diversity claims use Hamming distance and cluster counts directly. And the
+baseline arms currently hold 8 sequences each, so their apparent compactness is
+partly small-$n$; the temperature sweep in Block 5 is what makes the clouds
+comparable.}
+\todo{ame --- rebuild PCA panels once the temperature sweep supplies matched $n$}
+
+\subsection*{Block 5 --- The temperature frontier}
+
+\plan{\textbf{The experiment that decides the section.} Sample the base
+LigandMPNN at $T \in \{0.1, 0.2, 0.3, 0.5, 0.7, 1.0\}$, fold a budget matched
+to the \cleo{} trajectory pool, and apply the identical library-selection
+procedure to every arm --- greedy maximum-diversity selection over the passing
+subset. Plot pass rate against passing-set diversity. The claim is that the
+baseline traces a frontier along which fidelity and coverage trade off
+one-for-one, and that \cleo{} sits above it.
+
+\textbf{This section fails if} the sweep reaches \cleo{}'s coverage at
+\cleo{}'s pass rate at some intermediate temperature. Then there is no frontier
+shift, only a reparameterisation, and the honest conclusion is that tuning
+temperature was sufficient all along. $T=0.2$ and $T=0.3$ are the dangerous
+points and must be run --- reporting only $T=0.1$ and $T=1.0$, the two
+endpoints we happen to have, would be selecting the comparison that flatters
+us.
+
+\textbf{Second prediction worth stating explicitly.} Low-temperature
+LigandMPNN should \emph{saturate}: past some fold count it re-emits sequences
+it has effectively already produced, so cumulative distinct solutions flatten
+and further compute buys nothing. Report the saturation fold count as a number.
+A visible plateau in the incumbent next to a still-climbing \cleo{} curve is
+``filtering is not search'' rendered as a single line.}
+\todo{ame --- run the $T$ sweep at matched fold budget; build the frontier panel}
+
+\subsection*{Block 6 --- Rescue of backbones the benchmark cannot solve}
+
+\plan{The strongest available result if it lands, and it is a clean one: the
+near-miss class. Three backbones sit at \SIrange{1.61}{1.69}{\angstrom}
+best-of-40 in the deposit --- \emph{zero} passing predictions, but only
+$\sim$\SI{0.15}{\angstrom} from threshold. A pass on any of them is a design
+the published pipeline cannot produce, with no reproduction confound, because
+there is no positive result of theirs for us to fail to reproduce.
+
+Present status: on the two pilot backbones our pipeline cannot reproduce,
+\cleo{} recovers 4 passing designs each from 3200 folds where every baseline
+arm returns zero. That is directionally right but too thin to build on, and it
+is confounded by the reference-structure issue in Block 1. The near-miss
+backbones are the experiment that makes this claim rather than hints at it ---
+they have not yet been trained.}
+\todo{ame --- train the three near-miss backbones; report rescue rate}

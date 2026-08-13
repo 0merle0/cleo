@@ -82,8 +82,54 @@ search" rendered as a single line.
 Report the saturation fold count as a number in the text.
 
 **Arms (all panels):** LigandMPNN at their published settings; T ∈ {0.1, 0.2,
-0.3, 0.5}; best-of-N rejection; filtered-SFT; CLEO-GRPO; CLEO-GRPO + diversity
-reward.
+0.3, 0.5, 0.7, 1.0}; best-of-N rejection; filtered-SFT; CLEO-GRPO.
+
+**Design change (supersedes the earlier plan): the diversity-reward arm is
+dropped, and the library is the training trajectory.** Rather than adding an
+explicit diversity term to the reward — a hyperparameter that has to be tuned
+and then defended — every rollout sampled during training is a library
+candidate. Those sequences were already folded to compute the reward, so the
+pool costs nothing extra and the library is a byproduct of training. Measured
+on M0097: 3200 scored designs, 97 passing, 97 distinct clusters at 90 % id,
+33 % mean identity, still climbing at the end of training. This removes a
+knob and makes the comparison to a temperature sweep exactly parallel — both
+arms are "sample a lot, then select."
+
+**Measured negative result, recorded so it is not re-derived.** Selecting
+*which* sequences to fold by greedy max-min (farthest-point) diversity is
+**worse than random** at every budget tested on the M0097 pool:
+
+| Budget | as-sampled | random | max-min |
+|---|---|---|---|
+| 800 | 51 passing | 25 | 6 |
+| 1600 | 85 passing | 46 | 10 |
+
+Max-min preferentially selects outliers, and outliers are exactly the designs
+least likely to pass; gating candidates to a high-quality band narrows but does
+not close the gap. Diversity-first acquisition is therefore not a viable way to
+spend fold budget. Its defensible use is post-hoc selection of an orderable
+subset from designs *already known to pass* — implemented in
+`experiments/ame/select_library.py`, which also supports an optional
+anchor term that maximises distance from the low-temperature consensus.
+
+Note this also means the diversity is essentially *free*: among passing designs
+the cluster count already equals the passing count, so there is nothing for a
+selection step to improve. Hits are the expensive quantity; diversity is not.
+
+### Panel 2E — PCA of occupied sequence space *(free; script written)*
+
+`paper/figures/ame_pca.py` writes two figures. `ame_pca.svg` projects all arms
+into one shared PCA with CLEO restricted to its peak window, so three
+*policies* are compared at one moment in training: the low-T arm is a tight
+displaced knot, CLEO a broad cloud with passing designs throughout.
+`ame_pca_drift.svg` is the honesty control — **PC1 of the pooled trajectory
+correlates with training step at r = +0.92…0.94**, so most of that axis is
+drift over training, not diversity available at any one step. Drift-derived
+spread is real library diversity under the trajectory-as-library framing but is
+*not* evidence a single policy is diverse; conflating the two would overstate
+the result and is the kind of thing a referee finds. Explained variance is 5–9 %,
+so the projection is a visual aid — every quantitative claim uses Hamming
+distance and cluster counts.
 
 **Unconvincing if:** the temperature sweep reaches the same diversity at the
 same pass rate. Then there is no frontier shift, only a reparameterisation, and

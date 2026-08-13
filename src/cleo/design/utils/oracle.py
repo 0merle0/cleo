@@ -11,6 +11,7 @@ Supported oracles:
 """
 
 import os
+import re
 import json
 import copy
 import subprocess
@@ -33,6 +34,46 @@ def _min_not_none(values):
     """
     vals = [v for v in values if v is not None]
     return min(vals) if vals else float("nan")
+
+
+_AF3_SAMPLE_DIR_RE = re.compile(r"seed-(\d+)_sample-(\d+)$")
+
+
+def _af3_sample_paths_from_output_folder(folder: str):
+    """
+    Resolve every diffusion sample written for one AF3 design folder.
+
+    With ``--num_diffusion_samples=N`` AF3 writes ``seed-<S>_sample-<K>/`` for
+    K in 0..N-1 alongside the top-level files, which hold whichever sample won
+    on ranking score. Scoring against the RFdiffusion2 benchmark needs all N,
+    not the winner: their success criterion is best-of-40 over 8 sequences x 5
+    Chai models, so a single prediction per sequence is a strictly harsher unit
+    and the two rates are not comparable.
+
+    Returns ``[(name, sample_index, seed, cif_path, conf_json_path), ...]``
+    sorted by sample index, or ``[]`` if the folder has no sample subdirectories
+    (``num_diffusion_samples=1`` runs predating this, which keep only the
+    top-level files -- callers fall back to
+    ``_af3_name_and_paths_from_output_folder`` there).
+    """
+    out = []
+    for sub in sorted(glob.glob(os.path.join(folder, "seed-*_sample-*"))):
+        m = _AF3_SAMPLE_DIR_RE.search(os.path.basename(sub))
+        if not m or not os.path.isdir(sub):
+            continue
+        seed, sample = int(m.group(1)), int(m.group(2))
+        conf_paths = sorted(glob.glob(os.path.join(sub, f"*{_AF3_CONF_SUFFIX}")))
+        if not conf_paths:
+            continue
+        conf_json_path = conf_paths[0]
+        base = os.path.basename(conf_json_path)[: -len(_AF3_CONF_SUFFIX)]
+        cif_path = os.path.join(sub, f"{base}_model.cif")
+        if not os.path.exists(cif_path):
+            continue
+        # `base` carries the seed/sample suffix; the design name does not.
+        name = base[: -len(f"_seed-{seed}_sample-{sample}")]
+        out.append((name, sample, seed, cif_path, conf_json_path))
+    return sorted(out, key=lambda r: r[1])
 
 
 def _af3_name_and_paths_from_output_folder(folder: str) -> tuple[str, str, str] | None:
@@ -321,12 +362,13 @@ def boltz_from_df(df_input, cfg, step_name="boltz"):
 
 
 # For running AlphaFold 3 via Apptainer container
-def make_af3_command(input_folder, output_folder, container_path, script_path, model_dir):
+def make_af3_command(input_folder, output_folder, container_path, script_path, model_dir,
+                     num_diffusion_samples=1):
     cmd = (
         f"apptainer run --nv {container_path} python {script_path}"
         f" --input_dir {input_folder} --output_dir {output_folder}"
         f" --run_data_pipeline=false --model_dir={model_dir}"
-        f" --num_diffusion_samples=1"
+        f" --num_diffusion_samples={int(num_diffusion_samples)}"
     )
     return cmd
 
@@ -338,8 +380,20 @@ def af3_from_df(df_input, cfg, step_name="af3"):
     If ``step.cfg.skip_run`` is true (or ``CLEO_AF3_SKIP_RUN`` is set), the container
     is not run; existing results under ``{rundir}/{step_name}/outputs/`` are read
     and merged so downstream eval steps (``dist_to_ref`` etc.) can be re-run cheaply.
+
+    ``num_diffusion_samples`` (default 1) folds each sequence N times in one AF3
+    call. With ``per_sample_rows`` also set, the returned frame carries one row
+    per (sequence, sample) with ``{step_name}_sample`` and ``{step_name}_seed``
+    columns, so a downstream metric step scores all N and the caller aggregates
+    (min RMSD, any-pass) itself. Left off, only the top-ranked sample is
+    returned and the row count is unchanged -- which is what training wants,
+    since a reward step must return one row per sampled sequence.
     """
     assert cfg.rundir is not None, "rundir must be specified in cfg"
+    n_samples = int(cfg.get("num_diffusion_samples", 1))
+    per_sample_rows = bool(cfg.get("per_sample_rows", False))
+    if per_sample_rows and n_samples < 2:
+        print(f"af3: per_sample_rows with num_diffusion_samples={n_samples} is a no-op.")
 
     outdir = f"{cfg.rundir}/{step_name}/outputs"
     inputdir = f"{cfg.rundir}/{step_name}/inputs"
@@ -387,7 +441,8 @@ def af3_from_df(df_input, cfg, step_name="af3"):
                     json.dump(_template, f, indent=4)
 
             _cmd = make_af3_command(
-                batch_folder, outdir, cfg.af3_container, cfg.af3_script, cfg.model_dir
+                batch_folder, outdir, cfg.af3_container, cfg.af3_script, cfg.model_dir,
+                num_diffusion_samples=n_samples,
             )
             cmd_list.append(_cmd)
 
@@ -420,7 +475,29 @@ def af3_from_df(df_input, cfg, step_name="af3"):
         f"{step_name}_interaction_pae_min": [],
     }
 
+    if per_sample_rows:
+        output_data[f"{step_name}_sample"] = []
+        output_data[f"{step_name}_seed"] = []
+
+    # One (name, cif, conf) record per row we intend to emit.
+    records = []
     for folder in output_folders:
+        samples = _af3_sample_paths_from_output_folder(folder) if per_sample_rows else []
+        if samples:
+            records.extend(
+                (name, cif, conf, sample, seed)
+                for name, sample, seed, cif, conf in samples
+            )
+            continue
+        if per_sample_rows:
+            # Asked for per-sample rows but the folder has no sample subdirs.
+            # Falling through to the top-level file would silently emit 1 row
+            # where N are expected, so the aggregation downstream would be a
+            # best-of-1 wearing a best-of-N label.
+            print(
+                f"Warning: no seed-*_sample-* subfolders in {folder!r}; "
+                "falling back to the top-ranked prediction for this design."
+            )
         paths = _af3_name_and_paths_from_output_folder(folder)
         if paths is None:
             b = os.path.basename(folder)
@@ -428,8 +505,9 @@ def af3_from_df(df_input, cfg, step_name="af3"):
                 f"Warning: no *_summary_confidences.json in output folder {folder!r} (basename {b!r}), skipping."
             )
             continue
+        records.append((*paths, 0, -1))
 
-        name, cif_path, conf_json_path = paths
+    for name, cif_path, conf_json_path, sample_idx, seed in records:
         if not os.path.exists(conf_json_path):
             # Should be redundant if paths came from a glob that includes this file
             print(f"Warning: confidence path missing for {name}, skipping.")
@@ -439,6 +517,9 @@ def af3_from_df(df_input, cfg, step_name="af3"):
             conf_data = json.load(f)
 
         output_data["name"].append(name)
+        if per_sample_rows:
+            output_data[f"{step_name}_sample"].append(sample_idx)
+            output_data[f"{step_name}_seed"].append(seed)
         output_data[f"{step_name}_path"].append(cif_path)
         output_data[f"{step_name}_ptm"].append(conf_data["ptm"])
         output_data[f"{step_name}_iptm"].append(conf_data["iptm"])
@@ -470,6 +551,10 @@ def af3_from_df(df_input, cfg, step_name="af3"):
 
     df_output = pd.DataFrame(output_data)
     df_output = _af3_canonicalize_output_names_to_input(df_input, df_output)
+    if per_sample_rows and not df_output.empty:
+        # Fans df_input out to one row per (sequence, diffusion sample). Sorted
+        # so the row order is reproducible across runs rather than glob order.
+        df_output = df_output.sort_values(["name", f"{step_name}_sample"])
     df_merged = pd.merge(df_input, df_output, on="name", how="inner")
     if len(df_merged) == 0 and len(df_input) > 0:
         in_names = df_input["name"].head(5).tolist()

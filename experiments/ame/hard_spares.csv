@@ -1,7 +1,0 @@
-benchmark,design_id,n_pred_pass,n_pred,clash_ok,best_rmsd,seq_pass_min,seq_equiv,islands,site_pass,pdb
-M0552_1fgh,rfflow_fixed-ligand_run_M0552_1fgh_cond23_91-atomized-bb-True,0,40,True,7.890069484710693,0,0.0,5.0,0.02,run_M0552_1fgh_cond23_91-atomized-bb-True.pdb
-M0078_1al6,rfflow_fixed-ligand_run_M0078_1al6_cond5_89-atomized-bb-True,0,40,True,7.569018363952637,0,0.0,5.0,0.07,run_M0078_1al6_cond5_89-atomized-bb-True.pdb
-M0732_1xs1,rfflow_fixed-ligand_run_M0732_1xs1_cond35_38-atomized-bb-True,0,40,True,7.3073530197143555,0,0.0,5.0,0.05,run_M0732_1xs1_cond35_38-atomized-bb-True.pdb
-M0349_1e3v,rfflow_fixed-ligand_run_M0349_1e3v_cond19_72-atomized-bb-True,0,40,True,8.733908653259277,0,0.0,4.0,0.13,run_M0349_1e3v_cond19_72-atomized-bb-True.pdb
-M0151_1q0n,rfflow_fixed-ligand_run_M0151_1q0n_cond12_26-atomized-bb-True,0,40,True,7.728569507598877,0,0.0,4.0,0.08,run_M0151_1q0n_cond12_26-atomized-bb-True.pdb
-M0129_1os7,rfflow_fixed-ligand_run_M0129_1os7_cond11_23-atomized-bb-True,0,40,True,6.694424152374268,0,0.0,4.0,0.2,run_M0129_1os7_cond11_23-atomized-bb-True.pdb

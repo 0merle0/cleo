@@ -9,8 +9,6 @@ cleo.egg-info/
 # Claude Code personal settings
 .claude/settings.local.json
 
-# AME pilot: extracted benchmark structures and run outputs (regenerate with
-# experiments/ame/select_targets.py + tar extraction from /net/lab/pub)
-experiments/ame/targets/
-experiments/ame/runs/
-experiments/ame/templates/
+# Experiment scratch space: run outputs, checkpoints, AF3 folds (~2 GB).
+# Not tracked by request -- promote anything worth keeping into src/ or paper/.
+experiments/
