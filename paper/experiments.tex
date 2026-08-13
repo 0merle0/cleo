@@ -139,8 +139,10 @@ E1  & \statusscaffold & Matched-fold head-to-head &
 E2  & \statusscaffold & Diversity yield curves &
       \cleo{} 3200 folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters,
       still climbing \\
-E3  & \statusblocked  & Rescue of the three near-miss backbones
-      (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) & \todoresult \\
+E3  & \statusscaffold & Rescue of the three near-miss backbones
+      (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) &
+      M0050: 1/1200 clears at \SI{1.477}{\angstrom}. \textbf{Marginal} ---
+      unreplicated, \num{30}$\times$ the fold budget. 2 backbones running \\
 E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
 E7  & \statusdone     & Effective library size &
       Unique mutations rarefied to $k{=}5$: \cleo{} 347 vs.\ $T{=}0.7$ 316
@@ -173,8 +175,11 @@ E15 & \statusdone     & Centering-weight sweep, $W$ in both directions &
       \textbf{Clean monotone dial:} $W$ from $-1$ to $+1$ moves mean distance to
       reference \numrange{31.5}{172.4} and library spread \numrange{32.9}{123.0},
       trading success \numrange{79}{0}\% \\
-E16 & \statusscaffold & In-training selection: no-oversample /
-      oversample+random / oversample+diverse & Running \\
+E16 & \statusdone     & In-training selection: no-oversample /
+      oversample+random / oversample+diverse &
+      \textbf{Negative, decisively:} \texttt{maxmin} passes \SI{4.6}{\percent}
+      vs random's \SI{36.7}{\percent}; total library coverage $1.57\times$
+      worse despite $1.43\times$ more diversity per design \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -779,3 +784,82 @@ these land in --- it discovers arms on disk, so it fills out as they finish.
 The KL gating defect noted under E17 \emph{has} been fixed --- a non-zero
 \texttt{kl\_weight} now implies the reference model --- since that one only ever
 silenced a penalty the config asked for.}
+
+\subsection*{E16 result --- selecting for diversity during training also fails}
+
+\plan{The prospective version of E9. Two 75-step arms on M0097, identical but
+for the rule used to pick which \numproduct{16} of an oversampled pool of
+\numproduct{64} get folded: uniform random, or greedy farthest-point
+(\texttt{maxmin}). Best-of-5 folding, so pass rates here are on the benchmark's
+unit and are not comparable to the single-sample E15 numbers.}
+
+\begin{center}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Rule} & \textbf{Pass rate} & \textbf{Passing} & \textbf{Spread} &
+$U$ & $U_{50}$ \\
+\midrule
+\texttt{random}  & \SI{36.7}{\percent} & 440 & 93.3  & 2423 & 1041 \\
+\texttt{maxmin}  & \SI{4.6}{\percent}  & 55  & 121.6 & 1545 & 1486 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The rule does exactly what it is designed to do and the design is still wrong.
+Per passing design, \texttt{maxmin} genuinely explores more mutational space ---
+$U_{50}$ of 1486 against 1041, a factor of $1.43$ at matched design count, and a
+spread of 121.6 against 93.3. It simply produces \emph{eight times fewer} such
+designs, so the library actually obtained covers 1545 distinct substitutions
+against random's 2423. Diversity per design is up $1.43\times$; total library
+coverage is down $1.57\times$.
+
+This is the same conclusion as E9 and a stronger version of it. E9 selected
+retrospectively from a finished pool, where the only cost was picking sequences
+that happened to fail. Selecting during training adds a second cost on top:
+because the selection depends on the sampled actions, the batch GRPO computes
+its group-relative baseline over is no longer a sample from the policy, so the
+importance ratios apply to a distribution that was never sampled --- the
+gradient is biased by construction, as the docstring on \texttt{collect\_rollout}
+warns. The \SI{36.7}{\percent} versus \SI{4.6}{\percent} gap is far too large to
+be selection cost alone.
+
+\textbf{Consequence.} Both the retrospective and the prospective experiment now
+say the same thing: deciding what to fold should be left to the policy. The
+defensible use of these rules remains post-hoc, choosing an orderable subset from
+designs already known to pass.
+
+\subsection*{E3 result --- a marginal rescue, not yet a claim}
+
+\plan{M0050\_1dbt\_cond2\_6, one of the three near-miss backbones the published
+benchmark scores at 0/40 with a best-of-40 motif RMSD of
+\SIrange{1.61}{1.69}{\angstrom}. 75 steps, batch 16, best-of-5.}
+
+Out of 1200 designs, \textbf{one} clears the benchmark criterion: motif RMSD
+\SI{1.477}{\angstrom}, no ligand clash. Median RMSD over the run is
+\SI{2.81}{\angstrom} and the clash term is never binding (\SI{100}{\percent}
+clash-free throughout, so it contributes nothing to the reward on this target).
+
+\plan{\textbf{This should not be reported as a rescue yet, for three reasons.}
+
+The margin is \SI{0.023}{\angstrom} inside a \SI{1.5}{\angstrom} cutoff, on a
+single design out of 1200. Nothing establishes that the same sequence re-folded
+under different AF3 seeds still clears it; the obvious check --- refold that one
+sequence at high $N$ and see what fraction of predictions pass --- has not been
+run, and until it has, this is one draw from a distribution straddling the
+threshold.
+
+The compute is not matched. The published 0/40 is 8 sequences $\times$ 5 models
+on one backbone. We folded 1200 designs at best-of-5, roughly \num{30} times the
+budget. ``Found one hit with \num{30}$\times$ the folds'' is a much weaker claim
+than a rescue, and the compute-matched comparison (E4) is the one that would
+settle it.
+
+The reference-structure question is still open. The published benchmark scores
+against the unidealised packed design; we score against the idealised
+\texttt{-atomized-bb-True.pdb}. That discrepancy already blocks M0904 and M0907
+from carrying any claim and it applies here too.
+
+What the result does support is the weaker and still useful statement that the
+policy reaches \SI{1.477}{\angstrom} on a backbone whose published best over 40
+predictions was \SI{1.61}{\angstrom} --- the geometry is reachable. Two further
+near-miss backbones are still running.}
