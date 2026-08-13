@@ -40,6 +40,15 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+# Three panels are compressed into a 6.5in text width, so each lands at ~2.2in
+# across. Type sized for the 15in canvas the figure is drawn on is illegible
+# after that reduction; these are chosen to survive it.
+plt.rcParams.update({
+    "font.size": 13, "axes.titlesize": 14, "axes.labelsize": 13,
+    "xtick.labelsize": 11, "ytick.labelsize": 11, "legend.fontsize": 10,
+    "figure.titlesize": 16, "axes.linewidth": 1.0,
+})
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -140,13 +149,13 @@ def _panel(ax, d, arms, title, Z):
         ax.scatter(f.pc1, f.pc2, s=5, c=color, linewidths=0,
                    alpha=min(0.6, max(0.08, 40 / max(len(f), 1))),
                    rasterized=True)
-        ax.scatter(p.pc1, p.pc2, s=34, c=color, alpha=0.95, linewidths=0.6,
+        ax.scatter(p.pc1, p.pc2, s=60, c=color, alpha=0.95, linewidths=0.6,
                    edgecolors="white", label=f"{arm} ({len(p)} pass)")
     v = Z.explained_variance_ratio_
-    ax.set_title(title, fontsize=10)
+    ax.set_title(title)
     ax.set_xlabel(f"PC1 ({100 * v[0]:.1f}%)")
     ax.set_ylabel(f"PC2 ({100 * v[1]:.1f}%)")
-    ax.legend(fontsize=7, frameon=False, loc="best")
+    ax.legend(frameon=False, loc="best", handletextpad=0.3, borderpad=0.2)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
 
@@ -172,7 +181,7 @@ def main():
         proj[bb] = fit_projection(d)
 
     # --- Figure 1: policy vs policy, GRPO restricted to its peak window ---
-    fig, axes = plt.subplots(1, len(data), figsize=(5.2 * len(data), 4.8),
+    fig, axes = plt.subplots(1, len(data), figsize=(5.2 * len(data), 5.4),
                              squeeze=False)
     for ax, bb in zip(axes[0], data):
         d = data[bb]
@@ -182,14 +191,14 @@ def main():
         _panel(ax, d[keep], arms, f"{bb.replace('run_', '')}\nGRPO steps {lo}-{hi}",
                proj[bb])
     fig.suptitle("Sequence space of a single policy "
-                 "(faint = sampled, solid = passing)", fontsize=11)
+                 "(faint = sampled, solid = passing)", fontsize=16)
     fig.tight_layout()
     save(fig, "ame_pca")
 
     # --- Figure 2: the drift axis, shown rather than hidden ---
     # Same projection as Figure 1, so the two panels can be read against each
     # other rather than each defining its own axes.
-    fig, axes = plt.subplots(1, len(data), figsize=(5.2 * len(data), 4.4),
+    fig, axes = plt.subplots(1, len(data), figsize=(5.2 * len(data), 5.0),
                              squeeze=False)
     for ax, bb in zip(axes[0], data):
         d = data[bb]
@@ -202,16 +211,15 @@ def main():
         m = traj.passing.values
         ax.scatter(P[m, 0], P[m, 1], s=30, facecolors="none",
                    edgecolors=PALETTE["red"], linewidths=0.8, label="passing")
-        ax.set_title(f"{bb.replace('run_', '')}\nPC1 vs training step: r = {r:+.2f}",
-                     fontsize=10)
+        ax.set_title(f"{bb.replace('run_', '')}\nPC1 vs step: r = {r:+.2f}")
         ax.set_xlabel(f"PC1 ({100 * Z.explained_variance_ratio_[0]:.1f}%)")
         ax.set_ylabel(f"PC2 ({100 * Z.explained_variance_ratio_[1]:.1f}%)")
-        ax.legend(fontsize=7, frameon=False)
+        ax.legend(frameon=False)
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
         fig.colorbar(sc, ax=ax, label="training step", fraction=0.046)
     fig.suptitle("Most of PC1 is drift over training, not diversity available "
-                 "at any one step", fontsize=11)
+                 "at any one step", fontsize=16)
     fig.tight_layout()
     save(fig, "ame_pca_drift")
 
