@@ -132,15 +132,16 @@ so it is recorded here rather than removed from the record.}
 \toprule
 \textbf{ID} & \textbf{Status} & \textbf{Experiment} & \textbf{Result} \\
 \midrule
-E1  & \statusscaffold & Matched-fold head-to-head &
+E1  & \statusdone     & Matched-fold head-to-head &
       Superseded by the per-sequence success rate (see \emph{Scoring protocol});
       M0097 best-of-5 at $n{=}96$: $T{=}0.2$ \SI{66.7}{\percent} at spread 47.8,
       \cleo{} peak \SI{37.5}{\percent} at 98.8. E10 is the comparison that
       counts \\
-E2  & \statusscaffold & Diversity yield curves &
-      \cleo{} 3200 folds $\rightarrow$ 97 passing $\rightarrow$ 97 clusters,
-      still climbing \\
-E3  & \statusscaffold & Rescue of the three near-miss backbones
+E2  & \statusdone     & Diversity yield curves &
+      3200 folds $\rightarrow$ \num{1349} unique passing (anchored),
+      \num{3045} substitutions = \SI{89}{\percent} of ceiling. Substitutions
+      saturate; sequences still climbing \\
+E3  & \statusdone     & Rescue of the three near-miss backbones
       (\SIrange{1.61}{1.69}{\angstrom} best-of-40, 0/40 published) &
       \textbf{M0365 \texttt{hit00} replicates 22/40}, median
       \SI{1.470}{\angstrom} (published 0/40, best \SI{1.69}{\angstrom}). Of 7
@@ -148,8 +149,9 @@ E3  & \statusscaffold & Rescue of the three near-miss backbones
       backbones trained; M0375 fails 0/40 \\
 E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
 E7  & \statusdone     & Effective library size &
-      Unique mutations rarefied to $k{=}5$: \cleo{} 347 vs.\ $T{=}0.7$ 316
-      ($1.10\times$); per fold budget $2.0\times$ \\
+      $U_{15}$: anchored \cleo{} 804 vs.\ $T{=}0.7$ 608 ($1.32\times$);
+      unanchored 507, \emph{below} the baseline. The anchor is what buys
+      per-design coverage \\
 E8  & ---             & Mutation-diversity reward &
       \textbf{Retired}, superseded by trajectory-as-library \\
 E9  & \statusdone     & Selection rules, retrospective &
@@ -162,9 +164,9 @@ E10 & \statusdone     & \textbf{Temperature sweep} $T \in \{0.1, \ldots, 1.0\}$;
       ($1.04\times$) --- the edge is pass rate, not exploration \\
 E11 & \statusdone     & Reward shaping: rank normalisation &
       Folded into every new arm; E15 trains stably under it \\
-E12 & \statusscaffold & Early stopping at ${\sim}75$ steps &
-      \textbf{Rule was fitted to a broken config} (see E17); rank-normalised
-      runs are still improving at step 75 \\
+E12 & \statusdone     & Early stopping at ${\sim}75$ steps &
+      \textbf{Rule was fitted to a broken config} (see E17). Corrected runs
+      improve to ${\sim}$step 150 and plateau; 75 stops far too early \\
 E17 & \statusdone     & \textbf{Convergence}: why the policy degrades after
       its peak &
       Reward range misallocated. Fixed objective converges to
@@ -283,7 +285,7 @@ This also supplies the honest version of the frontier: E10 sweeps the
 method's frontier against another's single point is the mistake the temperature
 sweep exists to avoid, and it would be the same mistake in reverse to report
 our best $W$ against their swept $T$.}
-\todo{experiments --- run E15 on M0097 once E11 rank-normalisation is validated}
+
 
 \subsection*{E14 result --- the embedding view qualifies the Hamming view}
 

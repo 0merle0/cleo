@@ -48,135 +48,152 @@ five. Every number below is on their unit.}
 \subsection*{Block 2 --- Low-temperature sampling returns one solution,
 sampled repeatedly}
 
-The incumbent protocol samples LigandMPNN at low temperature. On M0097 this
-yields a high pass rate --- 5 of 8 sequences --- but the five passing designs
-are \SI{79}{\percent} identical to one another and \SI{87}{\percent} identical
-to their own consensus. Under complete-linkage clustering they collapse to a
-\emph{single} cluster at every threshold down to \SI{50}{\percent} identity.
-The library is one solution measured five times, and the folding budget spent
-distinguishing its members buys nothing.
+The incumbent protocol samples LigandMPNN at low temperature. At $n = 96$ on
+M0097 this yields a high success rate --- \SI{58.3}{\percent} of sequences pass
+--- but the passing designs are a tight cluster: mean pairwise Hamming distance
+\num{40.6} out of $L = 180$, and \num{162} distinct substitutions among any 15 of
+them. The library is close to one solution measured many times, and most of the
+folding budget spent distinguishing its members buys little.
 
-Raising the temperature removes the redundancy and the signal together. At
-$T=1.0$ the same backbone yields sequences at \SI{31}{\percent} mutual identity
-and \emph{zero} passing designs out of eight. Diversity alone is not the
-objective; a library that cannot be filtered is not a library.
+Raising the temperature removes the redundancy and most of the signal with it.
+At $T = 1.0$ the same backbone reaches mean pairwise distance \num{126.3} at a
+success rate of \SI{4.2}{\percent}. Diversity alone is not the objective; a
+library that cannot be filtered is not a library.
 
-\subsection*{Block 3 --- \cleo{} occupies the corner neither temperature
-reaches}
+\plan{Two numbers here were wrong in earlier drafts and are corrected. $T = 1.0$
+was reported as \emph{zero} passing designs; that came from $n = 8$, and at
+$n = 96$ it passes \SI{4.2}{\percent} of the time. And the low-temperature arm
+was described as collapsing to a single cluster ``at every threshold down to
+\SI{50}{\percent} identity'' --- true at \SI{70}{\percent}, but at
+\SI{90}{\percent} every passing design is its own cluster and the statistic
+simply counts designs. Cluster counts are threshold-dependent and are no longer
+quoted; mean pairwise Hamming and the distinct-substitution count $U$ are
+threshold-free and replace them throughout.}
 
-\plan{Numbers below are measured. Best-of-5 AF3 diffusion samples, 8-sequence
-draws to match the benchmark unit, M0097.}
+\subsection*{Block 3 --- \cleo{} occupies the corner neither temperature reaches}
 
-\begin{center}
-\begin{tabular}{@{}lccc@{}}
+Sampling temperature traces a frontier: success falls as diversity rises, and
+every point on it is available to the incumbent by turning one knob. The claim
+of this section is that \cleo{} sits above that frontier, and the measurement is
+in Table~\ref{tab:ame-frontier}.
+
+\begin{table}[htbp]
+\centering
+\caption{M0097, per-sequence success rate on best-of-5 AF3 predictions, with
+diversity measured over the \emph{passing} designs only --- a library contains
+only what survives filtering. $U_{15}$ is the number of distinct
+(position, residue) substitutions in a library of 15 passing designs, rarefied
+over 300 draws so arms with different yields are comparable. Baselines are
+$n = 96$; \cleo{} arms are the final 40 steps of a 200-step run.}
+\label{tab:ame-frontier}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Arm} & \textbf{Passing / 8} & \textbf{Distinct clusters / 8} &
-\textbf{Coverage vs.\ $T=1.0$} \\
+\textbf{Arm} & \textbf{Success} & \textbf{Mean pairwise} & $U_{15}$ &
+\textbf{Median RMSD} \\
+             &                  & \textbf{Hamming}       &          &
+(\si{\angstrom}) \\
 \midrule
-LigandMPNN $T=0.1$ & 5.0 & 1.0 & \SI{48}{\percent} \\
-LigandMPNN $T=1.0$ & 0.0 & --- & \SI{100}{\percent} \\
-\cleo{}-GRPO       & 3.1 & 3.1 & \SI{96}{\percent} \\
+LigandMPNN $T{=}0.1$ & \SI{58.3}{\percent} & 40.6  & 162 & 1.42 \\
+LigandMPNN $T{=}0.2$ & \SI{66.7}{\percent} & 47.8  & 205 & 1.37 \\
+LigandMPNN $T{=}0.3$ & \SI{58.3}{\percent} & 57.9  & 274 & 1.31 \\
+LigandMPNN $T{=}0.5$ & \SI{34.4}{\percent} & 80.5  & 438 & 1.70 \\
+LigandMPNN $T{=}0.7$ & \SI{26.0}{\percent} & 100.5 & 608 & 1.88 \\
+LigandMPNN $T{=}1.0$ & \SI{4.2}{\percent}  & 126.3 & --- & 5.59 \\
+\midrule
+\cleo{}, no anchor         & \SI{83.1}{\percent} & 76.6 & 507 & 1.07 \\
+\textbf{\cleo{}, KL anchor} & \textbf{\SI{56.7}{\percent}} & \textbf{114.4} &
+  \textbf{804} & 1.44 \\
 \bottomrule
 \end{tabular}
-\end{center}
+\end{table}
 
-\plan{Coverage is the count of variable sequence positions at matched $n=8$,
-as a fraction of the $T=1.0$ value; the same ordering holds for per-position
-amino-acid count and entropy, where \cleo{} reaches \SIrange{72}{81}{\percent}
-and \SIrange{68}{78}{\percent} of $T=1.0$ across the three backbones. Report
-positional coverage rather than entropy in the main text and both in the
-supplement --- ``comparable coverage'' is defensible at
-\SIrange{90}{96}{\percent}, ``same coverage'' is not.}
+Interpolating the baseline frontier at the anchored arm's diversity, the
+incumbent succeeds \SI{14}{\percent} of the time where \cleo{} succeeds
+\SI{56.7}{\percent} --- $\mathbf{3.98\times}$. Read the other way, at \cleo{}'s
+success rate the incumbent reaches mean pairwise distance \num{59} against
+\cleo{}'s \num{114.4} --- $\mathbf{1.93\times}$. The anchored arm also carries
+more distinct substitutions per passing design than any baseline
+($U_{15} = 804$ against \num{608} at $T{=}0.7$), so this is a genuine
+exploration advantage and not only a higher yield.
 
-Two features of this table carry the claim. First, \cleo{} explores
-\SI{96}{\percent} of the sequence positions that $T=1.0$ explores while
-converting an unfilterable library into a filterable one. Second, for
-\cleo{} the passing count and the cluster count coincide: every passing design
-is its own solution, whereas the low-temperature arm returns five designs and
-one solution. Per unit of folding compute, \cleo{} returns roughly threefold
-more independent solutions.
+The unanchored arm is the instructive contrast. It reaches the highest success
+rate in the table, \SI{83.1}{\percent}, and the \emph{worst} per-design coverage
+of any \cleo{} arm --- $U_{15} = 507$, below $T{=}0.7$. Left unconstrained the
+policy converges onto a narrow solution. The KL weight against the base model is
+what holds the distribution open, and it is the control the library application
+needs.
 
-The two arms are not exploring the same region. Every passing \cleo{} design
-lies at least 104 mutations --- \SI{58}{\percent} of a 180-residue protein ---
-from the nearest passing low-temperature design, and the best \cleo{} design
-scores marginally better than the best low-temperature design
-(\SI{1.14}{\angstrom} vs.\ \SI{1.16}{\angstrom}). The neighborhood that
-LigandMPNN's likelihood concentrates on is one satisfying region among many,
-and there is no evidence it is the best one.
+Figure~\ref{fig:ame-distributions} shows why the success rate alone is not
+enough: on M0097 every \cleo{} arm has its \emph{median} below the
+\SI{1.5}{\angstrom} cutoff, so the mode has moved rather than the tail merely
+reaching across --- which is precisely what fails to hold on the near-miss
+backbones of Block 6.
 
 \subsection*{Block 4 --- The training trajectory is the library}
 
-\plan{This is the reframing that removes a hyperparameter. Rather than adding
-an explicit diversity term to the reward, we treat every rollout sampled during
+\plan{This is the reframing that removes a hyperparameter. Rather than adding an
+explicit diversity term to the reward, we treat every rollout sampled during
 training as a library candidate. Those sequences were already folded and scored
-to compute the reward, so the candidate pool is free: the library is a
-byproduct of training, not an additional expense.}
+to compute the reward, so the candidate pool is free: the library is a byproduct
+of training, not an additional expense.}
 
 Across 200 GRPO steps at 16 sequences per step, M0097 accumulates 3200 scored
-designs, of which 97 pass. Those 97 are \SI{33}{\percent} identical on average
-and resolve into 97 distinct clusters at \SI{90}{\percent} identity --- no two
-passing designs are near-duplicates. The count is still rising at the end of
-training rather than saturating.
+designs. Under the anchored policy \num{1349} of them are distinct passing
+sequences carrying \num{3045} distinct substitutions --- \SI{89}{\percent} of the
+$19L = 3420$ ceiling.
 
 \begin{center}
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Cumulative folds} & \textbf{Unique passing} &
-\textbf{Clusters @\,\SI{90}{\percent} id} & \textbf{Distinct residue identities} \\
+& \multicolumn{2}{c}{\textbf{\cleo{}, no anchor}} &
+  \multicolumn{2}{c}{\textbf{\cleo{}, KL anchor}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+\textbf{Cumulative folds} & \textbf{Unique passing} & \textbf{Substitutions} &
+\textbf{Unique passing} & \textbf{Substitutions} \\
 \midrule
-400  & 14 & 14 & 848 \\
-800  & 51 & 51 & 1395 \\
-1600 & 85 & 85 & 1887 \\
-2400 & 90 & 90 & 1962 \\
-3200 & 97 & 97 & 2121 \\
+400  & 75   & 1483 & 47   & 1382 \\
+800  & 284  & 2294 & 160  & 2045 \\
+1600 & 893  & 2805 & 510  & 2757 \\
+2400 & 1560 & 2974 & 903  & 2958 \\
+3200 & 2229 & 3040 & 1349 & 3045 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\plan{Honest reading of the deceleration: the curve flattens between 1600 and
-2400 folds, but the cause is policy decay rather than exhaustion of sequence
-space. Batch diversity bottoms out at the performance peak (steps 36--45) and
-then rises while pass rate falls --- with \texttt{kl\_weight} at zero and a
-fixed-bounds reward whose within-batch spread collapses once median RMSD
-reaches \SIrange{2}{3}{\angstrom}, the policy drifts off its optimum rather
-than continuing to search. Rank-normalised rewards and early stopping are
-expected to keep the curve climbing; this is the ablation to run before the
-figure is final.}
+The distinct-substitution count is genuinely saturating here, at
+\SIrange{89}{89}{\percent} of the ceiling, while the count of distinct passing
+sequences is still climbing steeply. The library is not running out of designs;
+it is running out of \emph{single} substitutions to explore, which is the
+expected behaviour once most positions have been visited and further diversity
+must come from combinations.
 
-\plan{Pool numbers in this block are single-sample AF3 scores, because that is
-what training computed. They are \emph{not} interchangeable with the
-best-of-5 numbers in Block 3 and must not be placed on the same axis.}
+\plan{This supersedes an earlier version of this table reporting 97 passing
+designs from 3200 folds, a factor of \num{14} to \num{23} lower. That run used
+the pre-audit objective, and its curve flattened because the policy decayed
+rather than because sequence space was exhausted --- the earlier draft said so
+and predicted rank normalisation would keep it climbing, which is what happened.
+The pool numbers here are best-of-5, matching Block 3; the superseded ones were
+single-sample and were not comparable to it.}
 
 \subsection*{Block 4b --- Where in sequence space the passing designs sit}
 
-\plan{Generated by \texttt{paper/figures/ame\_pca.py}, which writes two
-figures because one projection cannot honestly carry both claims.
+\plan{Generated by \texttt{paper/figures/ame\_pca.py}, which writes two figures
+because one projection cannot honestly carry both claims. The shared projection
+is fit across arms within a backbone --- a per-arm PCA places every cloud at the
+origin and destroys the comparison --- but deliberately not across backbones,
+where a global fit puts \SI{99}{\percent} of PC1 variance on backbone identity.
 
-\texttt{ame\_pca.svg} projects all arms into a single shared PCA of one-hot
-encoded sequences, with \cleo{} restricted to its peak window so that three
-\emph{policies} are compared at one point in training. The low-temperature arm
-appears as a tight knot displaced far along PC1; \cleo{} occupies a broad cloud
-whose passing designs are spread throughout it rather than concentrated at one
-edge.
+\textbf{These two panels are stale and must be regenerated.} They were built
+from the pre-audit runs and from baseline arms holding 8 sequences each. Both
+inputs have been replaced: the objective is fixed and the baselines are now
+$n = 96$. The drift control below remains the right control and its conclusion
+is unlikely to change, but no number in these captions should be quoted until
+they are rebuilt.
 
-\texttt{ame\_pca\_drift.svg} is the control that keeps the first figure honest.
-PC1 of the \emph{pooled} trajectory correlates with training step at
-$r = +0.92$ to $+0.94$ on all three backbones, so most of the spread along that
-axis is drift over training, not diversity available from any single policy.
-That distinction is load-bearing: drift-derived spread is genuine library
-diversity when the library is assembled from the whole run, which is how we
-assemble ours (Block 4), but it is \emph{not} evidence that one policy is
-diverse. Reporting the pooled projection alone would conflate the two and
-overstate the result. Fit the shared projection across arms --- a per-arm PCA
-places every cloud at the origin and destroys the comparison.
-
-Two limitations to state in the caption. Explained variance is low
-(PC1 \SIrange{5}{9}{\percent}), which is expected for one-hot protein sequence
-and means the projection is a visual aid, not a metric --- all quantitative
-diversity claims use Hamming distance and cluster counts directly. And the
-baseline arms currently hold 8 sequences each, so their apparent compactness is
-partly small-$n$; the temperature sweep in Block 5 is what makes the clouds
-comparable.}
+Explained variance is low (PC1 \SIrange{5}{9}{\percent}), as expected for
+one-hot protein sequence, so the projection is a visual aid; every quantitative
+diversity claim in this section uses Hamming distance and substitution counts
+directly.}
 
 \begin{figure}[htbp]
   \centering
@@ -220,47 +237,63 @@ comparable.}
   \label{fig:ame-pca-drift}
 \end{figure}
 
-\todo{ame --- rebuild PCA panels once the temperature sweep supplies matched $n$}
+\todo{ame --- rebuild both PCA panels on the corrected runs at matched $n$}
 
 \subsection*{Block 5 --- The temperature frontier}
 
-\plan{\textbf{The experiment that decides the section.} Sample the base
-LigandMPNN at $T \in \{0.1, 0.2, 0.3, 0.5, 0.7, 1.0\}$, fold a budget matched
-to the \cleo{} trajectory pool, and apply the identical library-selection
-procedure to every arm --- greedy maximum-diversity selection over the passing
-subset. Plot pass rate against passing-set diversity. The claim is that the
-baseline traces a frontier along which fidelity and coverage trade off
-one-for-one, and that \cleo{} sits above it.
+Measured, and reported in Table~\ref{tab:ame-frontier}. Two predictions stated
+in advance were tested.
 
-\textbf{This section fails if} the sweep reaches \cleo{}'s coverage at
-\cleo{}'s pass rate at some intermediate temperature. Then there is no frontier
-shift, only a reparameterisation, and the honest conclusion is that tuning
-temperature was sufficient all along. $T=0.2$ and $T=0.3$ are the dangerous
-points and must be run --- reporting only $T=0.1$ and $T=1.0$, the two
-endpoints we happen to have, would be selecting the comparison that flatters
-us.
+\textbf{The dangerous intermediate temperatures do not close the gap.} $T=0.2$
+and $T=0.3$ were named as the points that would refute a frontier shift if
+either reached \cleo{}'s coverage at \cleo{}'s success rate. Neither does: both
+sit below \num{0.6} of the anchored arm's diversity. The frontier shift stands.
 
-\textbf{Second prediction worth stating explicitly.} Low-temperature
-LigandMPNN should \emph{saturate}: past some fold count it re-emits sequences
-it has effectively already produced, so cumulative distinct solutions flatten
-and further compute buys nothing. Report the saturation fold count as a number.
-A visible plateau in the incumbent next to a still-climbing \cleo{} curve is
-``filtering is not search'' rendered as a single line.}
-\todo{ame --- run the $T$ sweep at matched fold budget; build the frontier panel}
+\textbf{One prediction was wrong.} The trade-off was expected to be monotone in
+temperature; it is not. $T=0.2$ is the \emph{most} successful arm in the table
+at \SI{66.7}{\percent}, above $T=0.1$'s \SI{58.3}{\percent}, while also being
+more diverse. $T=0.2$, not $T=0.1$, is therefore the incumbent to quote at the
+low-diversity end, and any comparison against $T=0.1$ alone flatters us.
+
+\plan{Still outstanding from this block's original plan: the saturation fold
+count for low-temperature LigandMPNN --- the point past which it re-emits
+sequences it has effectively already produced. The \cleo{} side of that
+comparison is Block 4; the baseline side needs a cumulative-distinct curve at
+matched budget, which the $n = 96$ sweep can supply but does not yet.}
 
 \subsection*{Block 6 --- Rescue of backbones the benchmark cannot solve}
 
-\plan{The strongest available result if it lands, and it is a clean one: the
-near-miss class. Three backbones sit at \SIrange{1.61}{1.69}{\angstrom}
-best-of-40 in the deposit --- \emph{zero} passing predictions, but only
-$\sim$\SI{0.15}{\angstrom} from threshold. A pass on any of them is a design
-the published pipeline cannot produce, with no reproduction confound, because
-there is no positive result of theirs for us to fail to reproduce.
+Three backbones sit at \SIrange{1.61}{1.69}{\angstrom} best-of-40 in the deposit
+--- zero passing predictions, but only ${\sim}\SI{0.15}{\angstrom} $ from
+threshold. A pass on any of them is a design the published pipeline cannot
+produce, with no reproduction confound, because there is no positive result of
+theirs for us to fail to reproduce.
 
-Present status: on the two pilot backbones our pipeline cannot reproduce,
-\cleo{} recovers 4 passing designs each from 3200 folds where every baseline
-arm returns zero. That is directionally right but too thin to build on, and it
-is confounded by the reference-structure issue in Block 1. The near-miss
-backbones are the experiment that makes this claim rather than hints at it ---
-they have not yet been trained.}
-\todo{ame --- train the three near-miss backbones; report rescue rate}
+All three were trained for 75 steps at batch 16. Nine designs cleared the
+criterion. \textbf{Each was then refolded 40 times --- the published
+per-backbone budget --- and one survives.} M0365 \texttt{hit00} passes
+\num{22} of \num{40} predictions with a \emph{median} RMSD of
+\SI{1.470}{\angstrom}, below the cutoff rather than touching it, on a backbone
+the deposit scores 0/40 with a best of \SI{1.69}{\angstrom}. That is a design
+the published pipeline does not produce.
+
+The other eight do not survive. Five pass zero of 40; three pass one or two.
+Training-time margin predicts this almost perfectly: the single design with a
+margin above \SI{0.03}{\angstrom} inside the cutoff is the single design that
+replicates, and everything at \SIrange{0.003}{0.023}{\angstrom} was a tail draw
+from a distribution whose median sits near \SI{3}{\angstrom}
+(Figure~\ref{fig:ame-distributions}, right).
+
+\plan{\textbf{The honest claim is one rescue, not nine}, and the general lesson
+is worth more than the rescue: a best-of-$N$ filter applied to a distribution
+whose mode is far from the cutoff selects excursions, not solutions. A design
+that truly passes 1 in 40 times is flagged by a best-of-5 filter about
+\SI{12}{\percent} of the time it is folded. Every headline number that leaves
+this section should be replicated the way \texttt{hit00} was, and in-training
+pass rates should be described as counts of best-of-$N$ events rather than of
+reproducible designs.
+
+Two caveats remain open. The fold budget is not matched --- 1200 designs at
+best-of-5 against the deposit's 8 sequences at 5 models --- so a compute-matched
+comparison is still owed. And the idealised-versus-unidealised reference
+structure question from Block 1 applies here as it does everywhere.}
