@@ -123,6 +123,17 @@ policy converges onto a narrow solution. The KL weight against the base model is
 what holds the distribution open, and it is the control the library application
 needs.
 
+Sweeping that weight over $\{0, 0.005, 0.01, 0.02, 0.05, 0.1\}$ shows it is a
+well-behaved control with an interior optimum rather than a knob that has to be
+tuned. Success falls monotonically, \SIrange{83}{10}{\percent}, and per-design
+coverage rises monotonically, $U_{15}$ \numrange{510}{881}; the total distinct
+substitutions a library actually contains is the product of the two and is flat
+within noise across $w \in [0.01, 0.05]$ (\numrange{2480}{2501}) before
+collapsing to \num{1743} at $w = 0.1$, where too few designs pass for
+per-design exploration to accumulate. The value used throughout,
+$w = \num{0.02}$, sits in the middle of that plateau, so the reported numbers do
+not depend on having found a sharp optimum.
+
 Figure~\ref{fig:ame-distributions} shows why the success rate alone is not
 enough: on M0097 every \cleo{} arm has its \emph{median} below the
 \SI{1.5}{\angstrom} cutoff, so the mode has moved rather than the tail merely

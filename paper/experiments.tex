@@ -173,9 +173,13 @@ E17 & \statusdone     & \textbf{Convergence}: why the policy degrades after
       \SI{79}{\percent} but \textbf{entropy collapses} 1.7$\to$1.06;
       \texttt{kl\_weight} 0.02 holds it at 1.65 and gives the best library
       ($3.94\times$ baseline success at matched diversity) \\
-E13 & \statusscaffold & \textbf{KL-weight sweep} (was: consensus anchoring)
+E13 & \statusdone     & \textbf{KL-weight sweep} (was: consensus anchoring)
       --- promoted by the A/B result &
-      $w \in \{0, 0.005, 0.01, 0.02, 0.05, 0.1\}$; 0 and 0.02 done, 4 running \\
+      \textbf{Monotone dial, with an interior optimum:} $w$ trades success
+      \numrange{83}{10}\% against per-design coverage $U_{15}$
+      \numrange{510}{881}, but total library coverage $U$ is
+      \emph{unimodal} --- flat at ${\sim}2500$ for $w \in [0.01, 0.05]$ and
+      collapsing to 1743 at $w{=}0.1$. \num{0.02} sits in the plateau \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
       $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
@@ -1008,3 +1012,72 @@ Two caveats. \SI{42.5}{\percent} against \SI{79.2}{\percent} at matched steps is
 a real cost, and only a sweep says whether \num{0.02} is near the right place on
 that trade-off. And the anchored arm is still improving at step 194, so its
 numbers are a lower bound rather than a converged result.}
+
+\subsection*{E13 result --- the anchor has an interior optimum, and 0.02 is in it}
+
+Both caveats above are now settled. The anchored arm did keep improving: run to
+200 steps it reaches \SI{56.7}{\percent} over its final 40, not the
+\SI{42.5}{\percent} measured mid-climb, so the cost of anchoring is roughly half
+what that snapshot implied. And the sweep answers where to put $w$.
+
+\begin{table}[h]\centering
+\caption{KL weight against the reference policy. All arms: M0097, 200 steps,
+identical otherwise; statistics over the final 40 steps (640 designs).
+Diversity is computed on \emph{passing, deduplicated} designs only. $U$ is
+distinct (position, residue) substitutions in that set; $U_{15}$ rarefies it to
+15 designs so libraries of different size are comparable.}
+\label{tab:e13}
+\begin{tabular}{lrrrrrr}
+\toprule
+$w$ & Passing (\%) & Median RMSD (\AA) & Entropy & Passing seqs & $U$ & $U_{15}$ \\
+\midrule
+0     & 83.1 & 1.07 & 0.99 & 532 & 2109 & 510 \\
+0.005 & 81.1 & 1.22 & 1.15 & 519 & 2230 & 562 \\
+0.01  & 57.7 & 1.45 & 1.54 & 369 & \textbf{2498} & 760 \\
+0.02  & 56.7 & 1.44 & 1.65 & 363 & \textbf{2501} & 808 \\
+0.05  & 40.5 & 1.63 & 1.78 & 259 & \textbf{2480} & 858 \\
+0.10  & 10.2 & 2.14 & 1.85 &  65 & 1743 & \textbf{881} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]\centering
+  \includegraphics[width=\textwidth]{figures/pdf/ame_klsweep.pdf}
+  \caption{\textbf{The KL anchor has an interior optimum.} \textbf{Left:} the
+  trade-off the anchor moves along --- success rate against per-design coverage
+  $U_{15}$, one point per weight. \textbf{Right:} total distinct substitutions
+  $U$, the product of the two effects, which is flat across
+  $w \in [0.01, 0.05]$ and collapses at $w = 0.1$. Drawn as two panels rather
+  than one with two $y$-axes: success and $U_{15}$ have unrelated scales, so on
+  a dual axis the apparent crossing point could be placed anywhere by choosing
+  the scales. Encoding: $w$ is an ordinal ladder and gets one hue ramped light
+  to dark; \num{0.02} takes the accent hue as the recommended default, not as
+  another rung.}
+  \label{fig:ame-klsweep}
+\end{figure}
+
+Two quantities move in opposite directions and it matters which one the library
+cares about. Success rate falls monotonically, \SIrange{83}{10}{\percent}.
+Per-design coverage $U_{15}$ rises monotonically, \numrange{510}{881}. Neither
+is the objective on its own: what a library needs is the \emph{total} number of
+distinct substitutions it actually contains, and that is $U$, which is the
+product of the two effects and therefore \textbf{unimodal}. It is flat within
+noise across $w \in [0.01, 0.05]$ --- 2498, 2501, 2480 --- and falls off a cliff
+at $w = 0.1$, where the anchor is strong enough that only \SI{10}{\percent} of
+designs pass and there are too few of them to cover anything, despite each one
+being the most exploratory in the sweep.
+
+So the answer to the question E17 left open is that \num{0.02} is in the
+plateau, not on a slope, and the choice within $[0.01, 0.05]$ is a genuine free
+parameter rather than a tuned one --- it buys per-design coverage
+(\numrange{760}{858}) with success rate (\SIrange{58}{41}{\percent}) at
+constant total yield. \num{0.02} is a defensible default because it sits in the
+middle of the flat region.
+
+\textbf{Read the $w{=}0.1$ arm as a failure, not as an endpoint.} Its trajectory
+does not converge: binned pass rate runs 4.5, 5.0, 6.2, 7.8, 7.0, 11.5, 15.5,
+6.5 --- it is still wandering at step 200. The anchor is strong enough to
+prevent the policy from moving, so its high entropy is inherited from the
+reference rather than earned. That is the opposite failure from the unanchored
+arm's collapse, and it is why $U$ rather than entropy is the right summary: both
+extremes look good on exactly one of the two component metrics.
