@@ -145,7 +145,7 @@ E3  & \statusscaffold & Rescue of the three near-miss backbones
       \textbf{M0365 \texttt{hit00} replicates 22/40}, median
       \SI{1.470}{\angstrom} (published 0/40, best \SI{1.69}{\angstrom}). Of 7
       training hits only 1 survives $N{=}40$; M0050 fails (1/40). All 3
-      backbones trained; M0375 replication running \\
+      backbones trained; M0375 fails 0/40 \\
 E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
 E7  & \statusdone     & Effective library size &
       Unique mutations rarefied to $k{=}5$: \cleo{} 347 vs.\ $T{=}0.7$ 316
@@ -821,7 +821,7 @@ M0050\_1dbt & 0/40, \SI{1.61}{\angstrom} & 1 / 1200 & \SI{1.477}{\angstrom} &
   \SI{0.023}{\angstrom} & \SI{2.81}{\angstrom} \\
 M0365\_1pfk & 0/40, \SI{1.69}{\angstrom} & \textbf{6 / 1200} &
   \textbf{\SI{1.273}{\angstrom}} & \SI{0.227}{\angstrom} & \SI{3.12}{\angstrom} \\
-M0375\_4ts9 & 0/40 & 2 / 1200 & \SI{1.493}{\angstrom} &
+M0375\_4ts9 & 0/40, --- & 2 / 1200 & \SI{1.493}{\angstrom} &
   \SI{0.007}{\angstrom} & \SI{3.00}{\angstrom} \\
 \bottomrule
 \end{tabular}
@@ -833,9 +833,8 @@ sitting on the threshold. M0365 contributes six distinct sequences, the best at
 \SI{1.273}{\angstrom}, a margin ten times larger and well clear of the
 prediction noise that makes M0050 unreadable. M0375 contributes two designs at \SI{1.4926}{\angstrom} and
 \SI{1.4968}{\angstrom} --- margins of \SI{0.007}{\angstrom} and
-\SI{0.003}{\angstrom}, thinner even than M0050's, and on the replication
-evidence below almost certainly tail draws (their $N = 40$ check is running).
-If any of the three becomes a rescue claim it is M0365.
+\SI{0.003}{\angstrom}, thinner even than M0050's. Both fail replication outright
+(below). Of the three backbones only M0365 carries a claim.
 
 On all three targets the clash term is never binding (\SI{100}{\percent}
 clash-free throughout), so the composite criterion reduces to motif RMSD alone
@@ -869,15 +868,19 @@ the pass fraction counted.
 \end{tabular}
 \end{center}
 
-Of seven designs that cleared the criterion during training, \textbf{one}
-reproduces robustly. \texttt{hit00} passes \num{22} of \num{40} predictions with
+M0375's two hits were checked the same way and pass \textbf{0/40} each, with
+best refold RMSDs of \SI{1.577}{\angstrom} and \SI{1.658}{\angstrom} --- both
+above the cutoff. Across all three backbones, nine designs cleared the criterion
+during training and \textbf{one} reproduces robustly. \texttt{hit00} passes \num{22} of \num{40} predictions with
 a \emph{median} RMSD of \SI{1.470}{\angstrom} --- below the cutoff, not merely
 touching it --- on a backbone the published benchmark scores 0/40 with a best of
 \SI{1.69}{\angstrom}. That is a real result and the one worth reporting.
 
-Three of the seven pass \emph{zero} of 40 on refolding. M0050's single hit
-passes 1/40, exactly the tail draw its \SI{0.023}{\angstrom} margin predicted;
-the M0050 rescue does not survive and should be dropped.
+Five of the nine pass \emph{zero} of 40 on refolding. M0050's single hit passes
+1/40, exactly the tail draw its \SI{0.023}{\angstrom} margin predicted; neither
+the M0050 nor the M0375 rescue survives and both should be dropped. Margin at
+training time predicts replication well: the only design with a margin above
+\SI{0.03}{\angstrom} is the only one that reproduces.
 
 \plan{\textbf{The general lesson matters more than the rescue.} These seven were
 selected \emph{because} they passed, so they are the winners of a noisy filter
@@ -902,10 +905,7 @@ reference-structure question still blocks M0904 and M0907.}
 \subsection*{A/B result --- the fixes work, and the failure mode inverts}
 
 \plan{Four 200-step arms on M0097, each one fix further than the last, all with
-rank normalisation and best-of-5 folding. Compared at a matched window (steps
-70--109, 640 designs each) because the arms did not all reach step 200 together;
-ratios are against the $n = 96$ baseline frontier from E10, interpolated on its
-monotone branch ($T \ge 0.3$).}
+rank normalisation and best-of-5 folding.}
 
 \begin{center}
 \begin{tabular}{@{}lccccrr@{}}
@@ -913,14 +913,18 @@ monotone branch ($T \ge 0.3$).}
 \textbf{Arm} & \textbf{Success} & \textbf{Entropy} & \textbf{Spread} &
 $U_{15}$ & \textbf{succ.} & \textbf{div.} \\
 \midrule
-legacy objective   & \SI{53.9}{\percent} & 1.08 & 79.5  & 540 & $1.52\times$ & $1.28\times$ \\
-$+$ surrogate fix  & \SI{75.9}{\percent} & 1.27 & 93.3  & 624 & $2.62\times$ & $1.61\times$ \\
-$+$ log-prob fix   & \SI{79.2}{\percent} & 1.06 & 80.1  & 518 & $2.27\times$ & $1.38\times$ \\
-$+$ KL anchor      & \SI{42.5}{\percent} & \textbf{1.61} & \textbf{110.9} &
-  \textbf{782} & $2.47\times$ & $1.52\times$ \\
+legacy objective   & \SI{78.0}{\percent} & 0.88 & 69.8  & 470 & $1.71\times$ & $1.21\times$ \\
+$+$ surrogate fix  & \SI{88.8}{\percent} & 1.09 & 82.6  & 575 & $2.65\times$ & $1.43\times$ \\
+$+$ log-prob fix   & \SI{83.1}{\percent} & 0.99 & 76.6  & 507 & $2.16\times$ & $1.32\times$ \\
+$+$ KL anchor      & \SI{56.7}{\percent} & \textbf{1.65} & \textbf{114.4} &
+  \textbf{804} & $\mathbf{3.98\times}$ & $\mathbf{1.93\times}$ \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+All four arms completed 200 steps; statistics are over their final 40 (640
+designs each), with ratios against the $n = 96$ baseline frontier interpolated
+on its monotone branch ($T \ge 0.3$).
 
 \textbf{The divergence is gone.} Every corrected arm converges: success climbs
 monotonically and stays climbing, where the original run peaked at
@@ -928,8 +932,21 @@ monotonically and stays climbing, where the original run peaked at
 \texttt{legacy\_surrogate} arm converges, because it still carries rank
 normalisation --- which confirms the E17 diagnosis that the reward's compressed
 dynamic range, not the surrogate, was the primary cause of the collapse. The
-surrogate and advantage bugs cost roughly a factor of \num{1.7} in success on
-top of it (\SIrange{53.9}{75.9}{\percent}).
+surrogate and advantage bugs cost real performance on top of it:
+\SIrange{78.0}{88.8}{\percent} success, and a $1.71\times$ to $2.65\times$ jump
+in the frontier ratio.
+
+\plan{\textbf{That last comparison is not yet trustworthy and must not be
+reported as a finding.} Training is unseeded --- no \texttt{manual\_seed}
+anywhere in the pipeline --- so every run is a different random trajectory and
+there is exactly one run per arm. Nothing here separates a
+\SIrange{88.8}{83.1}{\percent} difference from run-to-run variance. The
+legacy-to-surrogate step (\SIrange{78.0}{88.8}{\percent}) is large enough and
+mechanistically clear enough to survive that doubt; the surrogate-to-log-prob
+step is not. Two further replicates of each are running, which will give $n = 3$
+on exactly that comparison. Until they land the defensible claim is that the
+surrogate and advantage fixes help substantially and the log-prob fix is
+\emph{not shown} to help.}
 
 \textbf{But the failure mode inverts.} Entropy no longer rises; it falls, from
 ${\sim}1.7$ to 1.06 in the fully corrected arm. Having fixed a policy that
@@ -937,15 +954,15 @@ diffused outward until it was useless, we now have one that converges onto a
 narrow solution: \SI{79.2}{\percent} success at spread 80.1 and $U_{15} = 518$,
 which is \emph{below} $T{=}0.7$'s 608. On per-design coverage the corrected
 policy without an anchor is worse than a high-temperature baseline. Sharpening
-the gradient made this worse, not better --- the log-prob fix buys
-\SI{3}{\percent} more success while dropping entropy 1.27 to 1.06, exactly what a
-more accurate gradient should do to an unconstrained optimiser.
+the gradient did not help: the log-prob fix arm is \emph{behind} the
+surrogate-only arm on every column at step 200 --- \SI{83.1}{\percent} against
+\SI{88.8}{\percent}, entropy 0.99 against 1.09, $U_{15}$ 507 against 575.
 
 \textbf{The KL anchor is the knob against it.} At
 $\texttt{kl\_weight} = 0.02$ entropy stays flat across the whole run (1.68 to
 1.65) instead of collapsing, and the library is the best of any arm: $U_{15} =
 782$, \num{1.51} times the unanchored arm and \num{1.29} times $T{=}0.7$, at
-spread 110.9. Both arms have now finished 200 steps; over their final 40 the anchored arm
+spread 110.9. Over its final 40 steps the anchored arm
 reaches \SI{56.7}{\percent} success at spread 114.4 with $U_{15} = 804$ ---
 $\mathbf{3.98\times}$ the baseline success at matched diversity and
 $\mathbf{1.93\times}$ the baseline diversity at matched success --- against the
