@@ -183,6 +183,12 @@ E13 & \statusdone     & \textbf{KL-weight sweep} (was: consensus anchoring)
       \numrange{510}{881}, but total library coverage $U$ is
       \emph{unimodal} --- flat at ${\sim}2500$ for $w \in [0.01, 0.05]$ and
       collapsing to 1743 at $w{=}0.1$. \num{0.02} sits in the plateau \\
+E18 & \statusscaffold  & \textbf{Selection sweep at 128$\to$16} --- six rules on
+      two axes, promoted by the E16 diagnosis &
+      Tests whether E16's negative was about \emph{selection} or about
+      \emph{selecting on distance}. Adds three log-prob-directed rules using a
+      signal no earlier rule could see. \texttt{random} at matched oversample
+      is the control \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
       $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
@@ -819,6 +825,64 @@ be selection cost alone.
 say the same thing: deciding what to fold should be left to the policy. The
 defensible use of these rules remains post-hoc, choosing an orderable subset from
 designs already known to pass.
+
+\subsection*{E18 --- was E16's negative about selection, or about selecting on
+distance?}
+
+\plan{Pre-registered. Six 150-step arms on M0097, identical but for the rule
+used to pick which \numproduct{16} of an oversampled pool of \numproduct{128}
+get folded. Predictions are recorded here \emph{before} the runs finish so the
+result can falsify them rather than be read post hoc.}
+
+E16 established that picking designs to fold by farthest-point traversal is
+much worse than picking them at random --- \SI{4.6}{\percent} passing against
+\SI{36.7}{\percent}. But it lost for a diagnosable reason: \texttt{maxmin} is
+drawn to sequences that are distant \emph{because they are degenerate}. On a
+synthetic pool built with a degenerate low-probability tail, \SI{94}{\percent}
+of its picks come from that tail. That diagnosis implicates the axis, not the
+idea: every rule available to E16 scored on sequence distance alone, and the
+policy's own log-probability of each sampled sequence --- computed during the
+rollout, free to reuse --- is a quality signal none of them could see.
+
+\begin{center}
+\begin{tabular}{@{}llp{7.4cm}@{}}
+\toprule
+\textbf{Rule} & \textbf{Axis} & \textbf{Prediction} \\
+\midrule
+\texttt{random}        & control  & The bar. At matched oversample, so the arm
+  separates ``this rule helped'' from ``oversampling helped'' \\
+\texttt{logprob\_strat} & quality & \textbf{Best, or the only rule to beat
+  random.} Targets reward spread \emph{within the group}, which is what the
+  group-relative baseline divides by \\
+\texttt{logprob\_top}   & quality & Folds excellent designs and stalls anyway,
+  because the group's reward spread collapses. If it trains well, the
+  group-baseline story is wrong \\
+\texttt{logprob\_band}  & hybrid  & The targeted repair of E16: same diversity
+  objective, degenerate sequences removed from the pool first \\
+\texttt{maxmin}         & distance & Loses again, harder --- a larger pool has a
+  more extreme tail to walk to \\
+\texttt{cluster\_rep}   & distance & Also loses. On synthetic pools it takes
+  \SI{94}{\percent} of its picks from the degenerate tail too, so
+  ``bounded'' was never the operative property \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The bias is instrumented rather than corrected.} As in E16 the selected
+batch is not a draw from the policy, so the importance ratios apply to a
+distribution that was never sampled. Two diagnostics now record what that
+costs. \texttt{sel\_logp\_shift} is how far the rule moved the batch in the
+policy's own measure --- the pool's rewards are never observed, since only the
+\numproduct{16} are folded, so a selected-versus-pool \emph{reward} gap is not
+computable and this is the honest substitute. \texttt{reward\_std} is the
+spread the group-relative advantage actually divides by, and it is the test of
+whether a rule bought the thing it was chosen for, independently of whether the
+run ends up better.
+
+\plan{Cost note: folding is \numproduct{16} designs $\times$ 5 diffusion
+samples per step regardless of the oversample factor, so runtime scales with
+\texttt{N\_steps} and not with the pool. Raising \numrange{64}{128} is close to
+free.}
 
 \subsection*{E3 result --- two backbones reach the cutoff, one convincingly}
 

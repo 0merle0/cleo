@@ -167,14 +167,46 @@ class PolicyMPNNvGRPO(PolicyMPNN):
             elif "anchor" in rule:
                 raise ValueError(f"selection rule {rule!r} needs `ref_seqs`")
             kw["w_anchor"] = float(getattr(sel, "w_anchor", 1.0))
+
+        # Per-sequence log-probability under the policy that drew it, summed
+        # over designed positions only. Free -- the rollout already computed it.
+        seq_mask = torch.nn.functional.one_hot(out["S"], out["log_probs"].shape[-1])
+        logp_tok = (out["log_probs"] * seq_mask.float()).sum(-1)
+        cm = out.get("chain_mask")
+        cm = cm.float() if cm is not None else torch.ones_like(logp_tok)
+        if cm.dim() == 1:
+            cm = cm.unsqueeze(0).expand_as(logp_tok)
+        logp = (logp_tok * cm).sum(-1)
+        kw["logp"] = logp.detach().float().cpu().numpy()
+        for opt in ("lo", "hi", "n_bins"):
+            if getattr(sel, opt, None) is not None:
+                kw[opt] = getattr(sel, opt)
+
         idx = torch.as_tensor(RULES[rule](D, B, **kw), device=self.device).long()
+
+        # How far the selection moved off-policy, in the policy's own measure.
+        # The pool's rewards are never observed -- only the selected 16 get
+        # folded -- so a selected-vs-pool *reward* gap is not computable. This
+        # is the honest substitute: a rule that leaves the log-prob distribution
+        # alone has not moved the sampling distribution much, and one that
+        # shifts it by several nats has, whatever it did to diversity.
+        lp = kw["logp"]
+        sel_log = {
+            "selection_pool": pool,
+            "selection_rule_is_random": rule == "random",
+            "sel_logp_mean": float(lp[idx.cpu().numpy()].mean()),
+            "pool_logp_mean": float(lp.mean()),
+            "sel_logp_shift": float(lp[idx.cpu().numpy()].mean() - lp.mean()),
+            "sel_logp_std": float(lp[idx.cpu().numpy()].std()),
+            "pool_logp_std": float(lp.std()),
+        }
 
         # Subset every batch-shaped tensor; leave scalars and size-1 entries.
         out = {
             k: (v[idx] if torch.is_tensor(v) and v.dim() and v.shape[0] == pool else v)
             for k, v in out.items()
         }
-        return out, {"selection_pool": pool, "selection_rule_is_random": rule == "random"}
+        return out, sel_log
 
     def advantage(self, rewards):
         """Standardised advantage for a group of rollouts. -> tensor like `rewards`.
@@ -215,6 +247,12 @@ class PolicyMPNNvGRPO(PolicyMPNN):
             batched_rewards, metrics = self.reward_fn(step, out, feature_dict, self.device)
             to_log.update(metrics)
             to_log["reward"] = batched_rewards.mean().cpu().item()
+            # The quantity GRPO actually divides by. Selection is being asked to
+            # raise this -- a group whose rewards are identical carries no
+            # gradient however good the designs are -- so it is the diagnostic
+            # that says whether a rule did the thing it was chosen to do,
+            # independently of whether the run ends up better.
+            to_log["reward_std"] = batched_rewards.std().cpu().item()
             if "p_omit" in out:
                 # Mass the policy places on tokens omit_AA forbids. Should stay
                 # flat; a rising trace means the ratio correction is being
