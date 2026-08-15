@@ -36,14 +36,36 @@ five. Every number below is on their unit.}
         32/40, 28/40 and 10/40 passing predictions in the deposit.
   \item Our predictor is AlphaFold3 rather than Chai; best-of-$N$ uses 5
         diffusion samples per sequence.
-  \item \textbf{Caveat to resolve before submission.} RFdiffusion2 scores
-        against the unidealized, packed design; we score against the idealized
-        backbone. This is the leading explanation for two of the three pilot
-        backbones failing in our pipeline at the published temperature despite
-        passing in the deposit. Until it is closed, only the backbone that
-        reproduces (M0097) supports a head-to-head claim.
+  \item \textbf{Caveat to resolve before submission.} Our implementation of the
+        one predictor-free benchmark quantity, \texttt{ligand\_dist\_des\_ncac\_min},
+        does not reproduce the published values: median absolute error
+        \SI{0.42}{\angstrom} over 40 backbones, \emph{zero} exact matches. Since
+        it shares parsing and superposition code with the motif RMSD, the
+        absolute values are not yet comparable to theirs. Until it is closed,
+        only the backbone that reproduces (M0097) supports a head-to-head claim.
+  \item \textbf{This is a metric-definition gap, not a reference-structure
+        gap.} An earlier draft attributed it to our scoring against the
+        idealized backbone where RFdiffusion2 scores against the unidealized,
+        packed design. That explanation is now excluded by direct measurement.
+        We recovered every candidate design structure from the authors'
+        \SI{177}{\giga\byte} benchmark archive --- idealized, unidealized,
+        LigandMPNN-packed, LigandMPNN input backbone --- and all four give the
+        same distance to within \SI{0.01}{\angstrom} while all four miss the
+        published value by ${\sim}\SI{0.42}{\angstrom}$. The authors' own
+        \texttt{metrics\_cache} confirms the mechanism could not have worked:
+        idealization displaces atoms by \SI{0.097}{\angstrom} mean and
+        \SI{0.274}{\angstrom} max, an order of magnitude too small. Atom-subset
+        and motif-inclusion variants are likewise excluded.
 \end{planlist}
-\todo{ame --- close the idealized/unidealized reference-structure discrepancy}
+\todo{ame --- reproduce \texttt{ligand\_dist\_des\_ncac\_min} exactly; needs
+  \texttt{per\_sequence\_metrics.py}, which is not in the deposit (outputs
+  only). Structure hypothesis falsified 2026-08-15 --- do not retry it.}
+
+\plan{\textbf{Scope of this caveat.} It bounds only whether our absolute
+numbers may be set beside the published ones. Every comparison the paper
+actually makes --- \cleo{} against LigandMPNN, the temperature ladder, the KL
+sweep, the objective ablation --- runs through a single pipeline with a single
+reference, and none of them is affected.}
 
 \subsection*{Block 2 --- Low-temperature sampling returns one solution,
 sampled repeatedly}
