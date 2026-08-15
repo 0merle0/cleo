@@ -100,9 +100,9 @@ LigandMPNN $T{=}0.5$ & \SI{34.4}{\percent} & 80.5  & 438 & 1.70 \\
 LigandMPNN $T{=}0.7$ & \SI{26.0}{\percent} & 100.5 & 608 & 1.88 \\
 LigandMPNN $T{=}1.0$ & \SI{4.2}{\percent}  & 126.3 & --- & 5.59 \\
 \midrule
-\cleo{}, no anchor         & \SI{83.1}{\percent} & 76.6 & 507 & 1.07 \\
+\cleo{}, no anchor         & \SI{83.1}{\percent} & 76.6 & 510 & 1.07 \\
 \textbf{\cleo{}, KL anchor} & \textbf{\SI{56.7}{\percent}} & \textbf{114.4} &
-  \textbf{804} & 1.44 \\
+  \textbf{808} & 1.44 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -113,12 +113,12 @@ incumbent succeeds \SI{14}{\percent} of the time where \cleo{} succeeds
 success rate the incumbent reaches mean pairwise distance \num{59} against
 \cleo{}'s \num{114.4} --- $\mathbf{1.93\times}$. The anchored arm also carries
 more distinct substitutions per passing design than any baseline
-($U_{15} = 804$ against \num{608} at $T{=}0.7$), so this is a genuine
+($U_{15} = 808$ against \num{608} at $T{=}0.7$), so this is a genuine
 exploration advantage and not only a higher yield.
 
 The unanchored arm is the instructive contrast. It reaches the highest success
 rate in the table, \SI{83.1}{\percent}, and the \emph{worst} per-design coverage
-of any \cleo{} arm --- $U_{15} = 507$, below $T{=}0.7$. Left unconstrained the
+of any \cleo{} arm --- $U_{15} = 510$, below $T{=}0.7$. Left unconstrained the
 policy converges onto a narrow solution. The KL weight against the base model is
 what holds the distribution open, and it is the control the library application
 needs.

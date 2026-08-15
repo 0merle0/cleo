@@ -149,8 +149,8 @@ E3  & \statusdone     & Rescue of the three near-miss backbones
       backbones trained; M0375 fails 0/40 \\
 E4  & \statusblocked  & Compute efficiency; cross-cutting over E1--E3 & \todoresult \\
 E7  & \statusdone     & Effective library size &
-      $U_{15}$: anchored \cleo{} 804 vs.\ $T{=}0.7$ 608 ($1.32\times$);
-      unanchored 507, \emph{below} the baseline. The anchor is what buys
+      $U_{15}$: anchored \cleo{} 808 vs.\ $T{=}0.7$ 608 ($1.33\times$);
+      unanchored 510, \emph{below} the baseline. The anchor is what buys
       per-design coverage \\
 E8  & ---             & Mutation-diversity reward &
       \textbf{Retired}, superseded by trajectory-as-library \\
@@ -172,7 +172,10 @@ E17 & \statusdone     & \textbf{Convergence}: why the policy degrades after
       Reward range misallocated. Fixed objective converges to
       \SI{79}{\percent} but \textbf{entropy collapses} 1.7$\to$1.06;
       \texttt{kl\_weight} 0.02 holds it at 1.65 and gives the best library
-      ($3.94\times$ baseline success at matched diversity) \\
+      ($3.98\times$ baseline success at matched diversity). \textbf{Seed
+      replicates ($n{=}3$) retract the log-prob-fix comparison}: the gap was
+      noise and reverses sign ($p = 0.60$); the fix is kept on correctness
+      grounds, not performance \\
 E13 & \statusdone     & \textbf{KL-weight sweep} (was: consensus anchoring)
       --- promoted by the A/B result &
       \textbf{Monotone dial, with an interior optimum:} $w$ trades success
@@ -540,7 +543,13 @@ throughout --- the reward cannot see the degradation at all.
   catastrophic folds --- and GRPO divides its advantage by that spread.
   \textbf{Bottom right:} the same trajectories in the entropy--success plane,
   coloured by step on one shared scale. Value normalisation walks right and
-  down, rank normalisation left and up.}
+  down, rank normalisation left and up. Direct labels are omitted in this panel
+  because the corrected arms all terminate in the same corner; the legend
+  carries identity. \textbf{Seed replicates} ($n = 3$, thin lines behind the
+  mean) are shown for the two contested arms. Their bands overlap almost
+  entirely, which is the visual form of the result in the A/B section: the
+  apparent gap between ``$+$ surrogate fix'' and ``$+$ log-prob fix'' is
+  narrower than the run-to-run variation within either.}
   \label{fig:ame-convergence}
 \end{figure}
 
@@ -914,16 +923,16 @@ reference-structure question still blocks M0904 and M0907.}
 rank normalisation and best-of-5 folding.}
 
 \begin{center}
-\begin{tabular}{@{}lccccrr@{}}
+\begin{tabular}{@{}lcccrcrr@{}}
 \toprule
 \textbf{Arm} & \textbf{Success} & \textbf{Entropy} & \textbf{Spread} &
-$U_{15}$ & \textbf{succ.} & \textbf{div.} \\
+$U$ & $U_{15}$ & \textbf{succ.} & \textbf{div.} \\
 \midrule
-legacy objective   & \SI{78.0}{\percent} & 0.88 & 69.8  & 470 & $1.71\times$ & $1.21\times$ \\
-$+$ surrogate fix  & \SI{88.8}{\percent} & 1.09 & 82.6  & 575 & $2.65\times$ & $1.43\times$ \\
-$+$ log-prob fix   & \SI{83.1}{\percent} & 0.99 & 76.6  & 507 & $2.16\times$ & $1.32\times$ \\
+legacy objective   & \SI{78.0}{\percent} & 0.88 & 69.8  & 1879 & 467 & $1.71\times$ & $1.21\times$ \\
+$+$ surrogate fix  & \SI{88.8}{\percent} & 1.09 & 82.6  & 2286 & 575 & $2.65\times$ & $1.43\times$ \\
+$+$ log-prob fix   & \SI{83.1}{\percent} & 0.99 & 76.6  & 2109 & 510 & $2.16\times$ & $1.32\times$ \\
 $+$ KL anchor      & \SI{56.7}{\percent} & \textbf{1.65} & \textbf{114.4} &
-  \textbf{804} & $\mathbf{3.98\times}$ & $\mathbf{1.93\times}$ \\
+  \textbf{2501} & \textbf{808} & $\mathbf{3.98\times}$ & $\mathbf{1.93\times}$ \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -942,37 +951,75 @@ surrogate and advantage bugs cost real performance on top of it:
 \SIrange{78.0}{88.8}{\percent} success, and a $1.71\times$ to $2.65\times$ jump
 in the frontier ratio.
 
-\plan{\textbf{That last comparison is not yet trustworthy and must not be
-reported as a finding.} Training is unseeded --- no \texttt{manual\_seed}
-anywhere in the pipeline --- so every run is a different random trajectory and
-there is exactly one run per arm. Nothing here separates a
-\SIrange{88.8}{83.1}{\percent} difference from run-to-run variance. The
-legacy-to-surrogate step (\SIrange{78.0}{88.8}{\percent}) is large enough and
-mechanistically clear enough to survive that doubt; the surrogate-to-log-prob
-step is not. Two further replicates of each are running, which will give $n = 3$
-on exactly that comparison. Until they land the defensible claim is that the
-surrogate and advantage fixes help substantially and the log-prob fix is
-\emph{not shown} to help.}
+\textbf{That last comparison was held back pending replication, and replication
+killed it.} Training is unseeded --- no \texttt{manual\_seed} anywhere in the
+pipeline --- so every run is a different trajectory, and the table above has
+$n = 1$ per arm. Two further replicates of each of the two contested arms give
+$n = 3$ on exactly that comparison:
+
+\begin{center}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Arm ($n=3$)} & \textbf{Success} & \textbf{Entropy} & $U$ & $U_{15}$ \\
+\midrule
+$+$ surrogate fix (no log-prob fix) & $86.0 \pm 4.7$ & $1.06 \pm 0.04$ &
+  $2225 \pm 57$ & $544 \pm 31$ \\
+$+$ log-prob fix                    & $88.3 \pm 4.9$ & $0.92 \pm 0.10$ &
+  $2074 \pm 61$ & $485 \pm 53$ \\
+\midrule
+Welch $p$                           & 0.60 & 0.13 & 0.036 & 0.19 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The \SIrange{88.8}{83.1}{\percent} gap was seed noise, and it does not merely
+shrink --- it \emph{reverses} sign, to \SI{88.3}{\percent} against
+\SI{86.0}{\percent}, at $p = 0.60$. Within-arm spread is ${\pm}5$ points, which
+is larger than the effect it was being asked to support. Refusing to report that
+difference was correct.
+
+What survives is weaker and points the other way: the log-prob fix costs total
+coverage, $U$ \numrange{2225}{2074} at a nominal $p = 0.036$. That is one of four
+metrics tested and does not survive a multiplicity correction, so it is a hint
+rather than a result --- but every diversity column leans the same direction and
+none of them favours the fix.
+
+\textbf{The log-prob fix is nonetheless kept, because it is a correctness fix
+and not a performance one.} It makes the scored distribution match the
+distribution actually sampled from; without it the ratio in the surrogate is not
+a likelihood ratio between the two policies, so the clipping bounds do not mean
+what PPO/DAPO says they mean and the objective is not the one we claim to
+optimise. A known-wrong gradient is not made right by scoring two points higher
+on one metric, and given the measured seed variance those two points are not
+even evidence. This is worth stating plainly because it is the one place in the
+audit where the corrected code does not beat the buggy code on the headline
+number.
+
+\plan{Whether the coverage cost is real needs $n \gtrsim 8$ per arm to resolve,
+which is not currently worth the GPU time: the KL anchor moves $U_{15}$ by
+\num{300}, and this effect, if it exists at all, is \num{60}.}
 
 \textbf{But the failure mode inverts.} Entropy no longer rises; it falls, from
 ${\sim}1.7$ to 1.06 in the fully corrected arm. Having fixed a policy that
 diffused outward until it was useless, we now have one that converges onto a
 narrow solution: \SI{79.2}{\percent} success at spread 80.1 and $U_{15} = 518$,
 which is \emph{below} $T{=}0.7$'s 608. On per-design coverage the corrected
-policy without an anchor is worse than a high-temperature baseline. Sharpening
-the gradient did not help: the log-prob fix arm is \emph{behind} the
-surrogate-only arm on every column at step 200 --- \SI{83.1}{\percent} against
-\SI{88.8}{\percent}, entropy 0.99 against 1.09, $U_{15}$ 507 against 575.
+policy without an anchor is worse than a high-temperature baseline. Crucially,
+this is true of \emph{both} corrected arms and all six replicates --- mean
+$U_{15}$ is 544 and 485, both well under 608 --- so it is a property of the
+fixed objective rather than of any one run. Sharpening the gradient does not
+rescue it: no version of the correct objective, anchored or not, explores enough
+on its own.
 
 \textbf{The KL anchor is the knob against it.} At
 $\texttt{kl\_weight} = 0.02$ entropy stays flat across the whole run (1.68 to
 1.65) instead of collapsing, and the library is the best of any arm: $U_{15} =
 782$, \num{1.51} times the unanchored arm and \num{1.29} times $T{=}0.7$, at
 spread 110.9. Over its final 40 steps the anchored arm
-reaches \SI{56.7}{\percent} success at spread 114.4 with $U_{15} = 804$ ---
+reaches \SI{56.7}{\percent} success at spread 114.4 with $U_{15} = 808$ ---
 $\mathbf{3.98\times}$ the baseline success at matched diversity and
 $\mathbf{1.93\times}$ the baseline diversity at matched success --- against the
-unanchored arm's \SI{83.1}{\percent} at spread 76.6, $U_{15} = 507$
+unanchored arm's \SI{83.1}{\percent} at spread 76.6, $U_{15} = 510$
 ($2.16\times$ / $1.32\times$). Entropy settles at 1.65 versus 0.99.
 
 \begin{figure}[htbp]
@@ -1000,7 +1047,7 @@ unanchored arm's \SI{83.1}{\percent} at spread 76.6, $U_{15} = 507$
 \plan{This supersedes the E10 comparison, whose \cleo{} row came from the
 uncorrected objective and gave $1.40\times$ / $1.31\times$. It also repairs the
 concession forced by the E10 rarefaction: with an anchor, \cleo{} no longer
-merely passes more often at an equal exploration rate --- $U_{15} = 807$ against
+merely passes more often at an equal exploration rate --- $U_{15} = 808$ against
 $T{=}0.7$'s 608 is a genuine per-design coverage advantage, which the unanchored
 arm does not have.
 

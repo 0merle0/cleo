@@ -101,24 +101,46 @@ def main():
         "rank norm (75 steps)": AME / "centering" / "run_M0097_1ctt_cond9_14_centre_w0.0",
     }
     # Any A/B arms that have started writing metrics.
-    # The ablation ladder, each rung one fix further than the last.
+    # The ablation ladder, each rung one fix further than the last. Seed
+    # replicates (_r2, _r3) collapse onto their parent arm rather than becoming
+    # their own lines: they are the *same* configuration, so drawing them
+    # separately would read as six distinct treatments and hide the thing they
+    # actually measure, which is how much of the gap between arms is seed noise.
     LABEL = {"legacy": "legacy objective", "surr": "+ surrogate fix",
              "": "+ log-prob fix", "kl": "+ KL anchor (0.02)"}
+    reps = {}
     for p in sorted(AME.glob("centering/run_M0097_1ctt_cond9_14_conv200*")):
-        key = p.name.split("conv200")[-1].strip("_")
-        runs[LABEL.get(key, key)] = p
+        # `_?r\d+$` not `_r\d+$`: the leading underscore is already stripped, so
+        # the bare replicate `conv200_r2` arrives as "r2" and must map to the
+        # unsuffixed arm "". "surr" is safe -- it ends in `r` but has no digits.
+        key = re.sub(r"_?r\d+$", "", p.name.split("conv200")[-1].strip("_"))
+        reps.setdefault(LABEL.get(key, key), []).append(p)
+    for k, v in reps.items():
+        runs[k] = v
 
     # A run needs a few bins before its trajectory means anything; arms that
     # have only just started would otherwise contribute a single point and, via
     # the shared colour scale, squash the step range for everyone else.
+    # data[k] = (mean-over-replicates trajectory, [per-replicate trajectories]).
+    # A single-run arm is just the degenerate case with one replicate.
     data = {}
     for k, v in runs.items():
-        d = load(v)
-        if d is None:
+        ts = []
+        for p in (v if isinstance(v, list) else [v]):
+            d = load(p)
+            if d is None:
+                continue
+            t = binned(d)
+            if len(t) >= 3:
+                ts.append(t)
+        if not ts:
             continue
-        t = binned(d)
-        if len(t) >= 3:
-            data[k] = t
+        # Average on the shared step grid; replicates are the same length here,
+        # but truncating to the shortest keeps a still-running replicate from
+        # dragging the mean off the end of the others.
+        n = min(len(t) for t in ts)
+        mean = sum(t.iloc[:n].reset_index(drop=True) for t in ts) / len(ts)
+        data[k] = (mean, ts)
     if not data:
         raise SystemExit("no runs found")
 
@@ -133,8 +155,14 @@ def main():
     # --- the failure, and its signature ------------------------------------
     for ax, col, lab in [(axes[0][0], "pass_pct", "Passing designs (%)"),
                          (axes[0][1], "entropy", "Positional entropy (nats)")]:
-        for (k, t), c in zip(data.items(), colors):
-            ax.plot(t.step, t[col], "o-", color=c, label=k, lw=1.8, ms=4)
+        for (k, (t, ts)), c in zip(data.items(), colors):
+            # Individual seeds behind the mean, so the reader can see directly
+            # how wide run-to-run variation is relative to the gaps between arms.
+            for r in (ts if len(ts) > 1 else []):
+                ax.plot(r.step, r[col], "-", color=c, lw=0.8, alpha=0.35, zorder=1)
+            n = f"  ($n$={len(ts)})" if len(ts) > 1 else ""
+            ax.plot(t.step, t[col], "o-", color=c, label=k + n, lw=1.8, ms=4,
+                    zorder=2)
         ax.set_xlabel("training step")
         ax.set_ylabel(lab)
         for side in ("top", "right"):
@@ -170,15 +198,16 @@ def main():
     # One normalisation across every arm, so a point's colour means the same
     # training step in all of them -- otherwise a short run and a long one get
     # the same colour ramp over different step ranges and the panel misleads.
-    smax = max(t.step.max() for t in data.values())
+    smax = max(t.step.max() for t, _ in data.values())
     nrm = matplotlib.colors.Normalize(vmin=0, vmax=smax)
-    for (k, t), c in zip(data.items(), colors):
+    for (k, (t, _ts)), c in zip(data.items(), colors):
         ax.plot(t.entropy, t.pass_pct, "-", color=c, lw=1.5, alpha=0.7)
         ax.scatter(t.entropy, t.pass_pct, c=t.step, cmap="viridis", norm=nrm,
                    s=42, zorder=3, edgecolors=c, linewidths=1.2)
-        ax.annotate(k, (t.entropy.iloc[-1], t.pass_pct.iloc[-1]),
-                    textcoords="offset points", xytext=(6, -4), fontsize=8,
-                    color=c, fontweight="bold")
+        # No direct labels here. The corrected arms all terminate in the same
+        # top-left corner, so end-of-trajectory labels pile up on each other and
+        # the last one drawn wins; the legend in the first panel already carries
+        # identity, and the marker edge colour matches it.
     fig.colorbar(matplotlib.cm.ScalarMappable(norm=nrm, cmap="viridis"),
                  ax=ax, label="training step", fraction=0.046)
     ax.set_xlabel("positional entropy (nats)")
