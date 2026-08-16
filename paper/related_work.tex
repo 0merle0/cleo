@@ -101,6 +101,33 @@ library. If compute allows, running ProteinZero as a baseline arm is the
 strongest possible version of this argument. \todo{decide whether ProteinZero
 is runnable as a baseline}}
 
+A separate line of work has independently arrived at the structural move our
+selection experiments test. Explorative Modeling factors the \emph{training
+loop} rather than the generation procedure: it samples $K$ candidate matches
+between model generations and data and trains on the best, so that predictions
+commit to modes rather than blurring them, and reports that scaling exploration
+acts as a third pretraining axis beyond parameters and data --- improving FLOP
+efficiency \num{4.1}$\times$ and sample efficiency \num{6.2}$\times$, and
+reaching \num{1.43} FID on ImageNet without
+guidance~\cite{gladstone2026explorative}. Oversampling candidates and training
+on a chosen subset is exactly the operation our E18 arms perform, and their
+observation that the mode-seeking variant ``applies no pressure to cover every
+mode, so on its own it is mode-seeking and can collapse'' is an independent
+derivation of the failure we predict for pure quality-directed selection.
+
+\plan{Cite this as convergent evidence, not as prior art we are extending, and
+be precise about the disanalogy --- a reviewer who knows the paper will check.
+Their selection criterion is the training objective itself (minimum
+reconstruction loss against real data), so every candidate can be scored before
+one is chosen. Ours cannot be: the objective requires a structure prediction,
+which is the expensive step and the entire reason to oversample. We therefore
+select on \emph{proxies} --- policy log-probability, sequence distance --- before
+any reward is known. That is why a selection rule can lose to random in our
+setting, which a minimum-loss rule cannot, and it is the reason E18 carries a
+\texttt{random} control at matched oversample: their paper positions exploration
+as a scaling axis where more candidates inherently help, and reports no ablation
+separating selection quality from simply processing more samples.}
+
 What this line of work does not address is the library. Its objectives and
 benchmarks are defined per sequence: is \emph{this} sequence designable, stable,
 recovered. The quantity that determines an experimental outcome is a property
