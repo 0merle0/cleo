@@ -884,6 +884,54 @@ samples per step regardless of the oversample factor, so runtime scales with
 \texttt{N\_steps} and not with the pool. Raising \numrange{64}{128} is close to
 free.}
 
+\subsection*{E18 --- two design errors, caught mid-run}
+
+Both are recorded rather than quietly repaired, because one of them invalidates
+a rationale stated above and the other would have produced a headline number
+that is pure artefact.
+
+\textbf{1. \texttt{reward\_std} is degenerate under rank normalisation.} It was
+added as the test of whether a rule bought the reward spread it was chosen for.
+It cannot be: with \texttt{normalize: rank} the reward is the within-batch rank
+mapped to $[0,1]$, so its standard deviation is fixed by the batch size alone.
+Measured, it is \num{0.317397} in \emph{every arm at every step} --- two or
+three distinct values across an entire run, all from tie-averaging --- against
+a theoretical \num{0.3073} for 16 evenly spaced ranks.
+
+This is not merely a dead diagnostic. The stated rationale for
+\texttt{logprob\_strat} was that it targets reward spread within the group,
+which is what the group-relative baseline divides by. Under rank normalisation
+that spread is \emph{already} constant, so the rule cannot be operating through
+the mechanism it was designed around. Whatever it is doing, it is not that.
+Testing the mechanism as written would require an arm with value normalisation,
+where the spread is free to vary.
+
+\textbf{2. The pass rate over folded designs cannot be compared across arms.}
+It is the obvious summary and it is confounded by construction: each rule
+chooses which \numproduct{16} of \numproduct{128} get folded, so a rule that
+selects for quality reports a high pass rate whether or not its policy improved
+at all. \texttt{logprob\_top} selects the 16 most probable sequences and reports
+\SI{78.3}{\percent} against \texttt{random}'s \SI{25.2}{\percent}; almost all of
+that gap is the selection, not the policy.
+
+This is the same trap as the \texttt{as-sampled} row in E9, running the other
+way. There it was a policy-quality effect masquerading as a selection effect;
+here it is a selection effect masquerading as policy quality. Entropy over
+folded designs is confounded for the same reason --- \texttt{maxmin} selects for
+diversity, so of course its folded set is diverse.
+
+\plan{\textbf{Consequence.} E18 cannot be read off the training logs at all.
+The comparison has to be made by sampling from each final checkpoint
+\emph{without selection} and folding that, which is the only measurement in
+which the arms differ solely by the policy they produced. The training-log
+columns retained below are the ones that are not confounded:
+\texttt{sel\_logp\_shift}, which is a property of the rule rather than of the
+outcome, and which confirms every rule does what it claims --- \num{+29.6} nats
+for \texttt{logprob\_top}, \num{-19.1} and \num{-19.4} for \texttt{maxmin} and
+\texttt{cluster\_rep}, and \num{-0.15} to \num{-0.17} for the two banded or
+stratified rules, which move the batch almost not at all in the policy's own
+measure.}
+
 \subsection*{E3 result --- two backbones reach the cutoff, one convincingly}
 
 \plan{M0050\_1dbt\_cond2\_6, one of the three near-miss backbones the published
