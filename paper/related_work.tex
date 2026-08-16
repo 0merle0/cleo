@@ -85,7 +85,10 @@ predictor, adds an embedding-level diversity regularizer to mitigate mode
 collapse, and reports reducing design failure rates by 36--48\% relative to
 ProteinMPNN, ESM-IF~\cite{hsu2022esmif}, and InstructPLM on the CATH-4.3
 benchmark, with success rates above 90\% across diverse
-folds~\cite{wang2025proteinzero}. Diversity-regularized direct preference
+folds~\cite{wang2025proteinzero}. Notably, its formulation balances three terms
+--- multi-reward optimization, KL-divergence from a reference model, \emph{and}
+diversity regularization --- so the anchor and the diversity mechanism are
+separate components. Diversity-regularized direct preference
 optimization has been applied to peptide inverse folding with related
 motivation~\cite{park2024divdpo}.
 
@@ -127,6 +130,28 @@ setting, which a minimum-loss rule cannot, and it is the reason E18 carries a
 \texttt{random} control at matched oversample: their paper positions exploration
 as a scaling axis where more candidates inherently help, and reports no ablation
 separating selection quality from simply processing more samples.}
+
+Read together, these two papers and our own results converge on the same
+failure from three directions. ProteinZero introduces an embedding-level
+diversity regularizer specifically to mitigate mode
+collapse~\cite{wang2025proteinzero}; Explorative Modeling reports that its
+mode-seeking variant applies no pressure to cover every mode and can collapse
+on its own~\cite{gladstone2026explorative}; and we find that correcting the RL
+objective converts a policy that diffuses outward into one that converges onto
+a narrow solution, with positional entropy falling from ${\sim}1.7$ to
+\num{1.06}. Collapse is not incidental to reward-aligned generative training ---
+it is what the corrected objective does by default, and it is the reason a
+library-level method cannot simply inherit a sequence-level one.
+
+\plan{Where we differ is in what the anchor has to do. ProteinZero carries a
+KL term \emph{and} a separate diversity regularizer; we carry only the KL term,
+and E13 shows it is sufficient on its own --- sweeping its weight moves
+per-design coverage $U_{15}$ from 510 to 881 monotonically, with total library
+coverage peaking in an interior plateau. That is a claim about parsimony, not
+about superiority: their regularizer operates in embedding space and ours does
+not, and we have not run the two against each other. State it as ``one control
+suffices in our setting'', which is defensible, rather than ``the regularizer
+is unnecessary'', which we have not tested.}
 
 What this line of work does not address is the library. Its objectives and
 benchmarks are defined per sequence: is \emph{this} sequence designable, stable,
