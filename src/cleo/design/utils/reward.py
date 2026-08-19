@@ -39,7 +39,64 @@ class UniversalReward():
         self.run_name = run_name
         self.steps = steps
         self.reward_aggregation = reward_aggregation
-    
+        self._check_best_of_n(steps)
+
+    @staticmethod
+    def _check_best_of_n(steps):
+        """Refuse a pipeline that folds N times and never reduces the N.
+
+        A reward step must return one row per sampled sequence. An oracle run at
+        ``num_diffusion_samples > 1`` with ``per_sample_rows`` returns N rows per
+        sequence, so something has to collapse them, and the reduction has to be
+        over the benchmark's own criterion rather than over AF3 confidence --
+        that is what ``best_of_n_from_df`` is for.
+
+        This is checked rather than auto-inserted. ``best_of_n_from_df`` needs to
+        know which metric prefix to reduce, and guessing it from step order would
+        silently pick the wrong column in any pipeline carrying two metric steps.
+
+        Since the oracle default became best-of-5, omitting the reduction is the
+        easy mistake, and left unchecked it fails far downstream as a length
+        mismatch between the reward tensor and the batch.
+        """
+        if not steps:
+            return
+        names = [getattr(s, "name", "?") for s in steps]
+        has_reduction = any(
+            str(getattr(s, "target_fn", "")).endswith("best_of_n_from_df")
+            for s in steps
+        )
+        if has_reduction:
+            return
+        for s in steps:
+            cfg = getattr(s, "cfg", None)
+            if cfg is None:
+                continue
+            # af3_from_df is the only step that implements per-sample rows, so
+            # it is the only one carrying the best-of-5 default. boltz_from_df
+            # reads neither key and always returns one row per sequence, and
+            # applying the default to every step with a cfg would flag steps
+            # that cannot produce the rows this check is about.
+            is_oracle = str(getattr(s, "target_fn", "")).endswith("af3_from_df")
+            if "num_diffusion_samples" not in cfg and not is_oracle:
+                continue
+            n = int(cfg.get("num_diffusion_samples", 5 if is_oracle else 1))
+            if n > 1 and bool(cfg.get("per_sample_rows", n > 1)):
+                raise ValueError(
+                    f"reward step '{getattr(s, 'name', '?')}' folds {n} samples "
+                    f"per sequence, but no best_of_n_from_df step follows it, so "
+                    f"the {n} rows per sequence are never collapsed.\n"
+                    f"Pipeline is: {names}\n"
+                    f"Add after the metric step:\n"
+                    f"  - name: bo{n}\n"
+                    f"    target_fn: cleo.design.utils.rfd2_benchmark.best_of_n_from_df\n"
+                    f"    cfg:\n"
+                    f"      group_col: name\n"
+                    f"      metric_prefix: <name of the metric step, e.g. ame>\n"
+                    f"Or set 'num_diffusion_samples: 1' on that step to opt out."
+                )
+
+
     def get_sequences(self, policy_output, chain_mask=None):
         """Decode integer token sequences from policy output into amino acid strings.
 

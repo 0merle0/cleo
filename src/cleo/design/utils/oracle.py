@@ -381,17 +381,26 @@ def af3_from_df(df_input, cfg, step_name="af3"):
     is not run; existing results under ``{rundir}/{step_name}/outputs/`` are read
     and merged so downstream eval steps (``dist_to_ref`` etc.) can be re-run cheaply.
 
-    ``num_diffusion_samples`` (default 1) folds each sequence N times in one AF3
-    call. With ``per_sample_rows`` also set, the returned frame carries one row
-    per (sequence, sample) with ``{step_name}_sample`` and ``{step_name}_seed``
-    columns, so a downstream metric step scores all N and the caller aggregates
-    (min RMSD, any-pass) itself. Left off, only the top-ranked sample is
-    returned and the row count is unchanged -- which is what training wants,
-    since a reward step must return one row per sampled sequence.
+    ``num_diffusion_samples`` (**default 5**) folds each sequence N times in one
+    AF3 call. With ``per_sample_rows`` also set (**default true**), the returned
+    frame carries one row per (sequence, sample) with ``{step_name}_sample`` and
+    ``{step_name}_seed`` columns, so a downstream metric step scores all N and
+    the caller aggregates (min RMSD, any-pass) itself. Left off, only the
+    top-ranked sample is returned and the row count is unchanged.
+
+    Both defaults changed from ``1``/``false`` on 2026-08-16. Best-of-5 is the
+    benchmark's own unit -- RFdiffusion2 counts a design as a success if any of
+    its predictions clears the cutoff -- so a single-sample run measures
+    something the benchmark does not, and the two are not comparable. Configs
+    predating the change are left as they are, since they record what was
+    actually run; re-running one now picks up best-of-5 and
+    :class:`UniversalReward` will refuse it until a ``best_of_n_from_df`` step is
+    added to collapse the rows. Set ``num_diffusion_samples: 1`` to opt out
+    deliberately.
     """
     assert cfg.rundir is not None, "rundir must be specified in cfg"
-    n_samples = int(cfg.get("num_diffusion_samples", 1))
-    per_sample_rows = bool(cfg.get("per_sample_rows", False))
+    n_samples = int(cfg.get("num_diffusion_samples", 5))
+    per_sample_rows = bool(cfg.get("per_sample_rows", n_samples > 1))
     if per_sample_rows and n_samples < 2:
         print(f"af3: per_sample_rows with num_diffusion_samples={n_samples} is a no-op.")
 

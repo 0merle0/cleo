@@ -183,12 +183,28 @@ E13 & \statusdone     & \textbf{KL-weight sweep} (was: consensus anchoring)
       \numrange{510}{881}, but total library coverage $U$ is
       \emph{unimodal} --- flat at ${\sim}2500$ for $w \in [0.01, 0.05]$ and
       collapsing to 1743 at $w{=}0.1$. \num{0.02} sits in the plateau \\
-E18 & \statusscaffold  & \textbf{Selection sweep at 128$\to$16} --- six rules on
+E18 & \statusdone     & \textbf{Selection sweep at 128$\to$16} --- six rules on
       two axes, promoted by the E16 diagnosis &
-      Tests whether E16's negative was about \emph{selection} or about
-      \emph{selecting on distance}. Adds three log-prob-directed rules using a
-      signal no earlier rule could see. \texttt{random} at matched oversample
-      is the control \\
+      Selection is \emph{not} the dead end E16 made it look: measured without
+      selection, \texttt{logprob\_top} dominates the control on both axes
+      (\SI{82.3}{\percent} vs \SI{68.8}{\percent}, $U_{15}$ 603 vs 558) and
+      \texttt{logprob\_band} buys $+\SI{27}{\percent}$ coverage at no resolvable
+      pass cost. But the pre-registered group-spread mechanism is falsified, and
+      \texttt{reward\_std} was degenerate under rank normalisation \\
+E19 & \statusscaffold  & \textbf{Does the E18 frontier generalise?} Four rules
+      $\times$ three backbones, matched \texttt{random} control &
+      E18 is one run on one backbone. Re-running M0097 gives a seed replicate;
+      M0904 and M0907 test whether the frontier is a property of the rules or of
+      that backbone. \emph{All 12 runs trained; unconfounded folds in flight.}
+      Pre-fold: every rule leaves a more diverse policy than the control on all
+      three backbones, same ordering each time \\
+E20 & \statusscaffold  & \textbf{Rescue}: do the winning rules recover backbones
+      the benchmark scores 0/40? Three rules $\times$ E3's three near-misses &
+      Different regime from E18 --- \SIrange{0.1}{0.5}{\percent} passing against
+      \SIrange{56}{88}{\percent}. Tests whether a selection rule can move a
+      \emph{median} that sits \SI{1.4}{\angstrom} outside the cutoff, or only
+      re-ranks a pool that already contains hits. \emph{All 9 runs trained;
+      unconfounded folds in flight} \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
       $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
@@ -200,7 +216,9 @@ E16 & \statusdone     & In-training selection: no-oversample /
       oversample+random / oversample+diverse &
       \textbf{Negative, decisively:} \texttt{maxmin} passes \SI{4.6}{\percent}
       vs random's \SI{36.7}{\percent}; total library coverage $1.57\times$
-      worse despite $1.43\times$ more diversity per design \\
+      worse despite $1.43\times$ more diversity per design. Re-measured
+      selection-free after E18 (\SI{19.8}{\percent} vs \SI{77.1}{\percent},
+      $p = \num{1e-15}$), every direction survives \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -826,6 +844,43 @@ say the same thing: deciding what to fold should be left to the policy. The
 defensible use of these rules remains post-hoc, choosing an orderable subset from
 designs already known to pass.
 
+\textbf{Re-measured without selection, the result stands.} The table above is a
+pass rate over \emph{folded} designs, which E18 later showed cannot be compared
+across selection rules --- so the conclusion was re-derived on the one
+measurement that can be. Both checkpoints were sampled \numproduct{96} times with
+no selection applied and folded best-of-5.
+
+\begin{center}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Rule} & \textbf{Pass rate} & \textbf{Median RMSD} & $U$ & $U_{15}$ &
+\textbf{Spread} \\
+\midrule
+\texttt{random} & \SI{77.1}{\percent} & \SI{1.24}{\angstrom} & \textbf{1133} & 477 & 82.8 \\
+\texttt{maxmin} & \SI{19.8}{\percent} & \SI{1.88}{\angstrom} & 867 & \textbf{768} & 107.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every direction survives and the effect is not marginal: \SI{19.8}{\percent}
+against \SI{77.1}{\percent} ($p = \num{1e-15}$), with median motif RMSD pushed
+from \SI{1.24}{\angstrom} to \SI{1.88}{\angstrom} --- from inside the
+\SI{1.5}{\angstrom} cutoff to well outside it. Per-design coverage is up
+$1.61\times$ and total library coverage is down to $0.77\times$, the same trade
+the folded-set numbers reported at larger magnitude. \texttt{maxmin} at
+oversample 4 damages the policy itself, not merely the set chosen from it.
+
+\plan{This is worth stating precisely because the same rule is \emph{harmless}
+in E18 at oversample 8, where it is indistinguishable from its control
+(\SI{70.8}{\percent} against \SI{68.8}{\percent}). The two runs differ in both
+pool size and step count --- 75 steps here, 150 there --- so this pair cannot
+attribute the reversal to either one, and the E18 prediction that a larger pool
+would make \texttt{maxmin} worse is contradicted rather than confirmed. Note
+also that the \texttt{random} controls differ, \SI{77.1}{\percent} at step 74
+against \SI{68.8}{\percent} at step 149, which is the decay already documented
+at $\texttt{kl\_weight} = 0$ and a reminder that these two experiments are not
+on a common baseline.}
+
 \subsection*{E18 --- was E16's negative about selection, or about selecting on
 distance?}
 
@@ -926,11 +981,222 @@ The comparison has to be made by sampling from each final checkpoint
 which the arms differ solely by the policy they produced. The training-log
 columns retained below are the ones that are not confounded:
 \texttt{sel\_logp\_shift}, which is a property of the rule rather than of the
-outcome, and which confirms every rule does what it claims --- \num{+29.6} nats
-for \texttt{logprob\_top}, \num{-19.1} and \num{-19.4} for \texttt{maxmin} and
-\texttt{cluster\_rep}, and \num{-0.15} to \num{-0.17} for the two banded or
-stratified rules, which move the batch almost not at all in the policy's own
+outcome, and which confirms every rule does what it claims --- \num{+29.7} nats
+for \texttt{logprob\_top}, \num{-19.2} and \num{-18.3} for \texttt{maxmin} and
+\texttt{cluster\_rep}, and \num{-0.04} and \num{-0.34} for the stratified and
+banded rules, which move the batch almost not at all in the policy's own
 measure.}
+
+\subsection*{E18 result --- the frontier is real, and the mechanism we
+pre-registered is not the one operating}
+
+\plan{Measured as the previous subsection requires: \numproduct{96} samples
+drawn from each arm's final checkpoint \emph{without selection}, folded
+best-of-5. One shared seed across arms, so the comparison is paired and the arms
+differ only by their weights. $U$ and $U_{15}$ are over passing designs, counted
+against one shared reference so the arms sit on a single scale; every passing
+design in every arm was unique, so deduplication is a no-op here.}
+
+\begin{center}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Rule} & \textbf{shift} & \textbf{Pass rate} & $p$ &
+$U$ & $U_{15}$ \\
+\midrule
+\texttt{random}         & \num{-0.4}  & \SI{68.8}{\percent} & ---   & 1237 & 558 \\
+\texttt{logprob\_strat} & \num{-0.0}  & \textbf{\SI{87.5}{\percent}} & 0.003 & 1141 & 525 \\
+\texttt{logprob\_top}   & \num{+29.7} & \SI{82.3}{\percent} & 0.043 & 1304 & 603 \\
+\texttt{logprob\_band}  & \num{-0.3}  & \SI{65.6}{\percent} & 0.759 & \textbf{1354} & 707 \\
+\texttt{maxmin}         & \num{-19.2} & \SI{70.8}{\percent} & 0.875 & 1298 & 641 \\
+\texttt{cluster\_rep}   & \num{-18.3} & \SI{56.2}{\percent} & 0.101 & 1349 & \textbf{746} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The pre-registered mechanism is falsified, by the test written down for
+it.} \texttt{logprob\_top} was predicted to fold excellent designs and stall
+anyway, with the explicit rider that if it trained well the group-baseline story
+was wrong. It trains well: it is the one arm that beats \texttt{random} on
+\emph{both} axes, \SI{82.3}{\percent} against \SI{68.8}{\percent} ($p = 0.043$)
+at $U_{15}$ 603 against 558. Pure exploitation, the rule with the least reward
+spread available to it, is not merely survivable but dominant over the control.
+This is the same conclusion the \texttt{reward\_std} defect reached from the
+other direction: under rank normalisation the group's spread is constant by
+construction, so no rule could have been operating through it.
+
+\texttt{logprob\_strat}, predicted best, is half right in a way that matters.
+It does take the highest pass rate, \SI{87.5}{\percent} ($p = 0.003$), and it is
+the largest single effect in the arm. But it is the \emph{only} rule whose
+coverage falls below the control on both measures --- $U$ 1141 against 1237,
+$U_{15}$ 525 against 558. It bought its pass rate by collapsing the policy,
+which is precisely the trade the whole method exists to refuse. It was also not
+the only rule to beat random, the other half of the prediction.
+
+\textbf{The two distance rules did not lose.} \texttt{maxmin} was predicted to
+lose again and harder; it is indistinguishable from the control on pass rate
+(\SI{70.8}{\percent}, $p = 0.88$) while carrying higher coverage.
+\texttt{cluster\_rep} takes the lowest pass rate, \SI{56.2}{\percent}, but the
+gap does not reach significance ($p = 0.10$) and it returns the highest per-design
+coverage in the arm, $U_{15}$ 746 --- a factor of \num{1.34} over the control.
+Neither is E16's eight-fold catastrophe. They trade along a frontier rather than
+falling off it.
+
+\textbf{\texttt{logprob\_band} is the rule that worked as designed}, and the
+diagnostic shows the mechanism directly. It was built as the targeted repair of
+E16: keep the diversity objective, remove the degenerate tail it was drawn to.
+Its \texttt{sel\_logp\_shift} is \num{-0.3}, so it moves the batch essentially
+not at all in the policy's own measure --- but its selected log-probability
+spread is \num{8.7} against the pool's \num{18.2}, so it is exploring inside a
+truncated band rather than walking to the edge. The outcome matches: $U_{15}$ up
+\SI{27}{\percent} over the control at no pass-rate cost that the data can resolve
+($p = 0.76$).
+
+\textbf{What survives.} Selection at $128 \to 16$ is not the dead end E16 made it
+look. The control is not on the frontier --- \texttt{logprob\_top} dominates it
+outright, and \texttt{logprob\_band} buys a quarter more coverage for a pass-rate
+difference the experiment cannot resolve. What is dead is the reason we expected
+it to work.
+
+\plan{\textbf{What this cannot support.} One run per arm. The binomial interval
+on a pass rate at $n = 96$ is roughly $\pm 9$ points before seed variance is
+added, and the A/B replicates put seed variance on top of that --- so the three
+arms with $p > 0.1$ are genuinely unresolved, not tied. The coverage ordering
+spans $1.42\times$ (525 to 746), comfortably outside the bootstrap noise scale of
+$\pm 25$--40; note that a bootstrap of a distinct-count statistic is biased
+\emph{downward}, since resampling with replacement introduces duplicates that can
+only reduce $U$, so those intervals are read for width and not for position.
+Replicating \texttt{logprob\_band} and \texttt{logprob\_top} at $n = 3$ is the
+cheap next step and the one that would license a recommendation.
+
+\textbf{The open question this reopens.} E16 concluded that \texttt{maxmin}
+damages the policy. That conclusion rests on a pass rate over folded designs ---
+the exact quantity error 2 above shows cannot be compared across selection rules.
+Both E16 checkpoints survive, so the same selection-free harness settles it
+directly; that evaluation is running. If E16's maxmin policy is fine and only its
+folded set was bad, E16's headline needs rewriting to a claim about wasted folding
+compute rather than about policy damage.}
+
+\subsection*{E19 --- does the frontier belong to the rules, or to M0097?}
+
+\plan{Pre-registered. Four rules --- \texttt{random}, \texttt{logprob\_top},
+\texttt{logprob\_band}, \texttt{logprob\_strat} --- on three backbones, 150 steps,
+oversample 8, evaluated by the same selection-free harness E18 required. The two
+distance rules are dropped: neither separated from the control on pass rate, and
+E16's re-evaluation covers \texttt{maxmin} directly.}
+
+Nothing seeds the trainer explicitly, so re-running M0097 in a fresh process is
+an independent draw rather than a repeat. That makes the M0097 arm a seed
+replicate of E18 and the M0904 and M0907 arms a test of generalisation, and the
+two failure modes are distinguishable: if M0097 reproduces and the other two do
+not, the frontier is a property of that backbone; if M0097 itself does not
+reproduce, E18 was noise.
+
+\textbf{Predictions.} \texttt{logprob\_top} continues to dominate
+\texttt{random} on both axes --- this is E18's one unambiguous positive and the
+claim most worth breaking. \texttt{logprob\_band} continues to buy coverage at
+no resolvable pass cost. \texttt{logprob\_strat} continues to raise pass rate
+while falling below the control on coverage; it is included precisely because a
+collapse result is the counterweight to the headline, and a headline whose
+counterweight does not replicate is not worth reporting either.
+
+\plan{Three backbones give three paired contrasts per rule rather than three
+draws of one number, which is the stronger design --- but it is still $n = 1$
+per cell. The arm can show that a direction is consistent across backbones; it
+cannot put a tight interval on the size of the effect on any one of them.}
+
+\textbf{Interim, sequence level only.} All twelve runs trained to 150 steps and
+were sampled \numproduct{96} times each without selection; the folds are running.
+Mean pairwise Hamming distance over those samples needs no oracle and is already
+unconfounded, so it is reported now:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Rule} & \textbf{M0097} & \textbf{M0904} & \textbf{M0907} \\
+\midrule
+\texttt{random}         & 76.5 & 58.8 & 61.0 \\
+\texttt{logprob\_strat} & 85.4 & 65.4 & 63.0 \\
+\texttt{logprob\_top}   & 103.7 & 84.0 & 71.0 \\
+\texttt{logprob\_band}  & \textbf{102.0} & \textbf{106.7} & \textbf{102.7} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every rule leaves a more diverse policy than the control on every backbone, and
+the ordering is the same all three times. \texttt{logprob\_band} is the striking
+column: it sits at \numrange{102}{107} regardless of backbone, while the control
+ranges \numrange{58.8}{76.5} --- consistent with the band acting on the policy's
+own log-probability measure, which is backbone-independent by construction, and
+with the mechanism claimed for it in E18.
+
+\plan{\textbf{This is not yet the E19 result and must not be read as one.} Mean
+pairwise Hamming is a different statistic from the $U_{15}$ coverage E18 reported,
+and it is computed over all samples rather than over passing ones. E16 is the
+standing example of those two moving in opposite directions: its \texttt{maxmin}
+arm raised per-design diversity while total coverage of passing designs fell to
+$0.77\times$. A policy can be diverse because it is exploring or because it is
+degrading, and only the folds separate those. The pass-rate half of every
+prediction above is untested until they land.}
+
+\subsection*{E20 --- can selection rescue a backbone the benchmark scores 0/40?}
+
+\plan{Pre-registered. \texttt{random}, \texttt{logprob\_band} and
+\texttt{logprob\_top} on M0050, M0365 and M0375 --- the three near-misses from
+E3, all scored 0/40 by the published benchmark. The matched \texttt{random}
+control at the same oversample is the comparator, not E3's numbers, which differ
+in both step count and oversample.}
+
+This is a different regime from E18 and the distinction is the whole point of
+running it. E18 measured these rules where \SIrange{56}{88}{\percent} of designs
+already pass; these backbones sit near \SIrange{0.1}{0.5}{\percent}, with median
+motif RMSD of \SIrange{2.8}{3.1}{\angstrom} against a \SI{1.5}{\angstrom} cutoff
+and every E3 hit an excursion into the tail rather than a shifted mode.
+
+\textbf{The mechanistic reason to expect little.} A selection rule chooses among
+the designs the policy already produced. If nothing in the pool is close, no
+choice among them manufactures a hit --- selection re-ranks, it does not
+generate. On a backbone whose median sits \SI{1.4}{\angstrom} outside the cutoff,
+the pool is mostly not close.
+
+\textbf{The reason to run it anyway.} The quantity that has to move is the
+median, not the pass rate, and \texttt{logprob\_band}'s effect is on coverage:
+it keeps the policy exploring distinct regions instead of walking to the
+degenerate edge, which is more places to find a mode. So the pre-registered
+prediction is a split one --- \emph{pass rate does not move on any of the three,
+and if anything moves it is median RMSD under \texttt{logprob\_band}}. Pass rate
+is close to useless as a readout here in any case: at these rates a 150-step run
+returns single-digit counts, so median and minimum motif RMSD are the primary
+endpoints and the pass count is reported only for continuity with E3.
+
+\textbf{Interim, sequence level only.} All nine runs trained to 150 steps and
+were sampled \numproduct{96} times each without selection; the folds are running.
+Mean pairwise Hamming over those samples:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Rule} & \textbf{M0050} & \textbf{M0365} & \textbf{M0375} \\
+\midrule
+\texttt{random}        & 63.1 & 76.1 & 74.5 \\
+\texttt{logprob\_top}  & 99.2 & 88.9 & 92.5 \\
+\texttt{logprob\_band} & \textbf{107.0} & \textbf{105.4} & \textbf{106.3} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The pattern is the same as E19's, including \texttt{logprob\_band}'s
+backbone-independent \numrange{105}{107}, and it holds on backbones where almost
+nothing passes. That is worth noting because it separates the two halves of the
+mechanism: whatever \texttt{logprob\_band} does to the policy's spread, it does
+without needing a pool that already contains hits. It says nothing yet about
+whether the median moves, which is the endpoint this experiment was built for.
+
+\plan{A null here is publishable and worth stating in advance as such: it would
+establish that the E18 frontier is a property of the high-pass-rate regime and
+does not transfer to hard targets, which bounds the claim rather than weakening
+it. The failure mode to guard against is reading a one- or two-design difference
+in a 1200-fold pool as a rescue --- E3's replication at $N = 40$ already showed
+that four of its seven hits do not survive refolding.}
 
 \subsection*{E3 result --- two backbones reach the cutoff, one convincingly}
 
