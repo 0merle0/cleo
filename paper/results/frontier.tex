@@ -1,16 +1,22 @@
-\section{Results: the AME benchmark (diversity at matched fidelity)}
-\label{sec:res:ame}
+\section{Results: function-aligned RL moves the diversity/fidelity frontier}
+\label{sec:res:frontier}
 
 \plan{\textbf{Claim.} On an established public benchmark, \cleo{} produces
 libraries with the sequence coverage of high-temperature LigandMPNN and the
 pass rate of low-temperature LigandMPNN --- a combination no single temperature
-achieves. \textbf{Why this section exists.} The three application sections rest
-on experimental assays that take months and cannot be re-run by a referee. This
-one is fully computational, uses a published benchmark and a published
-deposit, and can be reproduced end to end. It is the section that makes the
-method credible before any wet-lab claim is evaluated. Status:
-\statusscaffold{} --- the \cleo{} arm is measured, the temperature sweep is
-not yet run.}
+achieves.
+
+\textbf{Why this section leads.} The PETase result rests on assays that take
+months and cannot be re-run by a referee. This one is fully computational, uses
+a published benchmark and a published deposit, and can be reproduced end to end.
+It buys the method credibility before any wet-lab claim is weighed.
+
+\textbf{Status: \statusscaffold{}}, and close to \statusdone{}. Both the \cleo{}
+arms and the full temperature ladder are measured. What remains: reconcile the
+two \cleo{} rows below (Block 3 quotes the corrected 200-step anchored arm; the
+notebook's E10 table still carries a superseded pre-fix peak window), rebuild
+the two PCA panels, fold in the E20 rescue result, and attach the run-to-run
+error bars from E21.}
 
 \subsection*{Block 1 --- Setup and the unit of comparison}
 
@@ -155,6 +161,8 @@ collapsing to \num{1743} at $w = 0.1$, where too few designs pass for
 per-design exploration to accumulate. The value used throughout,
 $w = \num{0.02}$, sits in the middle of that plateau, so the reported numbers do
 not depend on having found a sharp optimum.
+
+\input{figures/blocks/distributions}
 
 Figure~\ref{fig:ame-distributions} shows why the success rate alone is not
 enough: on M0097 every \cleo{} arm has its \emph{median} below the

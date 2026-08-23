@@ -1,0 +1,57 @@
+\documentclass[11pt]{article}
+
+\input{preamble}
+
+% ---------------------------------------------------------------------------
+% The lab notebook.
+%
+% This is deliberately a SEPARATE document from main.tex. The two have
+% different readers and different standards of evidence:
+%
+%   main.tex      the paper. Only claims that survived replication, written as
+%                 prose for a referee. Nothing enters it that is not settled.
+%   notebook.tex  the run log. Every experiment E1--E21, including the ones
+%                 that failed, the ones that were retracted, and the reasoning
+%                 that turned out to be wrong. Pre-registrations stay next to
+%                 the results that falsified them.
+%
+% Keeping the record is the point of the split, not tidiness. E18's frontier
+% was retracted by E19 using E18's own pre-registered criterion; that only
+% works because the criterion was written down before the data landed. A paper
+% cannot carry that and stay readable, and deleting it would destroy the
+% evidence that the retraction was principled rather than post-hoc.
+%
+% Build:  make notebook   ->  notebook.pdf
+% ---------------------------------------------------------------------------
+
+\title{\cleo{}: experimental record}
+\author{}
+\date{Lab notebook --- compiled \today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+The complete experimental record behind \cleo{}: arm definitions, selection
+algorithms, the E1--E21 slate with pre-registrations and results, the algorithm
+audit, and the scoring protocol. Retracted claims are kept in place with the
+reasoning that produced them, rather than removed. This document is the
+provenance for the numbers quoted in the paper; it is not itself a paper.
+\end{abstract}
+
+\clearpage
+\setcounter{tocdepth}{2}
+\tableofcontents
+\clearpage
+
+\input{experiments}
+
+\clearpage
+\addcontentsline{toc}{section}{References}
+\bibliographystyle{unsrt}
+\bibliography{refs}
+
+\end{document}

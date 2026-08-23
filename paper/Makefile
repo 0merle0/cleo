@@ -1,4 +1,4 @@
-.PHONY: pdf svg2pdf clean watch
+.PHONY: pdf notebook all svg2pdf clean watch
 
 LATEX = latexmk -pdf -interaction=nonstopmode -halt-on-error
 SVG_DIR = figures/svg
@@ -19,8 +19,16 @@ PDF_DIR = figures/pdf
 SVGS := $(wildcard $(SVG_DIR)/*.svg)
 PDFS := $(patsubst $(SVG_DIR)/%.svg,$(PDF_DIR)/%.pdf,$(SVGS))
 
+# `make pdf` builds the paper only. The experimental record is a separate
+# document with a separate reader -- see the header of notebook.tex for why the
+# two are not one file. `make all` builds both.
+all: pdf notebook
+
 pdf: svg2pdf
 	$(LATEX) main.tex
+
+notebook: svg2pdf
+	$(LATEX) notebook.tex
 
 svg2pdf: $(PDFS)
 

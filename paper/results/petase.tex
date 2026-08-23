@@ -1,43 +1,114 @@
-\section{Results: PETase (closed-loop iteration)}
+\section{Results: three rounds of closed-loop optimization on a de novo PETase}
 \label{sec:res:petase}
 
-\plan{\textbf{Claim.} Experimental data from an initial library can be used to
-train a surrogate that becomes a reward signal for a second library, producing
-substantially improved designs. \textbf{Risk.} The second library has to be
-meaningfully better than the first --- not just predicted-better. Status:
-strongest data of the three applications.}
+\plan{\textbf{Claim.} Three successive libraries, each designed using the
+measured activity of the previous one, take a de novo PETase from a weak
+starting design to \textbf{[250]}$\times$ faster --- above every characterized
+natural enzyme on the same probe.
 
-\subsection*{Block 1 --- Initial library}
-\begin{planlist}
-  \item De novo PETase backbone, RFdiffusion origin.
-  \item Library 1: function-aligned RL sampling without surrogate.
-  \item $\sim$6k designs tested; activity distribution on the PET-trimer
-        fluorogenic probe.
-\end{planlist}
-\todo{petase results --- library 1 setup and outcomes}
+\textbf{Status: \statusblocked{}.} The assays exist; the numbers are not yet in
+this repository. Each block below names exactly what file or measurement it
+needs, so the section can be filled in without re-deriving the structure.
 
-\subsection*{Block 2 --- Surrogate training}
-\begin{planlist}
-  \item MLP ensemble trained on (sequence, activity) pairs from library 1.
-  \item Validation behavior; calibration of predicted vs.\ measured activity.
-\end{planlist}
-\todo{petase results --- surrogate training}
+\textbf{Why three rounds and not one big library.} The escalation is the
+argument. Round 1 uses an easy fluorogenic probe because a cold-start library
+needs a permissive assay to produce any signal at all. Round 2 moves to a
+substrate closer to real PET \emph{and} gets larger, which is only affordable
+because of Section~\ref{sec:res:fragments}. Round 3 is the closed loop proper:
+the design objective now contains a surrogate trained on rounds 1 and 2. Each
+round changes exactly one thing, which is what makes the final number
+attributable.}
 
-\subsection*{Block 3 --- Library 2 with surrogate-as-reward}
+\subsection*{Block 1 --- Starting point and the assay ladder}
 \begin{planlist}
-  \item Surrogate added as a reward step in the RL pipeline for library 2.
-  \item Library 2 size, mutation-distance distribution from starting design.
-  \item Activity distribution comparison: library 1 vs.\ library 2.
+  \item The de novo PETase backbone: origin, catalytic triad, why it is a
+        genuine de novo design and not a remodelled natural PETase.
+  \item Baseline activity of the starting design --- the denominator for every
+        fold-improvement number in this section. \textbf{State it once, here,
+        with units, and refer back to it.}
+  \item The three probes in order of stringency: the easy fluorogenic probe,
+        the PET-proximal probe, and bulk PET. Say up front which claims are on
+        which probe --- the single most likely way this section misleads a
+        referee is by quoting a fold-improvement from one probe next to a
+        comparison from another.
+  \item Comparator panel: which natural and engineered PETases were assayed
+        \emph{in-house on the same probe}. Literature values are not a
+        comparison and should not be presented as one.
 \end{planlist}
-\todo{petase results --- library 2 design and outcome}
+\todo{petase --- backbone provenance, starting activity with units, probe
+  ladder, comparator panel}
 
-\subsection*{Block 4 --- Best-variant deep dive}
+\subsection*{Block 2 --- Round 1: pilot library on the easy probe}
 \begin{planlist}
-  \item XXX-fold $k_\mathrm{cat}$ improvement over starting design on the
-        PET-trimer probe.
-  \item Comparison to optimized natural PETases on the same substrate.
-  \item PET-dimer activity confirmed.
-  \item Honest framing of the bulk PET gap (substrate accessibility, not
-        catalysis).
+  \item Library 1: designed by function-aligned RL sampling, no surrogate ---
+        the reward is computational only.
+  \item Size, fragment structure, mutation-distance distribution from the
+        starting design.
+  \item Activity distribution: hit rate, best variant, fold over start.
+  \item \textbf{What round 1 has to establish:} that the library contains
+        signal at all, and that the signal spans enough range to train on. A
+        library where everything is dead teaches the surrogate nothing.
 \end{planlist}
-\todo{petase results --- best variant kinetics + PET-dimer + bulk-PET caveat}
+\todo{petase --- round 1 library composition and activity distribution}
+
+\subsection*{Block 3 --- Round 2: larger library, harder probe}
+\begin{planlist}
+  \item What changed from round 1, and what deliberately did not.
+  \item Library 2 size --- this is where the fragment combinatorics pay off, so
+        the number should be stated against the count of DNA parts actually
+        ordered.
+  \item Activity on the PET-proximal probe: hit rate, distribution, best
+        variant.
+  \item \textbf{Expect the hit rate to fall} moving to the harder probe. Report
+        it falling. A round that got harder and easier at the same time invites
+        the reader to wonder what else changed.
+\end{planlist}
+\todo{petase --- round 2 library and activity on the PET-proximal probe}
+
+\subsection*{Block 4 --- Round 3: the surrogate closes the loop}
+\begin{planlist}
+  \item Surrogate: MLP ensemble on (sequence, activity) pairs pooled from
+        rounds 1 and 2. Architecture, training split, held-out calibration.
+  \item \textbf{Report held-out predictive performance before reporting what it
+        designed.} A surrogate that cannot rank held-out variants did not cause
+        the improvement, whatever the improvement turns out to be.
+  \item Surrogate added as a reward step in the RL pipeline; library 3
+        composition and mutation distance.
+  \item Activity distribution of library 3 against library 2 on the same probe
+        --- \textbf{the whole-distribution comparison, not just the best
+        variant.} A shifted distribution is evidence the loop closed; a single
+        outlier is evidence of a bigger library.
+\end{planlist}
+\todo{petase --- surrogate calibration, library 3, distribution shift vs.\
+  round 2}
+
+\subsection*{Block 5 --- The best construct}
+\begin{planlist}
+  \item Full kinetics on the top variant: $k_\mathrm{cat}$, $K_\mathrm{M}$,
+        $k_\mathrm{cat}/K_\mathrm{M}$, against the starting design under
+        identical conditions.
+  \item The \textbf{[250]}$\times$ figure: state precisely which quantity, which
+        probe, which comparator.
+  \item Head-to-head against the natural and engineered comparators on that
+        probe.
+  \item Mutation distance from the starting design, and how far outside SSM
+        range that is --- this closes the loop back to
+        Section~\ref{sec:intro}'s framing.
+  \item Structural rationalization if a structure exists; clearly marked as
+        post-hoc if so.
+\end{planlist}
+\todo{petase --- top-variant kinetics table + comparator head-to-head}
+
+\subsection*{Block 6 --- What this does not show}
+\begin{planlist}
+  \item Bulk PET. If activity on solid substrate does not follow the probe
+        results, say so in the main text rather than the supplement, and
+        attribute it to substrate accessibility only if there is evidence for
+        that attribution.
+  \item Cold start. The loop needs a first library with measurable spread; this
+        section does not show how to get one on a system where round 1 comes
+        back flat.
+  \item One backbone, one chemistry. The generality claim rests on
+        Section~\ref{sec:res:frontier}, which is 41 sites, not on this section.
+\end{planlist}
+\todo{petase --- limitations, including the bulk-PET gap}

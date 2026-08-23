@@ -4,12 +4,33 @@
 
 % Alternatives considered, kept for later comparison:
 %   - Library diversity, not library size, limits de novo enzyme optimization
-%   - Turning design filters into design objectives for de novo enzyme libraries
 %   - Function-aligned combinatorial libraries for de novo enzyme optimization
 %   - Reinforcement learning expands the reachable sequence space of de novo enzymes
 \title{High-fidelity libraries for enzyme optimization}
 \author{AUTHORS PLACEHOLDER}
 \date{Working draft --- compiled \today}
+
+% ---------------------------------------------------------------------------
+% THE PAPER. One clean document.
+%
+% The experimental record -- the E1--E21 slate, pre-registrations, retractions,
+% the algorithm audit -- lives in notebook.tex and compiles separately
+% (`make notebook`). Nothing from it is \input here. When a notebook result is
+% settled enough to make a claim, it gets rewritten as prose into results/ and
+% cited to the notebook, rather than pulled in wholesale.
+%
+% Narrative spine (three moves, not three applications):
+%
+%   1. results/frontier.tex   Function-aligned RL moves the diversity/fidelity
+%                             frontier. Public benchmark, fully reproducible.
+%   2. results/fragments.tex  Fragmentation and recombination turn that frontier
+%                             into a combinatorially large physical library.
+%   3. results/petase.tex     Three rounds of closed-loop optimization on a
+%                             de novo PETase, ending 250x above the start.
+%
+% Moves 1 and 2 are the method; move 3 is the demonstration. Everything else
+% (heme, protease) is supplementary or dropped -- see docindex.
+% ---------------------------------------------------------------------------
 
 \begin{document}
 
@@ -20,7 +41,7 @@
 \clearpage
 
 % --- Page 2: table of contents, then the document index ---
-% Reading aids for a paper that is still mostly scaffold. Both are wrapped in
+% Reading aids while the paper is still partly scaffold. Both are wrapped in
 % draft mode; delete the block before submission.
 \ifdraftmode
   \setcounter{tocdepth}{2}
@@ -39,32 +60,18 @@
 % --- Results ---
 % Note on Science formatting: Science articles run results inline with the
 % narrative rather than under a "Results" heading. We keep them in separate
-% files for collaborator-friendly editing; final compilation order is:
-%   ame (public benchmark, fully computational) -> heme (method foundation) ->
-%   petase (closed-loop iteration) -> protease (diversity reward).
-% AME leads because it is the only section a referee can reproduce end to end:
-% published benchmark, published deposit, no assay in the loop. It buys the
-% method credibility before any wet-lab claim is weighed.
-\input{results/ame}
-\input{results/heme}
+% files for collaborator-friendly editing.
+\input{results/frontier}
+\input{results/fragments}
 \input{results/petase}
-\input{results/protease}
+
+\input{conclusion}
 
 % --- Methods ---
 % In Science research articles, methods detail goes to "Materials and
-% Methods" (often supplementary). We keep one shared overview and per-app
-% methods files here.
+% Methods" (often supplementary).
 \input{methods/overview}
-\input{methods/heme}
 \input{methods/petase}
-\input{methods/protease}
-
-% Arms, selection algorithms and the experiment slate, in one place so results
-% elsewhere trace to a defined procedure. Most of this moves to Materials and
-% Methods at submission.
-\input{experiments}
-
-\input{conclusion}
 
 \clearpage
 \addcontentsline{toc}{section}{References}

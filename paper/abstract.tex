@@ -1,25 +1,33 @@
 \begin{abstract}
-\plan{Science abstract target: $\sim$125 words. Structure aligned to the
-three-application spine. Written last, on purpose --- it should compress the
-actual results rather than lead them.}
+\plan{Science abstract target: ${\sim}125$ words. Written last, on purpose ---
+it should compress the actual results rather than lead them. The structure below
+follows the three-move spine: frontier, fragments, PETase. Numbers in
+\texttt{[brackets]} are the ones that must be filled from measurement, not
+estimated.}
 \begin{planlist}
-  \item \textbf{Hook.} De novo enzyme design produces backbones; optimization
-        is the bottleneck that prevents most from reaching useful activity.
-  \item \textbf{Approach.} Function-aligned RL fine-tuning of ProteinMPNN,
-        combined with fragment-based combinatorial libraries and a closed-loop
-        experimental optimization protocol.
-  \item \textbf{Result (a) --- heme oxidation.} Fine-tuned MPNN outperforms SSM
-        and vanilla MPNN at matched experimental effort.
-  \item \textbf{Result (b) --- PETase.} Experimental data from an initial
-        library trains a surrogate that drives a second library to
-        substantially better designs (XXX-fold over starting; exceeds
-        optimized natural enzymes on the PET-trimer probe).
-  \item \textbf{Result (c) --- protease.} A batch-consensus mutation-diversity
-        reward unlocks rarer mutations and improves catalytic activity over an
-        equivalent library without the diversity term.
-  \item \textbf{Implication.} Broad, function-aligned sequence-space search
-        plus an experimental closed loop is a general strategy for de novo
-        enzymes.
+  \item \textbf{Hook.} De novo design now produces enzyme backbones faster than
+        they can be optimized. Optimization needs libraries that are large,
+        diverse \emph{and} target-specific; existing methods deliver at most two
+        of the three.
+  \item \textbf{Move 1 --- the frontier.} GRPO fine-tuning of ProteinMPNN
+        against a structure-prediction reward moves the diversity/fidelity
+        trade-off rather than sliding along it: on a public benchmark,
+        \textbf{[3.98]}$\times$ the pass rate at matched sequence diversity.
+  \item \textbf{Move 2 --- the fragments.} Splitting designs at fixed boundaries
+        and recombining across them turns $\sum_i |F_i|$ synthesized parts into
+        $\prod_i |F_i|$ testable variants, and the recombinants retain
+        \textbf{[XX]}\,\% of the parental pass rate --- a physically buildable
+        library of \textbf{[10\^{}X]} members.
+  \item \textbf{Move 3 --- the demonstration.} Three rounds of closed-loop
+        optimization on a de novo PETase: a pilot library on a fluorogenic
+        probe, a larger library on a PET-proximal substrate, and a third
+        library designed from the accumulated sequence--activity data.
+  \item \textbf{Headline.} The best construct is \textbf{[250]}$\times$ faster
+        than the starting design and exceeds every characterized natural enzyme
+        on the same probe.
+  \item \textbf{Implication.} Function-aligned search plus manufacturing-aware
+        library construction plus an experimental closed loop is a general
+        recipe for de novo enzyme optimization.
 \end{planlist}
-\todo{abstract --- fill once results sections converge}
+\todo{abstract --- write once the fragment and PETase numbers land}
 \end{abstract}

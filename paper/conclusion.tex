@@ -1,48 +1,69 @@
 \section{Discussion}
 \label{sec:discussion}
 
-\plan{Science research articles end with a short discussion / outlook paragraph
-rather than a separate Conclusion section. Keep this tight ($\sim$250--400
-words). Write last, after the abstract.}
+\plan{Science research articles end with a short discussion / outlook rather
+than a Conclusion section. Keep this tight (${\sim}250$--400 words). Write last,
+after the abstract. The four paragraphs below mirror the three-move spine plus
+limits.}
 
-\subsection*{P-A --- Central scientific takeaway}
+\subsection*{P-A --- The central takeaway}
 \begin{planlist}
-  \item The active-variant region for a de novo enzyme is broader and farther
-        from the starting design than SSM or vanilla MPNN can reach.
-  \item Function-aligned RL sampling + combinatorial library construction +
-        experimental closed loop together close the gap.
+  \item The active-variant region for a de novo enzyme is farther from the
+        starting design than SSM can reach and more specific than temperature
+        sampling can hit. Both halves of that sentence are measured in this
+        paper, and neither is measured by prior work.
+  \item The resolution is not a better sampler or a bigger library on its own.
+        It is a sampler trained against function, factorized into parts that can
+        be physically assembled, and closed against measured activity. Each
+        piece is necessary; state why.
 \end{planlist}
-\todo{conclusion p1 --- central takeaway tying the three applications together}
+\todo{discussion p1 --- central takeaway}
 
-\subsection*{P-B --- What each application individually established}
+\subsection*{P-B --- What each move established}
 \begin{planlist}
-  \item Heme: fine-tuned MPNN dominates SSM and vanilla MPNN under matched
-        experimental effort --- the foundation.
-  \item PETase: experimental data $\rightarrow$ surrogate reward $\rightarrow$
-        improved next library; a closed loop, not a single shot.
-  \item Protease: explicit diversity pressure (batch-consensus divergence
-        reward) unlocks rare mutations and improves activity over an
-        otherwise-matched library.
+  \item \textbf{Frontier.} A KL-anchored RL policy occupies a region of the
+        diversity/fidelity plane that no temperature reaches. The anchor is the
+        mechanism, not a detail --- unanchored, the policy collapses onto a
+        narrow solution with worse per-design coverage than the baseline.
+  \item \textbf{Fragments.} Recombination converts that distribution into a
+        library exponentially larger than the parts ordered, at a measured cost
+        in pass rate.
+  \item \textbf{PETase.} Three rounds, each designed on the last round's data,
+        ending above characterized natural enzymes on the same probe.
 \end{planlist}
-\todo{conclusion p2 --- what each app proves about the platform}
+\todo{discussion p2 --- what each move proves}
 
 \subsection*{P-C --- Honest limitations}
 \begin{planlist}
-  \item PETase: probe and dimer activity demonstrated; bulk PET activity
-        remains an open challenge attributed to substrate accessibility on
-        solid plastic.
-  \item Closed-loop iteration depends on having an assay-ready experimental
-        pipeline; cold-start is still hard.
-  \item Diversity reward improves access to rare mutations but does not
-        substitute for a well-specified function reward.
+  \item \textbf{Bulk PET.} Probe activity is not plastic degradation. Do not let
+        this paragraph soften.
+  \item \textbf{Run-to-run variance.} Single-run comparisons of pass rate on
+        this benchmark are not interpretable at the effect sizes usually of
+        interest; two draws of one config moved 21 points. Every claim retained
+        in this paper either clears that width or is replicated. \emph{Cite the
+        notebook's E17/E19/E21 record for the measurement.}
+  \item \textbf{The reward and the evaluation share a predictor.} Motif RMSD
+        under AF3 appears on both sides of the frontier result. A held-out
+        oracle remains the outstanding control, and the paper should say so
+        rather than wait to be asked.
+  \item \textbf{Selection during training does not help.} Five experiments
+        looked for a rule that beats random selection of rollouts and none
+        found one. Worth one sentence as a negative result others need not
+        repeat.
+  \item \textbf{Cold start.} The loop needs a first library with measurable
+        spread.
 \end{planlist}
-\todo{conclusion p3 --- limitations, including bulk PET gap}
+\todo{discussion p3 --- limitations}
 
 \subsection*{P-D --- Outlook}
 \begin{planlist}
-  \item Generalization to additional chemistries and substrate classes,
-        including bulk polymers.
-  \item Tighter integration of design-time rewards with experimental surrogate
-        signals across more rounds.
+  \item The obvious composition: a manufacturing-aware architecture
+        \citep{weinstein2026manufacturing} trained against a catalytic reward,
+        rather than factorizing after the fact as we do here. That gets the
+        scale of the former and the objective of the latter, and it is the next
+        experiment rather than a distant prospect.
+  \item More rounds, and rewards that mix computational and measured signal
+        continuously rather than once per library.
+  \item Other chemistries and substrate classes, including bulk polymers.
 \end{planlist}
-\todo{conclusion p4 --- outlook}
+\todo{discussion p4 --- outlook}

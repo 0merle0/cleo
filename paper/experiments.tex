@@ -1536,27 +1536,7 @@ $\mathbf{1.93\times}$ the baseline diversity at matched success --- against the
 unanchored arm's \SI{83.1}{\percent} at spread 76.6, $U_{15} = 510$
 ($2.16\times$ / $1.32\times$). Entropy settles at 1.65 versus 0.99.
 
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{ame_distributions}
-  \caption{\textbf{Where the distributions actually sit, rather than the success
-  rate thresholded out of them.} Each row is one arm's per-design best-of-5 motif
-  RMSD: box for median and quartiles, jittered strip behind it for the shape the
-  box hides. Log axis, because a linear one lets the single worst arm compress
-  everything that matters into the left fifth. \textbf{Left, M0097:} every
-  \cleo{} arm has its \emph{median} below the cutoff (\SIrange{1.07}{1.44}{\angstrom})
-  --- the mode has moved, not just the tail --- against
-  \SIrange{1.31}{1.42}{\angstrom} for low-temperature LigandMPNN and
-  \SI{5.59}{\angstrom} at $T{=}1.0$. The non-monotonicity noted in E10 is visible
-  directly: $T{=}0.3$ has a \emph{lower} median than $T{=}0.1$.
-  \textbf{Right, the three near-miss backbones:} medians of
-  \SIrange{2.81}{3.12}{\angstrom} with the cutoff far out in the left tail. The
-  one design that survived 40 refolds sits at the extreme edge of its own
-  distribution. Encoding: both ladders are ordinal, so each is a single hue
-  ramped light to dark rather than arbitrary categorical colours; the anchored
-  arm keeps an accent hue as the highlighted result.}
-  \label{fig:ame-distributions}
-\end{figure}
+\input{figures/blocks/distributions}
 
 \plan{This supersedes the E10 comparison, whose \cleo{} row came from the
 uncorrected objective and gave $1.40\times$ / $1.31\times$. It also repairs the

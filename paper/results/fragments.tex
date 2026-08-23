@@ -1,0 +1,142 @@
+\section{Results: fragment recombination builds the library}
+\label{sec:res:fragments}
+
+\plan{\textbf{Claim.} Designs from the trained policy can be cut at fixed
+boundaries and recombined across parents, so that $\sum_i |F_i|$ synthesized DNA
+parts yield $\prod_i |F_i|$ testable variants --- and the recombinants keep
+enough of the parental pass rate that the resulting library is worth building.
+
+\textbf{Status: \statusblocked{}.} This is the one section of the paper with no
+data behind it yet. Every other claim in the document is either measured or a
+rewrite of something measured. Written out in full here so the experiments it
+needs are unambiguous.
+
+\textbf{Why it is the load-bearing section.} Section~\ref{sec:res:frontier}
+buys a better \emph{distribution}; on its own that is a sampling result. This
+section is what converts a distribution into something you can physically order,
+and it is the only reason the PETase libraries in
+Section~\ref{sec:res:petase} can be the size they are. Without it the paper is a
+benchmark result with an application attached.}
+
+\subsection*{Block 1 --- The combinatorial argument, stated precisely}
+
+\begin{planlist}
+  \item Set up the notation: $L$ residues split into $k$ fragments at fixed
+        boundaries $[s_i, e_i]$; $F_i$ the set of distinct sequences observed at
+        fragment $i$ across the policy's output; a recombinant is one choice per
+        slot, joined.
+  \item The arithmetic: $\sum_i |F_i|$ parts, $\prod_i |F_i|$ recombinants. With
+        $k = 5$ and $|F_i| = 40$ that is 200 parts and $1.0 \times 10^8$
+        variants. \textbf{State the actual numbers used, not this example.}
+  \item Golden Gate assembly is what makes the product physically reachable:
+        one pot, orthogonal overhangs at the boundaries, no per-variant
+        synthesis. Methods carries the adapter design.
+  \item \textbf{The assumption the whole section rests on, named up front:}
+        fragments are treated as if they contribute independently to
+        foldability. They do not, exactly --- the whole point of an inverse
+        folding model is that residues are coupled. Block 3 measures how badly
+        the approximation fails, and that measurement is the result.
+\end{planlist}
+\todo{fragments --- state the actual $k$, $|F_i|$ and library size used}
+
+\subsection*{Block 2 --- Where the boundaries go}
+
+\begin{planlist}
+  \item Boundaries are chosen on the structure, not the sequence: cut in loops
+        and between secondary-structure elements, never through the active site.
+  \item \textbf{Pre-register the comparison:} boundaries placed on
+        secondary-structure breaks should retain more pass rate than boundaries
+        placed at evenly spaced sequence positions. If they do not, the
+        structural rationale is decorative and should be dropped from the paper
+        rather than defended.
+  \item Report the fixed-residue set --- catalytic residues held constant across
+        all fragments, so every recombinant retains the active site by
+        construction.
+\end{planlist}
+\todo{fragments --- boundary placement rule + the structural-vs-uniform control}
+
+\subsection*{Block 3 --- Do recombinants fold? (the experiment that must be run)}
+
+\plan{\textbf{This is the measurement the section exists for.} Everything above
+is setup and everything below is consequence. Design, in the order it should be
+run:
+
+\begin{enumerate}\setlength{\itemsep}{0pt}
+  \item Sample $n$ designs from a trained \cleo{} policy with no selection
+        applied, on an AME backbone where the parental pass rate is already
+        known and high (M0097 is the obvious choice --- it is the backbone every
+        other measurement in the paper uses).
+  \item Split each at the fragment boundaries. Keep only fragments drawn from
+        \emph{passing} parents, since that is what one would actually order.
+  \item Draw recombinants uniformly from the product space, excluding any
+        recombinant that reproduces a parent exactly.
+  \item Fold best-of-5 and score on the identical code path as
+        Section~\ref{sec:res:frontier}. \textbf{Same pipeline, same reference,
+        or the comparison to the parental rate is not a comparison.}
+\end{enumerate}
+
+\textbf{The endpoint is retention:} recombinant pass rate divided by parental
+pass rate. Everything else is secondary.
+
+\textbf{Pre-registered predictions, written before the run:}
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item Retention is well above the rate for recombining across \emph{random}
+        MPNN samples at matched diversity. If it is not, fragmentation is
+        adding nothing that temperature would not.
+  \item Retention falls monotonically with the number of slots swapped away
+        from a single parent. A recombinant differing at one slot should behave
+        nearly like its parent; one differing at all $k$ should be worst. A flat
+        curve would mean the fragments are effectively independent, which would
+        be a stronger result than we expect and should be reported as such.
+  \item Recombinants reach mutational combinations absent from the parental set
+        --- measured as $U$ over the recombinant library against $U$ over the
+        parents at matched design count.
+\end{itemize}
+
+\textbf{What kills the claim:} retention below the point where the library
+is filterable in practice. If the parental rate is \SI{57}{\percent} and
+recombinants pass at \SI{2}{\percent}, the product space is nominal rather than
+real, and the honest paper reports the fragment library as a screening funnel
+with a stated hit rate instead of as a $10^8$-member library. Decide the
+threshold now, not after seeing the number.}
+
+\todo{fragments --- RUN THIS. Selection-free sample $\rightarrow$ split $\rightarrow$
+  recombine $\rightarrow$ fold best-of-5 $\rightarrow$ retention curve vs.\ slots
+  swapped}
+
+\subsection*{Block 4 --- Relation to manufacturing-aware generative models}
+
+\plan{\citet{weinstein2026manufacturing} is the nearest prior art and the
+section must engage it directly rather than in passing. Their move is to make
+the generative model manufacturing-aware from the outset --- factorized to match
+what combinatorial DNA chemistry can physically sample --- and they reach
+${\sim}10^{16}$ designs for antibodies, T-cell antigens and Taq polymerase.
+
+\textbf{The honest framing.} They get there first and at larger scale. What is
+different is the regime, and it is a real difference rather than a hedge:
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item \textbf{Their objective comes from a natural distribution.} 300 million
+        observed human antibodies define what a good sample looks like, so the
+        model can be constrained to the chemistry from the start without giving
+        anything up. For a de novo enzyme there is no such distribution --- the
+        backbone has no natural homologs --- so the objective has to be
+        constructed, which is what Section~\ref{sec:res:frontier} does.
+  \item \textbf{Order of operations.} They factorize first and train the
+        factorized model; we train an unfactorized policy for catalytic geometry
+        and factorize afterwards. That makes retention (Block 3) our problem and
+        not theirs --- their samples are manufacturable by construction, ours
+        have to be shown to survive the cut.
+  \item \textbf{Scale is not the axis we win on and the section should say so
+        plainly.} $10^{16}$ is out of reach here and it does not need to be
+        reached: a $10^{8}$ library that is enriched for catalytic geometry is a
+        different object from a $10^{16}$ library that is not.
+\end{itemize}
+
+\textbf{Do not write this block as a competitive comparison.} The two results
+compose --- a manufacturing-aware architecture trained against a catalytic
+reward is the obvious next thing, and saying so is more useful than claiming a
+win.}
+
+\todo{fragments --- write Block 4 once Block 3 lands; needs the library-size
+  and retention numbers to be concrete about the $10^{8}$ vs $10^{16}$ point}

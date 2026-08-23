@@ -25,31 +25,45 @@ only; \statusblocked{} means the section cannot be written until data lands.
 \texttt{related\_work.tex} & Status quo: backbone generation, filtering,
                          RL for inverse folding, library design, the gap      & \statusdone \\
 \addlinespace
-\multicolumn{3}{@{}l}{\textit{Results} --- compile order is risk order} \\
-\texttt{results/ame.tex}      & AME benchmark; diversity at matched fidelity;
-                                fully computational and reproducible          & \statusscaffold \\
-\texttt{results/heme.tex}     & Three-arm head-to-head; foundational claim    & \statusblocked \\
-\texttt{results/petase.tex}   & Closed-loop iteration; strongest data         & \statusscaffold \\
-\texttt{results/protease.tex} & Diversity-reward ablation; highest risk       & \statusblocked \\
+\multicolumn{3}{@{}l}{\textit{Results} --- the three-move spine} \\
+\texttt{results/frontier.tex}  & Move 1: RL moves the diversity/fidelity
+                         frontier. Public benchmark, referee-reproducible  & \statusscaffold \\
+\texttt{results/fragments.tex} & Move 2: split + recombine $\rightarrow$
+                         combinatorial library. \textbf{No data yet}        & \statusblocked \\
+\texttt{results/petase.tex}    & Move 3: three closed-loop rounds to
+                         $250\times$; the demonstration                     & \statusblocked \\
 \addlinespace
 \multicolumn{3}{@{}l}{\textit{Methods}} \\
-\texttt{methods/overview.tex} & GRPO, fragment libraries, surrogate,
-                                diversity reward                              & \statusscaffold \\
-\texttt{methods/heme.tex}     & Design config, three-arm protocol, assay      & \statusscaffold \\
-\texttt{methods/petase.tex}   & Two libraries, surrogate, assays              & \statusscaffold \\
-\texttt{methods/protease.tex} & Design config, two-arm ablation, assay        & \statusscaffold \\
-\texttt{experiments.tex} & Arms, selection algorithms, experiment slate
-                                E1--E14 with status                           & \statusscaffold \\
+\texttt{methods/overview.tex} & GRPO, fragment libraries, surrogate          & \statusscaffold \\
+\texttt{methods/petase.tex}   & Three libraries, surrogate, assays           & \statusscaffold \\
 \addlinespace
 \multicolumn{3}{@{}l}{\textit{Back matter}} \\
-\texttt{conclusion.tex} & Four-paragraph discussion and outlook               & \statusscaffold \\
+\texttt{conclusion.tex} & Four-paragraph discussion and outlook              & \statusscaffold \\
+\addlinespace
+\multicolumn{3}{@{}l}{\textit{Not in this build}} \\
+\texttt{notebook.tex} & Separate document: the E1--E21 record               & \statusdone \\
+\texttt{experiments.tex} & Arms, selection rules, slate E1--E21, algorithm
+                        audit; \textbf{\textbackslash input by notebook.tex,
+                        not by main.tex}                                     & \statusdone \\
+\texttt{supplementary/*} & Heme and protease results + methods, cut from the
+                        spine and parked                                    & \statusblocked \\
 \bottomrule
 \end{tabular}
 
 \bigskip
 \noindent
+\textbf{The paper and the record are two documents.} \texttt{main.tex} builds
+the paper (\texttt{make pdf}); \texttt{notebook.tex} builds the experimental
+record (\texttt{make notebook}); \texttt{make all} builds both. The split is
+deliberate: the notebook keeps pre-registrations next to the results that
+falsified them, which is what makes a retraction checkable and what a paper
+cannot carry and stay readable. A claim moves from the notebook to the paper by
+being rewritten as prose, never by \textbackslash input.
+
+\bigskip
+\noindent
 Two companion files live in \texttt{paper/} but are deliberately \emph{not}
-part of this build:
+part of either build:
 \begin{itemize}\setlength{\itemsep}{0pt}
   \item \texttt{outline\_computational.md} --- working brainstorm for a
         computational-first version of the paper: landscape analysis, the
