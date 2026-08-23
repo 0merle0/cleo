@@ -1285,10 +1285,9 @@ that four of its seven hits do not survive refolding.}
 
 \subsection*{E20 result --- selection does not rescue, and the training already did}
 
-\plan{Nine runs; \texttt{logprob\_band} on M0375 is one cell short --- its fold
-job died on a CUDA fault and has been resubmitted. Everything below is the other
-eight cells. Pass counts are single digits on two of the three backbones, so
-median RMSD is the endpoint to read, exactly as pre-registered.}
+\plan{Nine runs, all nine folded. Pass counts are single digits on two of the
+three backbones, so median RMSD is the endpoint to read, exactly as
+pre-registered.}
 
 \begin{center}
 \begin{tabular}{@{}llrrrr@{}}
@@ -1305,15 +1304,17 @@ M0365 & \texttt{random}        & \SI{1.0}{\percent}           & ---         & \S
 \midrule
 M0375 & \texttt{random}        & \textbf{\SI{57.3}{\percent}} & ---         & \SI{1.44}{\angstrom} & \textbf{420} \\
       & \texttt{logprob\_top}  & \SI{6.2}{\percent}           & \num{6e-15} & \SI{2.15}{\angstrom} & 412 \\
+      & \texttt{logprob\_band} & \SI{0.0}{\percent}           & \num{8e-22} & \SI{2.39}{\angstrom} & 0 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \textbf{The pre-registered prediction holds in full.} Pass rate does not move on
-any backbone: two exact ties and one large loss. The one place we said movement
+any backbone: two exact ties and two large losses, both on M0375. The one place we said movement
 might appear --- median RMSD under \texttt{logprob\_band} --- moved the wrong
-way on all three, \SIrange{2.6}{3.3}{\angstrom} against controls at
-\SIrange{1.4}{2.2}{\angstrom}. Selection re-ranks; it does not generate. On a
+way on all three, \SIrange{2.4}{3.3}{\angstrom} against controls at
+\SIrange{1.4}{2.2}{\angstrom}, and \texttt{logprob\_band} passes nothing at all:
+0/96 on every backbone, 0/288 in total. Selection re-ranks; it does not generate. On a
 pool that mostly is not close, that is the whole story.
 
 \textbf{The unplanned result is more interesting than the planned one.} These
