@@ -190,21 +190,28 @@ E18 & \statusdone     & \textbf{Selection sweep at 128$\to$16} --- six rules on
       (\SI{82.3}{\percent} vs \SI{68.8}{\percent}, $U_{15}$ 603 vs 558) and
       \texttt{logprob\_band} buys $+\SI{27}{\percent}$ coverage at no resolvable
       pass cost. But the pre-registered group-spread mechanism is falsified, and
-      \texttt{reward\_std} was degenerate under rank normalisation \\
-E19 & \statusscaffold  & \textbf{Does the E18 frontier generalise?} Four rules
+      \texttt{reward\_std} was degenerate under rank normalisation.
+      \textbf{Pass-rate claims retracted --- E19 failed to replicate them on this
+      same backbone} \\
+E19 & \statusdone     & \textbf{Does the E18 frontier generalise?} Four rules
       $\times$ three backbones, matched \texttt{random} control &
-      E18 is one run on one backbone. Re-running M0097 gives a seed replicate;
-      M0904 and M0907 test whether the frontier is a property of the rules or of
-      that backbone. \emph{All 12 runs trained; unconfounded folds in flight.}
-      Pre-fold: every rule leaves a more diverse policy than the control on all
-      three backbones, same ordering each time \\
-E20 & \statusscaffold  & \textbf{Rescue}: do the winning rules recover backbones
+      \textbf{No --- and E18 fails to replicate on its own backbone.} No rule
+      beats its control anywhere; pooled at $n = 288$, \texttt{random}
+      \SI{69.1}{\percent} vs \SIrange{24.7}{45.1}{\percent}. A seed re-run moved
+      the control 21 points, so E18's pass-rate table was noise. The coverage
+      trade does replicate: \texttt{logprob\_top} $U_{15}$ $1.79\times$ mean
+      over six backbones \\
+E20 & \statusdone     & \textbf{Rescue}: do the winning rules recover backbones
       the benchmark scores 0/40? Three rules $\times$ E3's three near-misses &
       Different regime from E18 --- \SIrange{0.1}{0.5}{\percent} passing against
       \SIrange{56}{88}{\percent}. Tests whether a selection rule can move a
       \emph{median} that sits \SI{1.4}{\angstrom} outside the cutoff, or only
-      re-ranks a pool that already contains hits. \emph{All 9 runs trained;
-      unconfounded folds in flight} \\
+      re-ranks a pool that already contains hits.
+      \textbf{Pre-registered null confirmed:} pass rate moves on no backbone and
+      \texttt{logprob\_band} pushes median RMSD the wrong way. But the
+      \texttt{random} control rescues M0375 (\SI{57.3}{\percent}) and M0050
+      (\SI{9.4}{\percent}) on its own --- the rescue is the training, not the
+      selection \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
       $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
@@ -1013,6 +1020,18 @@ $U$ & $U_{15}$ \\
 \end{tabular}
 \end{center}
 
+\plan{\textbf{Superseded by E19 --- read the table above as one draw, not as a
+result.} E19 re-ran this same config on this same backbone in a fresh process
+and did not reproduce it. \texttt{logprob\_top} fell from \SI{82.3}{\percent} to
+\SI{46.9}{\percent} ($p = \num{4e-7}$) and the \texttt{random} control moved
+\emph{up}, \SI{68.8}{\percent} to \SI{89.6}{\percent} ($p = \num{6e-4}$), so the
+headline gap reverses sign between two draws of the same experiment. The
+pre-registration for E19 named this outcome in advance: ``if M0097 itself does
+not reproduce, E18 was noise.'' The paragraphs below are kept as written because
+the pre-registered reasoning they falsify is still worth recording, but every
+pass-rate claim in them is retracted. The coverage ordering does replicate; see
+the E19 result.}
+
 \textbf{The pre-registered mechanism is falsified, by the test written down for
 it.} \texttt{logprob\_top} was predicted to fold excellent designs and stall
 anyway, with the explicit rider that if it trained well the group-baseline story
@@ -1104,39 +1123,85 @@ draws of one number, which is the stronger design --- but it is still $n = 1$
 per cell. The arm can show that a direction is consistent across backbones; it
 cannot put a tight interval on the size of the effect on any one of them.}
 
-\textbf{Interim, sequence level only.} All twelve runs trained to 150 steps and
-were sampled \numproduct{96} times each without selection; the folds are running.
-Mean pairwise Hamming distance over those samples needs no oracle and is already
-unconfounded, so it is reported now:
+\subsection*{E19 result --- the frontier does not replicate, and the reason is
+seed variance}
+
+\plan{Twelve runs, 150 steps, oversample 8; \numproduct{96} selection-free
+samples per arm from the final checkpoint, folded best-of-5. Same harness as
+E18. $p$ is Fisher's exact against that backbone's own \texttt{random} control.}
 
 \begin{center}
-\begin{tabular}{@{}lrrr@{}}
+\begin{tabular}{@{}llrrrrr@{}}
 \toprule
-\textbf{Rule} & \textbf{M0097} & \textbf{M0904} & \textbf{M0907} \\
+\textbf{Backbone} & \textbf{Rule} & \textbf{Pass} & $p$ & \textbf{Med.\ RMSD} &
+$U$ & $U_{15}$ \\
 \midrule
-\texttt{random}         & 76.5 & 58.8 & 61.0 \\
-\texttt{logprob\_strat} & 85.4 & 65.4 & 63.0 \\
-\texttt{logprob\_top}   & 103.7 & 84.0 & 71.0 \\
-\texttt{logprob\_band}  & \textbf{102.0} & \textbf{106.7} & \textbf{102.7} \\
+M0097 & \texttt{random}         & \textbf{\SI{89.6}{\percent}} & ---            & \SI{1.04}{\angstrom} & 1022 & 432 \\
+      & \texttt{logprob\_strat} & \SI{82.3}{\percent}          & 0.21           & \SI{1.15}{\angstrom} & 1208 & 579 \\
+      & \texttt{logprob\_top}   & \SI{46.9}{\percent}          & \num{2e-10}    & \SI{1.56}{\angstrom} & 1362 & \textbf{787} \\
+      & \texttt{logprob\_band}  & \SI{64.6}{\percent}          & \num{6e-5}     & \SI{1.42}{\angstrom} & \textbf{1403} & 721 \\
+\midrule
+M0904 & \texttt{random}         & \textbf{\SI{63.5}{\percent}} & ---            & \SI{1.41}{\angstrom} & 709 & 333 \\
+      & \texttt{logprob\_strat} & \SI{32.3}{\percent}          & \num{2e-5}     & \SI{1.68}{\angstrom} & 559 & 413 \\
+      & \texttt{logprob\_top}   & \SI{33.3}{\percent}          & \num{5e-5}     & \SI{1.68}{\angstrom} & \textbf{803} & 567 \\
+      & \texttt{logprob\_band}  & \SI{9.4}{\percent}           & \num{2e-15}    & \SI{2.63}{\angstrom} & 580 & \textbf{580} \\
+\midrule
+M0907 & \texttt{random}         & \textbf{\SI{54.2}{\percent}} & ---            & \SI{1.48}{\angstrom} & 614 & 323 \\
+      & \texttt{logprob\_strat} & \SI{20.8}{\percent}          & \num{3e-6}     & \SI{1.74}{\angstrom} & 484 & 425 \\
+      & \texttt{logprob\_top}   & \SI{50.0}{\percent}          & 0.66           & \SI{1.49}{\angstrom} & \textbf{859} & \textbf{488} \\
+      & \texttt{logprob\_band}  & \SI{0.0}{\percent}           & \num{3e-20}    & \SI{2.07}{\angstrom} & 0 & 0 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Every rule leaves a more diverse policy than the control on every backbone, and
-the ordering is the same all three times. \texttt{logprob\_band} is the striking
-column: it sits at \numrange{102}{107} regardless of backbone, while the control
-ranges \numrange{58.8}{76.5} --- consistent with the band acting on the policy's
-own log-probability measure, which is backbone-independent by construction, and
-with the mechanism claimed for it in E18.
+\textbf{No rule beats the control on pass rate on any backbone.} The best result
+any rule achieves against its own control is a tie (\texttt{logprob\_top} on
+M0907, \SI{50.0}{\percent} vs \SI{54.2}{\percent}, $p = 0.66$). Pooled over the
+three backbones at $n = 288$ per arm, \texttt{random} takes \SI{69.1}{\percent}
+against \SI{45.1}{\percent} for \texttt{logprob\_strat}, \SI{43.4}{\percent} for
+\texttt{logprob\_top} and \SI{24.7}{\percent} for \texttt{logprob\_band}, every
+one of them a loss at $p < \num{1e-8}$. E18's central claim --- that
+\texttt{logprob\_top} dominates the control outright --- does not survive.
 
-\plan{\textbf{This is not yet the E19 result and must not be read as one.} Mean
-pairwise Hamming is a different statistic from the $U_{15}$ coverage E18 reported,
-and it is computed over all samples rather than over passing ones. E16 is the
-standing example of those two moving in opposite directions: its \texttt{maxmin}
-arm raised per-design diversity while total coverage of passing designs fell to
-$0.77\times$. A policy can be diverse because it is exploring or because it is
-degrading, and only the folds separate those. The pass-rate half of every
-prediction above is untested until they land.}
+\textbf{It fails first on E18's own backbone, which localises the problem to
+seed variance rather than to backbone specificity.} The M0097 arm is a straight
+re-run of the E18 config in a fresh process; nothing seeds the trainer, so it is
+an independent draw. \texttt{logprob\_top} went \SI{82.3}{\percent} $\to$
+\SI{46.9}{\percent} ($p = \num{4e-7}$). The \emph{control} went
+\SI{68.8}{\percent} $\to$ \SI{89.6}{\percent} ($p = \num{6e-4}$). Two draws of
+one configuration differ by 21 points on the control alone --- larger than
+almost every effect E18 reported, and in the opposite direction from the one
+that mattered. This is the branch the pre-registration named: E18 was noise.
+
+\plan{\textbf{This generalises past E18 and we should say so plainly.} A
+$\pm$21-point seed swing on a pass rate means any single-run pass-rate contrast
+in this paper at $n \approx 96$ is under-powered, not merely imprecise. The
+binomial interval we quoted for E18 ($\pm 9$ points) described sampling error
+inside one run and silently omitted run-to-run variance, which is the larger
+term. Every $n = 1$ pass-rate comparison in the slate inherits this, and the fix
+is replication, not a wider interval on one draw.}
+
+\textbf{What does replicate is the coverage trade.} \texttt{logprob\_top}
+returns more distinct substitutions per design than the control on five of the
+six backbones tested across E19 and E20, at $U_{15}$ ratios of 1.82, 1.70, 1.51,
+2.07 and 2.68 (mean \num{1.79}); the sixth is a wash at \num{0.98}. That
+direction is far steadier than anything in the pass-rate column. So there is a
+real frontier here, but it is a \emph{trade} --- coverage bought with pass rate
+--- and not the dominance E18 claimed. \texttt{logprob\_strat} is likewise
+consistent, and consistently mediocre: coverage up \numrange{1.24}{1.34}$\times$
+on all three E19 backbones, pass rate down on all three.
+
+\textbf{\texttt{logprob\_band} is the clearest casualty.} E18 read it as the rule
+that worked as designed. Across three fresh backbones it takes
+\SI{64.6}{\percent}, \SI{9.4}{\percent} and \SI{0.0}{\percent} --- on M0907 not a
+single one of 96 designs passes, with median motif RMSD at \SI{2.07}{\angstrom}
+against a \SI{1.5}{\angstrom} cutoff. Its sequence-level diversity was the most
+stable quantity we measured, \numrange{102}{107} mean pairwise Hamming on all six
+backbones, and it is precisely that stability that turns out to be the warning:
+the band holds the policy at a fixed spread in its own log-probability measure
+whether or not that spread is anywhere near the motif. Diversity decoupled from
+the objective is not exploration, and the interim sequence-level table we
+reported before folding pointed the wrong way for exactly this reason.
 
 \subsection*{E20 --- can selection rescue a backbone the benchmark scores 0/40?}
 
@@ -1168,35 +1233,62 @@ is close to useless as a readout here in any case: at these rates a 150-step run
 returns single-digit counts, so median and minimum motif RMSD are the primary
 endpoints and the pass count is reported only for continuity with E3.
 
-\textbf{Interim, sequence level only.} All nine runs trained to 150 steps and
-were sampled \numproduct{96} times each without selection; the folds are running.
-Mean pairwise Hamming over those samples:
-
-\begin{center}
-\begin{tabular}{@{}lrrr@{}}
-\toprule
-\textbf{Rule} & \textbf{M0050} & \textbf{M0365} & \textbf{M0375} \\
-\midrule
-\texttt{random}        & 63.1 & 76.1 & 74.5 \\
-\texttt{logprob\_top}  & 99.2 & 88.9 & 92.5 \\
-\texttt{logprob\_band} & \textbf{107.0} & \textbf{105.4} & \textbf{106.3} \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The pattern is the same as E19's, including \texttt{logprob\_band}'s
-backbone-independent \numrange{105}{107}, and it holds on backbones where almost
-nothing passes. That is worth noting because it separates the two halves of the
-mechanism: whatever \texttt{logprob\_band} does to the policy's spread, it does
-without needing a pool that already contains hits. It says nothing yet about
-whether the median moves, which is the endpoint this experiment was built for.
-
 \plan{A null here is publishable and worth stating in advance as such: it would
 establish that the E18 frontier is a property of the high-pass-rate regime and
 does not transfer to hard targets, which bounds the claim rather than weakening
 it. The failure mode to guard against is reading a one- or two-design difference
 in a 1200-fold pool as a rescue --- E3's replication at $N = 40$ already showed
 that four of its seven hits do not survive refolding.}
+
+\subsection*{E20 result --- selection does not rescue, and the training already did}
+
+\plan{Nine runs; \texttt{logprob\_band} on M0375 is one cell short --- its fold
+job died on a CUDA fault and has been resubmitted. Everything below is the other
+eight cells. Pass counts are single digits on two of the three backbones, so
+median RMSD is the endpoint to read, exactly as pre-registered.}
+
+\begin{center}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+\textbf{Backbone} & \textbf{Rule} & \textbf{Pass} & $p$ & \textbf{Med.\ RMSD} & $U_{15}$ \\
+\midrule
+M0050 & \texttt{random}        & \textbf{\SI{9.4}{\percent}}  & ---         & \SI{1.62}{\angstrom} & 239 \\
+      & \texttt{logprob\_top}  & \SI{8.3}{\percent}           & 1.0         & \SI{1.83}{\angstrom} & \textbf{495} \\
+      & \texttt{logprob\_band} & \SI{0.0}{\percent}           & 0.003       & \SI{3.34}{\angstrom} & 0 \\
+\midrule
+M0365 & \texttt{random}        & \SI{1.0}{\percent}           & ---         & \SI{2.18}{\angstrom} & 50 \\
+      & \texttt{logprob\_top}  & \SI{1.0}{\percent}           & 1.0         & \SI{2.16}{\angstrom} & \textbf{134} \\
+      & \texttt{logprob\_band} & \SI{0.0}{\percent}           & 1.0         & \SI{2.63}{\angstrom} & 0 \\
+\midrule
+M0375 & \texttt{random}        & \textbf{\SI{57.3}{\percent}} & ---         & \SI{1.44}{\angstrom} & \textbf{420} \\
+      & \texttt{logprob\_top}  & \SI{6.2}{\percent}           & \num{6e-15} & \SI{2.15}{\angstrom} & 412 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The pre-registered prediction holds in full.} Pass rate does not move on
+any backbone: two exact ties and one large loss. The one place we said movement
+might appear --- median RMSD under \texttt{logprob\_band} --- moved the wrong
+way on all three, \SIrange{2.6}{3.3}{\angstrom} against controls at
+\SIrange{1.4}{2.2}{\angstrom}. Selection re-ranks; it does not generate. On a
+pool that mostly is not close, that is the whole story.
+
+\textbf{The unplanned result is more interesting than the planned one.} These
+three backbones were selected as benchmark failures scored 0/40, and the
+\texttt{random} control --- which is CLEO training with no selection rule at all
+--- passes \SI{57.3}{\percent} on M0375 and \SI{9.4}{\percent} on M0050, with
+median motif RMSD inside the cutoff on both. The rescue is real and it is
+already done by the RL fine-tuning, independent of anything in this experiment.
+That is E3's claim reproducing on an unconfounded harness, which is a stronger
+form of it than E3 itself reported.
+
+\plan{It also means the framing in this experiment's pre-registration --- these
+backbones ``sit near \SIrange{0.1}{0.5}{\percent}'' --- describes the
+\emph{published benchmark's} designs, not a trained policy's, and should not be
+read as the comparator for the table above. M0365 is the one that stays hard:
+1/96 for both arms, median \SI{2.2}{\angstrom}. One backbone out of three
+resisting training is the honest headline for the rescue claim, and it is a
+claim about training, not about selection.}
 
 \subsection*{E3 result --- two backbones reach the cutoff, one convincingly}
 
