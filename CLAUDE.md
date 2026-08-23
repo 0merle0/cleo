@@ -162,6 +162,7 @@ clip_eps_high: 0.28
 
 model_type: protein_mpnn        # or ligand_mpnn (if ligand in PDB)
 temperature: 1.0                # keep at 1.0 to avoid mode collapse
+seed: null                      # optional; unset = unseeded (historical default)
 omit_AA: CX                    # amino acids to never sample
 fixed_residues: "A44 A85 ..."   # space-separated chain+resnum
 
@@ -170,6 +171,43 @@ reward:
   steps: [...]                  # ordered list of metric steps
   reward_aggregation: [...]     # weighted normalized sum of metrics
 ```
+
+### Seeding and Run-to-Run Variance
+
+`seed:` in a training config seeds `random`, `numpy` and `torch`. It is unset by
+default, which leaves runs nondeterministic and reproduces historical behaviour.
+
+**Set it for anything you intend to compare.** Two unseeded runs of one config
+on the AME benchmark produced control pass rates of 68.8% and 89.6% — a 21-point
+swing, larger than most effects these experiments are built to detect. A
+single-run A/B on pass rate at n≈96 cannot resolve anything smaller than that,
+so budget replicates rather than trusting one draw.
+
+### Best-of-N Folding
+
+`af3_from_df` defaults to `num_diffusion_samples: 5` and `per_sample_rows: true`,
+because best-of-5 is the AME benchmark's own unit — a single-sample run measures
+something the benchmark does not.
+
+When an oracle step emits N rows per sequence, the pipeline **must** reduce them
+back to one, or the reward tensor won't match the batch:
+
+```yaml
+- name: bo5
+  target_fn: cleo.design.utils.rfd2_benchmark.best_of_n_from_df
+  cfg:
+    group_col: name
+    metric_prefix: ame      # the metric step to reduce over
+```
+
+`UniversalReward` refuses to construct a pipeline that folds N times without
+this step, naming the exact block to add. Set `num_diffusion_samples: 1` to opt
+out. Configs written before this change are left as-is — they record what was
+actually run, and re-running one now errors rather than silently reverting to
+single-sample.
+
+Note `boltz_from_df` reads neither key and always returns one row per sequence;
+multi-sample output for Boltz is not implemented.
 
 ### Reward Aggregation
 
@@ -189,7 +227,9 @@ reward_aggregation:
 ```bash
 #!/bin/bash
 #SBATCH -p gpu-train
-#SBATCH --gres=gpu:l40:8
+#SBATCH --gres=gpu:large:1      # `gpu:l40:8` is NOT satisfiable here; sbatch
+                                # rejects it with "Requested node configuration
+                                # is not available"
 #SBATCH --nodes=1
 #SBATCH -c 8
 #SBATCH --mem=64g

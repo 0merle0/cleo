@@ -212,6 +212,11 @@ E20 & \statusdone     & \textbf{Rescue}: do the winning rules recover backbones
       \texttt{random} control rescues M0375 (\SI{57.3}{\percent}) and M0050
       (\SI{9.4}{\percent}) on its own --- the rescue is the training, not the
       selection \\
+E21 & \statusscaffold  & \textbf{Seed variance}: \texttt{random} and
+      \texttt{logprob\_top} $\times$ five explicit seeds on M0097 &
+      E19 moved the control 21 points between two draws of one config. Until the
+      run-to-run distribution has a width, no single-run pass-rate contrast in
+      this slate is interpretable. \emph{10 runs training} \\
 E14 & \statusdone     & ESM embedding view of the passing libraries &
       Advantage holds but shrinks: passing-set spread \cleo{}/$T{=}0.1$ is
       $1.31\times$ in ESM space vs.\ $2.57\times$ in Hamming \\
@@ -229,6 +234,44 @@ E16 & \statusdone     & In-training selection: no-oversample /
 \bottomrule
 \end{tabular}
 \end{center}
+
+\subsection*{E21 --- how wide is the run-to-run distribution?}
+
+\plan{Pre-registered. \texttt{random} and \texttt{logprob\_top} on M0097, five
+explicit seeds each, 150 steps, oversample 8 --- the E19 config unchanged except
+for the seed. Evaluated by the same selection-free harness: \numproduct{96}
+samples per run from the final checkpoint, folded best-of-5.}
+
+This is the experiment E19 forced. Two draws of one configuration put the
+\texttt{random} control at \SI{68.8}{\percent} and \SI{89.6}{\percent}, a gap
+larger than most of the effects the selection experiments were built to detect.
+Every pass-rate contrast reported in this slate at $n = 1$ is a difference
+measured against noise of unknown width, and no amount of re-reading those
+tables fixes that --- the width has to be measured.
+
+Two arms rather than four is deliberate. The quantity wanted is a
+\emph{spread}, and a spread is estimated from replicates; a third rule would buy
+less than a fourth and fifth seed on the two arms that carry the surviving
+claims.
+
+\textbf{Predictions.} The control's five draws span at least 15 points of pass
+rate --- if they span far less, E19's 21-point move was an outlier and the
+retraction of E18 is too strong. \texttt{logprob\_top}'s distribution overlaps
+the control's substantially, so the two arms are not separated by a
+between-seed $t$-test at $n = 5$; this is the outcome consistent with everything
+after E18 and it makes the pass-rate half of the selection story simply
+unresolved at this sample size rather than negative. The $U_{15}$ coverage ratio
+stays above 1 in at least four of the five paired seeds --- that is the claim
+E19 found stable across six backbones, and if it is also stable across seeds it
+is the one result from the selection arc worth carrying into the paper.
+
+\plan{\textbf{What this fixes and what it does not.} It puts an interval on one
+cell --- two rules, one backbone, one step count --- and licenses saying how
+large an effect this design can resolve. It does not retroactively repair E9,
+E16 or E18, whose comparisons remain single draws; what it does is tell the
+reader how much weight those can bear. Seeding is new (\texttt{seed:} in the
+training config, unset by default), so every run reported before E21 was
+unseeded and cannot be re-drawn even in principle.}
 
 \subsection*{Scoring protocol}
 
