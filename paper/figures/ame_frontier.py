@@ -2,18 +2,27 @@
 """The diversity/fidelity frontier: temperature is the baseline, CLEO is above it.
 
 Temperature is how you buy diversity from LigandMPNN today, and it is a genuine
-trade -- every point you gain in coverage costs you pass rate. Sweeping T from
-0.1 to 1.0 traces that trade out as a curve, which is the honest thing for a new
-method to be compared against. A method that only beat *one* temperature would
-be beating a badly chosen operating point, not the baseline.
+trade -- every point of coverage costs pass rate. Sweeping T=0.1..1.0 traces
+that trade as a curve, which is the honest thing to compare a new method
+against; beating a single temperature would only mean beating a badly chosen
+operating point.
 
-The claim this figure supports is "higher pass rate at matched diversity", and
-it is deliberately narrower than "more diverse". On mean pairwise Hamming CLEO
-is comparable to baseline T=0.7, not better; what CLEO changes is how often a
-design at that spread folds correctly. Plotting U_k rather than Hamming makes
-the supported claim the visible one.
+CLEO is shown as the `random` arm alone: sequences taken as the policy emits
+them, with no selection rule applied. Selection rules move both axes, so
+including them would confound "the policy is better" with "the filter is
+better". The on-policy draw is the claim about the policy.
+
+The claim is "higher pass rate at matched diversity", deliberately narrower than
+"more diverse". On mean pairwise Hamming CLEO is comparable to baseline T=0.7,
+not better; what changes is how often a design at that spread folds correctly.
 
     uv run python paper/figures/ame_frontier.py
+
+On the x-axis: U_k, distinct (position, residue) substitutions rarefied to k
+designs. Raw U grows with how many designs passed, so plotting it against pass
+rate would partly plot pass rate against itself. U/n does not fix this -- it
+inverts it, falling 57.4 -> 12.2 as n goes 5 -> 86 on a single fixed policy.
+Rarefaction is the fix: it holds the design count constant.
 """
 
 import argparse
@@ -21,32 +30,24 @@ import argparse
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from ame_diversity import ARMS, BACKBONES, baseline, cleo, reference, stats
+from ame_diversity import BACKBONES, baseline, cleo, reference, stats
 from figio import save
 from palette import PALETTE
 
-# Two series only: a neutral for the baseline curve and one accent for CLEO.
-# Identity is carried by shape and direct labels as well as hue, so the panel
-# survives both colourblindness and greyscale printing.
 C_BASE, C_CLEO = PALETTE["gray"], PALETTE["blue"]
-ARM_MARK = {"random": "o", "logprob_strat": "s", "logprob_band": "^", "logprob_top": "D"}
-ARM_LABEL = {"random": "random", "logprob_strat": "strat",
-             "logprob_band": "band", "logprob_top": "top"}
 
 
-def collect(k):
+def collect(k, arm):
     rows = []
     for bb in BACKBONES:
         ref = reference(bb)
-        b = baseline(bb)
-        for T, g in b.groupby("temperature"):
+        for T, g in baseline(bb).groupby("temperature"):
             rows.append(dict(backbone=bb, kind="baseline", label=f"T={T:g}",
                              temp=T, **stats(g, ref, k)))
-        for arm in ARMS:
-            d = cleo(bb, arm)
-            if d is not None:
-                rows.append(dict(backbone=bb, kind="cleo", label=arm,
-                                 temp=float("nan"), **stats(d, ref, k)))
+        d = cleo(bb, arm)
+        if d is not None:
+            rows.append(dict(backbone=bb, kind="cleo", label="CLEO",
+                             temp=float("nan"), **stats(d, ref, k)))
     return pd.DataFrame(rows)
 
 
@@ -54,70 +55,61 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--k", type=int, default=15, help="rarefaction depth for U_k")
+    ap.add_argument("--arm", default="random", help="CLEO selection arm to plot")
     a = ap.parse_args()
 
-    df = collect(a.k)
-    fig, axes = plt.subplots(1, 3, figsize=(10.5, 3.6), sharey=True)
+    df = collect(a.k, a.arm)
+    # Shared x as well as y: with one CLEO point per panel, an autoscaled
+    # M0907 would zoom to a 40-unit window and make its coverage look
+    # comparable to a full sweep's.
+    fig, axes = plt.subplots(1, 3, figsize=(9.6, 3.3), sharey=True, sharex=True)
 
     for ax, bb in zip(axes, BACKBONES):
         d = df[df.backbone == bb]
-        # Ordered by temperature, not by U_k: the line is the sweep's own path
-        # through the plane, so reordering it would draw a curve nobody ran.
-        # Temperatures with no passing design have no diversity to place and
-        # are reported in text instead of piled on the origin.
-        b = d[(d.kind == "baseline") & (d.n_pass > 0)].sort_values("temp")
-        ax.plot(b.Uk, b.pass_pct, "-", color=C_BASE, lw=2, zorder=1,
-                )
-        for _, r in b.iterrows():
-            ax.plot(r.Uk, r.pass_pct, "o", ms=5, mew=1.6, mec=C_BASE, zorder=2,
-                    mfc="white" if r.n_pass >= a.k else C_BASE)
-        # Ends only, pushed apart -- the low-T and high-T points sit close
-        # together whenever the sweep is compressed, as it is on M0904.
-        for r, off, ha in zip([b.iloc[0], b.iloc[-1]] if len(b) else [],
-                              [(-7, -3), (8, -4)], ["right", "left"]):
-            ax.annotate(r.label, (r.Uk, r.pass_pct), textcoords="offset points",
-                        xytext=off, fontsize=7.5, color=C_BASE, ha=ha)
 
-        for _, r in d[d.kind == "cleo"].iterrows():
-            ax.plot(r.Uk, r.pass_pct, ARM_MARK[r.label], ms=8, mew=1.4, mec="white",
-                    color=C_CLEO, zorder=3,
-                    alpha=1.0 if r.n_pass >= a.k else 0.45)
-            ax.annotate(ARM_LABEL[r.label], (r.Uk, r.pass_pct), textcoords="offset points",
-                        xytext=(7, 4) if r.Uk else (7, 7), fontsize=7.5, color=C_CLEO)
+        # Ordered by temperature: the line is the sweep's own path through the
+        # plane. Reordering by U_k would draw a curve nobody ran. Temperatures
+        # that pass nothing have no diversity to place and are noted in text.
+        b = d[(d.kind == "baseline") & (d.n_pass > 0)].sort_values("temp")
+        ax.plot(b.Uk, b.pass_pct, "-o", color=C_BASE, lw=1.8, ms=5,
+                mfc="white", mec=C_BASE, mew=1.5, zorder=2,
+                label="LigandMPNN ($T$ sweep)")
+
+        c = d[d.kind == "cleo"].iloc[0]
+        ax.plot(c.Uk, c.pass_pct, "o", color=C_CLEO, ms=11, mec="white", mew=1.5,
+                zorder=3, label="CLEO (on-policy)")
+
+        # The sweep's two ends, pushed apart -- they sit close together
+        # whenever the sweep is compressed, as it is on M0904.
+        # Offset horizontally, not vertically: the sweep's high-T end sits
+        # near the floor, where a label placed below would fall off the axis.
+        for r, off, ha in zip([b.iloc[0], b.iloc[-1]] if len(b) else [],
+                              [(-7, -3), (7, -3)], ["right", "left"]):
+            ax.annotate(r.label, (r.Uk, r.pass_pct), textcoords="offset points",
+                        xytext=off, ha=ha, fontsize=7, color=C_BASE)
 
         nz = d[(d.kind == "baseline") & (d.n_pass == 0)]
         if len(nz) == 6:
-            note = "baseline: 0/96 at every T"
-        elif len(nz):
-            note = "baseline T=" + ", ".join(f"{t:g}" for t in nz.temp) + ": 0/96"
-        else:
-            note = ""
-        if note:
-            ax.annotate(note, (0.5, 0.88), xycoords="axes fraction", ha="center",
-                        fontsize=7.5, color=C_BASE, style="italic")
+            ax.annotate("LigandMPNN: 0/96\nat every $T$", (0.30, 0.30), xycoords="axes fraction",
+                        ha="center", fontsize=8.5, color=C_BASE, style="italic")
 
-        ax.set_title(bb.replace("run_", "").split("_cond")[0], fontsize=9)
-        ax.set_xlabel(f"$U_{{{a.k}}}$  (substitutions, rarefied to {a.k} designs)", fontsize=8.5)
+        ax.set_title(bb.replace("run_", "").split("_cond")[0], fontsize=9.5)
         ax.tick_params(labelsize=8)
-        ax.grid(alpha=0.25, lw=0.6)
-        ax.margins(x=0.13)
+        ax.grid(alpha=0.22, lw=0.6)
         ax.set_axisbelow(True)
+        ax.margins(x=0.16, y=0.14)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
 
-    axes[0].set_ylabel("pass rate (%)", fontsize=8.5)
+    axes[0].set_ylabel("pass rate (%)", fontsize=10)
     axes[0].set_ylim(-4, 100)
-    axes[0].plot([], [], "o", ms=5, mfc="white", mec=C_BASE, mew=1.6, ls="none",
-                 label="LigandMPNN (T sweep)")
-    axes[0].plot([], [], "o", color=C_CLEO, ms=8, mec="white", mew=1.4, ls="none",
-                 label="CLEO (this work)")
-    axes[0].plot([], [], "o", color=C_BASE, ms=5, ls="none",
-                 label=f"filled: $<${a.k} passing, $U_k$ not rarefied")
-    h, lab = axes[0].get_legend_handles_labels()
-    fig.legend(h, lab, fontsize=8, frameon=False, ncol=3,
-               loc="lower center", bbox_to_anchor=(0.5, -0.01))
-
-    fig.tight_layout(rect=(0, 0.07, 1, 1))
+    # Legend goes in the emptiest panel, which is the one whose baseline
+    # never passes anything.
+    axes[2].legend(*axes[0].get_legend_handles_labels(), fontsize=8, frameon=False,
+                   loc="upper left", borderpad=0, handletextpad=0.5)
+    fig.supxlabel(f"$U_{{{a.k}}}$: distinct substitutions, rarefied to {a.k} passing designs",
+                  fontsize=9, color="#4B5563", y=0.02)
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
     save(fig, "ame_frontier")
     print(df.to_string(index=False, float_format="{:.3g}".format))
 
