@@ -110,14 +110,14 @@ def main():
             one = len(dead) == 1
             ax.scatter([0], [0], c=[T_RAMP(norm(dead.temp.iloc[0]))] if one else [C_DEAD],
                        s=62, edgecolor="white", lw=1.4, zorder=2)
-            label = (f"$T$={dead.temp.iloc[0]:g}: 0/96" if one
-                     else f"all {len(dead)} temperatures: 0/96")
-            # A single failing temperature sits beside the surviving ones, so
-            # its label goes above the origin rather than into them.
-            ax.annotate(label, (0, 0), textcoords="offset points",
-                        xytext=(3, 13) if one else (9, 1),
-                        ha="left", va="center", fontsize=7.5, color=C_TEXT,
-                        style="italic")
+            # Only the coincident case is annotated. A lone failing
+            # temperature keeps its ramp colour, so the colourbar already says
+            # which one it is; a label there would crowd the surviving points
+            # it sits beside to no purpose.
+            if not one:
+                ax.annotate(f"all {len(dead)} temperatures: 0/96", (0, 0),
+                            textcoords="offset points", xytext=(9, 1), ha="left",
+                            va="center", fontsize=7.5, color=C_TEXT, style="italic")
 
         ax.set_title(f"{tier}\n{bb.replace('run_', '').split('_cond')[0]}",
                      fontsize=10, linespacing=1.5)
