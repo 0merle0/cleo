@@ -97,7 +97,7 @@ def main():
             note = f"{r.depth:.0f} passing designs per side"
             col = C_BASE
         else:
-            note = f"LigandMPNN passes nothing here; CLEO's {r.n_cleo:.0f} designs, unmatched"
+            note = f"LigandMPNN passes nothing here; our {r.n_cleo:.0f} designs, unmatched"
             col = C_CLEO
         ax.annotate(note, (0, y[i] - 0.33), fontsize=7, color=col,
                     ha="left", va="top", style="italic")
@@ -113,7 +113,7 @@ def main():
         ax.spines[s].set_visible(False)
     for lab, col, x in (("LigandMPNN only", C_BASE, 0.0),
                         ("shared", C_SHARED, 0.24),
-                        ("CLEO only", C_CLEO, 0.40)):
+                        ("this paper only", C_CLEO, 0.40)):
         ax.text(x, 1.05, lab, transform=ax.transAxes, fontsize=8.5,
                 color="#6B7280" if col is C_SHARED else col, fontweight="bold")
 

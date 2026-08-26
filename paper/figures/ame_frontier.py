@@ -49,6 +49,10 @@ C_CLEO = PALETTE["blue"]
 # Failing temperatures coincide at the origin and are shown in neutral gray,
 # outside the ramp: no passing designs means no temperature reading to encode.
 C_DEAD = "#9AA1AC"
+# What the blue marker is called on the page. "CLEO" names the tool and means
+# nothing to a reader meeting it in a figure before the methods; "this paper"
+# says which of the two things being compared is ours.
+LABEL = "this paper"
 C_TEXT = "#4B5563"
 
 # Ordered easy -> hard by best baseline pass rate (66.7%, 10.4%, 0%).
@@ -90,7 +94,7 @@ def main():
 
         c = d[d.kind == "cleo"].iloc[0]
         ax.plot(c.Uk, c.pass_pct, "o", color=C_CLEO, ms=12, mec="white", mew=1.6, zorder=3)
-        ax.annotate("CLEO", (c.Uk, c.pass_pct), textcoords="offset points",
+        ax.annotate(LABEL, (c.Uk, c.pass_pct), textcoords="offset points",
                     xytext=(0, 14), ha="center", fontsize=9.5, color=C_CLEO,
                     fontweight="bold")
 
