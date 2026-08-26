@@ -46,6 +46,9 @@ from palette import PALETTE
 # colour-vision deficiencies.
 T_RAMP = LinearSegmentedColormap.from_list("temp", ["#F6D5B0", "#D97A29", "#7A3D08"])
 C_CLEO = PALETTE["blue"]
+# Failing temperatures coincide at the origin and are shown in neutral gray,
+# outside the ramp: no passing designs means no temperature reading to encode.
+C_DEAD = "#9AA1AC"
 C_TEXT = "#4B5563"
 
 # Ordered easy -> hard by best baseline pass rate (66.7%, 10.4%, 0%).
@@ -91,24 +94,33 @@ def main():
                     xytext=(0, 14), ha="center", fontsize=9.5, color=C_CLEO,
                     fontweight="bold")
 
-        # Temperatures that pass nothing have no diversity to place; say so in
-        # words rather than piling them on the origin.
+        # Temperatures that pass nothing are drawn at the origin, so the
+        # distance CLEO covers from a standing start is visible rather than
+        # asserted in a caption. Read x=0 as "no passing designs, so no
+        # coverage to measure" -- not as a measured diversity of zero.
         dead = d[(d.kind == "baseline") & (d.n_pass == 0)]
-        if len(dead) == 6:
-            ax.annotate("LigandMPNN\n0/96 at every $T$", (0.30, 0.30),
-                        xycoords="axes fraction", ha="center", fontsize=8.5,
-                        color=C_TEXT, style="italic")
-        elif len(dead):
-            ax.annotate("$T$=" + ", ".join(f"{t:g}" for t in dead.temp) + ": 0/96",
-                        (0.5, 0.93), xycoords="axes fraction", ha="center",
-                        fontsize=7.5, color=C_TEXT, style="italic")
+        if len(dead):
+            # Several failing temperatures coincide exactly at the origin, and
+            # a stack of ramp colours there would show only whichever was drawn
+            # last. One neutral marker, with the count named.
+            one = len(dead) == 1
+            ax.scatter([0], [0], c=[T_RAMP(norm(dead.temp.iloc[0]))] if one else [C_DEAD],
+                       s=62, edgecolor="white", lw=1.4, zorder=2)
+            label = (f"$T$={dead.temp.iloc[0]:g}: 0/96" if one
+                     else f"all {len(dead)} temperatures: 0/96")
+            # A single failing temperature sits beside the surviving ones, so
+            # its label goes above the origin rather than into them.
+            ax.annotate(label, (0, 0), textcoords="offset points",
+                        xytext=(3, 13) if one else (9, 1),
+                        ha="left", va="center", fontsize=7.5, color=C_TEXT,
+                        style="italic")
 
         ax.set_title(f"{tier}\n{bb.replace('run_', '').split('_cond')[0]}",
                      fontsize=10, linespacing=1.5)
         ax.tick_params(labelsize=8)
         ax.grid(alpha=0.22, lw=0.6)
         ax.set_axisbelow(True)
-        ax.margins(x=0.17, y=0.15)
+        ax.margins(x=0.10, y=0.15)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
 
