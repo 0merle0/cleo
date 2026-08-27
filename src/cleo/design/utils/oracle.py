@@ -579,3 +579,223 @@ def af3_from_df(df_input, cfg, step_name="af3"):
         )
 
     return df_merged
+
+
+# --------------------------------------------------------------------------- #
+# RoseTTAFold3
+# --------------------------------------------------------------------------- #
+
+RF3_CONTAINER = "/net/software/containers/versions/modelhub_inference/rf3_5.sif"
+
+
+def _rf3_input_from_af3_template(af3_template: dict, name: str, seq: str) -> dict:
+    """Translate one AF3 input JSON into RF3's schema.
+
+    The two formats carry the same information in different shapes. AF3 nests
+    entities under ``sequences`` as ``{"protein": {...}}`` / ``{"ligand": {...}}``;
+    RF3 takes a flat ``components`` list where a protein is ``{"seq", "chain_id"}``
+    and a ligand is ``{"ccd_code", "chain_id"}``.
+
+    Sharing one template between the two oracles is the point: a cross-oracle
+    comparison is only meaningful if both are folding the same complex, and two
+    hand-maintained templates drift. AF3 template stays authoritative.
+
+    Ligands are passed as CCD codes, which RF3's docs rank above SMILES and
+    CIF/SDF for accuracy. An AF3 ligand entity may name several CCD codes under
+    one chain id; each becomes its own component, since RF3 keys components to a
+    single code.
+
+    MSA fields are dropped. The AME templates carry empty ``unpairedMsa`` /
+    ``pairedMsa``, so these are single-sequence predictions on both sides.
+    """
+    components = []
+    for entity in af3_template["sequences"]:
+        if "protein" in entity:
+            components.append({"seq": seq, "chain_id": entity["protein"]["id"]})
+        elif "ligand" in entity:
+            ccd_codes = entity["ligand"].get("ccdCodes")
+            if not ccd_codes:
+                raise ValueError(
+                    f"rf3: ligand entity {entity['ligand'].get('id')!r} in the AF3 template has "
+                    "no ccdCodes. SMILES and file-based ligands are not translated yet; add them "
+                    "here rather than letting the ligand silently vanish from the complex."
+                )
+            for ccd in ccd_codes:
+                components.append({"ccd_code": ccd, "chain_id": entity["ligand"]["id"]})
+        else:
+            raise ValueError(
+                f"rf3: unrecognised AF3 entity {sorted(entity)!r}; expected 'protein' or 'ligand'."
+            )
+    return {"name": name, "components": components}
+
+
+def rf3_from_df(df_input, cfg, step_name="rf3"):
+    """Runs RoseTTAFold3 and aggregates confidence metrics from the output.
+
+    Same contract as :func:`af3_from_df` -- takes ``name``/``sequence``, returns
+    the input frame with ``{step_name}_path`` and confidence columns merged on
+    ``name`` -- so ``rfd2_metrics_from_df`` consumes it by setting
+    ``structure_col: rf3_path`` and nothing else changes.
+
+    The reason to have it: training reward and evaluation currently come from
+    the same predictor, so a gain is not separable from having learned that
+    predictor's quirks. Optimising under RF3 and reporting under AF3 makes the
+    two independent.
+
+    Config
+    ------
+    rundir          Where inputs/ and outputs/ are written (required).
+    template_path   AF3-format JSON template; translated to RF3's schema.
+    rf3_container   Apptainer image (defaults to the IPD modelhub build).
+    ckpt_path       Override RF3's default checkpoint.
+    num_diffusion_samples   Samples per design (default 5, matching AF3).
+    per_sample_rows One row per (design, sample) (default true when N > 1).
+    early_stopping_plddt_threshold  **Default 0.0, which disables it.**
+    num_steps       Diffusion steps (RF3's default is 50; AF3 uses 200).
+    skip_run        Reuse an existing outputs/ instead of folding again.
+
+    Note on ``early_stopping_plddt_threshold``: RF3 ships with 0.5, which makes
+    it abandon a prediction it judges unpromising and write a
+    ``summary_confidences.json`` with no structure beside it. That is a sensible
+    default for screening and the wrong one for a reward, because the abandoned
+    designs are exactly the failures the policy has to be told about -- they
+    would return with no coordinates and drop out of the batch, biasing reward
+    toward whatever RF3 was already confident about. Disabled here unless a
+    config asks for it back.
+    """
+    assert cfg.rundir is not None, "rundir must be specified in cfg"
+    n_samples = int(cfg.get("num_diffusion_samples", 5))
+    per_sample_rows = bool(cfg.get("per_sample_rows", n_samples > 1))
+
+    outdir = f"{cfg.rundir}/{step_name}/outputs"
+    inputdir = f"{cfg.rundir}/{step_name}/inputs"
+    os.makedirs(outdir, exist_ok=True)
+    os.makedirs(inputdir, exist_ok=True)
+
+    skip_run = bool(cfg.get("skip_run", False)) or bool(os.environ.get("CLEO_RF3_SKIP_RUN"))
+    if skip_run:
+        if not os.path.isdir(outdir):
+            raise FileNotFoundError(
+                f"rf3 skip_run: no outputs directory at {outdir!r}. "
+                "Run without skip_run once, or fix rundir / step name."
+            )
+        print(f"rf3: skip_run=True (reuse only). Reading metrics from {outdir!r}.")
+    else:
+        with open(cfg.template_path) as f:
+            af3_template = json.load(f)
+
+        # One JSON holding every design. RF3 amortises model load across a batch
+        # and distributes over available GPUs itself, so sharding the way
+        # af3_from_df does would have our scheduler and RF3's fight over the
+        # same devices. Startup is ~100 s against ~9 s per design, so batching
+        # is most of the cost control.
+        examples = [
+            _rf3_input_from_af3_template(af3_template, name, seq)
+            for name, seq in zip(df_input["name"], df_input["sequence"])
+        ]
+        input_json = os.path.join(inputdir, "inputs.json")
+        with open(input_json, "w") as f:
+            json.dump(examples, f, indent=2)
+
+        overrides = [
+            f"inputs='{input_json}'",
+            f"out_dir='{outdir}'",
+            f"diffusion_batch_size={n_samples}",
+            f"early_stopping_plddt_threshold={float(cfg.get('early_stopping_plddt_threshold', 0.0))}",
+        ]
+        if cfg.get("ckpt_path"):
+            overrides.append(f"ckpt_path='{cfg.ckpt_path}'")
+        if cfg.get("num_steps"):
+            overrides.append(f"num_steps={int(cfg.num_steps)}")
+
+        container = cfg.get("rf3_container", RF3_CONTAINER)
+        command = f"apptainer exec --nv {container} rf3 fold " + " ".join(overrides)
+        print(f"rf3: folding {len(examples)} designs x {n_samples} samples")
+        print(f"  {command}")
+        subprocess.run(command, shell=True, check=True)
+
+    output_folders = [f for f in glob.glob(os.path.join(outdir, "*")) if os.path.isdir(f)]
+    assert len(output_folders) > 0, f"No output folders found in {outdir}"
+
+    # RF3 writes AF3's directory layout byte for byte -- seed-<S>_sample-<K>/ with
+    # {name}_seed-<S>_sample-<K>_model.cif and _summary_confidences.json beside
+    # it -- so the AF3 resolver is reused rather than reimplemented. If that ever
+    # diverges, the assertion above and the merge check below are what catch it.
+    records = []
+    for folder in output_folders:
+        samples = _af3_sample_paths_from_output_folder(folder) if per_sample_rows else []
+        if samples:
+            records.extend((n, cif, conf, s, sd) for n, s, sd, cif, conf in samples)
+            continue
+        if per_sample_rows:
+            print(
+                f"Warning: no seed-*_sample-* subfolders in {folder!r}; "
+                "falling back to the top-ranked prediction for this design."
+            )
+        paths = _af3_name_and_paths_from_output_folder(folder)
+        if paths is None:
+            print(f"Warning: no *_summary_confidences.json in {folder!r}, skipping.")
+            continue
+        records.append((*paths, 0, -1))
+
+    cols = ["name", f"{step_name}_path", f"{step_name}_ptm", f"{step_name}_iptm",
+            f"{step_name}_ranking_score", f"{step_name}_plddt",
+            f"{step_name}_chain_ptm_protein", f"{step_name}_chain_ptm_ligand",
+            f"{step_name}_has_clash", f"{step_name}_interaction_pae_min"]
+    if per_sample_rows:
+        cols += [f"{step_name}_sample", f"{step_name}_seed"]
+    output_data = {c: [] for c in cols}
+
+    for name, cif_path, conf_json_path, sample_idx, seed in records:
+        if not os.path.exists(conf_json_path):
+            print(f"Warning: confidence path missing for {name}, skipping.")
+            continue
+        with open(conf_json_path) as f:
+            conf = json.load(f)
+
+        # RF3 reports `early_stopped` when it abandoned a prediction. There is
+        # no structure to score in that case, and a row with a path that does
+        # not exist would surface downstream as an unexplained NaN.
+        if conf.get("early_stopped") or not os.path.exists(cif_path):
+            print(
+                f"Warning: {name} sample {sample_idx} has no structure "
+                f"(early_stopped={conf.get('early_stopped')}); skipping. "
+                "Set early_stopping_plddt_threshold=0.0 to keep these."
+            )
+            continue
+
+        output_data["name"].append(name)
+        output_data[f"{step_name}_path"].append(cif_path)
+        output_data[f"{step_name}_ptm"].append(conf["ptm"])
+        output_data[f"{step_name}_iptm"].append(conf["iptm"])
+        output_data[f"{step_name}_ranking_score"].append(conf["ranking_score"])
+        output_data[f"{step_name}_plddt"].append(conf.get("overall_plddt"))
+        # Chain 0 is the protein, the rest are ligand entities; the ligand
+        # column summarises the worst-confidence ligand, as af3_from_df does.
+        output_data[f"{step_name}_chain_ptm_protein"].append(conf["chain_ptm"][0])
+        output_data[f"{step_name}_chain_ptm_ligand"].append(
+            _min_not_none(conf["chain_ptm"][1:]))
+        output_data[f"{step_name}_has_clash"].append(conf["has_clash"])
+
+        pae_mat = conf["chain_pair_pae_min"]
+        n_chains = len(pae_mat)
+        off_diag = [pae_mat[i][j] for i in range(n_chains) for j in range(n_chains) if i != j]
+        output_data[f"{step_name}_interaction_pae_min"].append(_min_not_none(off_diag))
+
+        if per_sample_rows:
+            output_data[f"{step_name}_sample"].append(sample_idx)
+            output_data[f"{step_name}_seed"].append(seed)
+
+    df_output = pd.DataFrame(output_data)
+    df_output = _af3_canonicalize_output_names_to_input(df_input, df_output)
+    if per_sample_rows and not df_output.empty:
+        df_output = df_output.sort_values(["name", f"{step_name}_sample"])
+    df_merged = pd.merge(df_input, df_output, on="name", how="inner")
+    if len(df_merged) == 0 and len(df_input) > 0:
+        raise RuntimeError(
+            "rf3: no rows after merging predictions into the input table "
+            f"(n_input={len(df_input)}, n_parsed={len(df_output)}, "
+            f"output_folders={len(output_folders)}). Usually a name mismatch between the "
+            f"input JSON and {outdir!r}, or every prediction early-stopped."
+        )
+    return df_merged

@@ -252,6 +252,23 @@ uv run cleo-design-train \
 
 - **Boltz** (`cleo.design.utils.oracle.boltz_from_df`) - uses a YAML template, runs CPU or GPU
 - **AlphaFold3** (`cleo.design.utils.oracle.af3_from_df`) - uses a JSON template, requires container + model weights
+- **RoseTTAFold3** (`cleo.design.utils.oracle.rf3_from_df`) - reads the *same* AF3 JSON template and
+  translates it, so one template feeds both and cannot drift. IPD container at
+  `/net/software/containers/versions/modelhub_inference/rf3_5.sif`; no MSA needed; ligands go in
+  as CCD codes. Writes AF3's exact output layout, so `structure_col: rf3_path` is the only change
+  a metric step needs.
+
+  Use it to break the reward/eval circularity: training against the predictor you also report
+  under cannot distinguish a better policy from one that learned that predictor's quirks.
+
+  **Set `early_stopping_plddt_threshold: 0.0`.** RF3 defaults to 0.5, abandoning predictions it
+  judges unpromising and writing confidences with no structure. Those are precisely the failing
+  designs a reward has to see; left on, they drop out of the batch and bias reward toward what
+  RF3 already liked. `rf3_from_df` disables it by default and warns on any row it still finds.
+
+  Cost, measured on M0097 at 5 samples: ~9 s per design plus ~100 s of model load per call, so
+  batch 32 is ~6.5 min/step and a 150-step run is ~16 GPU-h, against ~11.5 GPU-h for the same
+  run under AF3. Batch in one call; RF3 distributes over GPUs itself.
 
 ## Available Reward Step Functions
 
