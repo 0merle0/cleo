@@ -1,0 +1,1 @@
+wget -r -np -nH --cut-dirs=1 -R "index.html*" https://www.abc.xyz/path/to/dir/
