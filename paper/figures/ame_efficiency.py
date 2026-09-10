@@ -41,7 +41,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from ame_diversity import BACKBONES, baseline, cleo, passing, reference, subs
+from ame_diversity import AME, BACKBONES, baseline, cleo, passing, reference, subs
 from figio import save
 from palette import PALETTE
 
@@ -115,13 +115,35 @@ def chao2_extrapolate(I, targets):
     return out
 
 
+def measured_trajectory(bb):
+    """The T=1.0 fold-until-N-pass run, if it has produced anything yet.
+
+    Returns (folds, distinct_passing, frame) or None. Prefer this over the
+    96-design pilot wherever it exists: the pilot put M0097 at 4/96 = 4.17%
+    with a 95% CI of 1.15-10.33%, so a projection anchored on it inherits that
+    whole range. The trajectory measures the rate on thousands of designs
+    instead of ninety-six.
+    """
+    f = AME / "t1_yield" / bb / "cumulative_scored.csv"
+    if not f.exists():
+        return None
+    d = pd.read_csv(f)
+    if not len(d):
+        return None
+    return len(d), int(d[d.rfd2_any_pass].sequence.nunique()), d
+
+
 def collect(targets):
     rows = []
     for bb, tier in zip(BACKBONES, TIERS):
         ref = reference(bb)
         b = baseline(bb)
         b1 = b[b.temperature == 1.0]
+        traj = measured_trajectory(bb)
         for label, df, train in (("T=1.0", b1, 0), ("this paper", cleo(bb, "random"), TRAIN_FOLDS[bb])):
+            if label == "T=1.0" and traj is not None:
+                # Measured run supersedes the 96-design pilot for this arm.
+                _, _, df = traj
             keep = passing(df)
             k, n = int(df.rfd2_any_pass.sum()), len(df)
             rate = k / n
