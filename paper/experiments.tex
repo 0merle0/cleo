@@ -273,6 +273,173 @@ reader how much weight those can bear. Seeding is new (\texttt{seed:} in the
 training config, unset by default), so every run reported before E21 was
 unseeded and cannot be re-drawn even in principle.}
 
+\subsection*{E21 result --- the run-to-run spread is 7.75 points, and it
+governs every single-draw contrast in this slate}
+
+All ten runs trained and folded. \texttt{logprob\_top}'s \texttt{s1} died on an
+AF3 assertion at step 130 and resumed from a checkpoint \(\approx\)20 steps
+short of the others, so its arm is four clean seeds and one undertrained one;
+it scored lowest, which inflates that arm's spread in the direction that
+flatters the prediction, and is reported rather than dropped.
+
+\begin{center}
+\begin{tabular}{lrrrrrrr}
+\toprule
+arm & s1 & s2 & s3 & s4 & s5 & mean & sd \\
+\midrule
+\texttt{random}      & 84.4 & 83.3 & 74.0 & 75.0 & 76.0 & 78.5 & 4.9 \\
+\texttt{logprob\_top} & 62.5 & 69.8 & 85.4 & 63.5 & 62.5 & 68.8 & 9.8 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Pooled \(\sigma = 7.75\) points.} The resolution floor
+\(1.96\sigma\sqrt{2}/\sqrt{n}\) is therefore \SI{9.6}{points} at \(n=5\),
+\SI{6.8}{points} at \(n=10\) and \SI{4.8}{points} at \(n=20\). The control's
+five draws span 10.4 points, so the pre-registered prediction of ``at least 15
+points'' is \emph{not} met: E19's 21-point move was a wide draw, not a typical
+one. The retraction of E18 still stands on its own pre-registered criterion,
+but the stated width of the noise was too generous.
+
+The two arms differ by 9.7 points and are not separated at this sample size
+(\(t = 2.00\), \(p = 0.081\), \(n=5\)) --- the second prediction holds, and the
+pass-rate half of the selection story is unresolved rather than negative.
+
+\plan{\textbf{What this invalidates.} Any contrast in this slate smaller than
+\(\approx\)10 points at \(n=1\) is unresolved by construction. It also settles
+one open question in the other direction: the \SI{35}{point} disagreement
+between \texttt{backbone19} and \texttt{selection2} on M0097
+\texttt{logprob\_top} (\SI{46.9}{\percent} vs \SI{82.3}{\percent}) is
+\(4.5\sigma\) wide and so is \emph{not} seed noise. Something else differs
+between those two runs and it is still unidentified.}
+
+\subsection*{E22 --- does a policy trained against RF3 produce designs AF3
+accepts?}
+
+\plan{Pre-registered. Three seeds on M0097, the E21 \texttt{random} arm with
+exactly one line changed: \texttt{af3\_from\_df} \(\rightarrow\)
+\texttt{rf3\_from\_df}, \texttt{structure\_col} \texttt{af3\_path}
+\(\rightarrow\) \texttt{rf3\_path}. Motif atoms, best-of-5, aggregation,
+selection rule and hyperparameters byte-identical. Evaluation runs through
+\texttt{fold\_and\_score.py}, which imports \texttt{af3\_from\_df} directly and
+so cannot inherit the training oracle.}
+
+Every number in this slate has been optimised and reported under the same
+predictor, so no result so far can distinguish a better policy from one that
+learned AF3's idiosyncrasies. RoseTTAFold3 makes the two independent. It reads
+the \emph{same} AF3 JSON template, translated --- a cross-oracle comparison
+means nothing if the two sides fold different complexes, and two
+hand-maintained templates drift.
+
+\textbf{Predictions.} Transfer is partial: the RF3-trained arm lands above the
+untrained baseline (\SI{4.2}{\percent} at \(T=1.0\)) by a wide margin but below
+the AF3-trained arm's \SI{78.5}{\percent}. A result at or above
+\SI{78.5}{\percent} would say the oracles are interchangeable here; a result
+near \SI{4}{\percent} would say the training exploited RF3 specifically and
+nothing transferred.
+
+\subsection*{E22 result --- transfer is real and the penalty is large, but two
+seeds cannot size it}
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+arm & pass rate & median motif RMSD \\
+\midrule
+RF3-trained, AF3-eval \texttt{s1} & \SI{40.6}{\percent} & \SI{1.77}{\angstrom} \\
+RF3-trained, AF3-eval \texttt{s2} & \SI{61.5}{\percent} & \SI{1.33}{\angstrom} \\
+AF3-trained, AF3-eval (E21, \(n=5\)) & \SI{78.5}{\percent} & --- \\
+LigandMPNN \(T=1.0\), AF3-eval & \SI{4.2}{\percent} & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A policy that never saw AF3 during training produces designs AF3 accepts at
+\(\approx\)12$\times$ the untrained rate. The strong form of the reward-hacking
+objection is answered: the policy learned something about structure, not only
+about one predictor.
+
+\plan{\textbf{Do not quote a drop from these two seeds.} \texttt{s1} and
+\texttt{s2} differ by 21 points --- an observed sd of 14.7, three times E21's
+4.9 --- so the \SI{27.5}{point} gap to the AF3-trained mean is estimated from a
+spread wider than the gap is stable. An earlier reading of \texttt{s1} alone
+called it \(7.7\sigma\), using E21's \(\sigma\) on an arm whose own \(\sigma\)
+is much larger; that figure is wrong and is retracted here. The third seed is
+folding. What can be said now is directional: transfer is real, the penalty is
+large, and its size is unmeasured.}
+
+\plan{\textbf{Infrastructure note, because it nearly cost the experiment.} A
+scheduler outage on 2026-09-10 made \texttt{squeue} fail, and every watcher in
+this slate tested completion with \texttt{squeue \dots | grep -c}, which
+returns 0 both when the queue is empty and when the controller is unreachable.
+The eval watcher concluded training had drained, sampled all three arms from
+step \(\approx\)100--130 checkpoints, and was saved from folding them only
+because \texttt{sbatch} was failing too. The first fix --- check
+\texttt{squeue}'s exit code --- then hung forever, because \texttt{squeue -j}
+on a job that has left the queue exits 1 with ``Invalid job id specified'',
+indistinguishable from an outage by exit code alone. The rule that survives
+both: \emph{an absent signal from the scheduler is not a completion signal},
+and completion must be confirmed from the run's own output.}
+
+\subsection*{E4 result --- what a library actually costs, measured}
+
+\plan{Retrospective, then measured. Charges both arms in \emph{designs folded}
+--- folding is the entire cost, MPNN sampling is microseconds --- with the
+policy carrying \texttt{batch\_size}\(\times\)\texttt{N\_steps} as debt before
+it yields anything. Target: 100 distinct passing designs, cap
+\numproduct{10000} folds, \(T=1.0\), best-of-5, same code path throughout.}
+
+Reaching a library of 100 cannot be projected honestly from the 96-design
+pilots: two of three backbones showed 0/96, which supports only a
+rule-of-three bound. It was run instead.
+
+\begin{center}
+\begin{tabular}{llrrr}
+\toprule
+backbone & tier & folded & passing & rate \\
+\midrule
+M0097 & easy   & \numproduct{4000} & 102 & \SI{2.55}{\percent} \\
+M0904 & medium & \numproduct{5500} & 6   & \SI{0.11}{\percent} \\
+M0907 & hard   & \numproduct{8000} & 0   & \SI{0}{\percent} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The pilot put M0097 at \SI{4.17}{\percent}; the measured rate over
+\numproduct{4000} designs is \SI{2.55}{\percent}. The pilot sat at the
+optimistic end of its own interval, so every projection anchored on it
+understated what the baseline costs. Against \numproduct{2527} folds for the
+policy to reach the same 100 designs (\numproduct{2400} training +
+\numproduct{127} sampling at \SI{78.5}{\percent}), the measured saving is
+\(1.6\times\) --- far less than the \(4\)--\(7\times\) projected at library
+sizes of 500--1000, where the policy's flat cost dominates and the training
+debt has been amortised.
+
+\plan{\textbf{The finding that cuts against the diversity claim.} At matched
+library size --- 86 passing designs from each arm --- \(T=1.0\) carries
+\numproduct{1988} distinct substitutions against the policy's
+\numproduct{1045}. Nearly \(2\times\), measured on both sides. Matching instead
+on fold budget does not reverse it: at \numproduct{4000} folds the policy
+yields \(\approx\)14$\times$ the passing designs but still covers less
+substitution space. This is the expected signature of RL --- the policy finds a
+region that folds and exploits it --- and it means the defensible claim is
+\emph{more usable designs per fold}, not \emph{more diverse libraries}. The
+frontier figure is not wrong but answers a narrower question: equal design
+count against a \emph{single} temperature. The policy's coverage numbers here
+are floors, not measurements: only 96 designs were ever sampled from it, so
+\numproduct{1045} is what 86 passing designs contain, not what
+\numproduct{1433} would. Sampling \(\approx\)1500 designs from a trained policy
+and folding them (\(\approx\)7 GPU-h) would convert the floor into a
+measurement and settle whether the saturation is real.}
+
+\plan{\textbf{Where the policy wins unconditionally.} M0904 at 6/\numproduct{5500}
+and M0907 at 0/\numproduct{8000} are backbones on which sampling does not
+produce a library at any budget this project can afford --- \(\approx\)200{,}000
+folds for 100 designs on M0904 at its measured rate, unbounded on M0907 --- while
+the policy reaches \SI{63.5}{\percent} and \SI{54.2}{\percent}. The honest shape
+of the efficiency claim is that training buys targets sampling cannot reach, and
+reuse, rather than a cheaper or more diverse one-off library on a target it can.}
+
 \subsection*{Scoring protocol}
 
 Two conventions changed partway through the pilot, and results reported before
