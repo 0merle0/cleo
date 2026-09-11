@@ -338,8 +338,8 @@ the AF3-trained arm's \SI{78.5}{\percent}. A result at or above
 near \SI{4}{\percent} would say the training exploited RF3 specifically and
 nothing transferred.
 
-\subsection*{E22 result --- transfer is real and the penalty is large, but two
-seeds cannot size it}
+\subsection*{E22 result --- the RF3-trained arm is not separated from the
+AF3-trained one, and is far more variable}
 
 \begin{center}
 \begin{tabular}{lrr}
@@ -348,38 +348,46 @@ arm & pass rate & median motif RMSD \\
 \midrule
 RF3-trained, AF3-eval \texttt{s1} & \SI{40.6}{\percent} & \SI{1.77}{\angstrom} \\
 RF3-trained, AF3-eval \texttt{s2} & \SI{61.5}{\percent} & \SI{1.33}{\angstrom} \\
-AF3-trained, AF3-eval (E21, \(n=5\)) & \SI{78.5}{\percent} & --- \\
-LigandMPNN \(T=1.0\), AF3-eval & \SI{4.2}{\percent} & --- \\
+RF3-trained, AF3-eval \texttt{s3} & \SI{84.4}{\percent} & \SI{1.17}{\angstrom} \\
+\midrule
+RF3-trained mean (\(n=3\)) & \SI{62.2}{\percent} (sd 21.9) & \\
+AF3-trained mean (E21, \(n=5\)) & \SI{78.5}{\percent} (sd 4.9) & \\
+LigandMPNN \(T=1.0\), AF3-eval & \SI{4.2}{\percent} & \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-A policy that never saw AF3 during training produces designs AF3 accepts at
-\(\approx\)12$\times$ the untrained rate. The strong form of the reward-hacking
-objection is answered: the policy learned something about structure, not only
-about one predictor.
+A policy optimised against RoseTTAFold3 and never shown AlphaFold3 during
+training produces designs AF3 accepts at \SI{62.2}{\percent} against
+\SI{4.2}{\percent} untrained. The reward-hacking objection is answered: the
+training transfers across predictors.
 
-\plan{\textbf{Do not quote a drop from these two seeds.} \texttt{s1} and
-\texttt{s2} differ by 21 points --- an observed sd of 14.7, three times E21's
-4.9 --- so the \SI{27.5}{point} gap to the AF3-trained mean is estimated from a
-spread wider than the gap is stable. An earlier reading of \texttt{s1} alone
-called it \(7.7\sigma\), using E21's \(\sigma\) on an arm whose own \(\sigma\)
-is much larger; that figure is wrong and is retracted here. The third seed is
-folding. What can be said now is directional: transfer is real, the penalty is
-large, and its size is unmeasured.}
+The \SI{16.4}{point} gap to the AF3-trained arm is \textbf{not resolved} at
+these sample sizes --- \(t = 1.69\), \(p = 0.14\), against a floor of
+\SI{19.0}{points} for \(n=3\) vs \(n=5\) at the pooled \(\sigma\) of 13.3. The
+pre-registered prediction (``above baseline by a wide margin but below
+\SI{78.5}{\percent}'') is half-confirmed: the first clause holds, the second is
+untestable here because \texttt{s3} at \SI{84.4}{\percent} lands \emph{above}
+the AF3-trained mean.
 
-\plan{\textbf{Infrastructure note, because it nearly cost the experiment.} A
-scheduler outage on 2026-09-10 made \texttt{squeue} fail, and every watcher in
-this slate tested completion with \texttt{squeue \dots | grep -c}, which
-returns 0 both when the queue is empty and when the controller is unreachable.
-The eval watcher concluded training had drained, sampled all three arms from
-step \(\approx\)100--130 checkpoints, and was saved from folding them only
-because \texttt{sbatch} was failing too. The first fix --- check
-\texttt{squeue}'s exit code --- then hung forever, because \texttt{squeue -j}
-on a job that has left the queue exits 1 with ``Invalid job id specified'',
-indistinguishable from an outage by exit code alone. The rule that survives
-both: \emph{an absent signal from the scheduler is not a completion signal},
-and completion must be confirmed from the run's own output.}
+\plan{\textbf{The real finding is the variance, not the mean.} Three seeds span
+44 points (40.6, 61.5, 84.4), sd 21.9 --- against 4.9 for the same
+configuration trained under AF3. Whatever else RF3-in-the-loop does, it makes
+the outcome far less repeatable, and that is a larger and better-supported
+effect than any shift in the mean. It is also the quantity that matters for
+using RF3 as a training oracle in practice. Why is open: RF3's confidence may
+be noisier as a reward signal, or the RF3/AF3 agreement may itself be
+design-dependent in a way that compounds over training.}
+
+\plan{\textbf{Two retractions, recorded because the pattern matters.} After
+\texttt{s1} alone (\SI{40.6}{\percent}) this was written up as a
+\(7.7\sigma\) collapse, using E21's \(\sigma = 4.9\) on an arm whose own
+\(\sigma\) is 21.9. After \texttt{s1} and \texttt{s2} it was written up as
+``transfer is real and the penalty is large''; with \texttt{s3} the penalty is
+not statistically present at all. Both readings were of partial data from an
+experiment whose replicate count was chosen \emph{because} E21 had just shown
+single draws to be untrustworthy. The discipline E21 established was not
+applied to E22 while E22 was in flight.}
 
 \subsection*{E4 result --- what a library actually costs, measured}
 
@@ -394,13 +402,13 @@ pilots: two of three backbones showed 0/96, which supports only a
 rule-of-three bound. It was run instead.
 
 \begin{center}
-\begin{tabular}{llrrr}
+\begin{tabular}{llrrrl}
 \toprule
-backbone & tier & folded & passing & rate \\
+backbone & tier & folded & passing & rate & 100-design target \\
 \midrule
-M0097 & easy   & \numproduct{4000} & 102 & \SI{2.55}{\percent} \\
-M0904 & medium & \numproduct{5500} & 6   & \SI{0.11}{\percent} \\
-M0907 & hard   & \numproduct{8000} & 0   & \SI{0}{\percent} \\
+M0097 & easy   & \numproduct{4000}  & 102 & \SI{2.55}{\percent} & reached \\
+M0904 & medium & \numproduct{10000} & 8   & \SI{0.08}{\percent} & capped \\
+M0907 & hard   & \numproduct{10000} & 0   & \SI{0}{\percent}    & capped \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -432,9 +440,9 @@ are floors, not measurements: only 96 designs were ever sampled from it, so
 and folding them (\(\approx\)7 GPU-h) would convert the floor into a
 measurement and settle whether the saturation is real.}
 
-\plan{\textbf{Where the policy wins unconditionally.} M0904 at 6/\numproduct{5500}
-and M0907 at 0/\numproduct{8000} are backbones on which sampling does not
-produce a library at any budget this project can afford --- \(\approx\)200{,}000
+\plan{\textbf{Where the policy wins unconditionally.} M0904 at 8/\numproduct{10000}
+and M0907 at 0/\numproduct{10000} are backbones on which sampling does not
+produce a library at any budget this project can afford --- \numproduct{125000}
 folds for 100 designs on M0904 at its measured rate, unbounded on M0907 --- while
 the policy reaches \SI{63.5}{\percent} and \SI{54.2}{\percent}. The honest shape
 of the efficiency claim is that training buys targets sampling cannot reach, and
