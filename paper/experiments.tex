@@ -338,56 +338,63 @@ the AF3-trained arm's \SI{78.5}{\percent}. A result at or above
 near \SI{4}{\percent} would say the training exploited RF3 specifically and
 nothing transferred.
 
-\subsection*{E22 result --- the RF3-trained arm is not separated from the
-AF3-trained one, and is far more variable}
+\subsection*{E22 result --- training transfers across oracles on all three
+backbones, and most convincingly where sampling fails}
+
+\plan{Extended after the M0097 arm returned. Same one-line oracle swap on the
+medium and hard backbones, three seeds each, rebuilt from the M0097 arm's own
+config so all three share one pipeline (\texttt{rf3}\,\(\rightarrow\)\,%
+\texttt{ame}\,\(\rightarrow\)\,\texttt{bo5}), batch 16 and 150 steps. The
+parent configs for M0904/M0907 ran 200 steps and carried an extra diversity
+step; both were dropped so the backbones differ only in target.}
 
 \begin{center}
-\begin{tabular}{lrr}
+\begin{tabular}{lrrrrr}
 \toprule
-arm & pass rate & median motif RMSD \\
+backbone & seeds (\%) & mean & sd & untrained & AF3-trained \\
 \midrule
-RF3-trained, AF3-eval \texttt{s1} & \SI{40.6}{\percent} & \SI{1.77}{\angstrom} \\
-RF3-trained, AF3-eval \texttt{s2} & \SI{61.5}{\percent} & \SI{1.33}{\angstrom} \\
-RF3-trained, AF3-eval \texttt{s3} & \SI{84.4}{\percent} & \SI{1.17}{\angstrom} \\
-\midrule
-RF3-trained mean (\(n=3\)) & \SI{62.2}{\percent} (sd 21.9) & \\
-AF3-trained mean (E21, \(n=5\)) & \SI{78.5}{\percent} (sd 4.9) & \\
-LigandMPNN \(T=1.0\), AF3-eval & \SI{4.2}{\percent} & \\
+M0097 (easy)   & 40.6, 61.5, 84.4 & \SI{62.2}{\percent} & 21.9 & \SI{2.55}{\percent} & \SI{78.5}{\percent} \\
+M0904 (medium) & 10.4, 10.4, 8.3  & \SI{9.7}{\percent}  & 1.2  & \SI{0.08}{\percent} & \SI{63.5}{\percent} \\
+M0907 (hard)   & 27.1, 19.8, 22.9 & \SI{23.3}{\percent} & 3.7  & \SI{0}{\percent}    & \SI{54.2}{\percent} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-A policy optimised against RoseTTAFold3 and never shown AlphaFold3 during
-training produces designs AF3 accepts at \SI{62.2}{\percent} against
-\SI{4.2}{\percent} untrained. The reward-hacking objection is answered: the
-training transfers across predictors.
+Untrained rates are the measured E4 runs (\numproduct{4000}, \numproduct{10000}
+and \numproduct{10000} designs folded), not the 96-design pilots, so the
+comparison against them is not a resolution-floor argument. A policy optimised
+against RoseTTAFold3 and never shown AlphaFold3 during training beats untrained
+LigandMPNN under AF3 by \(24\times\), \(122\times\), and --- on M0907, where
+sampling produced nothing in \numproduct{10000} folds --- by a ratio with no
+finite value. \textbf{The reward/evaluation circularity objection is answered
+on all three targets.}
 
-The \SI{16.4}{point} gap to the AF3-trained arm is \textbf{not resolved} at
-these sample sizes --- \(t = 1.69\), \(p = 0.14\), against a floor of
-\SI{19.0}{points} for \(n=3\) vs \(n=5\) at the pooled \(\sigma\) of 13.3. The
-pre-registered prediction (``above baseline by a wide margin but below
-\SI{78.5}{\percent}'') is half-confirmed: the first clause holds, the second is
-untestable here because \texttt{s3} at \SI{84.4}{\percent} lands \emph{above}
-the AF3-trained mean.
+\plan{\textbf{Retracting the variance claim.} On M0097 alone the three seeds
+spanned 44 points (sd 21.9) against 4.9 for the AF3-trained arm, and that was
+written up as the arc's real finding: that RF3-in-the-loop destabilises
+training. The other two backbones have sd 1.2 and 3.7. The instability belongs
+to M0097, not to RF3, and the claim is withdrawn. This is the third reading of
+E22 to be revised by more data --- \texttt{s1} alone read as a
+\(7.7\sigma\) collapse, \texttt{s1+s2} as a large penalty, all three seeds as
+high variance --- and each revision came from treating a partial arm as an
+answer. The standing rule from E21 is that a single draw is uninformative here;
+it applies to partial arms of a multi-seed experiment too.}
 
-\plan{\textbf{The real finding is the variance, not the mean.} Three seeds span
-44 points (40.6, 61.5, 84.4), sd 21.9 --- against 4.9 for the same
-configuration trained under AF3. Whatever else RF3-in-the-loop does, it makes
-the outcome far less repeatable, and that is a larger and better-supported
-effect than any shift in the mean. It is also the quantity that matters for
-using RF3 as a training oracle in practice. Why is open: RF3's confidence may
-be noisier as a reward signal, or the RF3/AF3 agreement may itself be
-design-dependent in a way that compounds over training.}
+\plan{\textbf{The difficulty labels do not survive.} ``Easy/medium/hard'' were
+assigned by baseline pass rate, and they do not order the RF3-trained results:
+the hard backbone reaches \SI{23.3}{\percent} with median motif RMSD
+\SIrange{1.58}{1.75}{\angstrom} while the medium one reaches \SI{9.7}{\percent}
+at \SIrange{2.21}{2.31}{\angstrom}. Whatever makes a target hard for
+temperature sampling is not what makes it hard for a trained policy. The labels
+are kept for continuity with the figures but should not be read as an ordering
+of difficulty for this method.}
 
-\plan{\textbf{Two retractions, recorded because the pattern matters.} After
-\texttt{s1} alone (\SI{40.6}{\percent}) this was written up as a
-\(7.7\sigma\) collapse, using E21's \(\sigma = 4.9\) on an arm whose own
-\(\sigma\) is 21.9. After \texttt{s1} and \texttt{s2} it was written up as
-``transfer is real and the penalty is large''; with \texttt{s3} the penalty is
-not statistically present at all. Both readings were of partial data from an
-experiment whose replicate count was chosen \emph{because} E21 had just shown
-single draws to be untrustworthy. The discipline E21 established was not
-applied to E22 while E22 was in flight.}
+\plan{\textbf{What is still not established.} Whether RF3-training \emph{matches}
+AF3-training. The AF3-trained comparators are \(n=5\) on M0097 and \(n=1\) on
+the other two; at the spreads measured here a 3-vs-1 contrast resolves nothing,
+and even the M0097 3-vs-5 contrast does not (\(p = 0.14\)). Answering it needs
+AF3-trained replicates on M0904 and M0907, roughly 60 GPU-hours. The transfer
+claim above does not depend on it.}
 
 \subsection*{E4 result --- what a library actually costs, measured}
 
