@@ -236,12 +236,16 @@ kill criterion in `results/fragments.tex`. Runs on the panel's trained policies.
 Robust to a modest answer — even 1% retention leaves 4 x 10^10 against the
 baseline's 10^8 at 100% — but unmeasured it is the paper's soft center.
 
-### X4 — Seed replication on headline backbones  **[X]** ~60 GPU-h, optional
+**Order:** X0 (running) → X1 → X3.
 
-Only needed if we want "matches AF3-training" claimed. The transfer claim does
-not need it.
-
-**Order:** X0 (running) → X1 → X3 → X4 if wanted.
+**Cut: AF3-trained comparators.** An arm trained on the reporting oracle was
+considered and dropped. Under the protocol we never report AF3-trained numbers,
+so the comparator has no section to live in; and a result showing AF3-training
+scores higher would only be demonstrating the reward-hacking effect the protocol
+exists to remove, which needs no experiment. The M0097 pair we already have
+(78.5% AF3-trained vs 62.2% RF3-trained, p = 0.14, n = 5 vs 3) is enough for a
+Methods footnote quantifying the price of the held-out oracle. Quantifying that
+price properly is a different paper's question.
 
 ---
 
