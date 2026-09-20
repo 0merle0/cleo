@@ -5,7 +5,7 @@ Working doc. Not part of the LaTeX build.
 Purpose: define a paper that stands on computational results alone, so wet-lab
 data later slots in as confirmation of a claim that is already complete.
 
-Status key: **[M]** measured · **[P]** partial · **[X]** not run
+Status key: **[M]** measured · **[P]** partial · **[R]** running · **[X]** not run
 
 ---
 
@@ -22,6 +22,54 @@ Status key: **[M]** measured · **[P]** partial · **[X]** not run
 Two halves: **(1)** more diverse passing sequences per unit of screening effort;
 **(2)** fragment recombination turns them into libraries orders of magnitude
 larger than the parent set.
+
+---
+
+## 0. Protocol — applies to every result
+
+**Train under RoseTTAFold3, evaluate under AlphaFold3.** Always. The policy
+never sees the predictor it is scored by, so no number in the paper can be a
+product of optimizing the metric being reported. This is why cross-oracle is no
+longer a separate result — it is the method.
+
+**Budget accounting.** Folding is the entire cost; MPNN sampling is
+microseconds. Every arm is charged in *designs folded*, split into training and
+inference, and written to `folds.json` per run so the matched-budget claims are
+auditable rather than asserted.
+
+| | folds |
+|---|---|
+| policy training | 2,400 (batch 16 × 150 steps) |
+| policy inference | 256 |
+| **policy total** | **2,656** |
+| LigandMPNN baseline | 2,656 (443 at each of T = 0.1, 0.2, 0.3, 0.5, 0.7, 1.0) |
+
+The baseline's budget is spread across the temperature sweep, not given to one
+setting. Pooling temperatures reaches more distinct substitutions than any
+single temperature at the same budget (measured on M0097: pooled U = 1,090 vs
+781 for the best single temperature), so pooling is the baseline's strongest
+play and beating it is the stronger claim.
+
+**Objective.** Geometry and unique mutations, rank-normalized:
+
+```
+steps:  div → rf3 → ame → bo5
+  ame_motif_rmsd         min   weight 1.0   rank
+  div_marginal_fraction  max   weight  W    rank
+```
+
+`div` is sequence-level and must run before folding; `bo5` takes remaining
+columns from the min-RMSD row, so the diversity term survives the reduction.
+
+Note: under `normalize: rank` the `lower_bound`/`upper_bound` fields are
+**deliberately ignored** by `reward.py`. They have been stripped from all
+configs — left in, they read as a calibrated range that does nothing. The only
+lever on diversity pressure is `weight`.
+
+In reference-free mode (no `ref_seq`, correct for de novo backbones)
+`div_total_muts` is the sequence length for every member, so
+`marginal_fraction` and `marginal_count` are rank-identical (corr 1.000). The
+choice between them does not matter.
 
 ---
 
@@ -54,58 +102,46 @@ deliberately destroys diversity to buy pass rate.
 
 ### R1 — The informative-library frontier  ★ headline
 
-**Claim.** At equal sampling budget the policy dominates the entire temperature
-frontier: more passing sequences *and* more distinct substitutions among them.
+**Claim.** At matched fold budget the policy dominates the temperature frontier:
+more passing sequences *and* more distinct substitutions among them.
 
-Measured on M0097, 96 folds per arm **[M]**:
+Pilot evidence, M0097, 96 folds per arm (old budget) **[M]**:
 
-| arm | passing | U (substitutions among passers) |
+| arm | passing | U |
 |---|---|---|
 | T=0.2 | 64 | 341 |
 | T=0.5 | 33 | 628 |
-| T=0.7 | 25 | 781 |
+| T=0.7 (best U) | 25 | 781 |
 | T=1.0 | 4 | 356 |
-| **policy** | **86** | **1,045** |
+| policy (RF3-trained) | 60 | **1,092** |
 
-The sweep has an interior optimum (T~0.7) because the two axes trade off. The
-policy sits above all of it.
+The sweep has an interior optimum because the axes trade off; the policy sits
+above all of it, and every seed clears it individually (942 / 1,048 / 1,287).
 
-⚠️ **Open, and it decides this section.** Our U = 1,045 comes from the only 96
-designs ever sampled from a trained policy — a floor, not a measurement. Charged
-its 2,400-fold training debt, T=1.0 given the same total budget reaches 66
-passing / U = 1,824, *above* us. Whether the policy's coverage keeps climbing with
-sample count or saturates near the Chao2 estimate (~1,695) is unmeasured, and it
-determines whether R1 survives. **See X1.**
+⚠️ **Two open issues.** (a) That comparison excludes the 2,400-fold training
+debt; charged it, pooled T=1.0 at equal total budget reaches U = 1,824. (b) Our
+U figures come from 96 samples and are floors, not measurements. The panel
+(X1) fixes both by sampling 256 and charging the baseline a matched budget.
 
 ### R2 — Rescue: dead backbones become productive  ★ highlight, not the focus
 
-**Claim.** On backbones where sampling yields nothing at any affordable budget,
-the policy yields usable libraries.
-
-| backbone | untrained (measured) | trained |
+| backbone | untrained (measured) | RF3-trained → AF3 |
 |---|---|---|
-| M0907 | **0 / 10,000** | 23.3% (RF3-trained), 54.2% (AF3, n=1) |
-| M0904 | **8 / 10,000** = 0.08% | 9.7% (RF3-trained), 63.5% (AF3, n=1) |
-| M0097 | 102 / 4,000 = 2.55% | 62.2% / 78.5% |
+| M0907 | **0 / 10,000** | 23.3% (sd 3.7) |
+| M0904 | **8 / 10,000** = 0.08% | 9.7% (sd 1.2) |
+| M0097 | 102 / 4,000 = 2.55% | 62.2% (sd 21.9) |
 
 Context from RFdiffusion2's published 41-site table: **~76% of backbone-slots
-yield zero passing sequences**; the median site has 86% dead backbones; 16/41
-sites are >=90% dead. Our three sit at sites with 55% / 97% / 93% dead fractions,
-so the two hard ones are representative, not cherry-picked.
+yield zero passing sequences**; median site 86% dead; 16/41 sites >=90% dead.
+Our backbones sit at sites with 55% / 97% / 93% dead fractions — representative,
+not cherry-picked. **[M]** for these three; the panel makes it a rate.
 
-**[P] n = 3 backbones.** Needs breadth to become a rate rather than an anecdote.
+### R3 — *(absorbed into the protocol)*
 
-### R3 — The gain is not an artifact of the scoring model  **[M]**
-
-Train against RoseTTAFold3, evaluate with AlphaFold3 — the policy never sees AF3.
-
-| backbone | RF3-trained -> AF3-eval | untrained | ratio |
-|---|---|---|---|
-| M0097 | 62.2% (sd 21.9) | 2.55% | 24x |
-| M0904 | 9.7% (sd 1.2) | 0.08% | 122x |
-| M0907 | 23.3% (sd 3.7) | 0% | inf |
-
-Answers the circularity objection on all three targets. Three seeds each.
+Cross-oracle transfer is no longer a standalone result. Every number is
+RF3-trained and AF3-evaluated by construction, so the circularity objection is
+answered everywhere rather than in one section. The three-backbone transfer data
+stays in the notebook as the validation that established the protocol.
 
 ### R4 — Fragments convert yield into library size  **[M arithmetic, X biology]**
 
@@ -120,47 +156,92 @@ At a matched 4,000-fold budget on M0097, real passing parents, 4 equal slots:
 P^k while synthesis scales as k*P. Pass rate — exactly what RL improves — is the
 dominant lever on library size.
 
-⚠️ This is arithmetic on an untested assumption: that recombinants still fold.
-**See X2.**
+⚠️ Arithmetic on an untested assumption: that recombinants still fold. **See X3.**
+
+The 13 trained policies from the panel become the 13 fragment-library parents,
+so R4 is a by-product of X1 rather than a separate campaign.
 
 ### R5 — Calibration  **[M]**
 
-σ = 7.75 points run-to-run (E21, 10 runs), so the resolution floor is 9.6 points
-at n = 5. Stated up front; every contrast in the paper is reported against it.
-Rare in this literature and worth foregrounding rather than burying.
+σ = 7.75 points run-to-run (E21, 10 runs), resolution floor 9.6 points at n = 5.
+Stated up front; every contrast is reported against it. Rare in this literature
+and worth foregrounding rather than burying.
 
 ---
 
-## 3. Experiments needed
+## 3. Experiments
 
-### X1 — Policy coverage at scale  ★ critical path, ~10 GPU-h
+### X0 — Diversity-weight pilot  **[R] running**, ~96 GPU-h
 
-Sample ~2,000 designs from a trained policy (not 96), fold best-of-5, plot U of
-the passing set against fold budget on the same axes as the measured T=1.0
-trajectory. **Decides whether R1 stands as written.** Cheap, and the paper
-currently rests on an extrapolation from 86 sequences.
+Jobs 25866776–81. Two backbones (M0097 easy, M0907 hard) × div weight {1, 2, 4};
+**w = 0 comes free from the E22 runs**, which had no diversity term. Evaluated at
+n = 256 under AF3.
 
-### X2 — Fragment retention  ★ critical path, ~10 GPU-h
+Gates the panel. Two facts bracket the answer and neither was chosen:
+`backbone19`'s M0097 already ran with div at weight 1.0 and still reached
+U = 1,045, below the pooled baseline's 1,090 — so **1.0 is known insufficient**;
+and E16/E18 showed diversity-first pressure collapses pass rate — so **too much
+is known to fail**. The response is non-monotone with an interior optimum.
+
+Readout: U of the passing set at n = 256, not pass rate alone. A weight that
+raises coverage while halving yield may still win on the actual objective.
+
+A flat curve, or a peak at 1.0, is also informative — it would mean the
+objective cannot buy past the baseline's coverage and R1 needs rethinking before
+390 GPU-h goes into the panel.
+
+### X1 — The R1 panel  **[X]** built and waiting on X0, ~390 GPU-h
+
+13 backbones, **one per AME site** so the points are independent rather than
+correlated draws from one site. Stratified by the published dead-backbone
+fraction; hard-weighted on purpose, because the benchmark is (median site 86%
+dead).
+
+| tier | backbones |
+|---|---|
+| easy | M0664 (16% dead), M0097 (55%) |
+| medium | M0255 (77%), M0315 (85%), M0500 (86%) |
+| hard | M0078, M0058, M0732, M0050, M0092, M0365 (93–99%), M0904, M0907 |
+
+One seed per backbone: for a population claim, more backbones beats more seeds —
+seed noise averages out across targets, and the existing 3-seed runs already
+carry the variance statement.
+
+Configs are generated from each backbone's own source config with assertions on
+every field (pipeline order, `structure_col`, early-stopping disabled, existence
+of pdb / template / design_pdb / trb). All 13 pass; two verified through full
+Hydra instantiation. Backbones whose motif atoms sit on designable residues were
+checked — all such atoms are backbone-only (N/CA/C/O), so they exist regardless
+of residue identity.
+
+⚠️ All 13 must be re-run, including M0097/M0904/M0907, because those were
+trained without the diversity term and are no longer comparable. Their 3-seed
+variance result stays valid on its own.
+
+Produces R1, R2, and the parents for R4.
+
+### X2 — Policy coverage at scale  — folded into X1
+
+Sampling at n = 256 rather than 96 is now the panel default, which is what this
+experiment existed to fix. Still a floor rather than a saturating measurement;
+if the U-vs-n curve has not flattened by 256, a deeper draw on one backbone
+settles it cheaply.
+
+### X3 — Fragment retention  ★ critical path, ~10 GPU-h
 
 Split passing designs at fixed boundaries, recombine, fold best-of-5, report
 retention = recombinant pass rate / parental pass rate. Pre-registered with a
-kill criterion in `results/fragments.tex`. Shares its sampling step with X1 —
-**one job answers both**.
+kill criterion in `results/fragments.tex`. Runs on the panel's trained policies.
 
-Robust to a modest answer: even 1% retention leaves 4 x 10^10 against the
-baseline's 10^8 at 100%. But unmeasured it is the paper's soft center.
+Robust to a modest answer — even 1% retention leaves 4 x 10^10 against the
+baseline's 10^8 at 100% — but unmeasured it is the paper's soft center.
 
-### X3 — Breadth, ~10-15 backbones  ~200 GPU-h
+### X4 — Seed replication on headline backbones  **[X]** ~60 GPU-h, optional
 
-Stratified across the published dead-fraction distribution. Converts R2 from two
-rescued backbones into a rate, and gives R1 a population rather than one target.
+Only needed if we want "matches AF3-training" claimed. The transfer claim does
+not need it.
 
-### X4 — Seed replication on headline backbones  ~60 GPU-h
-
-AF3-trained comparators on M0904/M0907 are n = 1 against σ = 7.75. Needed only if
-we want "matches AF3-training" claimed; the transfer claim in R3 does not need it.
-
-**Order:** X1 + X2 (one job) -> X3 -> X4.
+**Order:** X0 (running) → X1 → X3 → X4 if wanted.
 
 ---
 
@@ -169,13 +250,14 @@ we want "matches AF3-training" claimed; the transfer claim in R3 does not need i
 | item | action |
 |---|---|
 | `results/frontier.tex` | Rewrite to the informative-library frontier; currently a pass-rate story |
-| `results/fragments.tex` | Keep pre-registration; fill Block 3 from X2 |
+| `results/fragments.tex` | Keep pre-registration; fill Block 3 from X3 |
 | `results/petase.tex` | **Cut** — wet lab |
 | `supplementary/heme_*`, `protease_*` | **Cut** |
+| Cross-oracle section | Fold into Methods as the protocol, not a result |
 | Selection-rule arc (E9/E16/E18/E19) | Demote to one honest paragraph in Discussion — it ends unresolved and is not a result |
 | Diversity wording | Must say *per unit budget* everywhere; at matched library size T=1.0 carries more substitutions (1,988 vs 1,045) and a reviewer will find it |
 | `abstract`, `intro`, `conclusion` | Rewrite to the two-half thesis |
-| Figures | F1 frontier (R1) · F2 rescue + published dead-fraction context (R2) · F3 cross-oracle (R3) · F4 library size vs budget (R4) |
+| Figures | F1 frontier across 13 backbones (R1) · F2 rescue + published dead-fraction context (R2) · F3 library size vs budget (R4) · F4 diversity-weight response (X0) |
 | `main.tex` | Drop Move-3 scaffolding; two results halves plus calibration |
 
 ---
@@ -190,4 +272,7 @@ we want "matches AF3-training" claimed; the transfer claim in R3 does not need i
   one on both pass rate and motif RMSD. Keep the labels for figure continuity
   only, not as an ordering of difficulty for this method.
 - **Training debt is per-backbone.** Policies are trained on one backbone, so the
-  debt amortizes over library size, not over targets — unless X3 shows transfer.
+  debt amortizes over library size, not over targets — unless the panel shows
+  transfer across backbones, which it is not designed to test.
+- **`experiments/` is gitignored**, so all panel and pilot infrastructure lives
+  only on disk.
