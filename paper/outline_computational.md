@@ -220,6 +220,13 @@ variance result stays valid on its own.
 
 Produces R1, R2, and the parents for R4.
 
+**Also answers:** does baseline difficulty predict policy performance? With 13
+backbones spanning 16-99% dead fractions we can regress policy pass rate on the
+published baseline rate. A null or weak correlation is a result in its own
+right — it would mean the backbones RL rescues cannot be picked in advance from
+how badly sampling does on them, which matters for anyone deciding where to
+spend training compute.
+
 ### X2 — Policy coverage at scale  — folded into X1
 
 Sampling at n = 256 rather than 96 is now the panel default, which is what this
@@ -272,9 +279,14 @@ price properly is a different paper's question.
   backbones. Unexplained.
 - **`backbone19` and `selection2` disagree by 35 points** on the same backbone
   and arm — 4.5σ, so not seed noise. Unexplained; must be resolved or disclosed.
-- **Difficulty labels do not order results**: the hard backbone beats the medium
-  one on both pass rate and motif RMSD. Keep the labels for figure continuity
-  only, not as an ordering of difficulty for this method.
+- **Baseline difficulty and policy difficulty are different axes.** The
+  easy/medium/hard labels are derived from the published dead-backbone fraction
+  and are correct for what they measure: how hard a backbone is for baseline
+  LigandMPNN. They simply do not predict how hard it is for the policy — M0907
+  is harder than M0904 for sampling (0/10,000 vs 8/10,000 measured) and easier
+  for the policy (23.3% vs 9.7%, and better motif RMSD). Keep the labels; they
+  are honest. The open question is whether the two axes are genuinely
+  uncorrelated, which the panel can answer.
 - **Training debt is per-backbone.** Policies are trained on one backbone, so the
   debt amortizes over library size, not over targets — unless the panel shows
   transfer across backbones, which it is not designed to test.
