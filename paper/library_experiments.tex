@@ -1,0 +1,182 @@
+% Library experiments. Compiled by library_notebook.tex, not by main.tex.
+%
+% A separate record from experiments.tex because this is a different arc. That
+% file is the AME benchmark programme -- E1-E22, selection rules, oracles,
+% run-to-run variance. This one is about whether designs can be cut into
+% fragments and reassembled, which is the question a combinatorial library
+% actually turns on, and which none of E1-E22 was built to answer.
+%
+% Same discipline: pre-registrations stay next to the results that confirmed or
+% killed them, and retracted claims stay visible rather than being quietly
+% rewritten. Three claims from the AME arc were overturned in the week before
+% this file was started, and they are recorded here because the overturning is
+% what justifies the change of thesis.
+
+\section{Library experiments: fragments, recombination, and modularity}
+
+\subsection*{Why a separate record}
+
+The AME programme asked whether reinforcement learning produces \emph{better}
+sequences. This arc asks whether it produces \emph{reusable} ones. A
+combinatorial library is assembled from parts: $P$ passing parents cut into $k$
+slots yield $P^k$ constructs from $k \cdot P$ synthesised fragments, and that
+product-versus-sum asymmetry is the only reason to build libraries this way. But
+$P^k$ counts constructs, not working constructs. If the recombinants do not
+fold, the number is fiction.
+
+Nothing in the AME slate measured that, and nothing in the published literature
+we are aware of does either.
+
+\subsection*{Three claims this arc retired}
+
+\plan{Recorded because the change of thesis rests on them, and because each was
+asserted here before the data that killed it.
+
+\textbf{The diversity/fidelity frontier.} On one backbone at a 96-fold budget
+the policy dominated the entire temperature sweep. Measured across 13 backbones
+at a \emph{matched} budget, it wins both axes on 6/13 and loses on the easy end
+where sampling already works. The original comparison excluded the policy's
+2{,}400-fold training debt.
+
+\textbf{Rescue.} ``Sampling yields nothing on hard backbones; the policy rescues
+them'' rested on $0/10{,}000$ at $T=1.0$ alone. Given the same budget spread
+across the temperature sweep, the baseline finds 116 and 1 passing designs on
+those backbones. Clean rescue is 1/13, with a counterexample beside it (M0078:
+policy 0, baseline 11).
+
+\textbf{Difficulty axes are uncorrelated.} Claimed from three backbones, where
+the hard one outperformed the medium one. Across 13, policy pass rate correlates
+with the published dead-backbone fraction at $r = -0.776$. Both methods find the
+same backbones hard.}
+
+\subsection*{L1 --- Does recombination work at all?}
+
+\plan{Pre-registered. Split passing designs at $k=4$ equal boundaries,
+recombine, exclude exact parents, fold best-of-5 under AlphaFold3. Retention is
+the chimera pass rate; parents are passing by construction, so no ratio is
+involved. 256 chimeras per cell, 21 cells across 13 backbones.}
+
+Retention spans \SIrange{0.4}{95}{\percent}. On the easier half it is high
+enough that the combinatorial multiplier is real: a few hundred parents give
+$\sim$\num{e9} constructs of which most fold.
+
+\subsection*{L2 result --- RL-designed fragments recombine better}
+
+\begin{center}
+\begin{tabular}{rlrr}
+\toprule
+dead\% & backbone & sampled & RL-trained \\
+\midrule
+16 & M0664\_2dhn & 90.6 & \textbf{94.9} \\
+55 & M0097\_1ctt & 59.8 & \textbf{72.7} \\
+77 & M0255\_1mg5 & 25.8 & \textbf{79.3} \\
+85 & M0315\_1ey3 & 49.6 & \textbf{78.1} \\
+86 & M0500\_1e3i & 10.9 & \textbf{53.5} \\
+95 & M0058\_1cju & 12.9 & \textbf{44.9} \\
+97 & M0050\_1dbt & \textbf{11.7} & 5.5 \\
+97 & M0904\_1qgx & 12.9 & \textbf{47.3} \\
+99 & M0365\_1pfk & 0.4 & \textbf{5.5} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{8 of 9, mean paired advantage \SI{+23.0}{points}}; mean retention
+\SI{48.1}{\percent} against \SI{28.5}{\percent}. Nothing in the objective asked
+for this --- the policy was trained on motif RMSD alone.
+
+Two things make it load-bearing rather than incidental. It holds \emph{where the
+policy loses on parent count}: on M0664 the baseline has \num{2273} passing
+parents to the policy's 243, nearly \num{10}$\times$, and its chimeras still
+pass less often. And fragment-space \emph{size} at matched parent count is
+exactly $1.00\times$ between arms --- at 45 residues no two passing designs
+share a fragment, so library size is determined entirely by parent count.
+Retention is the only axis on which the arms differ.
+
+\subsection*{L3 result --- the surviving parts pool is also more diverse}
+
+The diversity that matters for a library is over fragments that still work after
+shuffling, not over all designs.
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{survival fraction} & \multicolumn{2}{c}{$U$ over survivors (rarefied)} \\
+ & sampled & RL & sampled & RL \\
+\midrule
+mean & 0.52 & \textbf{0.84} & --- & --- \\
+backbones won & \multicolumn{2}{c}{9/9 to RL} & \multicolumn{2}{c}{8/8 to RL} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\plan{\textbf{This reverses an earlier finding and the reversal matters.} Over
+all passing \emph{designs}, $T=1.0$ carries more substitutions than the policy
+(\num{1988} against \num{1045}). Over \emph{usable fragments}, rarefied to a
+matched survivor count so pool size cannot explain it, the policy carries more
+on every backbone. Both are true. The first was measuring the wrong object for a
+library built from parts, and the diversity claim should be stated over
+survivors or not at all.}
+
+\subsection*{L4 --- Training for recombinability}
+
+\plan{Pre-registered, running. Fragment-level GRPO: sample 8 parents and never
+fold them; build 32 chimeras by rotation so every fragment appears in exactly 4;
+fold those; give each fragment an advantage equal to the mean motif RMSD over
+its chimeras, standardised within slot. The $[B, L]$ advantage is consumed by
+the existing per-token surrogate without changing \texttt{grpo.py}.
+
+Design choices were simulated against known fragment effects rather than
+guessed: rotation beats random permutation at this size; simple averaging beats
+least-squares regression at 32 chimeras (32 observations, 32 parameters); and
+scoring on continuous RMSD avoids the tied advantages a four-chimera binary
+would produce. Recovery of the true pairwise fragment ordering is
+$\approx$\SI{80}{\percent}, falling to $\approx$\SI{67}{\percent} once fragment
+interactions are included --- diluted, but enough to shift a distribution.
+
+\textbf{Prediction.} Retention and survival fraction rise above the policy arm
+on all three backbones (M0097, M0255, M0315). A small effect is consistent with
+the signal quality above and is not by itself evidence against the idea.
+
+\textbf{Kill criterion.} Fragment collapse. The objective can be satisfied by
+emitting near-identical sequences: every chimera then reproduces a parent and
+passes. That shows as survival fraction climbing toward 1.0 while $U$ over
+survivors falls. Retention alone cannot distinguish it; the pair can. If it
+triggers, the term is gated on chimeras differing from parents, \emph{not}
+reweighted --- the weight pilot measured that adding a diversity reward at any
+weight from 1 to 4 drove pass rate to 0/256 with median motif RMSD
+\SIrange{5.9}{11.8}{\angstrom}.}
+
+\subsection*{L5 --- How finely should a design be cut?}
+
+\plan{Pre-registered, running. Every result above is at $k = 4$, and the claim
+could be specific to 45-residue fragments. Library size is $P^k$ and synthesis
+is $k \cdot P$, so each step up in $k$ squares the library for a linear increase
+in parts --- but shorter fragments should recombine worse. There is an interior
+optimum and nobody has looked for it.
+
+$k \in \{2, 4, 6, 8\}$, both arms, three backbones, 256 chimeras per cell. No
+training required: the parents already exist.
+
+\textbf{Prediction.} Retention falls monotonically with $k$. The RL arm's
+advantage persists across $k$; if it vanishes by $k=8$ the claim is ``designs
+tolerate quarter-swaps'', which is much narrower than ``designs are modular''.
+
+Already visible at generation time: at $k=8$ fragments begin to \emph{collide}
+between designs --- M0097's baseline yields $[1011, 777, 926, \dots]$ distinct
+fragments from \num{1042} parents, where at $k=4$ every parent contributed a
+unique fragment to every slot. A shared parts pool only becomes possible at this
+granularity.}
+
+\subsection*{L6 --- Does boundary placement matter?}
+
+\plan{Pre-registered in \texttt{results/fragments.tex} before any of this ran,
+and quoted here unchanged: \emph{``If they do not, the structural rationale is
+decorative and should be dropped.''}
+
+Uniform boundaries against boundaries moved to the nearest coil residue (within
+12 positions, secondary structure from \texttt{biotite.annotate\_sse}). Three
+backbones, both arms, $k=4$.
+
+\textbf{Prediction.} Cutting through secondary structure costs retention, so
+structural boundaries beat uniform ones. If they do not, the structural story is
+dropped and equal slots are used throughout on the grounds of simplicity.}

@@ -1,0 +1,41 @@
+% Library experiments notebook. Built with `make library`.
+%
+% A third document, alongside main.tex (the paper) and notebook.tex (the AME
+% programme record). Separate because this is a different experimental arc with
+% a different question: not "does RL produce better sequences" but "does it
+% produce reusable ones".
+%
+% The split exists for the same reason as the first one. Keeping the record is
+% the point: three claims from the AME arc were retired by the 13-backbone
+% panel, and the retirements are only checkable because the originals were
+% written down before the data arrived.
+\documentclass[11pt]{article}
+
+\input{preamble}
+
+\title{\cleo{}: library experiments}
+\author{}
+\date{Lab notebook --- compiled \today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+The record behind the combinatorial-library results: whether designs can be cut
+into fragments and reassembled, whether reinforcement learning makes them more
+reassemblable, and how finely they should be cut. Pre-registrations are kept
+next to the results that confirmed or killed them, and the three claims this arc
+retired from the AME programme are recorded with the data that retired them.
+This document is provenance, not a paper.
+\end{abstract}
+
+\clearpage
+\tableofcontents
+\clearpage
+
+\input{library_experiments}
+
+\end{document}
