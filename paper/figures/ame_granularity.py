@@ -5,14 +5,16 @@ Two panels over the same x-axis, the number of slots a design is split into:
 
   top     retention -- the fraction of recombinants that still fold. Falls with
           k, because shorter fragments carry less of their own context.
-  bottom  expected working library size, P^k x retention(k). P^k grows
-          geometrically while retention decays, so the product has an interior
-          maximum: the granularity that actually maximises the number of folded
-          constructs.
+  bottom  fragment collision -- distinct fragments per slot as a fraction of
+          parents. At coarse granularity every parent contributes a unique
+          fragment to every slot; as fragments shorten the designs start sharing
+          them, which is degradation visible without folding anything.
 
-The second panel is the one worth having. Library size alone argues for cutting
-as finely as possible; retention alone argues for not cutting at all. Neither is
-the design decision anyone faces.
+Library size is deliberately NOT plotted. At a fixed synthesis budget both arms
+build the same-size library -- each slot takes budget/k fragments regardless of
+which arm produced them -- so the curves lie on top of each other and the panel
+shows nothing. That is itself the finding: the arms do not differ in how large a
+library they can build, only in what fraction of it folds.
 
 Includes k=4 from the main recombination panel, so the curve is anchored on the
 measurement everything else in the paper rests on.
@@ -36,14 +38,22 @@ sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
 from palette import PALETTE  # noqa: E402
 
+PARTS = 1000          # synthesised fragments the whole library may use
+RETENTION_FLOOR = 0.5  # below this you fold two constructs per usable one
+
 C = {"policy": PALETTE["blue"], "baseline": PALETTE["gray"]}
 LABEL = {"policy": "RL-trained", "baseline": "LigandMPNN"}
 MARK = {"M0097": "o", "M0255": "s", "M0315": "^"}
 
 
-def library_size(site, arm, k):
-    """log10 of the number of distinct recombinants: product over slots of
-    distinct fragments.
+def library_size(site, arm, k, parts_budget=None):
+    """log10 distinct recombinants: product over slots of distinct fragments.
+
+    With `parts_budget` set, each slot is capped at `budget / k` fragments. That
+    is the comparison a synthesis budget actually imposes, and it is the only
+    fair one between arms: the policy has 199 passing parents on M0315 and the
+    baseline 926, so an uncapped product rewards the arm that happened to
+    produce more parents rather than the one whose parts recombine.
 
     NOT P^k. Fragments collide as they shorten -- at 7 residues one M0097 slot
     holds 21 distinct variants from 178 parents -- and P^k overstates the
@@ -64,6 +74,8 @@ def library_size(site, arm, k):
     L = len(seqs[0])
     e = [round(i * L / k) for i in range(k + 1)]
     counts = [len({q[e[i]:e[i + 1]] for q in seqs}) for i in range(k)]
+    if parts_budget:
+        counts = [min(c, max(parts_budget // k, 1)) for c in counts]
     return float(np.sum(np.log10(counts)))
 
 
@@ -78,6 +90,25 @@ def parents_for(site, arm):
         return np.nan
     d = pd.read_csv(p)
     return int(d[d.rfd2_any_pass].sequence.nunique())
+
+
+def collision(site, arm, k):
+    """Mean distinct fragments per slot, as a fraction of parents."""
+    ev = sorted((AME / "r1panel" / "eval").glob(f"run_{site}*/*_af3scored.csv"))
+    if not ev:
+        return np.nan
+    bb = ev[0].parent.name[:-3]
+    p = ev[0] if arm == "policy" else AME / "r1panel" / f"{bb}_baseline" / "baseline_scored.csv"
+    if not Path(p).exists():
+        return np.nan
+    d = pd.read_csv(p)
+    seqs = d[d.rfd2_any_pass].drop_duplicates("sequence").sequence.tolist()
+    if len(seqs) < 2:
+        return np.nan
+    L = len(seqs[0])
+    e = [round(i * L / k) for i in range(k + 1)]
+    counts = [len({q[e[i]:e[i + 1]] for q in seqs}) for i in range(k)]
+    return float(np.mean(counts) / len(seqs))
 
 
 def collect():
@@ -106,8 +137,10 @@ def collect():
     df = pd.DataFrame(rows).drop_duplicates(["site", "arm", "k"])
     df["parents"] = [parents_for(r.site, r.arm) for r in df.itertuples()]
     df["log10_lib"] = [library_size(r.site, r.arm, r.k) for r in df.itertuples()]
-    # Expected working constructs, in log space.
-    df["log10_working"] = df.log10_lib + np.log10(df.retention.clip(lower=1e-9))
+    df["log10_lib_budget"] = [library_size(r.site, r.arm, r.k, PARTS) for r in df.itertuples()]
+    # Expected working constructs at a fixed synthesis budget, in log space.
+    df["log10_working"] = df.log10_lib_budget + np.log10(df.retention.clip(lower=1e-9))
+    df["collision"] = [collision(r.site, r.arm, r.k) for r in df.itertuples()]
     return df.sort_values(["site", "arm", "k"])
 
 
@@ -127,10 +160,14 @@ def main():
                      ls="-" if arm == "policy" else "--",
                      alpha=1.0 if arm == "policy" else 0.75)
         ax1.plot(g.k, 100 * g.retention, **style)
-        ax2.plot(g.k, g.log10_working, **style)
+        ax2.plot(g.k, 100 * g.collision, **style)
 
+    ax1.axhline(100 * RETENTION_FLOOR, color="#B23A3A", lw=1.0, ls=":", zorder=0)
+    ax1.annotate(f"{RETENTION_FLOOR:.0%} floor", (0.99, 100 * RETENTION_FLOOR),
+                 xycoords=("axes fraction", "data"), ha="right", va="bottom",
+                 fontsize=7.5, color="#B23A3A")
     ax1.set_ylabel("recombinants that fold (%)", fontsize=9.5)
-    ax2.set_ylabel(r"expected working library, $\log_{10}$", fontsize=9.5)
+    ax2.set_ylabel("distinct fragments per slot\n(% of parents)", fontsize=9.5)
     ax2.set_xlabel("fragments per design ($k$)", fontsize=10)
     for ax in (ax1, ax2):
         ax.grid(alpha=0.22, lw=0.6)
@@ -139,6 +176,7 @@ def main():
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
     ax1.set_ylim(bottom=0)
+    ax2.set_ylim(0, 105)
 
     h = [plt.Line2D([], [], color=C[a], ls="-" if a == "policy" else "--", lw=1.8,
                     label=LABEL[a]) for a in ("policy", "baseline")]
