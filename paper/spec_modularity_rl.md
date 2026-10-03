@@ -39,33 +39,49 @@ per-token trust region.
 
 ## Procedure, per training step
 
-1. Sample `B = 16` sequences as now.
-2. Split each at `k = 4` fixed equal boundaries → a pool of 16 fragments per slot.
-3. Build chimeras by **rotation, not random draw**: for rotation `ρ = 1..R`,
-   chimera `i` takes slot `j` from sequence `(i + ρ·j) mod B`. This is a Latin-
-   square design, so every fragment appears in exactly `R` chimeras and no
-   fragment's score is noisier than another's. Random sampling would leave some
-   fragments unscored and others over-represented, which biases the advantage.
-   `R = 4` → 64 chimeras.
-4. Fold the 16 originals at best-of-5 (the reported unit) and the 64 chimeras at
-   **1 diffusion sample**. The chimera number is an internal relative signal for
-   credit assignment, never reported, so it does not need the benchmark's
-   best-of-5. This is what keeps the cost down: 16×5 + 64×1 = 144 predictions per
-   step against 80 today, 1.8× rather than 5×.
-5. Fragment score `s(i,j)` = fraction of the `R` chimeras containing fragment
-   `(i,j)` that pass.
-6. Advantage: standardise `s` **within each slot** across the batch. Slots differ
-   systematically in how tolerant they are — a slot covering the motif will pass
-   less often than a surface loop — and pooling them would reward position rather
-   than quality.
-7. Combine with the existing geometry advantage per sequence:
+**Parents are sampled but never folded.** All credit comes from how a fragment
+performs in chimeras, which is the claim being trained for; folding the parents
+too would spend 40 extra predictions per step on a signal the objective does not
+use.
 
-   ```
-   A[i, t] = w_geom * A_rmsd[i]  +  w_frag * A_frag[i, slot(t)]
-   ```
+1. Sample `B = 8` sequences.
+2. Split each at `k = 4` fixed equal boundaries -> 8 fragments per slot, 32 total.
+3. Build 32 chimeras by **rotation, not random draw**: for `rho = 0..3`, chimera
+   `i` takes slot `j` from parent `(i + rho*j) mod 8`. Verified: 32 distinct
+   chimeras, every fragment in exactly 4, none duplicated. Random draws would
+   leave some fragments unscored and over-weight others, biasing the advantage.
+4. Fold the 32 chimeras at **best-of-5**. Single-sample folding measures
+   something the benchmark does not, and the extra samples are what hold the
+   reward's variance down -- each fragment score then rests on 4 chimeras x 5
+   predictions = 20 structure predictions.
+5. Fragment score `s(i,j)` = fraction of its 4 chimeras that pass
+   (`ame_motif_pass_and_no_clash`, best-of-5 reduced).
+6. Standardise `s` **within each slot** across the batch. Slots differ
+   systematically in tolerance -- one covering the motif passes less often than a
+   surface loop -- so pooling them would reward position rather than quality.
+7. Advantage `A[i, t] = A_frag[i, slot(t)]`, shape `[B, L]`, consumed directly by
+   the existing per-token surrogate.
 
-   `A_rmsd` is today's sequence-level advantage, broadcast flat; `A_frag` varies
-   along the sequence. Start `w_geom = w_frag = 1`.
+Cost: 32 designs/step x 150 steps = 4,800 designs, ~32 GPU-h per run, 2x the
+panel arm. Three backbones ~96 GPU-h.
+
+## What has to be built
+
+Three pieces, none of them large, but none of them free:
+
+**A chimera reward step.** `UniversalReward` passes one row per sampled sequence
+through a chain of steps. This step receives 8 rows, builds 32 chimeras, folds
+them, and returns the 8 rows carrying per-fragment columns. It is the first step
+in the codebase whose folding set differs from its input set.
+
+**A per-slot advantage path.** `self.advantage()` standardises over the whole
+reward tensor. Fragment advantages must be standardised per slot and assembled
+into `[B, L]`, so this needs its own path rather than reuse.
+
+**A checkpoint metric that does not depend on parents.**
+`ame_motif_rmsd_batch_mean` is computed from the sampled sequences, which are no
+longer folded. Use the chimera mean instead, and note in the config that it is
+not comparable to the panel runs' checkpoint metric.
 
 ## Backbones
 
@@ -90,10 +106,14 @@ same configuration without the fragment term.
 
 ## Cost
 
-144 predictions/step × 150 steps ≈ 21,600 per run. At the measured RF3 rate
-(~6.7 GPU-h per 1,000 designs) that is **~30 GPU-h per run, ~90 GPU-h for three**.
-Evaluation is the existing 256-design protocol plus a 256-chimera retention
-fold, ~2 GPU-h per backbone.
+32 chimeras/step × 150 steps = 4,800 designs at best-of-5, **~32 GPU-h per run,
+~96 GPU-h for three** -- 2x the panel arm. Evaluation is the existing 256-design
+protocol plus a 256-chimera retention fold, ~2 GPU-h per backbone.
+
+Note the batch drops from 16 to 8, which halves the group GRPO standardises over.
+If the arm underperforms, that is a confound with the fragment term. A B=8
+control without the fragment term costs ~16 GPU-h per backbone and removes it;
+worth running if the first result is ambiguous rather than pre-emptively.
 
 ## Predictions, pre-registered
 
