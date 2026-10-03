@@ -40,9 +40,19 @@ per-token trust region.
 ## Procedure, per training step
 
 **Parents are sampled but never folded.** All credit comes from how a fragment
-performs in chimeras, which is the claim being trained for; folding the parents
-too would spend 40 extra predictions per step on a signal the objective does not
-use.
+performs in chimeras, which is the claim being trained for, and no part of the
+objective reads a parent's own geometry.
+
+This is a decision on principle, not cost. Folding the 8 parents would add 8
+trunk passes, about 25% on top of the 32 chimeras -- not the 125% a
+per-prediction count suggests. Cost in these models is dominated by the trunk,
+which runs once per sequence; `diffusion_batch_size` is a batch dimension inside
+the diffusion module and its samples run in parallel off that single trunk pass.
+Measured: RF3 costs ~9 s/design *already at 5 samples*, so best-of-5 is close to
+free and the right unit for every cost estimate here is **designs, not
+predictions**.
+
+If a parental geometry signal turns out to be wanted, adding it back is cheap.
 
 1. Sample `B = 8` sequences.
 2. Split each at `k = 4` fixed equal boundaries -> 8 fragments per slot, 32 total.
@@ -51,9 +61,9 @@ use.
    chimeras, every fragment in exactly 4, none duplicated. Random draws would
    leave some fragments unscored and over-weight others, biasing the advantage.
 4. Fold the 32 chimeras at **best-of-5**. Single-sample folding measures
-   something the benchmark does not, and the extra samples are what hold the
-   reward's variance down -- each fragment score then rests on 4 chimeras x 5
-   predictions = 20 structure predictions.
+   something the benchmark does not, and the extra samples hold the reward's
+   variance down at nearly no cost, since they share one trunk pass. Each
+   fragment score rests on 4 chimeras x 5 samples = 20 structure predictions.
 5. Fragment score `s(i,j)` = fraction of its 4 chimeras that pass
    (`ame_motif_pass_and_no_clash`, best-of-5 reduced).
 6. Standardise `s` **within each slot** across the batch. Slots differ
