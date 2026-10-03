@@ -105,7 +105,30 @@ differing from parents, not reweighted. Diversity is explicitly **not** added as
 a reward — the weight pilot measured that at every weight from 1 to 4 it drove
 pass rate to 0/256 with median motif RMSD 5.9–11.8 Å.
 
-### R4 — What it buys  **[measured]**
+### R4 — How finely should a design be cut?  **[partial]**
+
+Library size is the product over slots of *distinct* fragments, not `P^k`.
+Fragments collide as they shorten: at 7 residues one M0097 slot holds 21
+distinct variants from 178 parents, and `P^k` overstates the library by 10^15 at
+k = 36. Collision is the first signature of degradation and it is measurable
+without folding anything.
+
+Retention is the second, and it has not appeared yet. M0097 policy runs
+81.2 / 72.7 / 77.3 / 73.4% across k = 2, 4, 6, 8 — flat from k = 4 onward, so
+22-residue fragments still recombine. The sweep is extended to k = 12, 16, 24,
+36 (fragments of 15, 11, 7, 5 residues) to find where it breaks.
+
+The figure is two panels on one x-axis: retention, and expected working library
+(`prod |F_i| x retention`). If retention stays flat while the product grows, the
+recommendation is "cut as finely as you can synthesise", which is cleaner than
+the tradeoff curve originally expected. If it collapses, the crossing point is
+the practical answer to how finely to cut — the question anyone building one of
+these libraries actually has.
+
+**Needs the fragment-RL checkpoints** to be a three-arm curve rather than two.
+That is the version that goes in the paper.
+
+### R5 — What it buys  **[measured]**
 
 At a matched 2,656-fold budget, library size is `P^k` and synthesis is `k·P`,
 so a few hundred parents give ~10⁹ constructs from ~10³ parts. Multiplying
