@@ -146,37 +146,132 @@ reweighted --- the weight pilot measured that adding a diversity reward at any
 weight from 1 to 4 drove pass rate to 0/256 with median motif RMSD
 \SIrange{5.9}{11.8}{\angstrom}.}
 
-\subsection*{L5 --- How finely should a design be cut?}
+\subsection*{L5 result --- the usable granularity, and where it ends}
 
-\plan{Pre-registered, running. Every result above is at $k = 4$, and the claim
-could be specific to 45-residue fragments. Library size is $P^k$ and synthesis
-is $k \cdot P$, so each step up in $k$ squares the library for a linear increase
-in parts --- but shorter fragments should recombine worse. There is an interior
-optimum and nobody has looked for it.
-
-$k \in \{2, 4, 6, 8\}$, both arms, three backbones, 256 chimeras per cell. No
-training required: the parents already exist.
-
-\textbf{Prediction.} Retention falls monotonically with $k$. The RL arm's
+\plan{Pre-registered: retention falls monotonically with $k$; the RL arm's
 advantage persists across $k$; if it vanishes by $k=8$ the claim is ``designs
-tolerate quarter-swaps'', which is much narrower than ``designs are modular''.
+tolerate quarter-swaps'', which is much narrower than ``designs are modular''.}
 
-Already visible at generation time: at $k=8$ fragments begin to \emph{collide}
-between designs --- M0097's baseline yields $[1011, 777, 926, \dots]$ distinct
-fragments from \num{1042} parents, where at $k=4$ every parent contributed a
-unique fragment to every slot. A shared parts pool only becomes possible at this
-granularity.}
+42 cells: three backbones $\times$ two arms $\times$
+$k \in \{2,4,6,8,12,16,24,36\}$, 256 recombinants each,
+\numproduct{10752} designs folded best-of-5.
 
-\subsection*{L6 --- Does boundary placement matter?}
+\begin{center}
+\begin{tabular}{rrrrcrrr}
+\toprule
+& \multicolumn{3}{c}{sampled} & & \multicolumn{3}{c}{RL-trained} \\
+\cmidrule(r){2-4}\cmidrule(l){6-8}
+$k$ & M0097 & M0255 & M0315 & & M0097 & M0255 & M0315 \\
+\midrule
+2  & 64.1 & 35.9 & 56.6 & & 81.2 & 80.5 & 86.3 \\
+4  & 59.8 & 25.8 & 49.6 & & 72.7 & 79.3 & 78.1 \\
+6  & 50.4 & 27.0 & 46.9 & & 77.3 & 82.4 & 80.1 \\
+8  & 51.6 & 25.8 & 43.4 & & 73.4 & 77.0 & 77.3 \\
+12 & 44.9 & 21.9 & 42.6 & & 71.1 & 68.0 & 73.8 \\
+16 & 39.8 & 19.5 & 37.9 & & 57.4 & 61.3 & 74.2 \\
+24 & 28.1 & 12.5 & 22.3 & & 48.4 & 36.3 & 64.8 \\
+36 & 12.1 &  9.8 &  7.8 & & 25.8 & 15.2 & 42.2 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The prediction was half right.} Retention does fall, but not
+monotonically and not early: it is flat through $k \approx 8$ --- 22-residue
+fragments still recombine --- and only then declines. The advantage does
+persist, and widens.
+
+Taking \SI{50}{\percent} as the point where a library stops being worth
+assembling (two constructs folded per usable one), the largest workable $k$ is
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+ & M0097 & M0255 & M0315 \\
+\midrule
+sampled     & 8  & $<2$ & 2  \\
+RL-trained  & \textbf{16} & \textbf{16} & \textbf{24} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Training extends the usable granularity by roughly $2$--$8\times$ in
+$k$.} Library size goes as $\prod_i |F_i|$, so that is the largest practical
+effect measured in this project --- far larger than the difference in parent
+counts, which runs the other way on several backbones.
+
+\plan{\textbf{Fragment collision is a second degradation signature, and it needs
+no folding.} Through $k=6$ every parent contributes a unique fragment to every
+slot. Past that, designs start sharing fragments: M0097's sampled arm falls to
+\SI{64}{\percent} of parents distinct per slot at $k=12$ and \SI{16}{\percent}
+at $k=36$, while the RL arms stay above \SI{80}{\percent} to $k=16$. Those
+\num{1042} sampled parents are far more redundant than the count suggests, which
+partly explains why they recombine worse despite outnumbering the policy's 178
+by six to one.}
+
+\plan{\textbf{Library size is deliberately not plotted against $k$.} At a fixed
+synthesis budget both arms build the same-size library --- each slot takes
+budget$/k$ fragments regardless of which arm produced them --- so those curves
+lie on top of one another. That is itself the finding: the arms do not differ in
+how large a library they can build, only in what fraction of it folds. An
+earlier version of the figure used $P^k$, which overstates the library by
+$10^{15}$ at $k=36$ once fragments collide; it now uses the product of measured
+distinct fragments.}
+
+\subsection*{L6 result --- boundary placement does not matter}
 
 \plan{Pre-registered in \texttt{results/fragments.tex} before any of this ran,
-and quoted here unchanged: \emph{``If they do not, the structural rationale is
-decorative and should be dropped.''}
+and quoted unchanged: \emph{``If they do not, the structural rationale is
+decorative and should be dropped.''}}
 
 Uniform boundaries against boundaries moved to the nearest coil residue (within
-12 positions, secondary structure from \texttt{biotite.annotate\_sse}). Three
-backbones, both arms, $k=4$.
+12 positions, secondary structure from \texttt{biotite.annotate\_sse}), $k=4$,
+seven backbones $\times$ two arms, 256 recombinants per cell.
 
-\textbf{Prediction.} Cutting through secondary structure costs retention, so
-structural boundaries beat uniform ones. If they do not, the structural story is
-dropped and equal slots are used throughout on the grounds of simplicity.}
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+ & mean $\Delta$ & \\
+\midrule
+all 14 cells   & \SI{+0.4}{points} & 95\,\% CI $[-1.3, +2.0]$, $t=0.42$, $p=0.68$ \\
+sampled arm    & \SI{-0.7}{points} & $n=7$ \\
+RL arm         & \SI{+1.5}{points} & $n=7$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every individual cell sits within $1.6$ standard errors of zero. By its own
+pre-registered criterion the structural rationale is dropped: \textbf{equal
+slots throughout}.
+
+\plan{\textbf{A sub-claim retracted.} On the first six cells the RL arm appeared
+to benefit more ($+5.9$, $+0.8$, $+1.6$), and that was written up here as
+``directionally consistent with RL designs having more coherent secondary
+structure''. With seven cells per arm the RL spread is $-5.1$ to $+5.9$ and the
+means are $+1.5$ against $-0.7$. It was pattern-reading across six numbers all
+within one or two standard errors of zero, and it is withdrawn.}
+
+\plan{\textbf{Equal slots are also easier to assemble, but the margin is
+smaller than first claimed.} Structural boundaries give fragment lengths
+spanning \SIrange{108}{162}{bp}, a $1.28$--$1.50\times$ spread; since moles
+scale as $1/\text{length}$ at fixed mass, equimolar Golden Gate pooling then
+needs per-part normalisation. That spread is a tunable consequence of the
+$\pm 12$ residue shift window, not a property of structural boundaries, and
+$1.3\times$ is workable in practice. So the honest statement is that structural
+boundaries buy no measurable retention and cost a little length uniformity ---
+not that they are unusable.}
+
+\subsection*{What the two measured results mean together}
+
+\plan{The L2/L3 result and the L5 result are different \emph{kinds} of evidence
+and should not be presented as equally strong.
+
+The panel policies were trained on parent motif RMSD alone --- chimeras appear
+nowhere in their objective. Their retention advantage is therefore a property
+measured on a quantity nothing in training optimised, which is the strongest
+form this claim can take.
+
+The L4 arm trains \emph{on} chimera quality, so its retention is the same kind
+of quantity it optimised, under a different predictor. The cross-oracle swap is
+the only thing between the training signal and the reported number. That is
+unavoidable when training for the thing you want to measure, but it means the L4
+result is a comparison against the panel arm, not a standalone number.}
