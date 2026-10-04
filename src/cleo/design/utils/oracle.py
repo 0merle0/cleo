@@ -15,6 +15,7 @@ import re
 import json
 import copy
 import subprocess
+import time
 import numpy as np
 import torch
 import glob
@@ -712,7 +713,27 @@ def rf3_from_df(df_input, cfg, step_name="rf3"):
         command = f"apptainer exec --nv {container} rf3 fold " + " ".join(overrides)
         print(f"rf3: folding {len(examples)} designs x {n_samples} samples")
         print(f"  {command}")
-        subprocess.run(command, shell=True, check=True)
+
+        # Retry transient infrastructure faults. A training run is thousands of
+        # these calls over many hours, and a single failure kills it: this
+        # project has lost runs to /dev/shm exhaustion on one node and to an NFS
+        # `[Errno 5] Input/output error` mid-write, neither of which says
+        # anything about the designs. Retries are cheap against ~80 GPU-h.
+        #
+        # Deliberately not unlimited: a genuine configuration error (bad
+        # template, missing checkpoint) fails identically every time, so after
+        # `rf3_retries` attempts the error is raised rather than looped on.
+        attempts = int(cfg.get("rf3_retries", 3))
+        for attempt in range(1, attempts + 1):
+            try:
+                subprocess.run(command, shell=True, check=True)
+                break
+            except subprocess.CalledProcessError:
+                if attempt == attempts:
+                    raise
+                wait = 30 * attempt
+                print(f"rf3: attempt {attempt}/{attempts} failed; retrying in {wait}s")
+                time.sleep(wait)
 
     output_folders = [f for f in glob.glob(os.path.join(outdir, "*")) if os.path.isdir(f)]
     assert len(output_folders) > 0, f"No output folders found in {outdir}"
