@@ -107,13 +107,19 @@ def chimera_metrics_from_df(df_input, cfg, step_name="frag"):
         "sequence": chim_seqs,
     })
 
-    # Fold and score the chimeras with the same machinery the standard arm uses.
+    # Fold and score the chimeras with the same machinery the standard arm uses,
+    # but in their OWN rundir. Sharing the parent chain's directory means the
+    # oracle parses `seq_*` outputs alongside its own `chim_*` ones and fails to
+    # merge, because the parents are not in its input.
+    import os as _os
+    chim_rundir = _os.path.join(str(cfg.rundir), "chimeras")
+    _os.makedirs(chim_rundir, exist_ok=True)
     for fn_key, cfg_key, nm in (("oracle_fn", "oracle_cfg", "rf3"),
                                 ("metric_fn", "metric_cfg", "ame"),
                                 ("bo_fn", "bo_cfg", "bo")):
         fn = get_method(cfg[fn_key])
         sub = cfg[cfg_key]
-        sub.rundir = cfg.rundir
+        sub.rundir = chim_rundir
         chim = fn(chim, sub, step_name=sub.get("step_name", nm))
 
     if metric_col not in chim.columns:
@@ -170,11 +176,21 @@ class FragmentReward(UniversalReward):
         mode         "min" if lower metric is better (motif RMSD), else "max"
     """
 
-    def __init__(self, *args, k=4, frag_step="frag", mode="min", **kwargs):
+    def __init__(self, *args, k=4, frag_step="frag", mode="min",
+                 parent_metric=None, w_geom=1.0, w_frag=1.0, **kwargs):
         super().__init__(*args, **kwargs)
         self.k = int(k)
         self.frag_step = frag_step
         self.mode = mode
+        # Parent geometry, folded alongside the chimeras. Omitting it was a
+        # mistake: with chimera quality as the only objective the policy
+        # optimised fragments that travel while the sequences it emits
+        # degraded -- 28 passing parents against 182 for the arm trained on
+        # parent RMSD alone, and retention fell with them. The parent fold
+        # costs 8 extra trunk passes against 32, about 25%.
+        self.parent_metric = parent_metric
+        self.w_geom = float(w_geom)
+        self.w_frag = float(w_frag)
 
     def __call__(self, step, policy_output, feature_dict, device):
         import os
@@ -217,10 +233,30 @@ class FragmentReward(UniversalReward):
         A = torch.zeros((s.shape[0], L), dtype=torch.float32)
         for j, (a, b) in enumerate(bounds):
             A[:, a:b + 1] = s[:, j].unsqueeze(1)
+        A = self.w_frag * A
+
+        # Parent geometry: one scalar per sequence, flat along its length. The
+        # fragment term says "your parts travel"; this says "and you fold".
+        if self.parent_metric:
+            if self.parent_metric not in df.columns:
+                raise KeyError(
+                    f"FragmentReward: parent_metric '{self.parent_metric}' not in "
+                    f"{sorted(df.columns)}; add the oracle and metric steps that "
+                    "produce it before the chimera step.")
+            g = torch.tensor(df[self.parent_metric].to_numpy(dtype=float),
+                             dtype=torch.float32)
+            if mode == "min":
+                g = -g
+            g = (g - g.mean()) / (g.std() + 1e-3)
+            A = A + self.w_geom * g.unsqueeze(1)
+            log_geom = {f"parent_{self.parent_metric}": float(df[self.parent_metric].mean())}
+        else:
+            log_geom = {}
 
         log = {
             f"{frag_step}_chimera_rmsd": float(df[f"{frag_step}_chimera_rmsd"].iloc[0]),
             f"{frag_step}_chimera_pass": float(df[f"{frag_step}_chimera_pass"].iloc[0]),
             "frag_score_spread": float(s.std().item()),
+            **log_geom,
         }
         return A.to(device), log
