@@ -253,6 +253,20 @@ class FragmentReward(UniversalReward):
         else:
             log_geom = {}
 
+        # `UniversalReward` emits `<metric>_batch_mean` keys from its
+        # aggregation; this class overrides __call__ and never runs that, so a
+        # config carrying a checkpoint_metric copied from a standard run dies at
+        # the first checkpoint. Logged keys are named here explicitly so the
+        # mismatch is visible in one place.
+        # Write the per-step record. UniversalReward does this; overriding
+        # __call__ dropped it, which lost the provenance the panel runs have and
+        # also removed the signal the pruner uses to tell a finished step from a
+        # live one.
+        try:
+            df.to_csv(os.path.join(rundir, "metrics.csv"), index=False)
+        except Exception as exc:                      # never fail a step on logging
+            print(f"FragmentReward: could not write metrics.csv ({exc})")
+
         log = {
             f"{frag_step}_chimera_rmsd": float(df[f"{frag_step}_chimera_rmsd"].iloc[0]),
             f"{frag_step}_chimera_pass": float(df[f"{frag_step}_chimera_pass"].iloc[0]),
