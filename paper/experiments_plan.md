@@ -751,7 +751,7 @@ All three run on data already on disk.
 
 | ID | What | Why it matters |
 |---|---|---|
-| **T1.1** | AF3-vs-steps curves, stride 0/30/60/90/120/150, on `fragrl4` vs `fragb32` | **This is the overfitting figure.** A single plateau number cannot show a training score climbing while held-out transfer stalls or falls; the curve can. ~28 min/probe. |
+| **T1.1** | AF3-vs-steps curves, stride 0/30/60/90/120, on `fragrl4` vs `fragb32` | **DONE 2026-10-14 — see 8.5.** Nine valid stride-points per arm instead of one plateau reading each. Not the overfitting curve this row predicted; see 8.5 for what it actually shows. Cost was ~8 min/probe at 32 chimeras and ~15 min at 128, not the ~28 min quoted here. |
 | **T1.2** | Full predictor cross-tab at plateau on `fragrl4` | `fragrl4` trained on RF3 alone, so boltz, protenix *and* AF3 are all genuinely held out — a 3-wide held-out panel for the single-oracle arm with no retraining. The pool arms only have AF3 held out; that asymmetry is what E17 fixes. |
 | **T1.3** | Pool each batch-8 cell over ~4 plateau steps → n = 128 | Brings the batch-8 cells to `fragb32` precision. Required before any magnitude in §8.1 goes in the paper. |
 
@@ -807,9 +807,83 @@ Additions to §5.
    a longer budget or is reported as a separate case — do not let it silently
    set the step budget for the others.
 
-### 8.5 Order of work
+10. **A resumed run overwrites its own step history.** `watch_fragb32.sh`
+   resubmits after a node failure, resuming from `_last.pt` into the **same
+   `output_dir`**, and the training step counter restarts at 0 on a resume (see
+   `submit_fragb32.sh`, where the remaining-budget argument exists for the same
+   reason). So the resumed run writes `step_0000, step_0001, ...` on top of the
+   original run's directories at ~10 steps/hour. Job 29184308 (resumed M0255,
+   2026-10-14 00:42) had consumed steps 0-31 before this was noticed, which
+   invalidated two points of T1.1's M0255 pool panel; steps 33-164 were rescued
+   to `experiments/ame/m0255_original_steps/` with the step-146 attribution row
+   intact. Checkpoints live at the run root and are unaffected.
 
-1. **T1.1–T1.3** now — offline, cheap, and T1.1 is the figure the argument needs.
+   It surfaced only because a probe happened to read a directory mid-overwrite
+   and reported the missing file. **Fix before the next node failure:** direct a
+   resume at a `_resume<N>` output dir, or offset its step counter by the
+   checkpoint's step so numbering stays global.
+
+11. **25% of every "chimera" set is not a chimera.** `build_chimeras` assigns
+   slot j of chimera (rho, i) from parent `(i + rho*j) % B`, so rotation 0 is the
+   identity and the first B of the B*R folded sequences are the parents verbatim
+   -- 32 of 128 at batch 32, 8 of 32 at batch 8. (An earlier note in this
+   project's records claiming "0 parent folds per step" was wrong.) Measured
+   across the first 8 probes, this does **not** inflate the pooled number:
+   parents pass at 0.352 and true recombinants at 0.385, a difference of -0.034
+   that is well inside noise. Worth reporting as its own panel -- no parent
+   advantage at matched folds is close to the modularity claim the thesis needs
+   -- but any per-chimera statistic must split on provenance rather than pool.
+
+
+### 8.5 T1.1 result — measured 2026-10-14
+
+Held-out AF3 against the oracle-balanced training level, at matched strides
+0/30/60/90/120 on both informative backbones.
+
+| arm | M0097 per-stride gap | mean | M0255 per-stride gap | mean |
+|---|---|---|---|---|
+| `fragrl4` rf3 only, b8 | +0.476 +0.288 +0.142 +0.281 +0.309 | **+0.299** | +0.531 +0.524 +0.417 +0.635 +0.274 | **+0.476** |
+| `fragb32` pool, b32 | +0.082 +0.088 +0.009 +0.111 -0.021 | **+0.054** | -- -- -0.028 -0.139 -0.094 | **-0.087** |
+
+**The pooled large-batch arm tracks AF3 across the whole trajectory, not just at
+convergence.** On M0097 it climbs training 0.082 -> 0.940 while AF3 climbs
+0.000 -> 0.961 beside it, never separating by more than 0.111. The single-oracle
+arm never closes to within 0.14 at any stride on either backbone.
+
+This answers the objection the 8.1 table could not: the no-gap result is not a
+lucky plateau step and the large gap is not a lucky bad one. It is nine valid
+stride-points per arm rather than one reading each.
+
+**Correction to this section's own framing.** 8.3 called T1.1 "the overfitting
+figure," expecting a training score climbing while held-out transfer stalls.
+That is not what it shows, on either arm. The single-oracle gap is large at
+*step 0*, before meaningful training, and then moves erratically with no trend
+-- M0255 swings +0.53, +0.52, +0.42, +0.64, +0.27 against a 2 SE of ~0.17. The
+defensible statement is **persistent miscalibration, not overfitting**: a single
+oracle disagrees with AF3 by a large and erratic margin at every point in
+training, and the pooled large-batch arm does not disagree at all. That is a
+stronger claim for the paper, because miscalibration present from step 0 cannot
+be fixed by early stopping.
+
+**What it still cannot say.** Both columns differ in batch size *and* oracle
+count, so this does not separate the two. **E15 remains the decisive, unrun
+cell** -- and is now more worth running, since the effect it would attribute is
+large and visible across an entire trajectory rather than at a single step.
+
+Figure: `paper/figures/ame_transfer_curves.py` ->
+`figures/svg/ame_transfer_curves.svg`.
+
+**Caveats carried forward.** Each point is n=32 or n=128 chimeras from one step,
+so T1.3's pooling is still required before these magnitudes are published. The
+M0255 pool panel rests on 3 points, because a resume destroyed steps 0 and 30
+(risk 10). The `fragrl4` M0255 volatility of +-0.37 between adjacent strides is
+itself a finding: any single-step readout of a single-oracle run can land
+anywhere in a 37-point band, which is how the original n=32 attribution cells
+could have misled.
+
+### 8.6 Order of work
+
+1. ~~**T1.1**~~ **done** (8.5). **T1.2–T1.3** next — offline and cheap.
 2. **E15 on M0255**, then M0097, as soon as GPUs are free.
 3. **T2**, the 256-parent library eval — independent of E15 and overdue.
 4. **E16/E17** only after E15 reports, for the reason in §8.3.
