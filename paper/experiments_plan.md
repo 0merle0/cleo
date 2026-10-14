@@ -629,7 +629,7 @@ materially and one is newly at risk; read those before planning compute.
 | **E2** | Diversity yield curves | **CLEO half done** | M0097 trajectory: 3200 folds → 97 passing → 97 clusters @90 % id, 33 % mean identity, still climbing. Baseline curves need A2. |
 | **E3** | Rescue | **not started** | Target picked: the three *near-miss* backbones (1.61–1.69 Å best-of-40, 0/40 published). Clean because there is no positive result of theirs to fail to reproduce. Current hint only: 4/3200 passing on two backbones where all baselines give 0. |
 | **E4** | Compute efficiency | **blocked on E1/E2** | — |
-| **E5** | Held-out oracle | **not started — now the top risk** | Reward is AF3 motif RMSD and evaluation is AF3 motif RMSD. The pilot is **fully circular** as run. Every headline number is contestable until an oracle swap exists. |
+| **E5** | Held-out oracle | **in progress — see §8** | Was fully circular as piloted (reward AF3 motif RMSD, evaluation AF3 motif RMSD). On the chimera objective this is now measured: training under an rf3/boltz/protenix round robin and reporting under held-out AF3. Three of four cells of the batch × pool design are done; the single-oracle large-batch cell (E15) is the one that decides whether the credit goes to the pool or to batch size. |
 | **E6** | Policy transfer | **not started** | — |
 | **E7** | Effective library size | **partially answered** | Among passing designs, cluster count already *equals* passing count. Effective size ≈ nominal for CLEO; for T=0.1 it is 1 regardless of nominal size. |
 | **E8** | Mutation-diversity reward | **DROPPED** | Superseded: the training trajectory *is* the library, so diversity comes free without a reward term to tune and defend. Arm A6 retired. |
@@ -651,3 +651,165 @@ The narrative is now **diversity at matched fidelity**, not pass rate. E10 decid
 whether that narrative survives; E5 decides whether anyone believes the numbers;
 E11/E12 are cheap and likely to improve every downstream result, so they should
 land before the expensive arms are run.
+
+---
+
+## 8. Chimera objective: multi-oracle transfer — plan as of 2026-10-14
+
+This section is the concrete build-out of **E5** for the *chimera* objective
+(split passing designs into fragments, recombine, reward the recombinants).
+E5 above states the principle — never report under the predictor you trained
+on. What follows is what has actually been measured against it, the one cell
+that is missing, and what it costs to close.
+
+### 8.1 What is measured
+
+Held-out AF3 pass on the in-loop chimera set versus the oracle-balanced
+training level at the same step. "Gap" is training level minus held-out AF3, so
+positive means the training number overstates.
+
+| arm | config family | batch | oracles | mean gap | per backbone (M0097 / M0255 / M0315) |
+|---|---|---|---|---|---|
+| single-oracle, small batch | `fragrl4` | 8 | rf3 | **+0.439** | +0.28 / +0.94 / +0.09 |
+| pool, small batch | `fragmulti` | 8 | rf3+boltz+protenix | **+0.176** | +0.33 / +0.20 / +0.00 |
+| pool, large batch | `fragb32` | 32 | rf3+boltz+protenix | **−0.001** | −0.01 / +0.02 / −0.01 |
+
+Both comparisons are one-factor. `fragrl4` and `fragmulti` are both
+`batch_size: 8, seed: 1` and differ only in the oracle function; `fragmulti`
+and `fragb32` share the pool and differ only in batch size.
+
+Worst single case: **M0255 `fragrl4` scored 1.000 under RF3 and 0.062 under
+AF3** — a 94-point gap at 22 SE. That is the project's cleanest reward-hacking
+demonstration and should be a figure panel, not a footnote.
+
+Precision caveat: the batch-8 cells are n = 32 chimeras from one step each
+(2 SE 0.09–0.16); the batch-32 cells are n = 128. Directions are 3.4–22 SE and
+safe, **magnitudes are not publishable at that precision** — see T1.3.
+
+### 8.2 The missing cell, and why it decides the claim
+
+The 2×2 has three cells. **Batch 32 with a single oracle does not exist.**
+
+|  | batch 8 | batch 32 |
+|---|---|---|
+| rf3 only | +0.439 | **missing** |
+| 3-oracle pool | +0.176 | −0.001 |
+
+So the pool is only *shown* to help at batch 8, where the gap is large anyway.
+Two readings survive the current data and they imply different papers:
+
+- **Pool necessary.** The missing cell reopens the gap → multi-oracle training
+  is what makes the chimera objective generalize, and batch size is a
+  prerequisite rather than the cause.
+- **Batch sufficient.** The missing cell transfers like `fragb32` → batch size
+  alone closes the gap, the pool is redundant, and the claim must be reframed
+  as "adequate batch size," not "multiple oracles."
+
+The honest current lean is toward the second, because batch 32 closed the gap
+to zero *with* the pool and nothing isolates the pool's contribution there.
+**One run settles it.** Better to learn this from E15 than from a referee.
+
+### 8.3 Experiments
+
+#### E15 — Complete the 2×2: batch 32, single oracle  ★ decisive, run first
+
+Forced single oracle inside the *same* `multi_oracle_from_df` call
+(`oracle: rf3`), so dispatch, per-oracle rundir layout and column renaming stay
+byte-identical to `fragb32`. This is a tighter pair than `fragrl4`-vs-
+`fragmulti`, which swapped the oracle function itself.
+
+- Start with **M0255** — largest single-oracle gap (94 points), so most room to
+  discriminate. Then M0097. M0315 is a control, not evidence: it transfers even
+  at batch 8.
+- 150 steps, `seed: 1`, `af3_probe_every: 25`.
+- **Cost:** from job 29035611's own rate (43.5 h for ~169 steps on 4 GPUs),
+  ~15.4 min/step → ~38 h wall, **~154 GPU-h per run**.
+- Staged and ready, not launched: `experiments/ame/fragb32rf3/*.yaml` and
+  `submit_fragb32rf3.sh`. Diff against `fragb32` is exactly three lines —
+  `N_steps: 150`, `oracle: rf3`, `af3_probe_every: 25`.
+
+#### E16 — Oracle dose-response at batch 32
+
+One → two → three oracles, held-out AF3, batch held at 32. The 1-oracle point
+comes from E15 and the 3-oracle point already exists; only **{rf3, boltz}** is
+missing. Three points on a monotone trend are much harder to attribute to batch
+size than two. **Cost:** ~154 GPU-h × backbones. Do not start before E15
+reports — if the pool is redundant at batch 32 this is ~600 GPU-h spent
+defending a claim that needs reframing anyway.
+
+#### E17 — Leave-one-out within the pool  ★ strongest form of E5
+
+Train on two predictors, evaluate on the third *and* AF3: {rf3,boltz} → protenix,
+{rf3,protenix} → boltz, {boltz,protenix} → rf3. This is generalization to a
+structure predictor never seen, not merely to AF3, and it is the version of the
+claim a sceptical reviewer will ask for. Expensive — needs new runs per arm, so
+it is gated behind E15/E16.
+
+#### T1 — Offline tier: no training, highest value per GPU-hour
+
+All three run on data already on disk.
+
+| ID | What | Why it matters |
+|---|---|---|
+| **T1.1** | AF3-vs-steps curves, stride 0/30/60/90/120/150, on `fragrl4` vs `fragb32` | **This is the overfitting figure.** A single plateau number cannot show a training score climbing while held-out transfer stalls or falls; the curve can. ~28 min/probe. |
+| **T1.2** | Full predictor cross-tab at plateau on `fragrl4` | `fragrl4` trained on RF3 alone, so boltz, protenix *and* AF3 are all genuinely held out — a 3-wide held-out panel for the single-oracle arm with no retraining. The pool arms only have AF3 held out; that asymmetry is what E17 fixes. |
+| **T1.3** | Pool each batch-8 cell over ~4 plateau steps → n = 128 | Brings the batch-8 cells to `fragb32` precision. Required before any magnitude in §8.1 goes in the paper. |
+
+#### T2 — The library evaluation  ★ still the outstanding gap
+
+Everything in §8.1 is the **in-loop** chimera set, which recombines the 32
+parents of one rollout. The paper's claim is about *library* design and the 65.6
+figure came from the post-hoc eval recombining **256**. Until the no-transfer-gap
+result is reproduced on that wider set, the headline has not faced the test it
+has to pass.
+
+### 8.4 Risks specific to this section
+
+Additions to §5.
+
+6. **`seed:` is the model seed, not the diffusion seed.** Verified in
+   `src/cleo/design/train_policy.py:39-46`: it seeds `random`, `numpy` and
+   `torch` only — LigandMPNN sampling, GRPO rollout, init. The predictors'
+   diffusion seeds are **not** set by it. `rf3_from_df`/`af3_from_df` pass no
+   seed and instead *read it back* out of the `seed-<S>_sample-<K>/` output
+   layout (`oracle.py:40`) as `{step_name}_seed`; `protenix_from_df` accepts
+   `cfg.seeds` (`oracle.py:1041-1042`) but no config sets it; and
+   `multi_oracle_from_df`'s own `seed` key only seeds the weighted oracle draw,
+   which is inert under `schedule: round_robin`.
+
+   Consequences: (a) **`seed: 1` does not make a run reproducible** — identical
+   sequence sampling, different folds; do not describe these as seeded
+   replicates. (b) Best-of-5 takes a max over those unseeded draws, so a
+   favourable draw inflates a cell. (c) The 21-point unseeded swing recorded
+   under "Seeding and Run-to-Run Variance" in `CLAUDE.md` is the **sum** of
+   policy and diffusion variance; nobody has separated them. Pinning protenix
+   alone would make the three oracles asymmetrically noisy, which is worse for
+   the comparison than leaving all three free — so average over plateau steps
+   (T1.3) instead of pinning.
+
+7. **Every cell is n = 1 run.** All arms are `seed: 1`, which is what makes them
+   comparable, but a 20-point arm difference from single runs is not resolvable
+   against the variance in risk 6. Budget ≥ 2 policy seeds for anything
+   headline and use the three backbones as a blocking factor.
+
+8. **`use_avg_reward` must stay off for any multi-oracle run.** GRPO's
+   `advantage()` computes `(r - mean(r)) / (std(r) + 1e-3)` within the group, so
+   a whole-batch oracle offset cancels in both location and scale — that is
+   *why* round-robin multi-oracle training is sound at all. Switch
+   `use_avg_reward` on and the offset leaks into the advantage and every
+   cross-oracle comparison breaks silently. It is absent from all current
+   configs and was, until this entry, written down nowhere.
+
+9. **M0255 does not converge in 150 steps.** It projects to ~342, with protenix
+   26 points below rf3 and the spread *widening* (0.000 → 0.307). It is
+   simultaneously the most informative backbone for transfer and the most
+   likely to be mistaken for a failed run. Decide per-experiment whether it gets
+   a longer budget or is reported as a separate case — do not let it silently
+   set the step budget for the others.
+
+### 8.5 Order of work
+
+1. **T1.1–T1.3** now — offline, cheap, and T1.1 is the figure the argument needs.
+2. **E15 on M0255**, then M0097, as soon as GPUs are free.
+3. **T2**, the 256-parent library eval — independent of E15 and overdue.
+4. **E16/E17** only after E15 reports, for the reason in §8.3.
