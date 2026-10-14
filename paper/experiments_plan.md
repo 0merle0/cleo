@@ -870,6 +870,9 @@ count, so this does not separate the two. **E15 remains the decisive, unrun
 cell** -- and is now more worth running, since the effect it would attribute is
 large and visible across an entire trajectory rather than at a single step.
 
+*(Superseded in part by 8.5.1: the matched-batch arm separates the two factors
+in one direction. E15 is still needed for the other.)*
+
 Figure: `paper/figures/ame_transfer_curves.py` ->
 `figures/svg/ame_transfer_curves.svg`.
 
@@ -881,9 +884,61 @@ itself a finding: any single-step readout of a single-oracle run can land
 anywhere in a 37-point band, which is how the original n=32 attribution cells
 could have misled.
 
+### 8.5.1 Completion: the full 3x3, and the matched-batch contrast
+
+The figure is now three arms x three backbones. The third arm, `fragmulti`
+(3-oracle pool, **batch 8**, seed 1), is matched to `fragrl4` on batch size and
+seed and differs only in the oracle function, which is the contrast 8.5 said it
+could not make.
+
+Mean gap per cell, over strides 0/30/60/90/120:
+
+| arm | M0097 | M0255 | M0315 |
+|---|---|---|---|
+| `fragrl4` rf3 only, b8 | **+0.299** | **+0.476** | +0.060 (ceiling) |
+| `fragmulti` pool, b8 | **+0.060** | **+0.042** | -0.103 |
+| `fragb32` pool, b32 | +0.054 | -0.057 | -0.025 (ceiling) |
+
+**At identical batch size the pool closes the gap.** M0097 +0.299 -> +0.060,
+M0255 +0.476 -> +0.042. Batch size is held at 8 across that comparison and so
+cannot account for it. This also reframes the step-0 observation of 8.5: the
+single-oracle arm opens a +0.48/+0.53 gap at step 0 while the pool arm on the
+same backbones at the same step shows +0.059/+0.007. A step-0 gap is therefore
+**not** an intrinsic property of chimeric recombination -- if recombination
+itself confused structure predictors, the pool arm would show it too. It is
+specific to being scored by one predictor.
+
+**The level confound, tested rather than assumed.** A gap is easier to keep
+small when both series are small, and `fragmulti` runs 3-5x lower than
+`fragrl4` at the same step. Comparing gaps at matched *training level* instead
+of matched step: over all 24 cross-arm point pairs within 0.08 of each other in
+training level, the pool's gap is smaller in **20 of 24**, mean reduction
+**+0.188**. The four exceptions are all M0315 above level 0.97, where neither
+arm has headroom to show a gap at all.
+
+**M0315 is largely uninformative and is annotated as such on the figure.** Under
+`fragrl4` it starts at 0.983 training / 0.969 AF3 -- a backbone the untrained
+policy already solves. Its near-zero mean gap is a ceiling artifact, not
+transfer, and it should not be counted as a third replicate of the no-gap
+result. The informative backbones remain M0097 and M0255.
+
+**What this changes.** The 2026-10-13 attribution reading -- that batch size,
+not the pool, closes the gap -- is **contradicted** by the matched-batch arm and
+should not be carried into the paper. The pool demonstrably closes the gap at
+batch 8. What remains open is the converse: whether batch 32 *alone* would also
+close it, making the pool redundant at scale. That is exactly E15, which is
+unchanged as the decisive unrun cell.
+
+**Provenance.** M0255/`fragb32` steps 33 and 45 were probed from the rescued
+snapshot in `experiments/ame/m0255_original_steps/` via
+`af3_probe_offline.py --metrics-dir=`, because a resume overwrote the live tree
+(risk 10). Fidelity checked: snapshot and live tree return identical values
+(0.394 / 0.580 / 0.680) on steps 60/90/120, which the resume had not yet
+reached.
+
 ### 8.6 Order of work
 
-1. ~~**T1.1**~~ **done** (8.5). **T1.2–T1.3** next — offline and cheap.
+1. ~~**T1.1**~~ **done** (8.5, 8.5.1). **T1.2–T1.3** next — offline and cheap.
 2. **E15 on M0255**, then M0097, as soon as GPUs are free.
 3. **T2**, the 256-parent library eval — independent of E15 and overdue.
 4. **E16/E17** only after E15 reports, for the reason in §8.3.

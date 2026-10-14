@@ -46,11 +46,18 @@ AME = Path(__file__).resolve().parents[2] / "experiments" / "ame"
 
 # (family, column title). Order is the argument: single oracle first, so the
 # eye reads "gap opens" then "gap closes".
+# Columns are ordered so adjacent pairs are one-factor comparisons:
+#   col 1 -> col 2  holds batch at 8, varies oracle count   (does the pool help?)
+#   col 2 -> col 3  holds the 3-oracle pool, varies batch   (does batch help?)
+# fragrl4 and fragmulti are both `batch_size: 8, seed: 1` and differ only in
+# the oracle function, so the first pair is a genuine matched-batch contrast
+# rather than the batch-and-oracle confound of the original two-column figure.
 ARMS = [
-    ("fragrl4", "RF3 only, batch 8"),
-    ("fragb32", "3-oracle pool, batch 32"),
+    ("fragrl4",   "RF3 only\nbatch 8"),
+    ("fragmulti", "3-oracle pool\nbatch 8"),
+    ("fragb32",   "3-oracle pool\nbatch 32"),
 ]
-BACKBONES = ["M0097", "M0255"]
+BACKBONES = ["M0097", "M0255", "M0315"]
 STRIDES = [0, 30, 60, 90, 120]
 
 
@@ -109,7 +116,7 @@ def load(family, backbone):
 
 def main():
     fig, axes = plt.subplots(
-        len(BACKBONES), len(ARMS), figsize=(7.2, 5.0),
+        len(BACKBONES), len(ARMS), figsize=(9.6, 7.2),
         sharex=True, sharey=True,
     )
     axes = np.atleast_2d(axes)
@@ -145,12 +152,27 @@ def main():
                     zorder=3, label="held-out AF3")
 
             mean_gap = float(np.mean(tr - af))
-            # Top-left, not bottom-left: every panel's curve rises left to
-            # right, so the lower-left corner is where the data actually is and
-            # the label sat on top of it.
-            ax.annotate(f"mean gap {mean_gap:+.3f}", xy=(0.04, 0.92),
-                        xycoords="axes fraction", fontsize=8,
+            # The labels live in a strip above the data rather than inside the
+            # plot. Choosing a corner per panel does not work here: these series
+            # end anywhere between 0.03 and 1.0, so every in-axes position
+            # collides with some panel's curve -- on M0315/fragrl4 the top-left
+            # label sat directly on a line pinned at 0.98. The y limit is
+            # extended past 1 and the ticks stop at 1.0, so the strip reads as
+            # margin rather than as headroom the data could occupy.
+            ax.annotate(f"mean gap {mean_gap:+.3f}", xy=(0.04, 0.94),
+                        xycoords="axes fraction", fontsize=8, va="top",
                         color=PALETTE["red"] if mean_gap > 0.05 else PALETTE["gray"])
+
+            # A panel that begins saturated cannot show a gap opening, so its
+            # near-zero mean is not evidence that the arm transfers. M0315 under
+            # the single-oracle arm starts at 0.98 training / 0.97 AF3: there is
+            # no room above for training to pull away. Said on the figure
+            # because the number alone reads as a pass.
+            if tr[0] >= 0.9 and af[0] >= 0.9:
+                ax.annotate("starts at ceiling -- gap untestable",
+                            xy=(0.04, 0.84), xycoords="axes fraction",
+                            fontsize=7, va="top", color=PALETTE["gray"],
+                            style="italic")
 
             # Say which strides are absent and why. A panel that silently starts
             # at step 60 looks like a shorter run rather than a damaged one.
@@ -158,14 +180,15 @@ def main():
             gone = sorted(set(STRIDES) - probed)
             if gone:
                 ax.annotate("steps " + ",".join(str(g) for g in gone) + " unusable",
-                            xy=(0.04, 0.82), xycoords="axes fraction",
-                            fontsize=7, color=PALETTE["gray"], style="italic")
+                            xy=(0.04, 0.84), xycoords="axes fraction",
+                            fontsize=7, va="top", color=PALETTE["gray"], style="italic")
 
             if r == 0:
                 ax.set_title(title, fontsize=10)
             if c == 0:
                 ax.set_ylabel(f"{bb}\nchimera pass rate", fontsize=9)
-            ax.set_ylim(0, 1.02)
+            ax.set_ylim(0, 1.30)
+            ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
             ax.grid(alpha=0.25, lw=0.5)
             ax.set_axisbelow(True)
             for s in ("top", "right"):
