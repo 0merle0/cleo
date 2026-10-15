@@ -192,12 +192,15 @@ def _fail_if_multi_gpu_visible_but_cuda_unusable() -> None:
         )
 
 
-def run_multi_gpu_commands(cmd_list):
-    """Runs commands across up to ``min(usable GPUs, len(cmd_list))`` concurrent workers."""
+def _run_commands_once(cmd_list):
+    """Run every command across the GPU slots. -> list of (cmd, code, stderr).
 
-    _require_nonempty_commands(cmd_list)
-    _fail_if_multi_gpu_visible_but_cuda_unusable()
-
+    Returns the failures instead of raising on the first one. The previous
+    version raised from inside the wait loop, which left the sibling processes
+    of that wave running with nobody to reap them -- and, more importantly, made
+    a single bad exit indistinguishable from a bad batch. Collecting them lets
+    the caller retry only what actually failed.
+    """
     desired = _local_oracle_worker_count()
     if not torch.cuda.is_available() and torch.cuda.device_count() > 0:
         print(
@@ -216,6 +219,7 @@ def run_multi_gpu_commands(cmd_list):
         f"(desired_gpu_slots={desired}, torch.cuda.is_available()={torch.cuda.is_available()})"
     )
 
+    failures = []
     processes = []
 
     for i, cmd in enumerate(cmd_list):
@@ -229,16 +233,62 @@ def run_multi_gpu_commands(cmd_list):
         processes.append((p, cmd, gpu_idx))
 
         if len(processes) == num_workers or i == len(cmd_list) - 1:
+            # Drain the whole wave before reacting to any failure, so a bad
+            # exit never strands its siblings.
             for p, cmd, gpu in processes:
                 stdout, stderr = p.communicate()  # wait and collect output
                 if p.returncode != 0:
+                    err = stderr.decode(errors="replace")
                     print(f"[GPU {gpu}] FAILED: {cmd[:100]}...")
-                    print("stdout:\n", stdout.decode())
-                    print("stderr:\n", stderr.decode())
-                    raise RuntimeError(f"Job failed on GPU {gpu} with code {p.returncode}")
+                    print("stdout:\n", stdout.decode(errors="replace"))
+                    print("stderr:\n", err)
+                    failures.append((cmd, p.returncode, err))
                 else:
                     print(f"[GPU {gpu}] FINISHED: {cmd[:100]}...")
             processes = []
+
+    return failures
+
+
+def run_multi_gpu_commands(cmd_list, attempts=3):
+    """Runs commands across up to ``min(usable GPUs, len(cmd_list))`` concurrent workers.
+
+    Retries transient infrastructure faults, for the reason `rf3_from_df` and
+    `protenix_from_df` already do: a training run is thousands of these calls
+    over many hours, and one non-zero exit used to kill the whole run. Job
+    29184308 (M0255, fragb32) died 16 h in on `Job failed on GPU 0 with code 1`
+    out of `boltz_from_df` -- a transient GPU fault that said nothing about the
+    designs. Because the two other oracles in that round robin retried and Boltz
+    did not, one predictor in three could end a multi-day run on its own.
+
+    Only the commands that failed are retried; the ones that already wrote their
+    output are not re-run.
+
+    Deliberately bounded, as in `rf3_from_df`: a genuine configuration error
+    fails identically every time, so after `attempts` passes the error is raised
+    rather than looped on.
+    """
+    _require_nonempty_commands(cmd_list)
+    _fail_if_multi_gpu_visible_but_cuda_unusable()
+
+    attempts = max(1, int(attempts))
+    pending = list(cmd_list)
+
+    for attempt in range(1, attempts + 1):
+        failures = _run_commands_once(pending)
+        if not failures:
+            return
+        if attempt == attempts:
+            cmd, code, err = failures[0]
+            raise RuntimeError(
+                f"{len(failures)}/{len(pending)} oracle job(s) failed after "
+                f"{attempt} attempt(s); first exited {code}: {cmd[:200]}\n{err[-2000:]}"
+            )
+        wait = 30 * attempt
+        print(f"oracle: {len(failures)}/{len(pending)} job(s) failed on attempt "
+              f"{attempt}/{attempts}; retrying those in {wait}s")
+        time.sleep(wait)
+        pending = [c for c, _, _ in failures]
 
 
 def chunk(_list, num_chunks):
@@ -255,13 +305,77 @@ def chunk(_list, num_chunks):
     return chunks
 
 # For running Boltz (https://github.com/jwohlwend/boltz)
-def make_boltz_command(input_folder, output_folder):
-    cmd = f"boltz predict {input_folder} --out_dir {output_folder};"
-    return cmd
+def make_boltz_command(input_folder, output_folder, diffusion_samples=1,
+                       no_kernels=True):
+    """Build the Boltz CLI call.
+
+    ``no_kernels`` defaults True because Boltz's optional cuequivariance kernels
+    are not installed in this project's environment -- without the flag it dies
+    with ``ModuleNotFoundError: No module named 'cuequivariance_torch'`` after
+    loading the model. The alternative is ``uv sync --extra cuda``
+    (pyproject declares ``cuda = ["boltz[cuda]"]``), which is faster but mutates
+    the shared environment every other run depends on; set
+    ``boltz_no_kernels: false`` once that extra is installed.
+    """
+    cmd = (f"boltz predict {input_folder} --out_dir {output_folder}"
+           f" --diffusion_samples {int(diffusion_samples)}")
+    if no_kernels:
+        cmd += " --no_kernels"
+    return cmd + ";"
+
+def _boltz_input_from_af3_template(af3_template: dict, seq: str) -> dict:
+    """Translate one AF3 input JSON into Boltz's YAML schema (as a dict).
+
+    Fourth translation of the same template, for the reason the other three
+    exist: a cross-oracle comparison only means something if every predictor
+    folds the same complex. Boltz previously required its own hand-written YAML,
+    and the AME set had 12 of them against 13 backbones -- M0255 had none, so a
+    multi-oracle run there would have failed on whichever step drew Boltz.
+
+    AF3 nests entities under ``sequences`` as ``{"protein": {...}}`` /
+    ``{"ligand": {"ccdCodes": [...]}}``. Boltz uses the same ``sequences`` key
+    with ``{"protein": {"id", "sequence", "msa"}}`` and
+    ``{"ligand": {"id", "ccd"}}`` -- one CCD code per entity, so a multi-code
+    AF3 ligand becomes several entities with suffixed chain ids.
+
+    ``msa: empty`` is set explicitly: that is Boltz's spelling for a
+    single-sequence prediction, matching --use_msa False (Protenix),
+    run_data_pipeline=false (AF3) and RF3's no-MSA default.
+    """
+    sequences = []
+    for entity in af3_template["sequences"]:
+        if "protein" in entity:
+            sequences.append({"protein": {"id": entity["protein"]["id"],
+                                          "sequence": seq, "msa": "empty"}})
+        elif "ligand" in entity:
+            ccd_codes = entity["ligand"].get("ccdCodes")
+            if not ccd_codes:
+                raise ValueError(
+                    f"boltz: ligand entity {entity['ligand'].get('id')!r} in the AF3 template "
+                    "has no ccdCodes. SMILES and file-based ligands are not translated yet; add "
+                    "them here rather than letting the ligand silently vanish from the complex."
+                )
+            base_id = entity["ligand"]["id"]
+            for j, ccd in enumerate(ccd_codes):
+                sequences.append({"ligand": {"id": base_id if j == 0 else f"{base_id}{j}",
+                                             "ccd": ccd}})
+        else:
+            raise ValueError(
+                f"boltz: unrecognised AF3 entity {sorted(entity)!r}; expected "
+                "'protein' or 'ligand'."
+            )
+    return {"version": 1, "sequences": sequences}
+
 
 def boltz_from_df(df_input, cfg, step_name="boltz"):
-    """
-    Runs Boltz and aggregates base metrics from the output.
+    """Runs Boltz and aggregates base metrics from the output.
+
+    Honours ``num_diffusion_samples`` (and ``per_sample_rows``) the same way
+    ``af3_from_df`` and ``rf3_from_df`` do. Until this was added Boltz silently
+    ran one sample and read only ``model_0``, so a config asking all three
+    oracles for best-of-5 got best-of-5 from two of them and a single draw from
+    Boltz -- a reward that means something different depending on which oracle
+    scored the step.
     """
     assert cfg.rundir is not None, "rundir must be specified in cfg"
 
@@ -276,8 +390,25 @@ def boltz_from_df(df_input, cfg, step_name="boltz"):
     names = df_input['name'].tolist()
 
     # load boltz template for prediction
+    # Accept either Boltz's own YAML or the authoritative AF3 JSON. The JSON
+    # path is preferred: it is the one template every oracle translates from, so
+    # no backbone can have a Boltz complex that differs from its AF3 one.
     template_path = cfg.template_path
-    boltz_template = OmegaConf.load(template_path)
+    if str(template_path).endswith(".json"):
+        with open(template_path) as f:
+            _af3 = json.load(f)
+        boltz_template = OmegaConf.create(_boltz_input_from_af3_template(_af3, ""))
+        _protein_idx = next(i for i, e in enumerate(boltz_template.sequences)
+                            if "protein" in e)
+    else:
+        boltz_template = OmegaConf.load(template_path)
+        _protein_idx = 0
+
+    # Default 5, matching af3_from_df and rf3_from_df. Best-of-5 is the AME
+    # benchmark's own unit, and an oracle that quietly ran 1 sample while the
+    # others ran 5 would make the reward mean different things per step.
+    n_samples = int(cfg.get("num_diffusion_samples", 5))
+    per_sample_rows = bool(cfg.get("per_sample_rows", n_samples > 1))
 
 
     chunk_size = _local_oracle_worker_count()
@@ -297,12 +428,13 @@ def boltz_from_df(df_input, cfg, step_name="boltz"):
         # write input files
         for j, (name, seq) in enumerate(seqs_chunked):
             _template = copy.deepcopy(boltz_template)
-            _template.sequences[0].protein.sequence = seq
+            _template.sequences[_protein_idx].protein.sequence = seq
 
             file_path = os.path.join(batch_folder, f"{name}.yaml")
             OmegaConf.save(_template, file_path)
 
-        _cmd = make_boltz_command(batch_folder, outdir)    
+        _cmd = make_boltz_command(batch_folder, outdir, n_samples,
+                                  no_kernels=bool(cfg.get("boltz_no_kernels", True)))
         cmd_list.append(_cmd)
 
     
@@ -315,7 +447,9 @@ def boltz_from_df(df_input, cfg, step_name="boltz"):
     print(f"Wrote {len(cmd_list)} commands to {jobs_file}")
 
     # run commands on multiple gpus
-    run_multi_gpu_commands(cmd_list)
+    # `boltz_retries` mirrors `rf3_retries` and `protenix_retries`; see
+    # run_multi_gpu_commands for why one non-zero exit used to end a run.
+    run_multi_gpu_commands(cmd_list, attempts=int(cfg.get("boltz_retries", 3)))
 
     # collect output data
     output_folders = glob.glob(os.path.join(outdir, "*", "predictions", "*"))
@@ -338,9 +472,27 @@ def boltz_from_df(df_input, cfg, step_name="boltz"):
     # go through each folder and extract metrics from confidence json, and path to cif file
     for folder in output_folders:
         name = os.path.basename(folder)
-        cif_path = os.path.join(folder, f"{name}_model_0.cif")
-        conf_json_path = os.path.join(folder, f"confidence_{name}_model_0.json")
+        # One row per diffusion sample when asked for, so a downstream
+        # best-of-N step sees every sample. A missing model is skipped rather
+        # than faked: Boltz can write fewer models than requested.
+        idxs = range(n_samples) if per_sample_rows else [0]
+        for k in idxs:
+            cif_path = os.path.join(folder, f"{name}_model_{k}.cif")
+            conf_json_path = os.path.join(folder, f"confidence_{name}_model_{k}.json")
+            if not (os.path.exists(cif_path) and os.path.exists(conf_json_path)):
+                continue
+            _collect_boltz_row(output_data, step_name, name, cif_path, conf_json_path)
 
+    df_output = pd.DataFrame(output_data)
+    if per_sample_rows:
+        df_output[f"{step_name}_sample"] = df_output.groupby("name").cumcount()
+    df_merged = pd.merge(df_input, df_output, on="name", how="inner")
+    return df_merged
+
+
+def _collect_boltz_row(output_data, step_name, name, cif_path, conf_json_path):
+    """Append one Boltz prediction's metrics to the column dict."""
+    if True:
         with open(conf_json_path, "r") as f:
             conf_data = json.load(f)
 
@@ -355,11 +507,6 @@ def boltz_from_df(df_input, cfg, step_name="boltz"):
         output_data[f"{step_name}_complex_iplddt"].append(conf_data["complex_iplddt"])
         output_data[f"{step_name}_complex_pde"].append(conf_data["complex_pde"])
         output_data[f"{step_name}_complex_ipde"].append(conf_data["complex_ipde"])
-
-    df_output = pd.DataFrame(output_data)
-    df_merged = pd.merge(df_input, df_output, on='name', how='inner')
-
-    return df_merged
 
 
 # For running AlphaFold 3 via Apptainer container
@@ -463,7 +610,7 @@ def af3_from_df(df_input, cfg, step_name="af3"):
             f.writelines([cmd + "\n" for cmd in cmd_list])
         print(f"Wrote {len(cmd_list)} commands to {jobs_file}")
 
-        run_multi_gpu_commands(cmd_list)
+        run_multi_gpu_commands(cmd_list, attempts=int(cfg.get("af3_retries", 3)))
 
     # AF3 outputs: <outdir>/<name>/<name>_model.cif and <name>_summary_confidences.json
     output_folders = glob.glob(os.path.join(outdir, "*"))
@@ -820,3 +967,333 @@ def rf3_from_df(df_input, cfg, step_name="rf3"):
             f"input JSON and {outdir!r}, or every prediction early-stopped."
         )
     return df_merged
+
+
+# For running Protenix via Apptainer container
+PROTENIX_CONTAINER = "/net/software/containers/pipelines/protenix.sif"
+PROTENIX_PYTHON = "/opt/protenix-env/bin/protenix"
+
+
+def _protenix_input_from_af3_template(af3_template: dict, name: str, seq: str) -> dict:
+    """Translate one AF3 input JSON into Protenix's schema.
+
+    Third translation of the same template, for the same reason as the RF3 one:
+    a cross-oracle comparison only means something if every predictor folds the
+    same complex, and hand-maintained per-oracle templates drift. The AF3
+    template stays authoritative; each oracle translates from it.
+
+    AF3 nests entities under ``sequences`` as ``{"protein": {...}}`` /
+    ``{"ligand": {"ccdCodes": [...]}}``. Protenix takes the same ``sequences``
+    key but spells a protein ``{"proteinChain": {"sequence", "count"}}`` and a
+    ligand ``{"ligand": {"ligand": "CCD_<code>", "count"}}`` -- the ``CCD_``
+    prefix is required, and Protenix's own parser rejects a bare code
+    ("Please change the 'ligand' input format to 'CCD_' or 'FILE_'").
+
+    An AF3 ligand entity may name several CCD codes under one chain id; each
+    becomes its own Protenix entity, since the format carries one code per
+    entity. Chain ids are dropped -- Protenix assigns its own -- which is why
+    metrics must key on the structure, not on chain naming.
+
+    MSA is not requested here; the caller passes ``--use_msa False``. The AME
+    templates carry empty MSA fields, so this is single-sequence on every oracle.
+    """
+    sequences = []
+    for entity in af3_template["sequences"]:
+        if "protein" in entity:
+            sequences.append({"proteinChain": {"sequence": seq, "count": 1}})
+        elif "ligand" in entity:
+            ccd_codes = entity["ligand"].get("ccdCodes")
+            if not ccd_codes:
+                raise ValueError(
+                    f"protenix: ligand entity {entity['ligand'].get('id')!r} in the AF3 template "
+                    "has no ccdCodes. SMILES and file-based ligands are not translated yet; add "
+                    "them here rather than letting the ligand silently vanish from the complex."
+                )
+            for ccd in ccd_codes:
+                sequences.append({"ligand": {"ligand": f"CCD_{ccd}", "count": 1}})
+        else:
+            raise ValueError(
+                f"protenix: unrecognised AF3 entity {sorted(entity)!r}; expected "
+                "'protein' or 'ligand'."
+            )
+    return {"name": name, "sequences": sequences}
+
+
+def protenix_from_df(df_input, cfg, step_name="protenix"):
+    """Runs Protenix and aggregates confidence metrics from the output.
+
+    Same contract as :func:`af3_from_df` / :func:`rf3_from_df` -- takes
+    ``name``/``sequence``, returns the input frame with ``{step_name}_path`` and
+    confidence columns merged on ``name`` -- so ``rfd2_metrics_from_df``
+    consumes it by setting ``structure_col: protenix_path`` and nothing else
+    changes. Reads the same AF3 JSON template, translated by
+    :func:`_protenix_input_from_af3_template`.
+
+    cfg keys
+    --------
+    rundir                Where inputs/ and outputs/ are written (required).
+    template_path         AF3-format JSON template; translated to Protenix's schema.
+    num_diffusion_samples Samples per design (default 5, the AME unit).
+    use_msa               Default False: the AME templates carry empty MSA
+                          fields, so every oracle here is single-sequence.
+    skip_run              Reuse existing outputs and recompute metrics only.
+
+    Output layout, observed rather than assumed:
+        <out>/<name>/seed_<S>/predictions/<name>_sample_<K>.cif
+        <out>/<name>/seed_<S>/predictions/<name>_summary_confidence_sample_<K>.json
+    which is Protenix's own shape, not AF3's, so the AF3 resolver is NOT reused.
+
+    Protenix reports ``plddt`` on 0-100; AF3 and RF3 use 0-1 (measured: RF3
+    spans 0.504-0.772 on the same designs). ``{step}_plddt`` is therefore
+    divided by 100 so one reward bound means the same thing whichever oracle
+    scored the step -- without this, a plddt term would weight Protenix steps
+    100x. The unscaled value is kept beside it as ``{step}_plddt_raw`` so the
+    rescaling is visible in the metrics table rather than implicit.
+    """
+    assert cfg.rundir is not None, "rundir must be specified in cfg"
+    n_samples = int(cfg.get("num_diffusion_samples", 5))
+    per_sample_rows = bool(cfg.get("per_sample_rows", n_samples > 1))
+
+    outdir = f"{cfg.rundir}/{step_name}/outputs"
+    inputdir = f"{cfg.rundir}/{step_name}/inputs"
+    os.makedirs(outdir, exist_ok=True)
+    os.makedirs(inputdir, exist_ok=True)
+
+    skip_run = bool(cfg.get("skip_run", False)) or bool(os.environ.get("CLEO_PROTENIX_SKIP_RUN"))
+    if skip_run:
+        if not os.path.isdir(outdir):
+            raise FileNotFoundError(
+                f"protenix skip_run: no outputs directory at {outdir!r}. "
+                "Run without skip_run once, or fix rundir / step name."
+            )
+        print(f"protenix: skip_run=True (reuse only). Reading metrics from {outdir!r}.")
+    else:
+        with open(cfg.template_path) as f:
+            af3_template = json.load(f)
+
+        # One JSON holding every design, as for RF3: Protenix amortises a long
+        # model load (plus a one-time CCD component download) across the batch.
+        examples = [
+            _protenix_input_from_af3_template(af3_template, name, seq)
+            for name, seq in zip(df_input["name"], df_input["sequence"])
+        ]
+        input_json = os.path.join(inputdir, "inputs.json")
+        with open(input_json, "w") as f:
+            json.dump(examples, f, indent=2)
+
+        container = cfg.get("protenix_container", PROTENIX_CONTAINER)
+        runner = cfg.get("protenix_bin", PROTENIX_PYTHON)
+        command = (
+            f"apptainer exec --nv {container} {runner} pred"
+            f" -i {input_json} -o {outdir} -e {n_samples}"
+            f" --use_msa {bool(cfg.get('use_msa', False))}"
+        )
+        if cfg.get("model_name"):
+            command += f" -n {cfg.model_name}"
+        if cfg.get("seeds"):
+            command += f" -s {cfg.seeds}"
+        print(f"protenix: folding {len(examples)} designs x {n_samples} samples")
+        print(f"  {command}")
+
+        # Same bounded retry as rf3_from_df, for the same reason: a training run
+        # is thousands of these calls and this project has lost runs to /dev/shm
+        # exhaustion and to a mid-write NFS error, neither of which says
+        # anything about the designs. A real config error fails identically
+        # every attempt and is raised rather than looped on.
+        attempts = int(cfg.get("protenix_retries", 3))
+        for attempt in range(1, attempts + 1):
+            try:
+                subprocess.run(command, shell=True, check=True)
+                break
+            except subprocess.CalledProcessError:
+                if attempt == attempts:
+                    raise
+                wait = 30 * attempt
+                print(f"protenix: attempt {attempt}/{attempts} failed; retrying in {wait}s")
+                time.sleep(wait)
+
+    rows = []
+    for cif in glob.glob(os.path.join(outdir, "*", "seed_*", "predictions", "*_sample_*.cif")):
+        pred_dir = os.path.dirname(cif)
+        stem = os.path.basename(cif)[: -len(".cif")]
+        m = re.search(r"^(?P<name>.+)_sample_(?P<k>\d+)$", stem)
+        if m is None:
+            print(f"Warning: cannot parse sample index from {cif!r}, skipping.")
+            continue
+        name, k = m.group("name"), int(m.group("k"))
+        conf = os.path.join(pred_dir, f"{name}_summary_confidence_sample_{k}.json")
+        if not os.path.exists(conf):
+            print(f"Warning: no summary confidence beside {cif!r}, skipping.")
+            continue
+        seed_m = re.search(r"seed_(\d+)", pred_dir)
+        rows.append((name, cif, conf, k, int(seed_m.group(1)) if seed_m else -1))
+
+    assert rows, f"No Protenix predictions found under {outdir}"
+    if not per_sample_rows:
+        # Keep one sample per design: sample_0, matching the single-sample
+        # contract the other oracles honour when asked for one row.
+        rows = [r for r in rows if r[3] == 0]
+
+    cols = ["name", f"{step_name}_path", f"{step_name}_ptm", f"{step_name}_iptm",
+            f"{step_name}_ranking_score", f"{step_name}_plddt",
+            f"{step_name}_chain_ptm_protein", f"{step_name}_chain_ptm_ligand",
+            f"{step_name}_has_clash", f"{step_name}_plddt_raw"]
+    if per_sample_rows:
+        cols += [f"{step_name}_sample", f"{step_name}_seed"]
+    output_data = {c: [] for c in cols}
+
+    for name, cif, conf, k, seed in rows:
+        with open(conf) as f:
+            c = json.load(f)
+        chain_ptm = c.get("chain_ptm") or []
+        output_data["name"].append(name)
+        output_data[f"{step_name}_path"].append(cif)
+        output_data[f"{step_name}_ptm"].append(c.get("ptm"))
+        output_data[f"{step_name}_iptm"].append(c.get("iptm"))
+        output_data[f"{step_name}_ranking_score"].append(c.get("ranking_score"))
+        # 0-100 -> 0-1, matching AF3/RF3 so a shared reward bound is valid.
+        plddt = c.get("plddt")
+        output_data[f"{step_name}_plddt"].append(
+            None if plddt is None else float(plddt) / 100.0)
+        output_data[f"{step_name}_plddt_raw"].append(plddt)
+        # chain_ptm is [protein, ligand...]; several ligands collapse to their
+        # best, matching how the AF3/RF3 columns summarise a multi-ligand complex.
+        output_data[f"{step_name}_chain_ptm_protein"].append(
+            chain_ptm[0] if chain_ptm else None)
+        output_data[f"{step_name}_chain_ptm_ligand"].append(
+            max(chain_ptm[1:]) if len(chain_ptm) > 1 else None)
+        output_data[f"{step_name}_has_clash"].append(c.get("has_clash"))
+        if per_sample_rows:
+            output_data[f"{step_name}_sample"].append(k)
+            output_data[f"{step_name}_seed"].append(seed)
+
+    df_output = pd.DataFrame(output_data)
+    df_merged = pd.merge(df_input, df_output, on="name", how="inner")
+    if df_merged.empty:
+        raise RuntimeError(
+            f"protenix: merged frame is empty -- {len(df_input)} inputs and "
+            f"{len(df_output)} predictions shared no 'name'. Check that the "
+            "template translation preserved design names."
+        )
+    return df_merged
+
+
+# Oracles the multi-oracle step can draw from, by name.
+_ORACLE_FNS = {
+    "rf3": rf3_from_df,
+    "boltz": boltz_from_df,
+    "protenix": protenix_from_df,
+    "af3": af3_from_df,
+}
+
+
+def multi_oracle_from_df(df_input, cfg, step_name="fold"):
+    """Fold with ONE oracle drawn per call, so a policy cannot overfit any single
+    structure predictor.
+
+    Training against a fixed predictor buys performance that does not transfer.
+    Measured on M0097, 256 designs, best-of-5: sampled sequences score 36.3%
+    under RF3 and 40.2% under AF3 -- the two predictors agree (-3.9) on designs
+    no policy optimised. The same comparison on RF3-trained policies gives +18.0
+    (sequence-level reward) and +36.3 (fragment-level), i.e. ~22 and ~40 points
+    of excess that exist only under the training oracle.
+
+    Drawing a different oracle each rollout removes the fixed target. The whole
+    group is folded by ONE oracle, never a mixture: GRPO's advantage is
+    group-relative -- ``advantage()`` centres and scales within the current
+    batch -- so every design in a group must be scored on the same yardstick for
+    the ranking to mean anything. Mixing predictors inside a group would make
+    part of each advantage a comparison between predictors rather than between
+    designs. One oracle per group also costs 1x rather than Nx. (The
+    across-steps part holds only while ``use_avg_reward`` is off, which it is in
+    every config here; with a running-history baseline, rewards WOULD have to be
+    comparable across steps and alternation would inject the oracle's scale
+    shift straight into the advantage.)
+
+    ``schedule`` picks how the per-group oracle is chosen:
+
+    ``round_robin`` (default)
+        ``oracles[train_step % len(oracles)]``. Exactly uniform by
+        construction. Preferred because the seed-arithmetic draw below is not:
+        measured over a real 115-step run it gave 43%/32%/25% against the
+        intended thirds, leaning toward whichever oracle sits first -- and the
+        lean was reproducible across seeds, so it is a property of the
+        ``seed + k*step`` sequence, not noise.
+    ``random``
+        Independent draw per step, honouring ``oracle_weights``. Use when the
+        schedule itself should be unpredictable; expect the realised split to
+        wander from the nominal one at these step counts.
+
+    Emits a stable ``{step_name}_path`` whichever oracle ran, so downstream
+    metric steps set ``structure_col: fold_path`` once and never change, plus
+    ``{step_name}_oracle`` recording the draw -- without which the training log
+    cannot say which predictor scored which step.
+
+    cfg keys
+    --------
+    oracles        Names to draw from (default ["rf3", "boltz", "protenix"]).
+    schedule       "round_robin" (default) or "random".
+    oracle_weights Draw probabilities for schedule="random", parallel to ``oracles``.
+    oracle         Force one oracle (skips the draw); for evaluation and tests.
+    seed           Optional base seed; combined with ``step`` for a reproducible
+                   draw. Without it the draw follows global numpy state.
+    train_step     Current training step index, set by UniversalReward. Note
+                   ``cfg.step`` is the step's NAME, not a number.
+    ...            Every other key is passed to the chosen oracle unchanged.
+    """
+    names = list(cfg.get("oracles", ["rf3", "boltz", "protenix"]))
+    unknown = [n for n in names if n not in _ORACLE_FNS]
+    if unknown:
+        raise ValueError(
+            f"multi_oracle: unknown oracle(s) {unknown}; known: {sorted(_ORACLE_FNS)}"
+        )
+    if not names:
+        raise ValueError("multi_oracle: 'oracles' is empty; nothing to fold with.")
+
+    forced = cfg.get("oracle")
+    if forced:
+        if forced not in _ORACLE_FNS:
+            raise ValueError(f"multi_oracle: unknown forced oracle {forced!r}")
+        choice = forced
+    elif str(cfg.get("schedule", "round_robin")) == "round_robin":
+        # Exactly uniform: every oracle is used once per cycle of len(oracles)
+        # steps, so no predictor is over-represented however long the run.
+        choice = names[int(cfg.get("train_step", 0)) % len(names)]
+    else:
+        weights = cfg.get("oracle_weights")
+        if weights is not None:
+            w = np.asarray([float(x) for x in weights], dtype=float)
+            if len(w) != len(names):
+                raise ValueError(
+                    f"multi_oracle: {len(weights)} weights for {len(names)} oracles."
+                )
+            w = w / w.sum()
+        else:
+            w = None
+        seed = cfg.get("seed")
+        if seed is None:
+            rng = np.random.default_rng()
+        else:
+            # Same seed must not pick the same oracle every step.
+            rng = np.random.default_rng(
+                int(seed) + 1000003 * int(cfg.get("train_step", 0)))
+        choice = str(rng.choice(names, p=w))
+
+    print(f"multi_oracle: train_step {cfg.get('train_step', '?')} folding with "
+          f"{choice!r} (pool {names})")
+
+    # Each oracle writes under its own name inside the step's rundir, so a step
+    # that draws Boltz cannot collide with, or be mistaken for, a step that drew
+    # RF3 -- and a `skip_run` reread finds the right tree.
+    sub = _ORACLE_FNS[choice](df_input, cfg, step_name=choice)
+
+    out = sub.rename(columns={f"{choice}_path": f"{step_name}_path"})
+    out[f"{step_name}_oracle"] = choice
+    if f"{choice}_sample" in out.columns:
+        out = out.rename(columns={f"{choice}_sample": f"{step_name}_sample"})
+    if f"{step_name}_path" not in out.columns:
+        raise RuntimeError(
+            f"multi_oracle: {choice} returned no {choice}_path column; cannot "
+            f"expose a stable {step_name}_path."
+        )
+    return out

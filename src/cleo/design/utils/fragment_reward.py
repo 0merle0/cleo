@@ -120,6 +120,13 @@ def chimera_metrics_from_df(df_input, cfg, step_name="frag"):
         fn = get_method(cfg[fn_key])
         sub = cfg[cfg_key]
         sub.rundir = chim_rundir
+        # Propagate the training step into the nested configs. UniversalReward
+        # sets train_step on the *step's* cfg, not on these sub-configs, so an
+        # alternating oracle (multi_oracle_from_df) would see train_step=0 on
+        # every rollout and draw the same predictor for the whole run -- which
+        # looks exactly like a working multi-oracle run and is not one.
+        if "train_step" in cfg:
+            sub.train_step = cfg.train_step
         chim = fn(chim, sub, step_name=sub.get("step_name", nm))
 
     if metric_col not in chim.columns:
@@ -159,6 +166,76 @@ def chimera_metrics_from_df(df_input, cfg, step_name="frag"):
         if "ame_motif_pass_and_no_clash" in chim.columns else np.nan
     )
     out[f"{step_name}_chimera_rmsd"] = float(np.nanmean(vals))
+
+    # --- diagnostic: the same chimeras under AF3, on a stride ---------------
+    # `{step_name}_chimera_pass` above is scored by the TRAINING oracle, and
+    # that number stopped tracking transfer: M0315 climbed 96.4 -> 99.6 on RF3
+    # between generations while its AF3 chimera pass went 66.8 -> 65.6. Folding
+    # the same chimeras under AF3 every `af3_probe_every` steps makes the
+    # transfer gap visible during the run instead of only after a full
+    # train-then-evaluate cycle.
+    #
+    # Read-only with respect to the reward: it writes one column and touches
+    # neither `score` nor `vals`. AF3 must never enter the objective here -- it
+    # is the held-out evaluator, and keeping it out is the entire point of the
+    # cross-oracle protocol. Cost is one extra fold per stride, so at
+    # every=100 it is ~1% of a run.
+    out[f"{step_name}_chimera_pass_af3"] = np.nan
+    every = int(cfg.get("af3_probe_every", 0) or 0)
+    step_i = int(cfg.get("train_step", -1))
+    if every > 0 and step_i >= 0 and step_i % every == 0:
+        try:
+            from omegaconf import OmegaConf as _OC
+
+            from cleo.design.utils.oracle import af3_from_df
+
+            def _copy(node):
+                return _OC.create(_OC.to_container(node, resolve=True))
+
+            pdir = _os.path.join(chim_rundir, "af3probe")
+            _os.makedirs(pdir, exist_ok=True)
+            ocfg = _copy(cfg["oracle_cfg"])
+            ocfg.rundir = pdir
+            # RF3-only knob; af3_from_df does not take it.
+            ocfg.pop("early_stopping_plddt_threshold", None)
+            # `oracle_cfg` is the TRAINING oracle's config. Under
+            # multi_oracle_from_df it carries template_path (shared by design,
+            # so one template feeds every predictor) but none of AF3's own
+            # container paths, so the probe raised
+            # `Missing key af3_container` on every stride and the column stayed
+            # NaN -- a broken diagnostic that looked like a quiet one. The
+            # paths come from the config rather than a module default, because
+            # a site path baked into library code is wrong on the next cluster.
+            probe_cfg = cfg.get("af3_probe_cfg", None)
+            if probe_cfg is None:
+                raise KeyError(
+                    "af3_probe_every is set but af3_probe_cfg is missing; it "
+                    "must supply af3_container, af3_script and model_dir"
+                )
+            for _k, _v in _OC.to_container(probe_cfg, resolve=True).items():
+                ocfg[_k] = _v
+            probe = pd.DataFrame({"name": chim["name"].tolist(),
+                                  "sequence": chim_seqs})
+            probe = af3_from_df(probe, ocfg, step_name="af3")
+            mcfg = _copy(cfg["metric_cfg"])
+            mcfg.rundir = pdir
+            mcfg.structure_col = "af3_path"
+            probe = get_method(cfg["metric_fn"])(probe, mcfg, step_name="ame")
+            bcfg = _copy(cfg["bo_cfg"])
+            bcfg.rundir = pdir
+            probe = get_method(cfg["bo_fn"])(probe, bcfg, step_name="bo")
+            if "ame_motif_pass_and_no_clash" in probe.columns:
+                out[f"{step_name}_chimera_pass_af3"] = float(
+                    probe["ame_motif_pass_and_no_clash"].mean())
+                print(f"{step_name}: AF3 probe at step {step_i}: "
+                      f"chimera pass {out[f'{step_name}_chimera_pass_af3'].iloc[0]:.3f} "
+                      f"vs training oracle "
+                      f"{out[f'{step_name}_chimera_pass'].iloc[0]:.3f}")
+        except Exception as exc:
+            # A diagnostic that can kill a 450-step run is worse than no
+            # diagnostic. The column stays NaN and training continues.
+            print(f"{step_name}: AF3 probe failed at step {step_i}: {exc!r}")
+
     return out
 
 
@@ -210,6 +287,12 @@ class FragmentReward(UniversalReward):
             fn = get_method(_s.target_fn)
             _s.cfg.rundir = rundir
             _s.cfg.step = _s.name
+            # This class duplicates UniversalReward's step loop, so anything
+            # added there has to be added here too. train_step is what an
+            # alternating oracle uses to advance its schedule; without it
+            # multi_oracle_from_df drew rf3 on every rollout -- a single-oracle
+            # run that logs and plots exactly like a multi-oracle one.
+            _s.cfg.train_step = int(step)
             print(f"Running step: {_s.name} using function: {_s.target_fn}")
             df = fn(df, _s.cfg, step_name=_s.name)
 
@@ -273,4 +356,13 @@ class FragmentReward(UniversalReward):
             "frag_score_spread": float(s.std().item()),
             **log_geom,
         }
+        # The AF3 probe is the only number here that measures transfer rather
+        # than training-oracle score, and this dict is enumerated by hand -- so
+        # omitting it meant the probe printed to the log and reached no file,
+        # leaving `check_converged.py --metric frag_chimera_pass_af3` with
+        # nothing to read. NaN on non-probe steps is correct: the readers drop
+        # it, and a zero would be a measurement that never happened.
+        _af3 = f"{frag_step}_chimera_pass_af3"
+        if _af3 in df.columns:
+            log[_af3] = float(df[_af3].iloc[0])
         return A.to(device), log

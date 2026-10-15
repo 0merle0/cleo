@@ -72,12 +72,17 @@ class UniversalReward():
             cfg = getattr(s, "cfg", None)
             if cfg is None:
                 continue
-            # af3_from_df is the only step that implements per-sample rows, so
-            # it is the only one carrying the best-of-5 default. boltz_from_df
-            # reads neither key and always returns one row per sequence, and
-            # applying the default to every step with a cfg would flag steps
-            # that cannot produce the rows this check is about.
-            is_oracle = str(getattr(s, "target_fn", "")).endswith("af3_from_df")
+            # Every oracle now implements per-sample rows and defaults to
+            # best-of-5: af3, rf3, protenix, boltz, and multi_oracle (which
+            # delegates to one of them). Each therefore carries the default and
+            # must be checked -- when only af3_from_df was listed here, an
+            # rf3/boltz/protenix step folding 5 samples passed this guard and
+            # returned 5 rows per sequence, which is exactly the reward/batch
+            # mismatch the check exists to prevent.
+            is_oracle = str(getattr(s, "target_fn", "")).endswith((
+                "af3_from_df", "rf3_from_df", "protenix_from_df",
+                "boltz_from_df", "multi_oracle_from_df",
+            ))
             if "num_diffusion_samples" not in cfg and not is_oracle:
                 continue
             n = int(cfg.get("num_diffusion_samples", 5 if is_oracle else 1))
@@ -171,6 +176,11 @@ class UniversalReward():
             print(f"Running step: {_name} using function: {_s.target_fn}")
             _s.cfg.rundir = rundir
             _s.cfg.step = _name
+            # The TRAINING step index, distinct from cfg.step (the step's name).
+            # multi_oracle_from_df needs it to vary its oracle draw: without it
+            # every rollout would draw from the same seed and pick the same
+            # oracle for the whole run, silently defeating the alternation.
+            _s.cfg.train_step = int(step)
             df = fn(df, _s.cfg, step_name=_name)
 
 

@@ -206,8 +206,41 @@ out. Configs written before this change are left as-is — they record what was
 actually run, and re-running one now errors rather than silently reverting to
 single-sample.
 
-Note `boltz_from_df` reads neither key and always returns one row per sequence;
-multi-sample output for Boltz is not implemented.
+All four predictors now read both keys and default to best-of-5:
+`af3_from_df`, `rf3_from_df`, `boltz_from_df` and `protenix_from_df`, plus
+`multi_oracle_from_df`, which delegates to one of them. So every one of them
+needs the reducing step above, and `UniversalReward` checks all of them -- when
+only `af3_from_df` was on that list, an RF3 or Boltz step folding 5 samples
+passed the guard and returned 5 rows per sequence.
+
+### Multi-oracle training
+
+`cleo.design.utils.oracle.multi_oracle_from_df` picks ONE predictor per step
+and renames its columns to the step's name, so downstream metric steps read
+`fold_path` and do not know which oracle produced it:
+
+```yaml
+oracle_fn: cleo.design.utils.oracle.multi_oracle_from_df
+oracle_cfg:
+  oracles: [rf3, boltz, protenix]
+  schedule: round_robin        # choice = oracles[train_step % len(oracles)]
+  step_name: fold
+```
+
+Under `round_robin` the choice is driven by `cfg.train_step`, which
+`UniversalReward` and `FragmentReward` set from the training step index. Both
+set it, because `FragmentReward` duplicates the step loop rather than calling
+it; and `chimera_metrics_from_df` forwards it into its nested oracle config.
+If any of those three is missing the dispatcher sees `train_step=0` every
+rollout and draws the same predictor for the whole run -- a single-oracle run
+that logs, plots and reads exactly like a multi-oracle one.
+
+Because one step is one oracle, a per-step score is not comparable across
+steps: the three disagree by up to 26 points on identical designs. Compare
+oracle-balanced windows of `len(oracles) * m` consecutive steps, not raw steps.
+
+Keep `use_avg_reward` off here. GRPO's advantage is `(r - mean) / (std + 1e-3)`,
+which cancels a whole-batch oracle offset; turning it on leaks that offset in.
 
 ### Reward Aggregation
 
