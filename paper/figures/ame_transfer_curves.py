@@ -44,16 +44,27 @@ from palette import PALETTE     # noqa: E402
 
 AME = Path(__file__).resolve().parents[2] / "experiments" / "ame"
 
-# (family, column title). Order is the argument: single oracle first, so the
-# eye reads "gap opens" then "gap closes".
-# Columns are ordered so adjacent pairs are one-factor comparisons:
-#   col 1 -> col 2  holds batch at 8, varies oracle count   (does the pool help?)
-#   col 2 -> col 3  holds the 3-oracle pool, varies batch   (does batch help?)
-# fragrl4 and fragmulti are both `batch_size: 8, seed: 1` and differ only in
-# the oracle function, so the first pair is a genuine matched-batch contrast
-# rather than the batch-and-oracle confound of the original two-column figure.
+# (family, column title).
+#
+# Only ONE adjacent pair here is a one-factor contrast, and it is not the one
+# this figure was built to make. All nine configs are `seed: 1`, but:
+#
+#   fragrl4    batch  8, rf3 only,      checkpoint_path = a fragrl3 `_last.pt`
+#   fragmulti  batch  8, 3-oracle pool, checkpoint_path = null
+#   fragb32    batch 32, 3-oracle pool, checkpoint_path = null
+#
+# So col 2 -> col 3 is clean (pool held, batch varies). col 1 -> col 2 is NOT:
+# it varies the oracle *and* the initialisation. Every `fragrl4` run warm-starts
+# from a previous RF3-only generation, so its "step 0" is a policy with roughly
+# 450 prior RF3-trained steps behind it, not an untrained one -- which is why
+# M0315 reads 0.983 at step 0 under RF3 while the from-scratch pool run on the
+# same backbone reads 0.000-0.047 across steps 1-5.
+#
+# The column title says so, because the earlier version of this file asserted
+# the opposite in a comment and the number was reported as a matched-batch
+# result on that basis.
 ARMS = [
-    ("fragrl4",   "RF3 only\nbatch 8"),
+    ("fragrl4",   "RF3 only, batch 8\n(warm-started)"),
     ("fragmulti", "3-oracle pool\nbatch 8"),
     ("fragb32",   "3-oracle pool\nbatch 32"),
 ]
@@ -97,7 +108,15 @@ def load(family, backbone):
     # name rather than by an outlier rule, because it is wrong for a known
     # reason and an outlier rule would also have thrown out real volatility.
     # The original steps 33+ survive in experiments/ame/m0255_original_steps/.
-    CONTAMINATED = {("fragb32", "M0255"): {0}}
+    # M0315's step_0000 was overwritten the same way on 2026-10-14 00:54, by a
+    # resume that died immediately afterwards -- its mtime is newer than
+    # step_0129's, while steps 30/60/90/120 are still the original run's and
+    # still monotonic. That point is currently dropped anyway because it has no
+    # af3_pass, but that is luck: re-probing it would produce a contaminated
+    # value that passes every other filter here. Named now, while the reason is
+    # known, rather than after it silently enters a panel.
+    CONTAMINATED = {("fragb32", "M0255"): {0},
+                    ("fragb32", "M0315"): {0}}
     bad = CONTAMINATED.get((family, backbone), set())
     if bad:
         drop = df["step"].isin(bad)
@@ -168,6 +187,9 @@ def main():
             # the single-oracle arm starts at 0.98 training / 0.97 AF3: there is
             # no room above for training to pull away. Said on the figure
             # because the number alone reads as a pass.
+            # For fragrl4 this is a warm start, not an easy backbone: the run
+            # inherits a trained RF3-only checkpoint, so step 0 is already at
+            # the top of the scale and nothing can be read off its trajectory.
             if tr[0] >= 0.9 and af[0] >= 0.9:
                 ax.annotate("starts at ceiling -- gap untestable",
                             xy=(0.04, 0.84), xycoords="axes fraction",

@@ -899,9 +899,42 @@ Mean gap per cell, over strides 0/30/60/90/120:
 | `fragmulti` pool, b8 | **+0.060** | **+0.042** | -0.103 |
 | `fragb32` pool, b32 | +0.054 | -0.057 | -0.025 (ceiling) |
 
-**At identical batch size the pool closes the gap.** M0097 +0.299 -> +0.060,
-M0255 +0.476 -> +0.042. Batch size is held at 8 across that comparison and so
-cannot account for it. This also reframes the step-0 observation of 8.5: the
+**CORRECTION, same day.** The sentence that stood here -- "at identical batch
+size the pool closes the gap", from M0097 +0.299 -> +0.060 and M0255 +0.476 ->
++0.042 -- claimed a one-factor contrast that does not exist. All three
+`fragrl4` configs set
+
+    checkpoint_path: .../fragrl3/run_<backbone>_frag3/..._last.pt
+
+while every `fragmulti` and `fragb32` config sets `checkpoint_path: null`. So
+`fragrl4` and `fragmulti` differ in the oracle function **and** in
+initialisation: the single-oracle arm warm-starts from a previous RF3-only
+generation (~450 steps), the pool arm starts from the pretrained policy. Batch
+size is held at 8, but it was never the only other factor.
+
+What made this visible: on M0315 the RF3-only arm reads **0.983 at step 0**
+while the from-scratch pool arm on the same backbone reads **0.000-0.047 across
+steps 1-5** -- a span covering the whole round robin, so not single-draw
+jitter. An untrained policy does not score 0.983; that run had already been
+trained.
+
+**What survives.** `fragmulti` vs `fragb32` is still clean (same pool, same
+seed, both from scratch, batch 8 vs 32). The *direction* of the single-oracle
+result also survives, and arguably reads stronger: a policy carrying ~450 steps
+of RF3-only training shows a +0.30/+0.48 held-out gap, which is what
+accumulated single-oracle optimisation looks like. What cannot be claimed is
+that the pool, rather than the warm start, is what separates the two arms.
+
+**What this costs.** The matched-level analysis below is confounded the same
+way -- its 24 pairs compare a warm-started arm against from-scratch arms -- so
+it does not rescue the claim either. And the step-0 framing in 8.5 ("the gap is
+large at step 0, before meaningful training") is wrong for `fragrl4`: its step 0
+is not before training.
+
+**E15 is now the only clean single-vs-pool contrast available.** The staged
+`fragb32rf3` configs are `checkpoint_path: null`, `batch_size: 32`, `seed: 1` --
+identical to `fragb32` except for the forced oracle. It was already the decisive
+cell; it is now the *only* one. This also reframes the step-0 observation of 8.5: the
 single-oracle arm opens a +0.48/+0.53 gap at step 0 while the pool arm on the
 same backbones at the same step shows +0.059/+0.007. A step-0 gap is therefore
 **not** an intrinsic property of chimeric recombination -- if recombination

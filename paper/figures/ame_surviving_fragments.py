@@ -11,8 +11,16 @@ Reported per (backbone, arm, slot):
   n_frag       fragments entering recombination (= parents, since at 45 residues
                no two passing designs share one)
   n_surv       fragments appearing in >= 1 passing chimera
-  surv_frac    n_surv / n_frag -- unbiased by pool size, so comparable between
-               arms that produced different parent counts
+  surv_frac    n_surv / n_frag -- CONFOUNDED by parent count, kept only for
+               continuity. A fragment survives if ANY of its chimeras passes,
+               and appearances per fragment = (chimeras x slots) / n_fragments,
+               so an arm with fewer parents gives each fragment more attempts.
+               M0255's chimera-objective arm had 28 parents, 9.1 attempts per
+               fragment, and scored 0.92 at 30% retention -- 1-0.7^9 = 0.96,
+               which is the number, not modularity.
+  frag_rate    mean per-fragment pass RATE. Attempt-count independent, matches
+               a one-attempt resampling of the same data, and is the quantity
+               the fragment-level reward itself computes. Use this one.
   U_surv       distinct (position, residue) substitutions across surviving
                fragments, vs the slot consensus
   ham_surv     mean pairwise Hamming among surviving fragments
@@ -107,8 +115,11 @@ def main():
                     continue
                 ref = np.array([max(set(c), key=list(c).count)
                                 for c in as_matrix(allf).T], dtype="S1")
+                rates = [float(np.mean(fl)) for fl in frags.values()]
                 rows.append(dict(site=site, dead=dead, arm=arm, slot=slot,
                                  n_frag=len(allf), n_surv=len(surv),
+                                 appear=float(np.mean([len(fl) for fl in frags.values()])),
+                                 frag_rate=float(np.mean(rates)),
                                  surv_frac=len(surv) / len(allf),
                                  U_surv=subs_count(surv, ref),
                                  ham_surv=mean_pairwise(surv)))
@@ -143,15 +154,16 @@ def main():
     pd.set_option("display.width", 250, "display.float_format", "{:.2f}".format)
     print("SURVIVING FRAGMENTS -- those appearing in >= 1 passing chimera\n")
     agg = d.groupby(["dead", "site", "arm"]).agg(
-        n_frag=("n_frag", "sum"), n_surv=("n_surv", "sum"),
-        surv_frac=("surv_frac", "mean"), U_surv=("U_surv", "sum"),
-        ham=("ham_surv", "mean")).reset_index().sort_values(["dead", "site", "arm"])
+        n_frag=("n_frag", "sum"), appear=("appear", "mean"),
+        frag_rate=("frag_rate", "mean"), surv_frac=("surv_frac", "mean"),
+        U_surv=("U_surv", "sum"), ham=("ham_surv", "mean")
+    ).reset_index().sort_values(["dead", "site", "arm"])
     print(agg.to_string(index=False))
 
-    piv = agg.pivot(index=["dead", "site"], columns="arm", values="surv_frac")
+    piv = agg.pivot(index=["dead", "site"], columns="arm", values="frag_rate")
     both = piv.dropna()
     if len(both):
-        print(f"\nsurvival fraction: policy > baseline on "
+        print(f"\nper-fragment pass rate: policy > baseline on "
               f"{(both.policy > both.baseline).sum()}/{len(both)} backbones")
         print(f"  mean  policy {both.policy.mean():.2f}   baseline {both.baseline.mean():.2f}")
 
