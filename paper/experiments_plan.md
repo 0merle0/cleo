@@ -1045,7 +1045,7 @@ reached.
 3. **T2**, the 256-parent library eval — independent of E15 and overdue.
 4. **E16/E17/E18** only after E15 reports, for the reason in §8.3.
 
-**Blocked as of 2026-10-15, not by GPUs.** `/etc/slurm/slurm.conf` on
+**RESOLVED the same day — see 8.7.** **Blocked as of 2026-10-15, not by GPUs.** `/etc/slurm/slurm.conf` on
 `buffalo.dhcp.ipd` was truncated to 0 bytes at 07:39, so `sbatch`, `squeue`,
 `sacct` and `sinfo` all exit fatal with `ClusterName needs to be specified`.
 The file is root-owned and there is no sudo on that host. `munged` is running,
@@ -1054,3 +1054,62 @@ recovery is a copy from a working host plus `SLURM_CONF=~/.slurm/slurm.conf`,
 which `watch_fragb32.sh` now picks up on its own. All three `fragb32` runs died
 ~22:00 on 2026-10-14 (M0097 on an `Errno 5` reading `/projects/msa`), and the
 watcher could not resubmit them because it cannot reach the scheduler.
+
+### 8.7 Launched 2026-10-15, and the decisions inside that
+
+**The blocker was one file.** `digs.ipd` still had a valid
+`/etc/slurm/slurm.conf`; buffalo's was the only truncated copy. A user-space
+copy plus `SLURM_CONF=$HOME/.slurm/slurm.conf` restores every client command
+with no root and no change to the shared system. `watch_runs.sh` and
+`status_loop.sh` both set it themselves whenever `/etc/slurm/slurm.conf` is
+empty, so this heals without intervention if it recurs.
+
+**`fragb32` is capped at 150 steps, down from 300.** Two reasons, and the second
+is the one that matters: every run under this objective converged well inside
+150 (M0315 saturated at 0.993 by step 61, M0097 by ~120), and **E15 runs 150**,
+so the decisive single-vs-pool contrast is now length-matched rather than
+150-against-300. Checkpoints at the moment of the change: M0097 step 150
+(complete), M0255 step 75, M0315 step 125. The two short runs were resumed for
+75 and 25 further steps; M0097 needed nothing.
+
+**A requeued job is a landmine, not a rescue.** SLURM requeued M0097 after a
+`NODE_FAIL` at 04:13 and an admin held it (`JobHeldAdmin`, `Restarts=1`).
+Released, it would have re-run its sbatch line *with no checkpoint argument* and
+restarted from step 0 into the same `output_dir` — over 150 steps of history and
+six per-step checkpoints. It was cancelled rather than released, after `_last.pt`,
+every `_step_*.pt` and the metrics CSV for all three runs were copied to
+`experiments/ame/fragb32_safety/` (202 MB). `watch_runs.sh` now detects this
+state and reports it instead of acting on it.
+
+That the per-step checkpoints are retained is worth recording in its own right:
+M0097 and M0255 hold steps 25–150, M0315 25–125. That *is* the progressive
+checkpoint pool the AF3 transfer curves need — it existed already and only
+needed protecting.
+
+**Resume offsets are now recorded.** A resumed run restarts its step counter at
+0 into a cleared tree, so a step labelled 12 is really `offset + 12`.
+`watch_runs.sh` writes `resume_offset` at each resume and `status_report.py`
+reports it rather than silently adding it. Every step-numbering error in this
+section came from a label that did not mean what it said.
+
+**Running as of 2026-10-15 22:55**, five jobs at 4 GPUs each: `fragb32` M0255
+(75→150) and M0315 (125→150); **E15** (`fragb32rf3`) on all three backbones at
+150 steps with `oracle: rf3`. Confirmed that the forced key wins —
+`multi_oracle_from_df` reads `forced = cfg.get("oracle")` *before* the
+round-robin draw — so E15 is genuinely single-oracle despite inheriting the
+three-name `oracles` list. A config that merely looks like a pool run is exactly
+the failure this arm cannot afford.
+
+**E18 stays gated.** Nine configs staged and validated, not launched, pending
+E15. All 12 staged configs pass `experiments/ame/validate_configs.py`, which
+checks Hydra composition, that every referenced path exists, that the two `k:`
+fields agree, and that the reward instantiates (so `UniversalReward`'s best-of-N
+guard is satisfied). GPU-free, because the alternative is learning the same
+thing from a job that dies a minute into its queue slot.
+
+**Supervision.** `watch_runs.sh` (multi-family: resume, first-launch, held-job
+alert, scheduler-health gate, checkpoint-based progress) replaces the
+fragb32-only watcher; `status_loop.sh` appends a snapshot to
+`logs/status.log` every 30 min so "what ran when" is a grep rather than mtime
+forensics. Management and reporting are separate processes on purpose — the
+reporter can be stopped at any time without touching the experiments.
