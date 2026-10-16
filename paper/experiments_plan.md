@@ -745,6 +745,74 @@ structure predictor never seen, not merely to AF3, and it is the version of the
 claim a sceptical reviewer will ask for. Expensive — needs new runs per arm, so
 it is gated behind E15/E16.
 
+#### E18 — Fragment-count sweep: where recombination stops working
+
+Train at k ∈ {2, 8, 16} on all three backbones, pool oracles, batch 32. k=4 is
+the already-measured anchor and is not re-run.
+
+**Why this is not `ame_granularity.py`.** That figure already sweeps k from 4 to
+36 and reports `best k = 36` by working-construct count — but *post hoc*, by
+re-cutting designs that were trained at `k: 4`. Every point past k=4 there is a
+policy evaluated off its training distribution, so the retention decline it
+shows has two candidate causes that no amount of re-cutting can separate:
+
+- **train/test mismatch** — a policy trained at k=16 holds retention, and the
+  method scales further than that figure implies;
+- **physical** — 11-residue fragments cannot carry their own junction context,
+  so the decline survives training at that k.
+
+Training at each k separates them. The second outcome is the boundary of the
+method, and is the more useful of the two to be able to state.
+
+**Cost is flat in k.** `build_chimeras()` emits `rotations * batch` = 4 × 32 =
+128 chimeras per step whatever k is — k changes where `equal_bounds()` cuts, not
+how many sequences are folded. So k=16 costs what k=2 costs, and the sweep's
+price is set by the number of levels, not their depth.
+
+Measured per-step medians, from step-directory mtimes on the three `fragb32`
+runs (not from the s/it average, which is a running mean):
+
+| backbone | rf3 | boltz | protenix | pool | 200 steps, 4 GPUs |
+|---|---|---|---|---|---|
+| M0097 | 11.1 | 30.7 | 22.4 | 22.4 min | **299 GPU-h** |
+| M0255 | 8.1 | 17.2 | 13.2 | 11.7 min | **156 GPU-h** |
+| M0315 | 9.2 | 17.7 | 14.7 | 14.7 min | **196 GPU-h** |
+
+**651 GPU-h per k level**, so **~1,950 GPU-h for three** — these are GPU-hours,
+wall-hours × 4, because `submit_fragk.sh` requests `gpu:large:4`. Boltz is the
+cost driver at 2–3× RF3; a 2-oracle pool would cut roughly a quarter, at the
+price of changing the oracle set mid-argument.
+
+Fragment lengths at L=180 (all three backbones are the same length): k=2 → 90aa,
+k=4 → 45aa, k=8 → 22–23aa, k=16 → 11–12aa. The post-hoc optimum of k=36 is 5aa;
+reaching it is one more level and one more 651 GPU-h, and is the cell that would
+test that claim at its own optimum.
+
+**Held fixed so k is the only variable:** `batch_size: 32`, `seed: 1`,
+`checkpoint_path: null`, `rotations: 4`, the rf3/boltz/protenix round robin, and
+lr/N_updates/clip. `N_steps: 200` rather than 300 because M0315 converged by
+step 61 and M0097 by ~120 on the same objective; `af3_probe_every: 25` gives 8
+held-out points per run for ~6 GPU-h total across the sweep.
+
+**Caveat on what "chimera pass" means here.** `build_chimeras` maps chimera
+(rho, i) to parent `(i + rho*j) % B` for slot j, so rho=0 takes every slot from
+parent i — i.e. 32 of each step's 128 "chimeras" are the unrecombined parents.
+That is a constant 25% at every k, so it does not confound the sweep, but it
+inflates absolute chimera pass rates and has to be stated wherever they appear.
+
+**Gating.** Every config here uses the pool, so E18 inherits whatever E15 says
+about it. If the pool turns out not to beat rf3 alone, these runs carry the same
+ambiguity `fragrl4` does — which is why E15, at 284 GPU-h for all three
+backbones, is cheap insurance on a ~1,950 GPU-h sweep.
+
+- Staged and ready, not launched: `experiments/ame/fragk/*.yaml` (9 configs) and
+  `submit_fragk.sh`. Diff against each backbone's own `fragb32` config is
+  exactly six lines — `run_name`, `output_dir`, `N_steps`, the two `k:` fields,
+  and `af3_probe_every`.
+- Note the two `k:` fields must agree: `FragmentReward.k` attributes a chimera's
+  score back to its fragments, `chimera_metrics_from_df.cfg.k` cuts them. The
+  generator asserts it found exactly two.
+
 #### T1 — Offline tier: no training, highest value per GPU-hour
 
 All three run on data already on disk.
@@ -972,6 +1040,17 @@ reached.
 ### 8.6 Order of work
 
 1. ~~**T1.1**~~ **done** (8.5, 8.5.1). **T1.2–T1.3** next — offline and cheap.
-2. **E15 on M0255**, then M0097, as soon as GPUs are free.
+2. **E15 on M0255**, then M0097, as soon as GPUs are free. 284 GPU-h for all
+   three backbones, and it gates ~1,950 GPU-h of E18.
 3. **T2**, the 256-parent library eval — independent of E15 and overdue.
-4. **E16/E17** only after E15 reports, for the reason in §8.3.
+4. **E16/E17/E18** only after E15 reports, for the reason in §8.3.
+
+**Blocked as of 2026-10-15, not by GPUs.** `/etc/slurm/slurm.conf` on
+`buffalo.dhcp.ipd` was truncated to 0 bytes at 07:39, so `sbatch`, `squeue`,
+`sacct` and `sinfo` all exit fatal with `ClusterName needs to be specified`.
+The file is root-owned and there is no sudo on that host. `munged` is running,
+so client commands work the moment a valid config is readable; the user-level
+recovery is a copy from a working host plus `SLURM_CONF=~/.slurm/slurm.conf`,
+which `watch_fragb32.sh` now picks up on its own. All three `fragb32` runs died
+~22:00 on 2026-10-14 (M0097 on an `Errno 5` reading `/projects/msa`), and the
+watcher could not resubmit them because it cannot reach the scheduler.
