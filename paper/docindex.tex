@@ -29,7 +29,11 @@ only; \statusblocked{} means the section cannot be written until data lands.
 \texttt{results/frontier.tex}  & Move 1: RL moves the diversity/fidelity
                          frontier. Public benchmark, referee-reproducible  & \statusscaffold \\
 \texttt{results/fragments.tex} & Move 2: split + recombine $\rightarrow$
-                         combinatorial library. \textbf{No data yet}        & \statusblocked \\
+                         combinatorial library. Computational half measured;
+                         physical half in \texttt{experimental.tex}          & \statusscaffold \\
+\texttt{results/experimental.tex} & Move 3: that library ordered and assayed.
+                         3{,}135 recombined PETase designs; zero-shot AF3 vs
+                         measured activity                                   & \statusdone \\
 \addlinespace
 \multicolumn{3}{@{}l}{\textit{Methods}} \\
 \texttt{methods/overview.tex} & GRPO, fragment libraries, surrogate          & \statusscaffold \\
@@ -48,9 +52,10 @@ only; \statusblocked{} means the section cannot be written until data lands.
                         \textbf{\textbackslash input by library\_notebook.tex} & \statusdone \\
 \addlinespace
 \multicolumn{3}{@{}l}{\textit{Archived} --- see \texttt{archive/README.md}} \\
-\texttt{archive/*} & The three wet-lab application arcs (PETase, heme,
-                        protease) and one superseded outline. Not part of the
-                        computational paper                                  & \statusdone \\
+\texttt{archive/*} & The heme and protease arcs, one superseded outline, and
+                        the \emph{plan} for a three-round closed-loop PETase
+                        campaign that has no data. The PETase data that does
+                        exist is in \texttt{results/experimental.tex}        & \statusdone \\
 \bottomrule
 \end{tabular}
 

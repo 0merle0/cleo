@@ -25,11 +25,16 @@
 %                             frontier. Public benchmark, fully reproducible.
 %   2. results/fragments.tex  Fragmentation and recombination turn that frontier
 %                             into a combinatorially large physical library.
-%   3. results/petase.tex     Three rounds of closed-loop optimization on a
-%                             de novo PETase, ending 250x above the start.
+%   3. results/experimental.tex  That library, ordered and assayed: 3,135
+%                             recombined PETase designs on one assay run.
 %
-% Moves 1 and 2 are the method; move 3 is the demonstration. Everything else
-% (heme, protease) is supplementary or dropped -- see docindex.
+% Moves 1 and 2 are the method; move 3 is the experimental check on both -- it
+% is what makes the recombination arithmetic physical, and it is where the
+% oracle the policy trains against gets calibrated against measured function.
+%
+% The three-round closed-loop PETase campaign that used to be move 3 is a plan
+% with no data; it lives in archive/results_petase.tex. Everything else (heme,
+% protease) is supplementary or dropped -- see docindex.
 % ---------------------------------------------------------------------------
 
 \begin{document}
@@ -63,6 +68,7 @@
 % files for collaborator-friendly editing.
 \input{results/frontier}
 \input{results/fragments}
+\input{results/experimental}
 
 \input{conclusion}
 

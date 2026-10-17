@@ -130,6 +130,64 @@ which was not trained for recombination at all.
 
 ---
 
+## The experimental panel
+
+### 7. A recombined PETase library was ordered and assayed — **solid, and narrower than it looks**
+
+`results/experimental.tex`, figure `petase_zeroshot.py`, data snapshot
+`figures/data/petase_activity_zeroshot.csv` (3,155 rows; provenance in
+`figures/data/README_petase.md`).
+
+Two claims, both measured, and they are the two the paper needs from wet lab:
+
+**The platform is physically real.** Five fragments (42/44/42/37/44 aa) over a
+209-aa de novo PETase scaffold; 25–26 variants per slot = **128 protein parts
+spanning 1.1x10^7 recombinants**; 1,920 DNA parts ordered as BsaI blocks,
+assembled one-pot, one well per recombinant. **3,135 assayed, 67% registering
+above background at a median of 29 mutations from the parent.** This is the only
+direct experimental test in the paper of the independence assumption
+`results/fragments.tex` names as load-bearing.
+
+**Zero-shot prediction is lightly predictive.** Best AF3 metric is local and
+state-specific — per-atom pLDDT at the catalytic His of the *acyl-enzyme
+intermediate*, rho = +0.60 (n = 2,548); active-site shell +0.58. Global pTM/ipTM
+reach only +0.32 to +0.36, so **scoring the right state at the right atoms is
+worth roughly 2x the global number**. In practice: select the top 5% by
+active-site pLDDT and 28% are top-decile actives against a 10% base rate,
+**2.8x enrichment** (1.9x if you keep 25%). Supervised held-out (RidgeCV, 200
+splits): AF3 0.73, Rosetta 0.75, both 0.80.
+
+### The three things this panel must not be made to say
+
+1. **Mutation count beats it.** Distance from the parent ranks activity at
+   rho = -0.65, better than any AF3 metric. A zero-shot claim has to clear that
+   comparison and this one does not. What survives: restricted to the 2,539
+   designs >=20 mutations out, active-site pLDDT still gives +0.59, so the AF3
+   signal is not just the distance confound re-expressed.
+2. **The 20 designs above 100 are a different assay run.** They score 204–261
+   against a screen median of 2.2, and `build_unified_and_tasks.py` says plainly
+   they are "the same assay, different runs". No shared normalizing control is
+   in the record. Every number that would cross that line is not quoted.
+3. **There is no wild-type comparator.** The parent was never assayed here, so
+   no fold-over-parent figure can be computed. The archived
+   `archive/results_petase.tex` plan's **250x** was always a placeholder and
+   cannot be filled from this data.
+
+Within the one screen run, searching the library does move activity: median
+2.2 -> 12.2 across four design rounds, best recombinant 20.5 -> 47.8. Round 2
+has the lowest median and the best single design, which is what a deliberately
+broadened library looks like — report it that way rather than smoothing it.
+
+**The uncomfortable one, which belongs in the text:** the most active designs in
+the record sit 1–11 mutations from the parent, and activity falls monotonically
+with distance (median 218 at 0–9 mutations, 6.9 at 20–29, 0.2 at 50+). On this
+scaffold and this assay, recombination at depth bought reachable diversity and a
+67% register rate, not a better enzyme than local work. The paper's claim is
+about the diversity/fidelity frontier and physical realizability; it should not
+be stretched past that.
+
+---
+
 ## Caveats that belong in the text, not in a footnote
 
 - **One seed per cell.** Two unseeded runs of one config gave 68.8% and 89.6%
@@ -158,3 +216,4 @@ which was not trained for recombination at all.
 | transfer curves | `ame_transfer_curves.py` | current; 3 arms, E15 not yet drawn |
 | frontier / distributions / PCA / novelty / convergence / efficiency / klsweep | `ame_*.py` | from the benchmark programme; triage before use |
 | diversity | `ame_diversity.py` | **broken** — reads `backbone19/eval`, which does not exist |
+| PETase zero-shot + rounds + distance control | `petase_zeroshot.py` | current; the only wet-lab panel |

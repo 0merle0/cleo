@@ -6,10 +6,14 @@ boundaries and recombined across parents, so that $\sum_i |F_i|$ synthesized DNA
 parts yield $\prod_i |F_i|$ testable variants --- and the recombinants keep
 enough of the parental pass rate that the resulting library is worth building.
 
-\textbf{Status: \statusblocked{}.} This is the one section of the paper with no
-data behind it yet. Every other claim in the document is either measured or a
-rewrite of something measured. Written out in full here so the experiments it
-needs are unambiguous.
+\textbf{Status: \statusscaffold{}.} The computational half is measured; the
+section is still written as a plan because the blocks below are what the prose
+has to become. The \emph{physical} half is no longer hypothetical:
+Section~\ref{sec:res:experimental} reports a five-fragment library built by
+exactly this procedure --- 128 protein parts spanning $1.1 \times 10^{7}$
+recombinants, 3{,}135 of them assembled and assayed, 67\% registering above
+background at a median of 29 mutations from the parent. That is the one
+experimental test in this paper of the independence assumption named below.
 
 \textbf{Why it is the load-bearing section.} Section~\ref{sec:res:frontier}
 buys a better \emph{distribution}; on its own that is a sampling result. This
@@ -37,7 +41,10 @@ the paper is a benchmark result.}
         folding model is that residues are coupled. Block 3 measures how badly
         the approximation fails, and that measurement is the result.
 \end{planlist}
-\todo{fragments --- state the actual $k$, $|F_i|$ and library size used}
+\todo{fragments --- state the actual $k$, $|F_i|$ and library size used for
+  the AME arm. The PETase numbers ($k = 5$, $|F_i| = 25$--$26$, $1.1 \times
+  10^{7}$) are in Section~\ref{sec:res:experimental} and should be quoted here
+  as the physical instance, not substituted for the computational one.}
 
 \subsection*{Block 2 --- Where the boundaries go}
 

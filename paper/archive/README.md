@@ -33,3 +33,22 @@ without breaking the build:
 `outline_computational.md` — superseded by `plan_combinatorial.md`, which says
 so in its own second paragraph: the outline's headline claim (policy dominates
 the diversity/pass-rate frontier) did not survive the 13-backbone panel.
+
+## Amended 2026-10-17: the PETase data came back, the plan did not
+
+`results_petase.tex` is a six-block **plan** for a three-round closed-loop
+campaign ending "250x above the start". No part of that campaign is in this
+repository, and the `250` in it was always a placeholder. It stays archived.
+
+What does exist, and what was found after this directory was created, is the
+assay data for a *library* built by the fragment-recombination procedure: 3,135
+recombined PETase designs on one MoMI run, folded by AF3 in two states. That is
+now `results/experimental.tex`, with the join snapshotted into
+`figures/data/petase_activity_zeroshot.csv`.
+
+The two are easy to confuse and must not be. The archived plan is about
+*optimizing* an enzyme across rounds; the live section is about whether the
+library is physically realizable and whether the oracle predicts function. The
+archived plan's headline number cannot be computed from the live section's data
+— the parent was never assayed, and the only designs above 100 were measured in
+a different assay run.
