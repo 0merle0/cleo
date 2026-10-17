@@ -21,6 +21,8 @@
 # to origin/paper so collaborators can read the current draft without a TeX
 # install. Other PDF output stays untracked.
 supplement.pdf
+library_notebook.pdf
+notebook.pdf
 
 # Hook build log
 .build.log

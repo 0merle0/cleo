@@ -100,14 +100,32 @@ shuffling, not over all designs.
 \begin{center}
 \begin{tabular}{lrrrr}
 \toprule
- & \multicolumn{2}{c}{survival fraction} & \multicolumn{2}{c}{$U$ over survivors (rarefied)} \\
+ & \multicolumn{2}{c}{per-fragment pass rate} & \multicolumn{2}{c}{$U$ over survivors (rarefied)} \\
  & sampled & RL & sampled & RL \\
 \midrule
-mean & 0.52 & \textbf{0.84} & --- & --- \\
-backbones won & \multicolumn{2}{c}{9/9 to RL} & \multicolumn{2}{c}{8/8 to RL} \\
+mean & 0.31 & \textbf{0.54} & --- & --- \\
+backbones won & \multicolumn{2}{c}{8/9 to RL} & \multicolumn{2}{c}{8/8 to RL} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\plan{\textbf{The metric here was replaced, and the first version was wrong.}
+An earlier draft of this table reported \emph{survival fraction} --- the share
+of fragments appearing in at least one passing chimera --- as \num{0.52} against
+\num{0.84}, won \num{9}/\num{9}. That statistic is confounded by parent count.
+Appearances per fragment are (chimeras $\times$ slots)/$n_\text{fragments}$, so
+an arm with fewer parents gives each of its fragments more attempts, and
+survival rises with attempts whether or not the fragments are any good. The
+baseline on M0078\_1al6 is the clearest case: \num{44} fragments at \num{23.3}
+appearances each scored \num{0.80} survival on a per-fragment pass rate of
+\num{0.10}. Those are the same designs; one number is modularity and the other
+is the binomial.
+
+It is replaced by the mean per-fragment pass \emph{rate}, which is independent
+of attempt count. The direction of the result survives --- \num{0.31} to
+\num{0.54}, winning \num{8} of \num{9} backbones rather than \num{9} --- and it
+is now a claim about fragments rather than about how many times each was
+tried.}
 
 \plan{\textbf{This reverses an earlier finding and the reversal matters.} Over
 all passing \emph{designs}, $T=1.0$ carries more substitutions than the policy
@@ -133,14 +151,14 @@ would produce. Recovery of the true pairwise fragment ordering is
 $\approx$\SI{80}{\percent}, falling to $\approx$\SI{67}{\percent} once fragment
 interactions are included --- diluted, but enough to shift a distribution.
 
-\textbf{Prediction.} Retention and survival fraction rise above the policy arm
-on all three backbones (M0097, M0255, M0315). A small effect is consistent with
+\textbf{Prediction.} Retention and per-fragment pass rate rise above the policy
+arm on all three backbones (M0097, M0255, M0315). A small effect is consistent with
 the signal quality above and is not by itself evidence against the idea.
 
 \textbf{Kill criterion.} Fragment collapse. The objective can be satisfied by
 emitting near-identical sequences: every chimera then reproduces a parent and
-passes. That shows as survival fraction climbing toward 1.0 while $U$ over
-survivors falls. Retention alone cannot distinguish it; the pair can. If it
+passes. That shows as per-fragment pass rate climbing toward 1.0 while $U$
+over survivors falls. Retention alone cannot distinguish it; the pair can. If it
 triggers, the term is gated on chimeras differing from parents, \emph{not}
 reweighted --- the weight pilot measured that adding a diversity reward at any
 weight from 1 to 4 drove pass rate to 0/256 with median motif RMSD

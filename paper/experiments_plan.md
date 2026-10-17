@@ -678,6 +678,16 @@ Both comparisons are one-factor. `fragrl4` and `fragmulti` are both
 `batch_size: 8, seed: 1` and differ only in the oracle function; `fragmulti`
 and `fragb32` share the pool and differ only in batch size.
 
+> **WITHDRAWN — see 8.5.1.** The first half of that sentence is false.
+> `fragrl4` warm-starts from a `fragrl3` checkpoint (~450 RF3-only steps) while
+> `fragmulti` and `fragb32` set `checkpoint_path: null`, so that pair varies the
+> oracle *and* the initialisation. `fragmulti` vs `fragb32` is still clean.
+>
+> The gap figures in this section are also superseded. They are single-step
+> n=32 measurements; the arm means over the 5-point probe series, excluding
+> rows a resume overwrote, are **+0.278 / +0.000 / −0.009** (8.5.1), and E15
+> supplies the fourth cell at **+0.058** so far (8.7).
+
 Worst single case: **M0255 `fragrl4` scored 1.000 under RF3 and 0.062 under
 AF3** — a 94-point gap at 22 SE. That is the project's cleanest reward-hacking
 demonstration and should be a figure panel, not a footnote.
@@ -694,6 +704,11 @@ The 2×2 has three cells. **Batch 32 with a single oracle does not exist.**
 |---|---|---|
 | rf3 only | +0.439 | **missing** |
 | 3-oracle pool | +0.176 | −0.001 |
+
+> **The missing cell is now filled.** `fragb32rf3` (E15) is running; at steps
+> 25–76 it reads **+0.058**, against the pool arm's −0.009 at matched batch.
+> Current series values for the whole 2×2 are in 8.7. The numbers in this table
+> are the superseded single-step ones.
 
 So the pool is only *shown* to help at batch 8, where the gap is large anyway.
 Two readings survive the current data and they imply different papers:

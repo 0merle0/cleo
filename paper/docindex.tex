@@ -25,17 +25,14 @@ only; \statusblocked{} means the section cannot be written until data lands.
 \texttt{related\_work.tex} & Status quo: backbone generation, filtering,
                          RL for inverse folding, library design, the gap      & \statusdone \\
 \addlinespace
-\multicolumn{3}{@{}l}{\textit{Results} --- the three-move spine} \\
+\multicolumn{3}{@{}l}{\textit{Results} --- the spine} \\
 \texttt{results/frontier.tex}  & Move 1: RL moves the diversity/fidelity
                          frontier. Public benchmark, referee-reproducible  & \statusscaffold \\
 \texttt{results/fragments.tex} & Move 2: split + recombine $\rightarrow$
                          combinatorial library. \textbf{No data yet}        & \statusblocked \\
-\texttt{results/petase.tex}    & Move 3: three closed-loop rounds to
-                         $250\times$; the demonstration                     & \statusblocked \\
 \addlinespace
 \multicolumn{3}{@{}l}{\textit{Methods}} \\
 \texttt{methods/overview.tex} & GRPO, fragment libraries, surrogate          & \statusscaffold \\
-\texttt{methods/petase.tex}   & Three libraries, surrogate, assays           & \statusscaffold \\
 \addlinespace
 \multicolumn{3}{@{}l}{\textit{Back matter}} \\
 \texttt{conclusion.tex} & Four-paragraph discussion and outlook              & \statusscaffold \\
@@ -45,8 +42,15 @@ only; \statusblocked{} means the section cannot be written until data lands.
 \texttt{experiments.tex} & Arms, selection rules, slate E1--E21, algorithm
                         audit; \textbf{\textbackslash input by notebook.tex,
                         not by main.tex}                                     & \statusdone \\
-\texttt{supplementary/*} & Heme and protease results + methods, cut from the
-                        spine and parked                                    & \statusblocked \\
+\texttt{library\_notebook.tex} & Separate document: the library arc, L1--L5 & \statusdone \\
+\texttt{library\_experiments.tex} & Fragment retention, recombination,
+                        granularity, the transfer gap;
+                        \textbf{\textbackslash input by library\_notebook.tex} & \statusdone \\
+\addlinespace
+\multicolumn{3}{@{}l}{\textit{Archived} --- see \texttt{archive/README.md}} \\
+\texttt{archive/*} & The three wet-lab application arcs (PETase, heme,
+                        protease) and one superseded outline. Not part of the
+                        computational paper                                  & \statusdone \\
 \bottomrule
 \end{tabular}
 
