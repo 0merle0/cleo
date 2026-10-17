@@ -5,7 +5,9 @@ named here regenerates from `paper/figures/`. Status is one of **solid** (data
 in hand, arms matched), **provisional** (direction clear, precision or matching
 not yet adequate), **missing** (the panel the story needs and does not have).
 
-Compiled 2026-10-17.
+Compiled 2026-10-17. This file is the *numbers*; `plan_combinatorial.md` is the
+*outline* (R1-R5, the order the paper argues in) and `README.md` maps the rest
+of this directory.
 
 ---
 

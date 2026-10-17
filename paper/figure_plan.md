@@ -4,8 +4,14 @@ Working backwards from the panels that have to convince a reviewer. Each panel
 lists its claim, axes, arms, the data it needs, and **what would make it
 unconvincing** — the failure mode is the useful part.
 
-Companion to `experiments_plan.md` (protocol) and `outline_computational.md`
-(framing).
+Companion to `experiments_plan.md` (protocol). The framing doc it names,
+`outline_computational.md`, is now in `archive/`, superseded by
+`plan_combinatorial.md`.
+
+> **Stale as of 2026-10-17.** Written 2026-08-12, before the 13-backbone panel,
+> the library arc and the chimera objective. `key_results.md` is the current
+> figure list; read this one for the per-panel failure modes, which are still
+> good, and not for the panel inventory.
 
 Two decisions this plan encodes:
 

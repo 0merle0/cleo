@@ -12,7 +12,7 @@ Short working plan. Supersedes `outline_computational.md`, whose headline claim
 > fragments, synthesise the parts, assemble the product. That only works if the
 > recombinants still fold, and nothing in current design practice optimises for
 > it. We show that RL fine-tuning produces designs whose fragments recombine:
-> 48% of chimeras from RL-designed parents pass, against 28% from sampled
+> 53.5% of chimeras from RL-designed parents pass, against 30.5% from sampled
 > parents, on 8 of 9 backbones. Training directly on recombination makes it the
 > objective rather than a byproduct.
 
@@ -64,8 +64,14 @@ that we are aware of, and it stands alone regardless of what trained it.
 | 97 | M0904_1qgx | 12.9 | **47.3** |
 | 99 | M0365_1pfk | 0.4 | **5.5** |
 
-**8 of 9, mean paired advantage +23.0 points.** Mean retention 48.1% against
-28.5%.
+**8 of 9, mean paired advantage +23.0 points.** Mean retention 53.5% against
+30.5%.
+
+> Corrected 2026-10-17. This line read 48.1% / 28.5%, which did not match the
+> table directly above it: the nine paired rows as printed average 53.5 and
+> 30.5. `paper/figures/ame_library_table.py` prints both means on every run, so
+> this is now checkable in one command rather than by hand. The per-backbone
+> numbers never changed and the 8-of-9 count is unaffected.
 
 Nothing in the training objective asked for this. The policy was trained on
 motif RMSD alone; modularity came out as a property of the designs.

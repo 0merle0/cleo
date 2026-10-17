@@ -1,7 +1,9 @@
 # Computational experiments: CLEO vs. LigandMPNN on the RFdiffusion2 AME benchmark
 
-Working doc. Not part of the LaTeX build. Companion to `outline_computational.md`
-(landscape + framing); this file is the concrete experimental build-out.
+Working doc. Not part of the LaTeX build. The framing doc it was written
+against, `outline_computational.md`, is now in `archive/`; `plan_combinatorial.md`
+supersedes it. This file is the concrete experimental build-out. Start at
+`README.md`.
 
 ---
 
