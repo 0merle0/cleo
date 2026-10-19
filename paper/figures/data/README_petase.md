@@ -49,7 +49,7 @@ narrative is `REPORT.md` there). Regenerate at the source, not here.
 | file | source name | what |
 |---|---|---|
 | `petase_super_af3_transfer.csv` | `cross_enzyme_comparison.csv` | 49 AF3 metric concepts, Spearman vs activity on each enzyme |
-| `petase_super_rosetta_transfer.csv` | `cross_enzyme_rosetta.csv` | 48 shared Rosetta Layer-1 concepts, same |
+| `petase_super_rosetta_transfer.csv` | `cross_enzyme_rosetta.csv` | 66 shared Rosetta concepts, same |
 | `petase_super_floor_sensitivity.csv` | `super_floor_sensitivity.csv` | every `super` metric with and without the 251-design rate floor |
 
 The second enzyme is `super`, a 160-aa de novo serine hydrolase
@@ -77,3 +77,33 @@ Two caveats carried from the source, both load-bearing:
   decades containing zero designs. Cause undetermined. Dropping all 251 flips
   only 4 of 65 metric signs and none in the top 14, so the transfer verdict
   survives either way (`petase_super_floor_sensitivity.csv`).
+
+
+### Re-snapshotted 2026-10-18 18:22 after a correction at the source
+
+`cross_enzyme_rosetta.csv` was regenerated and both files were re-copied. The
+bug: `concept()` did not bridge PETase's `his_X_dist` names against `super`'s
+flip-invariant `his_X_dist_min`, so PETase's single most predictive Rosetta
+metric was silently dropped and the shared set was 48 concepts rather than 66.
+
+`super` carries `_min` names because its His95 ring is mislabeled in the input
+PDB -- both Ser128-OG and Asp53 contact `NE2` while `ND1` is far from both,
+which is impossible for a working triad -- so its readout takes the min over
+{ND1, NE2} rather than hardcoding NE2 the way the PETase pipeline does. The
+naming that records that fix is what broke the concept match.
+
+What changed: Rosetta $\rho_\rho$ **-0.036 to +0.035**, concepts **48 to 66**,
+sign agreement **26/48 to 33/66**. The verdict is unchanged -- still
+indistinguishable from zero, still chance-level agreement. The AF3 numbers did
+not move at all.
+
+What it retracts: the claim that the Rosetta comparison used only the weaker half
+of its range because PETase's best metrics were Layer-2 interface/ddG terms with
+no counterpart. The excluded metric was Layer-1 geometry, and the corrected
+shared set contains PETase's strongest Rosetta metric at -0.502. Layer-2 is
+still absent from `super` (24 PETase metrics, reaching |rho| 0.345) and is still
+worth running, but it is not why the comparison looks weak.
+
+Column names also changed: `petase_spearman`/`super_spearman` became
+`spearman_petase`/`spearman_super`, and a `state` column was added. Anything
+reading these files by column name needs updating.

@@ -168,10 +168,26 @@ metric's usefulness on one enzyme against the other gives **rho-of-rhos =
 −0.604** over 49 shared AF3 concepts, with only **10/49** agreeing in sign
 against ~24 expected by chance. **All ten of PETase's strongest predictors
 invert**, mean +0.470 → −0.100; `acyl_his_catN_plddt` goes +0.600 → −0.147.
-Rosetta fails more mildly — rho-of-rhos −0.036, 26/48 sign agreement, i.e. no
-transferable signal rather than an inverted one — but on the weaker shared
-subset only (PETase's best Rosetta metrics are Layer-2 interface/ddG terms with
-no `super` counterpart).
+Rosetta fails more mildly — rho-of-rhos **+0.035**, **33/66** sign agreement,
+i.e. no transferable signal rather than an inverted one. One thing does survive:
+PETase's three strongest Rosetta predictors are all His–Asp distance terms and
+all three **keep their sign** on `super` while collapsing 7–21× in magnitude
+(−0.502 → −0.072, −0.484 → −0.023, −0.410 → −0.030). Catalytic-geometry strain
+points the same way on both enzymes and nearly stops mattering — the only
+concept family that does. Rank agreement over all 66 concepts is still nil.
+
+> **Corrected 2026-10-18 18:22.** These were −0.036 / 26 of 48 for one turn.
+> `concept()` at the source did not bridge PETase's `his_X_dist` against
+> `super`'s flip-invariant `his_X_dist_min` (super needs the min over {ND1,NE2}
+> because its His95 ring is mislabeled in the input PDB), so PETase's single
+> most predictive Rosetta metric was silently excluded. **Retracted with it:**
+> the claim that the comparison used only the weaker half of Rosetta's range
+> because PETase's best metrics were Layer-2 ddG/interface terms. The excluded
+> metric was Layer-1 geometry, and the corrected set contains the −0.502.
+> Layer-2 is still absent from `super` (24 metrics, |rho| up to 0.345) and is
+> still worth running, but it is not why the comparison looks weak. The AF3
+> numbers did not move. Column names changed too:
+> `petase_spearman`/`super_spearman` → `spearman_petase`/`spearman_super`.
 
 What *does* replicate is method orthogonality: predicting Rosetta from AF3 gives
 median CV R² 0.145 (PETase) / 0.199 (`super`), against 0.556 / 0.527 the other

@@ -166,13 +166,19 @@ can be reused. It cannot.
   \label{tab:petase-super-transfer}
 \end{table}
 
-Rosetta fails differently and more mildly: $\rho_{\rho} = -0.036$ over 48 shared
-Layer-1 concepts with 26/48 sign agreement, which is indistinguishable from
-chance. That is \emph{no} transferable signal rather than an inverted one. The
-comparison is also the weaker half of Rosetta's range --- PETase's strongest
-Rosetta metrics are interface and $\Delta\Delta G$ terms with no
-\texttt{super} counterpart, so the shared subset tops out at $|\rho| = 0.34$ on
-PETase against $0.50$ for the full set.
+Rosetta fails differently and more mildly: $\rho_{\rho} = +0.035$ over 66 shared
+concepts with 33/66 sign agreement, which is exactly chance. That is \emph{no}
+transferable signal rather than an inverted one, a weaker claim than AF3's.
+
+The nuance is worth stating, because it is the one place anything survives.
+PETase's three strongest Rosetta predictors are all His--Asp distance terms, and
+all three \emph{keep their sign} on \texttt{super} while collapsing in
+magnitude: $-0.502 \rightarrow -0.072$, $-0.484 \rightarrow -0.023$,
+$-0.410 \rightarrow -0.030$, a 7--21$\times$ shrink. Catalytic-geometry strain
+points the same way on both enzymes and nearly stops mattering; it is the only
+concept family here that does. Rank agreement over all 66 concepts is still nil,
+so this does not rescue selection --- but it is a different failure from AF3's
+outright inversion, and the direction is not random.
 
 What \emph{does} replicate is a methodological fact about the two predictor
 families. On both enzymes, Rosetta carries substantial information AF3 cannot
