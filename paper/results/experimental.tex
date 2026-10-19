@@ -7,8 +7,14 @@ procedure of Section~\ref{sec:res:fragments} was ordered, assembled and assayed:
 run of the MoMI esterase assay. Two things follow. The platform produces
 physically assemblable, expressible, measurable libraries at combinatorial
 scale --- and zero-shot structure prediction, the signal the policy is trained
-against, is \emph{lightly} predictive of measured activity: $\rho = 0.58$ at
-best, worth a $2.8\times$ enrichment, and beaten by mutation count alone.
+against, is \emph{lightly} predictive of measured activity on this scaffold
+--- $\rho = 0.58$ at best, worth a $2.8\times$ enrichment, beaten by mutation
+count alone --- and \textbf{does not transfer to a second serine hydrolase at
+all}: across 49 shared AF3 metrics the two enzymes' usefulness rankings
+anti-correlate at $-0.604$, and all ten of PETase's strongest predictors invert
+in sign. The oracle calibration is a per-target measurement, not a method
+property, which is the strongest argument in this paper for deciding a library
+by experiment rather than by score.
 
 \textbf{Status: \statusdone{}.} Every number below is on disk and is regenerated
 by \texttt{paper/figures/petase\_zeroshot.py} from
@@ -118,6 +124,81 @@ pLDDT still gives $\rho = +0.59$, and within single 5-mutation bands it ranges
 from $+0.07$ to $+0.67$. Prediction adds something to distance; it does not
 dominate it.
 
+\subsection*{\dots and it does not transfer to a second enzyme}
+
+The $\rho = 0.60$ above is a property of this scaffold, not of the method. The
+same two-state fold and the same metric pipeline were run against a second,
+unrelated serine hydrolase --- \texttt{super}, a 160-aa de novo design
+(Ser128/His95/Asp53, 4-methylumbelliferyl butyrate, 2{,}509 purified designs
+measured over 2.51 decades). Correlating each metric's \emph{usefulness} on one
+enzyme against its usefulness on the other asks whether a predictor chosen once
+can be reused. It cannot.
+
+\begin{table}[h]
+  \centering\small
+  \begin{tabular}{@{}llrrc@{}}
+    \toprule
+    State & Concept & PETase $\rho$ & \texttt{super} $\rho$ & Same sign \\
+    \midrule
+    acyl      & His catalytic-N pLDDT  & $+0.600$ & $-0.147$ & no \\
+    acyl      & active-site pLDDT      & $+0.587$ & $-0.076$ & no \\
+    acyl      & His pLDDT              & $+0.573$ & $-0.080$ & no \\
+    acyl      & Ser pLDDT              & $+0.542$ & $-0.054$ & no \\
+    acyl      & Ser-OG pLDDT           & $+0.526$ & $-0.075$ & no \\
+    acyl      & ligand pLDDT (mean)    & $+0.424$ & $-0.045$ & no \\
+    substrate & Ser pLDDT              & $+0.385$ & $-0.179$ & no \\
+    delta     & interface PAE (min)    & $+0.371$ & $-0.177$ & no \\
+    substrate & pTM                    & $+0.348$ & $-0.116$ & no \\
+    delta     & His catalytic-N pLDDT  & $+0.345$ & $-0.049$ & no \\
+    \midrule
+    \multicolumn{2}{@{}l}{mean of these ten}       & $+0.470$ & $-0.100$ & 0/10 \\
+    \multicolumn{2}{@{}l}{all 49 shared concepts}  & \multicolumn{2}{c}{$\rho_{\rho} = -0.604$} & 10/49 \\
+    \bottomrule
+  \end{tabular}
+  \caption{\textbf{The zero-shot correlation does not survive an enzyme swap.}
+  Every one of PETase's ten strongest AF3 predictors inverts on a second serine
+  hydrolase. $\rho_{\rho}$ is the Spearman between the two enzymes' per-metric
+  Spearmans across all 49 shared concepts: $+1$ would mean a predictor can be
+  picked once and reused, $0$ that one enzyme says nothing about the other, and
+  a negative value that it actively misleads. Sign agreement of 10/49 is worse
+  than the ${\sim}24$ expected by chance. Source:
+  \texttt{figures/data/petase\_super\_af3\_transfer.csv}.}
+  \label{tab:petase-super-transfer}
+\end{table}
+
+Rosetta fails differently and more mildly: $\rho_{\rho} = -0.036$ over 48 shared
+Layer-1 concepts with 26/48 sign agreement, which is indistinguishable from
+chance. That is \emph{no} transferable signal rather than an inverted one. The
+comparison is also the weaker half of Rosetta's range --- PETase's strongest
+Rosetta metrics are interface and $\Delta\Delta G$ terms with no
+\texttt{super} counterpart, so the shared subset tops out at $|\rho| = 0.34$ on
+PETase against $0.50$ for the full set.
+
+What \emph{does} replicate is a methodological fact about the two predictor
+families. On both enzymes, Rosetta carries substantial information AF3 cannot
+reconstruct while the reverse is largely false: predicting Rosetta features from
+AF3 gives a median cross-validated $R^2$ of $0.145$ on PETase and $0.199$ on
+\texttt{super}, against $0.556$ and $0.527$ in the other direction. The most
+private features are relax-ensemble \emph{variance} terms, for which a single
+structure prediction has no analogue. Same asymmetry, same magnitude, both
+enzymes.
+
+\textbf{This is the wet-lab counterpart of the transfer gap in
+Section~\ref{sec:res:frontier}.} There, a policy trained inside a structure
+predictor scored higher under that predictor than under a held-out one. Here, a
+predictor that ranks function on the target it was calibrated against
+anti-ranks it on the next target. Both say the same thing: a structure
+predictor's agreement with the quantity you care about is a property of the
+specific system, re-earned per target, never inherited.
+
+That conclusion is an argument \emph{for} the library, not against it. If
+zero-shot oracle scores could be trusted across targets, the right strategy
+would be to rank a large virtual set and order the top of it. Because they
+cannot, the ordering has to be decided by something the oracle does not control
+--- which is what a combinatorially compatible library at a $67\%$ register rate
+buys: enough physically assemblable, measurable diversity that the experiment,
+not the predictor, does the selecting.
+
 \subsection*{Searching the library moves activity}
 
 Across four design rounds on the single screen run, median activity rises from
@@ -146,9 +227,17 @@ good design --- not about what recombination reached.
         this assay it did not buy a better enzyme than careful local work did.
         Section~\ref{sec:res:frontier}'s claim is about the diversity/fidelity
         frontier, and that is the claim this section supports.
-  \item \textbf{One scaffold, one chemistry, one assay.} The AME results carry
-        the generality claim; this section carries the physical-realizability
-        claim and the calibration of the oracle.
+  \item \textbf{The oracle calibration does not generalise, and that is
+        measured, not assumed.} A second serine hydrolase inverts every one of
+        PETase's ten best AF3 predictors
+        (Table~\ref{tab:petase-super-transfer}). So this section calibrates the
+        oracle \emph{on this target} and establishes physical realizability; it
+        does not license zero-shot selection on a new target, and no number here
+        should be carried to one. The AME results carry the generality claim.
+  \item \textbf{Two enzymes is not a trend.} $\rho_{\rho} = -0.604$ is one
+        pairwise comparison. It is enough to refuse the claim that the
+        correlation transfers; it is not enough to predict the sign or size of
+        the failure on a third target.
   \item \textbf{The closed loop is not here.} The surrogate-in-the-reward
         campaign is planned in \texttt{archive/results\_petase.tex} and has no
         data in this repository.

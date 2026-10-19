@@ -36,3 +36,44 @@ Held-out scores for RidgeCV over 200 stratified splits, three feature sets
 (AF3-only / Rosetta-only / AF3+Rosetta). Copied verbatim from
 `adaptyv_library/outputs/rosetta_combined/model_cv_scores.csv`, written by that
 project's `rosetta/model_cv.py`.
+
+---
+
+## Cross-enzyme transfer snapshot (added 2026-10-18)
+
+Three files, copied verbatim from
+`/home/jgershon/projects/adaptyv_library/results/`, which is where they are
+generated (`make_report.py` / `build_results.py` from `RESULTS.json`; the
+narrative is `REPORT.md` there). Regenerate at the source, not here.
+
+| file | source name | what |
+|---|---|---|
+| `petase_super_af3_transfer.csv` | `cross_enzyme_comparison.csv` | 49 AF3 metric concepts, Spearman vs activity on each enzyme |
+| `petase_super_rosetta_transfer.csv` | `cross_enzyme_rosetta.csv` | 48 shared Rosetta Layer-1 concepts, same |
+| `petase_super_floor_sensitivity.csv` | `super_floor_sensitivity.csv` | every `super` metric with and without the 251-design rate floor |
+
+The second enzyme is `super`, a 160-aa de novo serine hydrolase
+(Ser128/His95/Asp53), 2,509 purified designs, substrate
+4-methylumbelliferyl butyrate. Same two folded states and the same metric
+pipeline as the PETase screen, so the columns are concept-matched rather than
+name-matched.
+
+**Why these are in the paper.** `results/experimental.tex` claimed AF3 was
+lightly predictive of activity from $\rho = +0.60$ on PETase. That number is
+real and it does not transfer: the Spearman-of-Spearmans across the 49 shared
+AF3 concepts is **-0.604**, and all ten of PETase's strongest metrics invert on
+`super` (mean $+0.470 \rightarrow -0.100$). Only 10 of 49 agree in sign against
+~24 expected by chance.
+
+Two caveats carried from the source, both load-bearing:
+
+- The `acyl_` state in both screens is a **tetrahedral adduct**, not an
+  acyl-enzyme intermediate -- AF3 strips leaving hydrogens but keeps leaving
+  oxygens, so the acid -OH survives and the bonded carbon is 4-coordinate. Both
+  enzymes model the same species, so the cross-enzyme comparison is unaffected,
+  but the column must not be described as an acyl-enzyme intermediate.
+- `super`'s activity range is **2.51 decades, not 5.70**. 251 of 2,509 designs
+  (10.0%) sit in a narrow band separated from the live population by 2.56
+  decades containing zero designs. Cause undetermined. Dropping all 251 flips
+  only 4 of 65 metric signs and none in the top 14, so the transfer verdict
+  survives either way (`petase_super_floor_sensitivity.csv`).

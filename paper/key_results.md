@@ -150,7 +150,7 @@ above background at a median of 29 mutations from the parent.** This is the only
 direct experimental test in the paper of the independence assumption
 `results/fragments.tex` names as load-bearing.
 
-**Zero-shot prediction is lightly predictive.** Best AF3 metric is local and
+**Zero-shot prediction is lightly predictive — on this scaffold only.** Best AF3 metric is local and
 state-specific — per-atom pLDDT at the catalytic His of the *acyl-enzyme
 intermediate*, rho = +0.60 (n = 2,548); active-site shell +0.58. Global pTM/ipTM
 reach only +0.32 to +0.36, so **scoring the right state at the right atoms is
@@ -158,6 +158,41 @@ worth roughly 2x the global number**. In practice: select the top 5% by
 active-site pLDDT and 28% are top-decile actives against a 10% base rate,
 **2.8x enrichment** (1.9x if you keep 25%). Supervised held-out (RidgeCV, 200
 splits): AF3 0.73, Rosetta 0.75, both 0.80.
+
+**And it does not transfer.** Added 2026-10-18 from
+`adaptyv_library/results/REPORT.md`; snapshot in
+`figures/data/petase_super_af3_transfer.csv`. The same two-state fold and metric
+pipeline were run on a second de novo serine hydrolase (`super`, 160 aa,
+Ser128/His95/Asp53, 2,509 purified designs, 2.51 decades). Correlating each
+metric's usefulness on one enzyme against the other gives **rho-of-rhos =
+−0.604** over 49 shared AF3 concepts, with only **10/49** agreeing in sign
+against ~24 expected by chance. **All ten of PETase's strongest predictors
+invert**, mean +0.470 → −0.100; `acyl_his_catN_plddt` goes +0.600 → −0.147.
+Rosetta fails more mildly — rho-of-rhos −0.036, 26/48 sign agreement, i.e. no
+transferable signal rather than an inverted one — but on the weaker shared
+subset only (PETase's best Rosetta metrics are Layer-2 interface/ddG terms with
+no `super` counterpart).
+
+What *does* replicate is method orthogonality: predicting Rosetta from AF3 gives
+median CV R² 0.145 (PETase) / 0.199 (`super`), against 0.556 / 0.527 the other
+way. Rosetta carries private information — mostly relax-ensemble **variance**
+terms, which a single structure prediction has no analogue for. Same asymmetry,
+same magnitude, both enzymes.
+
+**Why this is good news for the paper.** It is the wet-lab counterpart of §4: a
+predictor's agreement with the quantity you care about is a property of the
+specific system, re-earned per target, never inherited. If zero-shot scores
+transferred, the right strategy would be to rank a virtual set and order the
+top. Because they do not, selection has to be done by experiment — which is
+exactly what a combinatorially compatible library at a 67% register rate is for.
+This is now the strongest argument in the paper for the library strategy.
+
+Two caveats carried from the source, both load-bearing: the `acyl_` state is a
+**tetrahedral adduct**, not an acyl-enzyme intermediate (AF3 keeps leaving
+oxygens), identical in both screens so the comparison is unaffected; and
+`super`'s range is **2.51 decades, not 5.70** — 251 of 2,509 designs sit in a
+band 2.56 decades below the live population, cause undetermined, and dropping
+them flips only 4/65 signs, none in the top 14.
 
 ### The three things this panel must not be made to say
 
@@ -219,3 +254,4 @@ be stretched past that.
 | frontier / distributions / PCA / novelty / convergence / efficiency / klsweep | `ame_*.py` | from the benchmark programme; triage before use |
 | diversity | `ame_diversity.py` | **broken** — reads `backbone19/eval`, which does not exist |
 | PETase zero-shot + rounds + distance control | `petase_zeroshot.py` | current; the only wet-lab panel |
+| cross-enzyme transfer (PETase vs `super`) | none yet — table is inline in `results/experimental.tex` | data snapshot current; **no figure script** |
