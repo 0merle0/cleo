@@ -338,3 +338,62 @@ Two caveats remain open. The fold budget is not matched --- 1200 designs at
 best-of-5 against the deposit's 8 sequences at 5 models --- so a compute-matched
 comparison is still owed. And the idealised-versus-unidealised reference
 structure question from Block 1 applies here as it does everywhere.}
+
+\subsection*{Block 7 --- The cost axis: evaluations, not steps}
+
+Every number in this paper is bought with structure predictions, so the unit
+that matters is folds, not training steps. The two are not interchangeable:
+folds per step is $\text{rotations}\times\text{batch}\times
+\text{diffusion samples}$, so at fixed step count a batch-64 run spends eight
+times what a batch-8 run does. Comparing policies at matched steps compares
+budgets, not methods.
+
+A batch sweep run on a matched fold budget, with sample reuse pinned at
+$4\times$ so that batch size is the only factor, gives
+Figure~\ref{fig:bsweep-frontier}. \textbf{Batch 16 reaches the
+\SI{90}{\percent} chimera pass level on \num{40000} evaluations against batch
+32's \num{55000}, and batch 64 never reaches it.} Batch 8 is cheaper at every
+level up to \SI{70}{\percent} and then needs \num{46720} to close, so the
+ordering inverts between \SI{70}{\percent} and \SI{90}{\percent} --- small
+batches climb fast and converge late, which is what one expects when the GRPO
+advantage is normalised by the standard deviation of few samples.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{ame_bsweep_frontier}
+  \caption{\textbf{Evaluation efficiency on M0097.} Chimera pass rate against
+  cumulative structure predictions for four batch sizes at matched sample
+  reuse. Curves are smoothed over a constant \emph{fold} width rather than a
+  constant number of steps: a three-step window spans \num{480} folds at batch
+  8 and \num{1920} at batch 32, which smooths the small-batch arms four times
+  less and lets a noisier curve touch a threshold early by chance. Window width
+  is held at \num{1920} folds and kept a multiple of three so that the
+  round-robin oracle pool stays balanced.}
+  \label{fig:bsweep-frontier}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{ame_bsweep_backbones}
+  \caption{\textbf{The ordering replicates across backbones.} Batch 16 against
+  batch 32 on all three AME backbones. The margin is \emph{smallest} on M0097,
+  the backbone the sweep itself was run on. On M0255 --- the hardest of the
+  three --- batch 16 reaches \SI{90}{\percent} at \num{59520} folds where batch
+  32 never reaches it at all within \num{107520}.}
+  \label{fig:bsweep-backbones}
+\end{figure}
+
+\plan{\textbf{Why this block is here and not in methods.} It reads as a
+hyperparameter note but it is the reason the transfer-gap grid in this section
+and the library result in Section~\ref{sec:res:fragments} are affordable at
+all. It also carries one correction worth keeping visible: every batch
+comparison made before this sweep held \texttt{N\_updates} fixed at 16, which
+makes sample reuse scale as $1/\text{batch}$ --- $16\times$ at batch 8 against
+$4\times$ at batch 32. Those comparisons varied batch and reuse together, so
+the earlier conclusion that batch 8 has a lower ceiling was not a statement
+about batch size. Pinning reuse is what makes this one a one-factor result.
+
+\textbf{Still owed:} every cell is $n=1$ in seed, and the figures above are
+training-level pass rates. The held-out AF3 probe grid agrees with the ordering
+(batch 16's final held-out pass on M0255 is \num{0.938} against batch 32's
+\num{0.789}), but no arm here has been replicated.}

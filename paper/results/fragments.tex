@@ -107,9 +107,97 @@ real, and the honest paper reports the fragment library as a screening funnel
 with a stated hit rate instead of as a $10^8$-member library. Decide the
 threshold now, not after seeing the number.}
 
-\todo{fragments --- RUN THIS. Selection-free sample $\rightarrow$ split $\rightarrow$
-  recombine $\rightarrow$ fold best-of-5 $\rightarrow$ retention curve vs.\ slots
-  swapped}
+\textbf{This experiment has now been run.} The rest of this block reports it.
+The pre-registration above is left in place so the predictions can be read
+against the outcome rather than reconstructed after it.
+
+Three AME backbones, 256 designs sampled per arm with no selection applied,
+split at uniform boundaries into $k=4$ slots, recombined uniformly over the
+product space with exact parents excluded, and folded best-of-5 through
+\texttt{af3\_from\_df} --- the identical evaluator used for the parental rate
+and for every library number in this paper, so the comparison is a comparison.
+
+\begin{table}[h]\centering\small
+\caption{Library evaluation at $n=256$ parents and $n=256$ recombinants per
+cell, scored by held-out AF3 best-of-5. The two plain-RL rows per backbone are
+\emph{replicates of one configuration differing only in} \texttt{seed}.}
+\label{tab:frag-retention}
+\begin{tabular}{llcrrr}
+\toprule
+backbone & objective & seed & parents & recombinants & retention \\
+\midrule
+M0097 & plain RL          & 2 & 88.7\% & 68.0\%  & 0.767 \\
+M0097 & plain RL          & 3 & 44.1\% & 71.1\%  & 1.611 \\
+M0097 & \textbf{chimera}  & 1 & 94.1\% & \textbf{96.9\%} & 1.029 \\
+\midrule
+M0255 & plain RL          & 2 & 59.0\% & 29.3\%  & 0.497 \\
+M0255 & plain RL          & 3 & 33.6\% & 30.5\%  & 0.907 \\
+M0255 & \textbf{chimera}  & 1 & 80.5\% & \textbf{82.4\%} & 1.024 \\
+\midrule
+M0315 & plain RL          & 2 & 89.5\% & 65.2\%  & 0.729 \\
+M0315 & plain RL          & 3 & 92.6\% & 57.0\%  & 0.616 \\
+M0315 & \textbf{chimera}  & 1 & 100.0\% & \textbf{100.0\%} & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Recombinants fold, and training for recombination is what makes them
+fold.} Under the chimera objective the recombinant pass rate is \emph{at or
+above} the parental rate on all three backbones --- retention 1.029, 1.024 and
+1.000 --- so the product space is real rather than nominal. Cutting a passing
+design into four parts and reassembling it across parents costs nothing
+measurable in foldability.
+
+\textbf{The comparison that carries weight is against the seed band, not
+against a single baseline.} The two plain-RL rows per backbone are the same
+configuration run twice, and they bound what a lucky draw can buy. The chimera
+arm clears the full observed band on every backbone: +25.8 points on
+M0097 (96.9\% against 68.0--71.1\%), +52.0 points on M0255 (82.4\%
+against 29.3--30.5\%), and +34.8 points on M0315 (100.0\% against
+57.0--65.2\%). That is three to six times the largest seed-to-seed difference
+observed, which is why a single chimera seed is informative here even though
+single-seed results usually are not.
+
+\textbf{Retention is the least reproducible statistic in this table and should
+not be read as a point estimate.} It is a ratio whose numerator is stable and
+whose denominator is not. Across the plain-RL replicates the recombinant rate
+moves by 1.2--8.2 points between seeds while the \emph{parental} rate moves by
+3.1--44.5 points, so retention swings from 0.767 to 1.611 on M0097 for a
+configuration that was not changed at all. The chimera arm's 1.029/1.024/1.000
+is therefore consistent with the claim but is not yet evidence for it; the
+recombinant pass rate is. This is a general caution about retention as an
+endpoint, and it revises the framing of the pre-registration above, which named
+retention as the endpoint and everything else as secondary.
+
+\textbf{Scoring the pre-registered predictions.} The first holds: recombining
+across unselected MPNN samples gives a library pass rate of \SI{45.1}{\percent}
+against the chimera arm's \SI{93.1}{\percent} pooled over backbones. The third
+holds: the chimera library reaches 1{,}409 distinct mutational combinations
+against 1{,}139 for the plain-RL arm at matched design count, so recombination
+adds combinations rather than redistributing them. \textbf{The second is not yet
+measured} --- the retention-versus-slots-swapped curve requires scoring
+recombinants by their Hamming distance in slot space from the nearest parent,
+which the current pipeline does not emit. It is the one pre-registered
+prediction this experiment does not address.
+
+\plan{\textbf{Two limits to state plainly when this is written for submission.}
+
+(i) The chimera cells are $n=1$ in seed. Every chimera-objective run in this
+paper uses \texttt{seed: 1}, and the replicate evidence above comes from
+plain-RL arms trained against RF3 alone rather than the three-oracle pool. A
+single-oracle policy can overfit that predictor differently on each run, which
+is a plausible mechanism for the 44.5-point parental swing and suggests
+the pool arms may be tighter --- but no pool arm has ever been run twice, so
+the error bar on the chimera row is unmeasured. One replicate of the pool
+configuration is the cheapest thing that would fix this.
+
+(ii) The contrast varies two factors at once: objective (chimera vs.\ plain RL)
+\emph{and} training oracle (pool vs.\ RF3 alone). It establishes that
+chimera-plus-pool beats plain-RL-plus-RF3; it does not apportion the gain
+between them. The transfer-gap grid in Section~\ref{sec:res:frontier} bears on
+this --- holding batch fixed, the pool is worth roughly \num{0.05} --- which
+points to the objective carrying most of the effect, but this table alone
+cannot separate them.}
 
 \subsection*{Block 4 --- Relation to manufacturing-aware generative models}
 

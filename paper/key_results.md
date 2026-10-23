@@ -77,20 +77,39 @@ junction context. E18 trains at each k and is what would.
 
 ## The methodological result
 
-### 4. The in-loop number overstates, and an oracle pool is what keeps it honest — **provisional**
+### 4. The in-loop number overstates, and an oracle pool is what keeps it honest — **solid**
 
 The reward sits inside a structure predictor, so the training pass rate is not
 evidence on its own. Gap = oracle-balanced training level − held-out AF3.
 
-|  | RF3 only | 3-oracle pool |
-|---|---:|---:|
-| **batch 8** | +0.278 ⚠ warm-started | +0.000 |
-| **batch 32** | **+0.058** (running) | **−0.009** |
+> Updated 2026-10-23. The earlier version of this table quoted +0.278 / +0.058
+> from training-log reads rather than the balanced comparator, and the +0.058
+> cell was mid-run. Both are withdrawn and replaced by the probe grid below.
 
-Source: `ame_transfer_curves.py`; full detail and per-backbone values in
-`transfer_gap.md`. Provisional for three reasons, all stated there: M0315 runs
-the other way, the batch-32 RF3 arm is at 26–101 of 150 steps, and n = 1 seed
-per cell against a documented 21-point run-to-run swing.
+**Measured on 42 held-out AF3 probe points** across three backbones and four
+batch sizes, every one an oracle-balanced training level against AF3 best-of-5
+chimeras rebuilt deterministically from the step's own parents:
+
+| batch | points | mean gap | worst |
+|---|---:|---:|---:|
+| 8 | 5 | +0.085 | +0.312 |
+| 16 | 15 | **−0.001** | +0.151 |
+| 32 | 18 | **−0.018** | +0.111 |
+| 64 | 4 | +0.054 | +0.133 |
+
+Pooled: n = 42, **mean +0.007, median −0.005**. Most individual gaps are
+*negative* — held-out AF3 scores these designs slightly higher than the training
+pool did. 7 of 42 points overstate by more than 0.10.
+
+**The pool closes the gap; a single oracle does not.** The one single-oracle arm
+probed, `fragrl4`, sits at **+0.279**. That is the contrast this section is
+about, and it is now the strongest version of it: 42 points instead of a
+provisional 2×2.
+
+Source: `experiments/ame/{fragbsweep,fragb16,fragb32}/offline_probe/`. Residual
+caveats: `fragrl4` also warm-starts from a `fragrl3` checkpoint, so it varies
+initialisation as well as oracle and must never be shown as the controlled
+contrast; and every cell is n = 1 in seed.
 
 The batch-8 RF3 cell is **not a matched baseline** — it warm-starts from a
 `fragrl3` checkpoint while every other arm starts fresh. Show it as the arm the
@@ -114,9 +133,54 @@ white paper is stronger for saying so once, briefly:
 
 ---
 
-## Missing: the panel the thesis actually needs
+## The panel the thesis needs — now measured
 
-### 6. The current chimera-trained policy is not in the library table — **missing**
+### 6. The chimera-trained policy clears the plain-RL seed band — **solid**
+
+> Filled 2026-10-23. This section read **missing** until T2 (the 256-parent
+> library evaluation) completed on all three backbones. The text below replaces
+> it; the old framing is kept in the second paragraph because the fragrl2 result
+> it describes is still true and still the reason the library table is wrong.
+
+Library evaluation, 256 parents and 256 recombinants per cell, folded best-of-5
+through `af3_from_df` — the same evaluator as every other library number here,
+so the arms are comparable despite training differently.
+
+| backbone | objective | oracle | seed | parents | recombinants | retention |
+|---|---|---|---:|---:|---:|---:|
+| M0097 | plain RL | RF3 only | 2 | 88.7% | 68.0% | 0.767 |
+| M0097 | plain RL | RF3 only | 3 | 44.1% | 71.1% | 1.611 |
+| M0097 | **chimera** | **pool** | 1 | 94.1% | **96.9%** | 1.029 |
+| M0255 | plain RL | RF3 only | 2 | 59.0% | 29.3% | 0.497 |
+| M0255 | plain RL | RF3 only | 3 | 33.6% | 30.5% | 0.907 |
+| M0255 | **chimera** | **pool** | 1 | 80.5% | **82.4%** | 1.024 |
+| M0315 | plain RL | RF3 only | 2 | 89.5% | 65.2% | 0.729 |
+| M0315 | plain RL | RF3 only | 3 | 92.6% | 57.0% | 0.616 |
+| M0315 | **chimera** | **pool** | 1 | 100.0% | **100.0%** | 1.000 |
+
+**The two plain-RL rows per backbone are replicates of one config differing only
+in `seed`.** They bound what a lucky draw buys, and the chimera arm clears the
+full band everywhere: **+25.8 pt** (M0097), **+52.0 pt** (M0255), **+34.8 pt**
+(M0315) — three to six times the largest seed-to-seed difference. That is why a
+single chimera seed is worth something here when single-seed results usually
+are not.
+
+**Do not report retention as a point estimate.** It is a ratio with a stable
+numerator and an unstable denominator: across the replicates the recombinant
+rate moves 1.2–8.2 pt between seeds while the parental rate moves 3.1–44.5 pt,
+so retention swings 0.767 → 1.611 on an unchanged config. The chimera arm's
+1.029/1.024/1.000 is consistent with the claim, not evidence for it. **The
+recombinant pass rate is the number to quote.**
+
+**Two limits.** (i) Every chimera run in this paper is `seed: 1`; the replicate
+evidence is from plain-RL/RF3 arms, and **no pool arm has ever been run twice**,
+so the chimera row's error bar is unmeasured. (ii) The contrast varies objective
+*and* oracle together, so it does not apportion the gain between them.
+
+Source: `experiments/ame/{r1rep,fragb32}/`, written up in
+`results/fragments.tex` Block 3.
+
+### 6b. The library table still points at the wrong arm — **missing**
 
 `ame_library_table.py`'s third arm, `RL+frag`, is **fragrl2** — an early
 fragment-trained generation. It loses to plain RL on library pass (53.6 vs 76.7,
@@ -124,11 +188,12 @@ fragment-trained generation. It loses to plain RL on library pass (53.6 vs 76.7,
 That is a real result about fragrl2 and it is not the chimera objective the
 paper argues for.
 
-The arm the thesis is about — `fragb32`, chimera objective at batch 32, which
-completed on all three backbones on 2026-10-17 — has never been evaluated as a
-library. **T2, the 256-parent library eval, is what fills this row**, and it is
-now unblocked. Until it exists the paper's central claim rests on §1's RL arm,
-which was not trained for recombination at all.
+The arm the thesis is about — `fragb32`, chimera objective at batch 32 — **has
+now been evaluated as a library** (§6 above). What remains is mechanical:
+`ame_library_table.py` has `ARMS = ("sampled", "RL", "RL+frag")` and resolves
+`RL+frag` to fragrl2's tree. Adding fragb32 as a fourth arm is the open task;
+until then the paper's own table shows the thesis losing, on data that predates
+the thesis.
 
 ---
 
