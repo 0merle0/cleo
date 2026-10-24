@@ -189,7 +189,7 @@ $19L = 3420$ ceiling.
 & \multicolumn{2}{c}{\textbf{\cleo{}, no anchor}} &
   \multicolumn{2}{c}{\textbf{\cleo{}, KL anchor}} \\
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
-\textbf{Cumulative folds} & \textbf{Unique passing} & \textbf{Substitutions} &
+\textbf{Cumulative designs} & \textbf{Unique passing} & \textbf{Substitutions} &
 \textbf{Unique passing} & \textbf{Substitutions} \\
 \midrule
 400  & 75   & 1483 & 47   & 1382 \\
@@ -348,11 +348,19 @@ folds per step is $\text{rotations}\times\text{batch}\times
 times what a batch-8 run does. Comparing policies at matched steps compares
 budgets, not methods.
 
-A batch sweep run on a matched fold budget, with sample reuse pinned at
-$4\times$ so that batch size is the only factor, gives
-Figure~\ref{fig:bsweep-frontier}. \textbf{Batch 16 reaches the
-\SI{90}{\percent} chimera pass level on \num{40000} evaluations against batch
-32's \num{55000}, and batch 64 never reaches it.} Batch 8 is cheaper at every
+A batch sweep with sample reuse pinned at $4\times$, so that batch size is the
+only factor varying between arms, gives Figure~\ref{fig:bsweep-frontier}.
+\textbf{Batch 16 reaches the \SI{90}{\percent} chimera pass level on
+\num{40000} evaluations against batch 32's \num{55000}.}
+
+The arms are matched in reuse but \emph{not} in total budget, and the
+difference matters for one claim. Batch 8, 16 and 64 were configured for
+\num{48000}, \num{48000} and \num{48640} folds; batch 32 ran to
+\num{105600}. Batch 64 peaked at a smoothed pass of \num{0.605} and never
+reached \SI{90}{\percent} --- but it was never given the \num{55040} folds
+that batch 32 needed to get there, so that is a censored observation and not a
+measurement. The honest statement is that batch 64 does not reach
+\SI{90}{\percent} within \num{48640} evaluations. Batch 8 is cheaper at every
 level up to \SI{70}{\percent} and then needs \num{46720} to close, so the
 ordering inverts between \SI{70}{\percent} and \SI{90}{\percent} --- small
 batches climb fast and converge late, as expected when the GRPO advantage is

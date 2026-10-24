@@ -201,10 +201,39 @@ retention as the endpoint and everything else as secondary.
 
 \textbf{Scoring the pre-registered predictions.} The first holds: recombining
 across unselected MPNN samples gives a library pass rate of \SI{45.1}{\percent}
-against the chimera arm's \SI{93.1}{\percent} pooled over backbones. The third
-holds: the chimera library reaches 1{,}409 distinct mutational combinations
-against 1{,}139 for the plain-RL arm at matched design count, so recombination
-adds combinations rather than redistributing them. \textbf{The second is not yet
+against the chimera arm's \SI{93.1}{\percent} pooled over backbones. \textbf{The third was
+ill-posed, and scoring it properly is more informative than the prediction
+would have been.} It asked whether the recombinant library carries more
+distinct substitutions than its parents at matched design count. It cannot.
+Every recombinant is a concatenation of parent fragments, so every
+(position, residue) pair it carries appears in some parent \emph{at that
+position}: the recombinant repertoire is a subset of the parental one by
+construction, and no training objective can change that. Earlier drafts
+reported the prediction as holding, on a pair of numbers (1{,}409 against
+1{,}139) that no script on disk produces and that were rarefied at different
+depths.
+
+Measured as the ratio it actually is, recombination is a mild subset. At
+matched design count the recombinant library retains \SI{87}{\percent} of the
+parental repertoire at $k=4$ (0.876, 0.848, 0.880 on M0097, M0255, M0315) and
+\SI{92}{\percent} at $k=16$ (0.944, 0.913, 0.913), while multiplying the number
+of variants carrying it by four to thirty orders of magnitude depending on $k$.
+That $k=16$ loses less than $k=4$, with no overlap between the two ranges, is
+the expected direction: shorter fragments mean each slot's substitutions recur
+across more recombinants, so fewer are lost to any particular draw.
+
+\textbf{The objective does not make the subset gentler --- it makes the set
+being subsetted larger.} The preservation ratio is not what the chimera
+objective improves. Recombining unselected LigandMPNN draws preserves
+\SI{93}{\percent}, marginally the highest of any arm, because a smaller and
+more redundant parental repertoire has less unique material to lose: that arm
+retains 836, 584 and 1{,}222 substitutions out of 854, 668 and 1{,}294. The
+chimera arm at $k=16$ retains 1{,}095, 1{,}187 and 1{,}320 out of 1{,}160,
+1{,}300 and 1{,}445 --- a slightly smaller fraction of a substantially larger
+repertoire, and in absolute terms between \num{1.1} and \num{2.0} times as many
+surviving substitutions, at three times the library pass rate. A ratio close to
+one is cheap to achieve by having little to lose, which is why the absolute
+count is the quantity that matters here. \textbf{The second is not yet
 measured.} The retention-versus-slots-swapped curve scores recombinants by
 their Hamming distance in slot space from the nearest parent. That distance is
 \emph{computable from the scored libraries already on disk} --- earlier drafts
@@ -215,6 +244,45 @@ axis has no support at $d=1,2,4$ and the curve cannot be fitted. Measuring it
 needs a stratified draw at fixed $d$, not a new metric. It remains the one
 pre-registered prediction this experiment does not address, but it is cheap
 rather than blocked.
+
+\textbf{The chimera objective buys pass rate by narrowing the policy, and
+cutting finer buys it back.} Pointing the library table at the chimera arms
+makes a cost visible that a comparison against an obsolete arm had hidden.
+Against plain RL the chimera arms carry fewer distinct substitutions per
+library and sit closer together in sequence space, at a markedly higher pass
+rate:
+
+\begin{table}[h]\centering\small
+\caption{Recombined libraries at $n=256$, three backbones, AF3 best-of-5, all
+arms at batch 16. Substitutions are distinct (position, residue) pairs over
+\emph{passing} members, raw and rarefied to a matched count of passing members.
+Hamming is the mean pairwise distance within the passing library. \texttt{sampled}
+recombines unselected LigandMPNN draws; it is the no-RL control.}
+\label{tab:lib-diversity}
+\begin{tabular}{lrrrr}
+\toprule
+arm & library pass & substitutions (raw) & (matched $n$) & Hamming \\
+\midrule
+sampled              & \SI{30.5}{\percent} & 881  & 881 & 75.3 \\
+plain RL             & \SI{76.7}{\percent} & 1368 & 1141 & 76.5 \\
+chimera, $k=4$       & \SI{93.4}{\percent} & 1154 & 895  & 63.0 \\
+chimera, $k=16$      & \SI{92.2}{\percent} & 1201 & 950  & 71.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three things follow. First, the cost is \emph{within} RL: every chimera arm
+carries more substitutions than the no-RL control (1{,}154 and 1{,}201 against
+881) at triple its pass rate, so this is a statement about the objective and
+not about whether function-aligned search moves the frontier. Second, the cost
+is concentrated in one cell --- M0255 at $k=4$ falls to Hamming 42.4 against
+plain RL's 73.2, while M0097 and M0315 sit at 68.6 and 78.0 against 72.0 and
+84.4 --- and M0255 is also the backbone where the fragment-count sweep is
+non-monotone, so the two may be one instability. Third, \textbf{$k=16$
+dominates $k=4$ on both axes}: more substitutions (950 against 895), greater
+spread (71.2 against 63.0), the same pass rate, and a product space larger by
+twenty-five orders of magnitude. The diversity given up by cutting into four
+parts is largely recovered by cutting into sixteen.
 
 \plan{\textbf{Two limits to state plainly when this is written for submission.}
 
