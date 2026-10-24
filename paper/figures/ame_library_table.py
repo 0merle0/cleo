@@ -44,7 +44,24 @@ AME = CLEO / "experiments" / "ame"
 sys.path.insert(0, str(AME))
 from analyze_selection2 import as_matrix  # noqa: E402
 
-ARMS = ("sampled", "RL", "RL+frag")
+# The chimera arms are the ones the paper argues for. Until 2026-10-24 the third
+# arm here was "RL+frag", resolved to fragrl2 -- an early fragment-trained
+# generation that predates the chimera objective and loses library pass 53.6 vs
+# 76.7 on 0 of 3 backbones. The paper's own table therefore showed the thesis
+# losing, on data gathered before the thesis existed. fragrl2 is kept reachable
+# below as "RL+frag (legacy)" for the record, but it is not in ARMS.
+#
+# `RL+chim` is pinned to the BATCH-16 chimera runs, not fragb32, because the
+# `sampled` and `RL` arms here are batch 16 (r1panel). fragb32 is batch 32 with
+# 4x sample reuse against r1panel's 8x, so using it varies batch and reuse on
+# top of objective and oracle -- the exact confound frontier.tex Block 7 argues
+# invalidates a comparison. Batch is matched now; reuse still differs (4x vs
+# 8x), which is a smaller gap and is stated in the caption rather than hidden.
+ARMS = ("sampled", "RL", "RL+chim", "RL+chim k16")
+
+# family -> stem suffix, searched in order; first hit wins.
+CHIM_K4 = (("fragbsweep", "bs16"), ("fragb16", "bs16"))
+CHIM_K16 = (("fragk", "fragk16"),)
 
 
 def passing_library(scored_csv):
@@ -65,7 +82,14 @@ def locate(bb, arm):
         return AME / "r1panel" / "recomb" / f"{bb}_baseline_scored.csv"
     if arm == "RL":
         return AME / "r1panel" / "recomb" / f"{bb}_policy_scored.csv"
-    return AME / "fragrl2" / "recomb" / f"{bb}_frag2_scored.csv"
+    if arm == "RL+frag (legacy)":
+        return AME / "fragrl2" / "recomb" / f"{bb}_frag2_scored.csv"
+    fams = CHIM_K16 if arm == "RL+chim k16" else CHIM_K4
+    for fam, suf in fams:
+        f = AME / fam / "recomb" / f"{bb}_{suf}_scored.csv"
+        if f.exists():
+            return f
+    return AME / fams[0][0] / "recomb" / f"{bb}_{fams[0][1]}_scored.csv"
 
 
 def main():
@@ -111,7 +135,8 @@ def main():
     d["diversity"] = [div.get((r.site, r.arm), np.nan) for r in d.itertuples()]
     d = d.sort_values(["dead", "site", "arm"])
     pd.set_option("display.width", 200, "display.float_format", "{:.0f}".format)
-    print("LIBRARY TABLE -- recombined libraries, 4 slots, AF3 best-of-5, n=256\n")
+    print("LIBRARY TABLE -- recombined libraries, AF3 best-of-5, n=256 per cell.\n"
+      "RL+chim is k=4; RL+chim k16 is k=16. All arms batch 16.\n")
     print(d.to_string(index=False,
                       header=["site", "dead%", "arm", "n_pass", "pass%", "novel_muts"],
                       float_format=lambda v: f"{v:.1f}"))
@@ -123,12 +148,14 @@ def main():
         b = p.dropna(subset=["RL", "sampled"])
         print(f"\n{metric}: RL > sampled on {(b.RL > b.sampled).sum()}/{len(b)}"
               f"   mean {b.RL.mean():.1f} vs {b.sampled.mean():.1f}")
-        if "RL+frag" in p:
-            c = p.dropna(subset=["RL", "RL+frag"])
+        for chim in ("RL+chim", "RL+chim k16"):
+            if chim not in p:
+                continue
+            c = p.dropna(subset=["RL", chim])
             if len(c):
-                print(f"{' ' * len(metric)}  RL+frag > RL on "
-                      f"{(c['RL+frag'] > c.RL).sum()}/{len(c)}"
-                      f"   mean {c['RL+frag'].mean():.1f} vs {c.RL.mean():.1f}")
+                print(f"{' ' * len(metric)}  {chim} > RL on "
+                      f"{(c[chim] > c.RL).sum()}/{len(c)}"
+                      f"   mean {c[chim].mean():.1f} vs {c.RL.mean():.1f}")
 
 
 if __name__ == "__main__":

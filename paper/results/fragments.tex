@@ -119,53 +119,83 @@ and for every library number in this paper, so the comparison is a comparison.
 
 \begin{table}[h]\centering\small
 \caption{Library evaluation at $n=256$ parents and $n=256$ recombinants per
-cell, scored by held-out AF3 best-of-5. The two plain-RL rows per backbone are
-\emph{replicates of one configuration differing only in} \texttt{seed}.}
+cell, $k=4$ slots, scored by held-out AF3 best-of-5. The two plain-RL rows per
+backbone are \emph{replicates of one configuration differing only in}
+\texttt{seed}. The bold chimera row is the batch-matched one: $B=16$, as the
+plain-RL arms are. The $B=32$ row is shown because it was the arm reported in
+earlier drafts, and because the two differ enough to matter. Sample reuse is
+still unmatched between objectives ($4\times$ for chimera, $8\times$ for plain
+RL); retention is deliberately omitted as a column --- see below.}
 \label{tab:frag-retention}
 \begin{tabular}{llcrrr}
 \toprule
-backbone & objective & seed & parents & recombinants & retention \\
+backbone & objective & $B$ & seed & parents & recombinants \\
 \midrule
-M0097 & plain RL          & 2 & 88.7\% & 68.0\%  & 0.767 \\
-M0097 & plain RL          & 3 & 44.1\% & 71.1\%  & 1.611 \\
-M0097 & \textbf{chimera}  & 1 & 94.1\% & \textbf{96.9\%} & 1.029 \\
+M0097 & plain RL          & 16 & 2 & 88.7\%  & 68.0\%  \\
+M0097 & plain RL          & 16 & 3 & 44.1\%  & 71.1\%  \\
+M0097 & \textbf{chimera}  & 16 & 1 & 84.4\%  & \textbf{85.5\%} \\
+M0097 & chimera           & 32 & 1 & 94.1\%  & 96.9\%  \\
 \midrule
-M0255 & plain RL          & 2 & 59.0\% & 29.3\%  & 0.497 \\
-M0255 & plain RL          & 3 & 33.6\% & 30.5\%  & 0.907 \\
-M0255 & \textbf{chimera}  & 1 & 80.5\% & \textbf{82.4\%} & 1.024 \\
+M0255 & plain RL          & 16 & 2 & 59.0\%  & 29.3\%  \\
+M0255 & plain RL          & 16 & 3 & 33.6\%  & 30.5\%  \\
+M0255 & \textbf{chimera}  & 16 & 1 & 94.9\%  & \textbf{97.3\%} \\
+M0255 & chimera           & 32 & 1 & 80.5\%  & 82.4\%  \\
 \midrule
-M0315 & plain RL          & 2 & 89.5\% & 65.2\%  & 0.729 \\
-M0315 & plain RL          & 3 & 92.6\% & 57.0\%  & 0.616 \\
-M0315 & \textbf{chimera}  & 1 & 100.0\% & \textbf{100.0\%} & 1.000 \\
+M0315 & plain RL          & 16 & 2 & 89.5\%  & 65.2\%  \\
+M0315 & plain RL          & 16 & 3 & 92.6\%  & 57.0\%  \\
+M0315 & \textbf{chimera}  & 16 & 1 & 98.8\%  & \textbf{97.3\%} \\
+M0315 & chimera           & 32 & 1 & 100.0\% & 100.0\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \textbf{Recombinants fold, and training for recombination is what makes them
-fold.} Under the chimera objective the recombinant pass rate is \emph{at or
-above} the parental rate on all three backbones --- retention 1.029, 1.024 and
-1.000 --- so the product space is real rather than nominal. Cutting a passing
-design into four parts and reassembling it across parents costs nothing
-measurable in foldability.
+fold.} Under the chimera objective at matched batch the recombinant pass rate
+is \emph{above} the parental rate on M0097 (85.5\% against 84.4\%) and on
+M0255 (97.3\% against 94.9\%), and 1.5 points below it on M0315 (97.3\%
+against 98.8\%, where the parents are nearly saturated). Cutting a passing
+design into four parts and reassembling it across parents costs at most a
+point and a half of foldability, and on two of three backbones costs nothing
+at all --- so the product space is real rather than nominal.
 
 \textbf{The comparison that carries weight is against the seed band, not
 against a single baseline.} The two plain-RL rows per backbone are the same
-configuration run twice, and they bound what a lucky draw can buy. The chimera
-arm clears the full observed band on every backbone: +25.8 points on
-M0097 (96.9\% against 68.0--71.1\%), +52.0 points on M0255 (82.4\%
-against 29.3--30.5\%), and +34.8 points on M0315 (100.0\% against
-57.0--65.2\%). That is three to six times the largest seed-to-seed difference
-observed, which is why a single chimera seed is informative here even though
-single-seed results usually are not.
+configuration run twice, and they bound what a lucky draw can buy. At matched
+batch the chimera arm clears the full observed band on every backbone: +14.4
+points on M0097 (85.5\% against 68.0--71.1\%), +66.8 points on M0255 (97.3\%
+against 29.3--30.5\%), and +32.1 points on M0315 (97.3\% against
+57.0--65.2\%). Measured against each backbone's own seed-to-seed spread in the
+recombinant rate (3.1, 1.2 and 8.2 points) those margins are 4.6$\times$,
+56$\times$ and 3.9$\times$.
+
+That is the honest version of a claim earlier drafts made more strongly. The
+margins quoted previously (+25.8, +52.0, +34.8) came from the $B=32$ chimera
+rows, which differ from the plain-RL arms in batch size and sample reuse as
+well as in objective and oracle. Batch-matching costs M0097 eleven points of
+margin and gains M0255 fifteen. One caveat survives the correction and should
+be stated rather than buried: M0097's +14.4 is \emph{below} the 21-point
+control-pass swing documented between two unseeded runs of a single
+configuration elsewhere in this work, so on that backbone the margin alone does
+not clear the widest variance we have measured. M0255 and M0315 clear it
+comfortably.
 
 \textbf{Retention is the least reproducible statistic in this table and should
 not be read as a point estimate.} It is a ratio whose numerator is stable and
 whose denominator is not. Across the plain-RL replicates the recombinant rate
 moves by 1.2--8.2 points between seeds while the \emph{parental} rate moves by
 3.1--44.5 points, so retention swings from 0.767 to 1.611 on M0097 for a
-configuration that was not changed at all. The chimera arm's 1.029/1.024/1.000
-is therefore consistent with the claim but is not yet evidence for it; the
-recombinant pass rate is. This is a general caution about retention as an
+configuration that was not changed at all. It has therefore been dropped as a
+column: the recombinant pass rate is the endpoint, and it is what the table
+reports.
+
+Retention is also not the same quantity across arms, which is the second reason
+to stop tabulating it. The recombination step filters parents to those that
+already pass, so for an arm whose parents are drawn from a pre-filtered pool the
+denominator is 1.0 by construction, while for the arms here it is the pass rate
+of the 256 \emph{sampled} designs. Dividing the unselected-MPNN control by the
+same rule gives retention of 1.53, 7.59 and 1.43 --- values that are obviously
+not foldability ratios, and that show the column was never comparing like with
+like. This is a general caution about retention as an
 endpoint, and it revises the framing of the pre-registration above, which named
 retention as the endpoint and everything else as secondary.
 
@@ -175,10 +205,16 @@ against the chimera arm's \SI{93.1}{\percent} pooled over backbones. The third
 holds: the chimera library reaches 1{,}409 distinct mutational combinations
 against 1{,}139 for the plain-RL arm at matched design count, so recombination
 adds combinations rather than redistributing them. \textbf{The second is not yet
-measured} --- the retention-versus-slots-swapped curve requires scoring
-recombinants by their Hamming distance in slot space from the nearest parent,
-which the current pipeline does not emit. It is the one pre-registered
-prediction this experiment does not address.
+measured.} The retention-versus-slots-swapped curve scores recombinants by
+their Hamming distance in slot space from the nearest parent. That distance is
+\emph{computable from the scored libraries already on disk} --- earlier drafts
+recorded it as a missing pipeline feature, which was wrong. The real obstacle
+is the sampling: uniform recombination over the product space at $k=4$ puts
+essentially every draw at three slots swapped (249 of 256 on M0097), so the
+axis has no support at $d=1,2,4$ and the curve cannot be fitted. Measuring it
+needs a stratified draw at fixed $d$, not a new metric. It remains the one
+pre-registered prediction this experiment does not address, but it is cheap
+rather than blocked.
 
 \plan{\textbf{Two limits to state plainly when this is written for submission.}
 
@@ -191,10 +227,14 @@ the pool arms may be tighter --- but no pool arm has ever been run twice, so
 the error bar on the chimera row is unmeasured. One replicate of the pool
 configuration is the cheapest thing that would fix this.
 
-(ii) The contrast varies two factors at once: objective (chimera vs.\ plain RL)
-\emph{and} training oracle (pool vs.\ RF3 alone). It establishes that
-chimera-plus-pool beats plain-RL-plus-RF3; it does not apportion the gain
-between them. The transfer-gap grid in Section~\ref{sec:res:frontier} bears on
+(ii) The contrast varies more than one factor. Batch size is matched in the
+bold rows, but sample reuse is not: the chimera arms reuse each rollout
+$4\times$ and the plain-RL arms $8\times$, because both were configured with
+\texttt{N\_updates: 16} at different batch sizes. So the contrast varies
+objective (chimera vs.\ plain RL), training oracle (pool vs.\ RF3 alone) and
+reuse. It is \emph{consistent with} chimera-plus-pool beating
+plain-RL-plus-RF3; with one chimera seed and three factors moving it does not
+establish it, and it does not apportion the gain. The transfer-gap grid in Section~\ref{sec:res:frontier} bears on
 this --- holding batch fixed, the pool is worth roughly \num{0.05} --- which
 points to the objective carrying most of the effect, but this table alone
 cannot separate them.}

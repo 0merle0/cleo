@@ -355,8 +355,20 @@ Figure~\ref{fig:bsweep-frontier}. \textbf{Batch 16 reaches the
 32's \num{55000}, and batch 64 never reaches it.} Batch 8 is cheaper at every
 level up to \SI{70}{\percent} and then needs \num{46720} to close, so the
 ordering inverts between \SI{70}{\percent} and \SI{90}{\percent} --- small
-batches climb fast and converge late, which is what one expects when the GRPO
-advantage is normalised by the standard deviation of few samples.
+batches climb fast and converge late, as expected when the GRPO advantage is
+normalised by the standard deviation of few samples.
+
+\textbf{What the in-loop chimera pass rate counts.} The training-time chimera
+set is built by rotation: chimera $(\rho, i)$ takes slot $j$ from parent
+$(i + \rho j) \bmod B$, so at $\rho = 0$ every slot comes from the same parent
+and the ``chimera'' is the unrecombined parent. With four rotations, one in
+four of the chimeras scored inside the loop is a parent, and the levels quoted
+above are therefore a quarter parental. This does not distort the comparison
+between arms --- the rotation count is four in every arm, so the parental
+fraction is identical --- but it does mean the absolute level is not a pure
+recombinant pass rate. Every \emph{library} number in this paper is clean:
+the library evaluation excludes exact parents explicitly, so the retention
+table and Section~\ref{sec:res:fragments} are unaffected.
 
 \begin{figure}[htbp]
   \centering

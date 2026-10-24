@@ -200,7 +200,8 @@ def fig_backbones():
     """b16 against b32, one panel per backbone. Shared axes, so the panels are
     comparable to each other and not just internally."""
     fig, axes = plt.subplots(1, 3, figsize=(9.6, 3.2), sharex=True, sharey=True)
-    colors = {16: PALETTE["orange"], 32: PALETTE["blue"]}
+    colors = {16: RAMP[16], 32: RAMP[32]}  # same ramp as the frontier figure: batch
+    # size is ordered, and 16 must not be blue in one figure and orange in the next
     for ax, bb in zip(axes, BACKBONES):
         for b in (32, 16):
             g = curve(bb, b)
