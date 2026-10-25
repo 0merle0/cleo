@@ -302,10 +302,21 @@ $4\times$ and the plain-RL arms $8\times$, because both were configured with
 objective (chimera vs.\ plain RL), training oracle (pool vs.\ RF3 alone) and
 reuse. It is \emph{consistent with} chimera-plus-pool beating
 plain-RL-plus-RF3; with one chimera seed and three factors moving it does not
-establish it, and it does not apportion the gain. The transfer-gap grid in Section~\ref{sec:res:frontier} bears on
-this --- holding batch fixed, the pool is worth roughly \num{0.05} --- which
-points to the objective carrying most of the effect, but this table alone
-cannot separate them.}
+establish it, and it does not apportion the gain.
+
+One contrast does isolate the oracle, and it is not the grid this passage used
+to cite --- that grid lives in the project ledger, not in
+Section~\ref{sec:res:frontier}, and it covers only pool-trained arms, so it
+cannot speak to pool-versus-single at all. The contrast that can is
+\texttt{fragb32} against \texttt{fragb32rf3}: both batch 32 (\num{32} rollouts
+per step, read off the written metrics rather than the configs), both
+chimera-objective, both self-resumed with no foreign warm start, differing only
+in training oracle. Over the held-out AF3 probe points their in-loop
+overstatement differs by \num{0.046} ($-0.005$ for the pool over 14 points
+against $+0.041$ for RF3 alone over 10) --- so ``roughly \num{0.05}'' survives,
+but on this comparison rather than the cited one. It points to the objective
+carrying most of the effect. Both arms are still $n=1$ in seed, and this table
+alone cannot separate the three factors.}
 
 \subsection*{Block 4 --- Relation to manufacturing-aware generative models}
 

@@ -52,10 +52,16 @@ ${\sim}800$ words.}
 
 \subsection*{P3 --- What we contribute}
 \begin{planlist}
-  \item \textbf{(i) A frontier shift, not a knob.} GRPO fine-tuning of
-        ProteinMPNN against a structure-prediction reward, with a KL anchor to
-        the base model that holds the output distribution open. Measured on a
-        public benchmark against the full temperature ladder.
+  \item \textbf{(i) A frontier shift, not a knob.} GRPO fine-tuning of an MPNN
+        sequence designer against a structure-prediction reward, with a KL
+        anchor to the base model that holds the output distribution open.
+        Measured on a public benchmark against the full temperature ladder.
+        \plan{The two halves of this paper fine-tune different base models and
+        the text must not blur them: every AME benchmark run is LigandMPNN
+        (\texttt{model\_type: ligand\_mpnn} in all 118 run configs), because the
+        benchmark's targets carry a ligand in the backbone; the PETase campaign
+        is ProteinMPNN. Name the specific model wherever a number is quoted and
+        the generic ``MPNN policy'' only where the claim is about the method.}
   \item \textbf{(ii) Combinatorial realization.} Fragment splitting and
         recombination convert the trained policy's output into a library that is
         exponentially larger than the number of DNA parts synthesized, while

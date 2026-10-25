@@ -45,7 +45,9 @@ five. Every number below is on their unit.}
   \item \textbf{Caveat to resolve before submission.} Our implementation of the
         one predictor-free benchmark quantity, \texttt{ligand\_dist\_des\_ncac\_min},
         does not reproduce the published values: median absolute error
-        \SI{0.42}{\angstrom} over 40 backbones, \emph{zero} exact matches. Since
+        \SI{0.4745}{\angstrom} over 40 backbones, \emph{zero} exact matches
+        (\texttt{experiments/ame/calibration\_ligand\_dist.csv}; the pass/fail
+        call still agrees on 37 of 40). Since
         it shares parsing and superposition code with the motif RMSD, the
         absolute values are not yet comparable to theirs. Until it is closed,
         only the backbone that reproduces (M0097) supports a head-to-head claim.
@@ -57,7 +59,7 @@ five. Every number below is on their unit.}
         \SI{177}{\giga\byte} benchmark archive --- idealized, unidealized,
         LigandMPNN-packed, LigandMPNN input backbone --- and all four give the
         same distance to within \SI{0.01}{\angstrom} while all four miss the
-        published value by ${\sim}\SI{0.42}{\angstrom}$. The authors' own
+        published value by ${\sim}\SI{0.47}{\angstrom}$. The authors' own
         \texttt{metrics\_cache} confirms the mechanism could not have worked:
         idealization displaces atoms by \SI{0.097}{\angstrom} mean and
         \SI{0.274}{\angstrom} max, an order of magnitude too small. Atom-subset
@@ -180,8 +182,12 @@ of training, not an additional expense.}
 
 Across 200 GRPO steps at 16 sequences per step, M0097 accumulates 3200 scored
 designs. Under the anchored policy \num{1349} of them are distinct passing
-sequences carrying \num{3045} distinct substitutions --- \SI{89}{\percent} of the
-$19L = 3420$ ceiling.
+sequences carrying \num{3045} distinct substitutions --- \SI{96}{\percent} of
+the reachable ceiling. That ceiling is $18 \times 176 = 3168$, not $19L = 3420$:
+four catalytic positions are held fixed and cysteine is barred from every
+sampled position, so each of the 176 free positions offers 18 alternatives to
+its reference rather than 19. The passing set varies at exactly those 176
+positions, which is the check that the denominator is the right one.
 
 \begin{center}
 \begin{tabular}{@{}lcccc@{}}
@@ -404,9 +410,9 @@ table and Section~\ref{sec:res:fragments} are unaffected.
 \end{figure}
 
 \plan{\textbf{Why this block is here and not in methods.} It reads as a
-hyperparameter note but it is the reason the transfer-gap grid in this section
-and the library result in Section~\ref{sec:res:fragments} are affordable at
-all. It also carries one correction worth keeping visible: every batch
+hyperparameter note but it is the reason the held-out AF3 probe grid (project
+ledger, \S4 --- not reproduced here) and the library result in
+Section~\ref{sec:res:fragments} are affordable at all. It also carries one correction worth keeping visible: every batch
 comparison made before this sweep held \texttt{N\_updates} fixed at 16, which
 makes sample reuse scale as $1/\text{batch}$ --- $16\times$ at batch 8 against
 $4\times$ at batch 32. Those comparisons varied batch and reuse together, so

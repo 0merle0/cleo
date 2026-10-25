@@ -294,8 +294,8 @@ arm & s1 & s2 & s3 & s4 & s5 & mean & sd \\
 \end{center}
 
 \textbf{Pooled \(\sigma = 7.75\) points.} The resolution floor
-\(1.96\sigma\sqrt{2}/\sqrt{n}\) is therefore \SI{9.6}{points} at \(n=5\),
-\SI{6.8}{points} at \(n=10\) and \SI{4.8}{points} at \(n=20\). The control's
+\(1.96\sigma\sqrt{2}/\sqrt{n}\) is therefore \SI{9.6}{\points} at \(n=5\),
+\SI{6.8}{\points} at \(n=10\) and \SI{4.8}{\points} at \(n=20\). The control's
 five draws span 10.4 points, so the pre-registered prediction of ``at least 15
 points'' is \emph{not} met: E19's 21-point move was a wide draw, not a typical
 one. The retraction of E18 still stands on its own pre-registered criterion,
@@ -489,8 +489,19 @@ twice as many distinct substitutions. So we also report
   s_i = a \neq a^{\mathrm{ref}}_i \,\}\bigr|,
 \]
 the number of distinct (position, residue) substitutions appearing anywhere in
-the library, each counted once no matter how many designs carry it. The ceiling
-is $19L = 3420$.
+the library, each counted once no matter how many designs carry it.
+
+The ceiling is \emph{not} $19L$. Two constraints in the training config remove
+part of that space before sampling starts: \texttt{fixed\_residues} holds the
+catalytic positions invariant, and \texttt{omit\_AA: CX} bars cysteine from
+every sampled position. On M0097 that is 4 fixed positions of $L = 180$ and a
+samplable alphabet of 19, so each of the 176 free positions offers 18
+alternatives to its reference and the reachable ceiling is
+$18 \times 176 = 3168$, not $19L = 3420$. The data agree: across all 200 steps
+the passing set varies at exactly 176 positions and carries cysteine at only
+the 2 fixed catalytic ones. Quote the reachable ceiling, not $19L$ --- the
+latter counts substitutions the sampler cannot make and so understates coverage
+by \SI{7}{\percent} of its own denominator.
 
 $U$ grows with $|\mathcal{P}|$, so arms with different numbers of passing
 designs cannot be compared on it directly --- doing so measures sample size as

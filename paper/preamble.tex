@@ -9,6 +9,12 @@
 \usepackage{xcolor}
 \usepackage{amsmath, amssymb}
 \usepackage{siunitx}
+% siunitx drops a leading "+" unless told otherwise, so \SI{+23.0}{points} set
+% "23.0 points" -- turning a signed margin into a level and silently reversing
+% the reading of any negative-looking cell beside it. There is no unit called
+% "points" either; declare it rather than letting siunitx guess.
+\sisetup{retain-explicit-plus}
+\DeclareSIUnit{\points}{points}
 \usepackage{booktabs}
 \usepackage{caption}
 \usepackage[numbers,sort&compress]{natbib}

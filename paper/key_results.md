@@ -20,8 +20,8 @@ chimeras.
 
 | | library pass % | diversity over passing members |
 |---|---:|---:|
-| sampled (T=1.0) | 30.5 | 721.7 |
-| RL policy | **53.5** | **859.9** |
+| sampled (T=1.0) | 30.5 | 721.6 |
+| RL policy | **53.5** | **859.6** |
 | backbones won | 8 / 9 | 6 / 8 |
 
 Source: `ame_library_table.py`. Diversity is distinct (position, residue)
@@ -126,6 +126,21 @@ contrast; and every cell is n = 1 in seed.
 The batch-8 RF3 cell is **not a matched baseline** — it warm-starts from a
 `fragrl3` checkpoint while every other arm starts fresh. Show it as the arm the
 project started from, never as the controlled contrast.
+
+**The one contrast that does isolate the oracle** is `fragb32` vs `fragb32rf3`:
+both batch 32, both chimera-objective, both self-resumed, differing only in
+training oracle. Pool −0.005 over 14 points against RF3-alone +0.041 over 10 —
+a difference of 0.046, which is where "the pool is worth roughly 0.05" comes
+from. Neither arm is replicated in seed. Note that this pair is *not* in the
+n = 38 grid above, which covers pool-trained arms only and therefore cannot
+speak to pool-versus-single.
+
+**Trap: `fragb32`'s resume configs say `batch_size: 16` and the runs are batch
+32.** All three write 32 rows per step in `metrics.csv`, start to finish. The
+resumed config's field is stale, so anyone establishing matching by reading
+configs will get it backwards — read rows per step from the metrics instead.
+This is the same class of error as the withdrawn headline margin: a comparison
+that looked matched because the wrong artefact was consulted.
 
 ### 5. Two withdrawn results, and why they are worth a paragraph
 

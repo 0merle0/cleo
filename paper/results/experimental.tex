@@ -53,7 +53,7 @@ only direct experimental test of it in this paper.
   \caption{\textbf{Structure-prediction confidence against measured activity
   for 3{,}135 recombined PETase designs.}
   (a) The strongest zero-shot signal is local and state-specific: per-atom
-  pLDDT over the active site of the \emph{acyl-enzyme intermediate}. Selecting
+  pLDDT over the active site of the \emph{tetrahedral adduct}. Selecting
   the top 5\% by this metric returns top-decile actives at $2.8\times$ the base
   rate. (b) Activity by design round, on the single screen run. (c) The
   control: distance from the design parent ranks activity better than any
@@ -62,9 +62,15 @@ only direct experimental test of it in this paper.
   \label{fig:petase-zeroshot}
 \end{figure}
 
-Every design was folded by AF3 in two states --- the Michaelis complex and the
-covalent acyl-enzyme intermediate --- and scored on 52 confidence and geometry
-metrics. Table~\ref{tab:petase-zeroshot} gives the ranking against measured
+Every design was folded by AF3 in two states --- the Michaelis complex and a
+covalent \emph{tetrahedral adduct} --- and scored on 52 confidence and geometry
+metrics. The adduct is not an acyl-enzyme intermediate, although the column is
+named \texttt{acyl\_*}: AF3 strips the leaving hydrogens but keeps the leaving
+oxygens, so the acid --OH survives and the bonded carbon stays
+4-coordinate. Both enzymes in the transfer comparison below model the same
+species, so that comparison is unaffected --- but the state is the adduct, and
+calling it the acyl-enzyme intermediate would misstate which chemistry the
+predictor was scored on. Table~\ref{tab:petase-zeroshot} gives the ranking against measured
 activity.
 
 \begin{table}[h]
@@ -101,8 +107,8 @@ Three readings, in the order that matters.
 
 \textbf{The useful signal is local and state-specific, not global.} pTM and ipTM
 --- the metrics a design pipeline reaches for by default --- reach $\rho \approx
-0.35$. Per-atom pLDDT at the catalytic histidine of the \emph{acyl-enzyme
-intermediate} reaches $0.60$. The gain comes from scoring the chemically
+0.35$. Per-atom pLDDT at the catalytic histidine of the \emph{tetrahedral
+adduct} reaches $0.60$. The gain comes from scoring the chemically
 relevant state at the chemically relevant atoms, which is an argument for
 building the covalent intermediate into the oracle rather than for folding
 harder.

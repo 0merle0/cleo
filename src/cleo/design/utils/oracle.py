@@ -1113,22 +1113,39 @@ def protenix_from_df(df_input, cfg, step_name="protenix"):
                 time.sleep(wait)
 
     rows = []
+    n_cif = n_unparsed = n_noconf = 0
     for cif in glob.glob(os.path.join(outdir, "*", "seed_*", "predictions", "*_sample_*.cif")):
+        n_cif += 1
         pred_dir = os.path.dirname(cif)
         stem = os.path.basename(cif)[: -len(".cif")]
         m = re.search(r"^(?P<name>.+)_sample_(?P<k>\d+)$", stem)
         if m is None:
+            n_unparsed += 1
             print(f"Warning: cannot parse sample index from {cif!r}, skipping.")
             continue
         name, k = m.group("name"), int(m.group("k"))
         conf = os.path.join(pred_dir, f"{name}_summary_confidence_sample_{k}.json")
         if not os.path.exists(conf):
+            n_noconf += 1
             print(f"Warning: no summary confidence beside {cif!r}, skipping.")
             continue
         seed_m = re.search(r"seed_(\d+)", pred_dir)
         rows.append((name, cif, conf, k, int(seed_m.group(1)) if seed_m else -1))
 
-    assert rows, f"No Protenix predictions found under {outdir}"
+    if not rows:
+        # Not an assert: `python -O` strips asserts, and this is the one failure
+        # a caller cannot diagnose from the message alone. The loop above warns
+        # and continues, so "nothing found" has three different causes -- no
+        # .cif at all (Protenix wrote nothing, or `outdir` is wrong), names it
+        # could not parse, or .cif files whose confidence JSON is missing -- and
+        # they call for opposite fixes. Say which one happened.
+        raise RuntimeError(
+            f"No usable Protenix predictions under {outdir}: found {n_cif} .cif "
+            f"file(s), of which {n_unparsed} had unparsable sample indices and "
+            f"{n_noconf} had no summary-confidence JSON beside them."
+            + ("" if n_cif else " No .cif files matched at all -- check that "
+               "Protenix ran and that outdir points at its output root.")
+        )
     if not per_sample_rows:
         # Keep one sample per design: sample_0, matching the single-sample
         # contract the other oracles honour when asked for one row.

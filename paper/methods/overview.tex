@@ -6,14 +6,20 @@ specifics live in the following subsections. Do not write this out in detail
 before the Results numbers exist --- Methods text written against placeholder
 numbers gets rewritten.}
 
-\subsection*{Block 1 --- RL fine-tuning of ProteinMPNN with GRPO}
+\subsection*{Block 1 --- RL fine-tuning of an MPNN designer with GRPO}
 \begin{planlist}
   \item Reference \texttt{cleo.design.train\_policy} and
         \texttt{cleo.design.utils.grpo}.
   \item Reward pipeline composition (\texttt{UniversalReward}, ordered metric
         steps, normalized weighted aggregation).
-  \item Cite GRPO~\cite{shao2024deepseekmath} and
-        ProteinMPNN~\cite{dauparas2022proteinmpnn}.
+  \item Cite GRPO~\cite{shao2024deepseekmath},
+        ProteinMPNN~\cite{dauparas2022proteinmpnn} and
+        LigandMPNN~\cite{dauparas2025ligandmpnn}.
+  \item \textbf{State which base model each result uses.} The AME benchmark
+        arms are LigandMPNN, since those targets have a ligand in the backbone;
+        the PETase campaign is ProteinMPNN. The algorithm is identical across
+        both --- only the base policy differs --- but a reader cannot be left to
+        infer that from context.
 \end{planlist}
 \todo{methods overview --- GRPO + reward pipeline}
 
