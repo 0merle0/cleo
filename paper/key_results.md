@@ -85,8 +85,17 @@ evidence on its own. Gap = oracle-balanced training level − held-out AF3.
 > Updated 2026-10-23. The earlier version of this table quoted +0.278 / +0.058
 > from training-log reads rather than the balanced comparator, and the +0.058
 > cell was mid-run. Both are withdrawn and replaced by the probe grid below.
+>
+> Corrected 2026-10-25, from n = 42 to n = 38. The grid globs `*_summary.csv`
+> under each `offline_probe/`, and that glob also caught
+> `run_M0255_..._fragb32_strides_summary.csv`, an older probe of the same arm
+> whose steps 60/90/120 duplicate the live summary's and whose step-0 row reads
+> `af3_pass 0.766` — a post-resume read of an already-trained step. Its sibling
+> had been quarantined as `_POSTRESUME_invalid.csv.bak` for exactly this; this
+> one had not. It is now quarantined the same way, which takes the b32 cell from
+> 18 points to 14 and is the only cell that moves.
 
-**Measured on 42 held-out AF3 probe points** across three backbones and four
+**Measured on 38 held-out AF3 probe points** across three backbones and four
 batch sizes, every one an oracle-balanced training level against AF3 best-of-5
 chimeras rebuilt deterministically from the step's own parents:
 
@@ -94,17 +103,20 @@ chimeras rebuilt deterministically from the step's own parents:
 |---|---:|---:|---:|
 | 8 | 5 | +0.085 | +0.312 |
 | 16 | 15 | **−0.001** | +0.151 |
-| 32 | 18 | **−0.018** | +0.111 |
+| 32 | 14 | **−0.005** | +0.111 |
 | 64 | 4 | +0.054 | +0.133 |
 
-Pooled: n = 42, **mean +0.007, median −0.005**. Most individual gaps are
-*negative* — held-out AF3 scores these designs slightly higher than the training
-pool did. 7 of 42 points overstate by more than 0.10.
+Pooled: n = 38, **mean +0.015, median −0.000**. Individual gaps are split almost
+evenly about zero — held-out AF3 scores these designs about as well as the
+training pool did, and the pooled mean is carried by the two smallest cells.
+7 of 38 points overstate by more than 0.10.
 
 **The pool closes the gap; a single oracle does not.** The one single-oracle arm
-probed, `fragrl4`, sits at **+0.279**. That is the contrast this section is
-about, and it is now the strongest version of it: 42 points instead of a
-provisional 2×2.
+probed, `fragrl4`, sits at **+0.279** over 15 points. That is the contrast this
+section is about, and it is still the strongest version of it: 38 points instead
+of a provisional 2×2. Note that de-duplication moved the b32 cell *toward* zero
+while moving the pooled mean away from it — the pooled figure is the one to
+quote with its cell breakdown, never alone.
 
 Source: `experiments/ame/{fragbsweep,fragb16,fragb32}/offline_probe/`. Residual
 caveats: `fragrl4` also warm-starts from a `fragrl3` checkpoint, so it varies

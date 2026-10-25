@@ -11,8 +11,8 @@ against, is \emph{lightly} predictive of measured activity on this scaffold
 --- $\rho = 0.58$ at best, worth a $2.8\times$ enrichment, beaten by mutation
 count alone --- and \textbf{does not transfer to a second serine hydrolase at
 all}: across 49 shared AF3 metrics the two enzymes' usefulness rankings
-anti-correlate at $-0.604$, and all ten of PETase's strongest predictors invert
-in sign. The oracle calibration is a per-target measurement, not a method
+anti-correlate at $-0.604$, and all ten of PETase's most strongly
+\emph{positive} predictors invert in sign. The oracle calibration is a per-target measurement, not a method
 property, which is the strongest argument in this paper for deciding a library
 by experiment rather than by score.
 
@@ -120,9 +120,12 @@ better than any AF3 metric in the table (Figure~\ref{fig:petase-zeroshot}c).
 This is the comparison a zero-shot claim has to clear and it does not clear it.
 What survives is that the AF3 signal is not merely that confound re-expressed:
 restricted to the 2{,}539 designs at least 20 mutations from the parent, active-site
-pLDDT still gives $\rho = +0.59$, and within single 5-mutation bands it ranges
-from $+0.07$ to $+0.67$. Prediction adds something to distance; it does not
-dominate it.
+pLDDT still gives $\rho = +0.59$. Within single 5-mutation bands it ranges from
+$+0.05$ nearest the parent to $+0.59$ at \numrange{30}{34} mutations, and is
+indistinguishable from zero in the three most distant bands
+(\numrange{-0.01}{+0.09} beyond 50). Prediction adds something to distance; it
+does not dominate it --- but it adds it only in the middle of the range, and the
+band-wise view is what shows that the pooled $+0.59$ is not uniform.
 
 \subsection*{\dots and it does not transfer to a second enzyme}
 
@@ -156,8 +159,10 @@ can be reused. It cannot.
     \bottomrule
   \end{tabular}
   \caption{\textbf{The zero-shot correlation does not survive an enzyme swap.}
-  Every one of PETase's ten strongest AF3 predictors inverts on a second serine
-  hydrolase. $\rho_{\rho}$ is the Spearman between the two enzymes' per-metric
+  Every one of PETase's ten most strongly positive AF3 predictors inverts on a
+  second serine hydrolase. Ranked by $|\rho|$ instead, one of the top ten keeps
+  its sign --- the claim is about the predictors anyone would actually pick,
+  which are the positive ones. $\rho_{\rho}$ is the Spearman between the two enzymes' per-metric
   Spearmans across all 49 shared concepts: $+1$ would mean a predictor can be
   picked once and reused, $0$ that one enzyme says nothing about the other, and
   a negative value that it actively misleads. Sign agreement of 10/49 is worse
@@ -208,7 +213,8 @@ not the predictor, does the selecting.
 \subsection*{Searching the library moves activity}
 
 Across four design rounds on the single screen run, median activity rises from
-2.2 to 12.2 and the best recombinant from 20.5 to 47.8
+2.2 in round 0 to 12.2 in round 3, and the best single recombinant from 20.5 to
+31.7 over the same span --- with the highest of all four, 47.8, in round 2
 (Figure~\ref{fig:petase-zeroshot}b). The progression is not monotone --- round 2
 has the \emph{lowest} median of the four and the \emph{best} single design,
 which is what a deliberately broadened library looks like.
