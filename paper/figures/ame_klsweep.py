@@ -5,7 +5,7 @@ Two things move in opposite directions as the anchor weight `w` rises, and the
 library cares about neither of them alone:
 
   success rate      falls monotonically   83 -> 10 %
-  per-design cover  rises monotonically   U_15 510 -> 881
+  per-design cover  rises monotonically   U_15 506 -> 878
 
 What a library actually contains is the *total* distinct substitution count U,
 which is the product of those two effects and therefore unimodal. It is flat
@@ -50,11 +50,20 @@ ACCENT = PALETTE["red"]
 CHOSEN = 0.02
 
 # Final 40 steps of each 200-step run; diversity on passing, deduplicated
-# designs. Produced by the E13 sweep -- see experiments.tex Table (tab:e13).
+# designs, against the LigandMPNN temperature sweep's per-position consensus on
+# this backbone.
+#
+# Regenerate with `uv run python experiments/ame/klsweep_table.py`, which is the
+# only definition of these numbers. They were hand-copied until 2026-10-25, and
+# the U_15 column had drifted high by 5 to 30 per arm while every other column
+# still reproduced exactly -- 808 here against 802.6 from the runs, a value not
+# recoverable under any reference, k or seed. Do not edit these by hand; rerun
+# the script and paste its --latex output into tab:e13 as well, so the figure
+# and the table cannot disagree.
 W      = [0.0,  0.005, 0.01, 0.02, 0.05, 0.10]
-PASS   = [83.1, 81.1,  57.7, 56.7, 40.5, 10.2]
-U15    = [510,  562,   760,  808,  858,  881]
-U      = [2109, 2230,  2498, 2501, 2480, 1743]
+PASS   = [83.1, 82.2,  57.5, 56.7, 40.5, 9.8]
+U15    = [506,  554,   765,  803,  850,  878]
+U      = [2110, 2251,  2499, 2501, 2480, 1731]
 
 
 def ramp(hex_color, n, lo=0.35, hi=1.0):

@@ -333,6 +333,7 @@ be stretched past that.
 | granularity | `ame_granularity.py` | current |
 | transfer curves | `ame_transfer_curves.py` | current; 3 arms, E15 not yet drawn |
 | frontier / distributions / PCA / novelty / convergence / efficiency / klsweep | `ame_*.py` | from the benchmark programme; triage before use |
-| diversity | `ame_diversity.py` | **broken** — reads `backbone19/eval`, which does not exist |
+| klsweep + A/B ladder + frontier baseline rows | `experiments/ame/klsweep_table.py` | current — added 2026-10-25; regenerates every cell of tab:e13, the A/B ladder and the LigandMPNN rows. Was hand-copied; `U_15` had drifted high by 5–30 per arm |
+| diversity | `ame_diversity.py` | **broken** — reads `backbone19/eval`, which does not exist and is not archived anywhere (`prune_old.sh` listed `backbone19` and `selection2`; no `.tar.gz` survives). Table 1's CLEO rows cannot be regenerated from raw folds |
 | PETase zero-shot + rounds + distance control | `petase_zeroshot.py` | current; the only wet-lab panel |
 | cross-enzyme transfer (PETase vs `super`) | none yet — table is inline in `results/experimental.tex` | data snapshot current; **no figure script** |

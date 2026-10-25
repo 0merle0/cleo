@@ -121,16 +121,16 @@ $n = 96$; \cleo{} arms are the final 40 steps of a 200-step run.}
              &                  & \textbf{Hamming}       &          &
 (\si{\angstrom}) \\
 \midrule
-LigandMPNN $T{=}0.1$ & \SI{58.3}{\percent} & 40.6  & 162 & 1.42 \\
+LigandMPNN $T{=}0.1$ & \SI{58.3}{\percent} & 40.6  & 161 & 1.42 \\
 LigandMPNN $T{=}0.2$ & \SI{66.7}{\percent} & 47.8  & 205 & 1.37 \\
-LigandMPNN $T{=}0.3$ & \SI{58.3}{\percent} & 57.9  & 274 & 1.31 \\
-LigandMPNN $T{=}0.5$ & \SI{34.4}{\percent} & 80.5  & 438 & 1.70 \\
-LigandMPNN $T{=}0.7$ & \SI{26.0}{\percent} & 100.5 & 608 & 1.88 \\
+LigandMPNN $T{=}0.3$ & \SI{58.3}{\percent} & 57.9  & 273 & 1.31 \\
+LigandMPNN $T{=}0.5$ & \SI{34.4}{\percent} & 80.5  & 437 & 1.70 \\
+LigandMPNN $T{=}0.7$ & \SI{26.0}{\percent} & 100.5 & 607 & 1.88 \\
 LigandMPNN $T{=}1.0$ & \SI{4.2}{\percent}  & 126.3 & --- & 5.59 \\
 \midrule
-\cleo{}, no anchor         & \SI{83.1}{\percent} & 76.6 & 510 & 1.07 \\
+\cleo{}, no anchor         & \SI{83.1}{\percent} & 76.6 & 506 & 1.07 \\
 \textbf{\cleo{}, KL anchor} & \textbf{\SI{56.7}{\percent}} & \textbf{114.4} &
-  \textbf{808} & 1.44 \\
+  \textbf{803} & 1.44 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -141,12 +141,12 @@ incumbent succeeds \SI{14}{\percent} of the time where \cleo{} succeeds
 success rate the incumbent reaches mean pairwise distance \num{59} against
 \cleo{}'s \num{114.4} --- $\mathbf{1.93\times}$. The anchored arm also carries
 more distinct substitutions per passing design than any baseline
-($U_{15} = 808$ against \num{608} at $T{=}0.7$), so this is a genuine
+($U_{15} = 803$ against \num{607} at $T{=}0.7$), so this is a genuine
 exploration advantage and not only a higher yield.
 
 The unanchored arm is the instructive contrast. It reaches the highest success
 rate in the table, \SI{83.1}{\percent}, and the \emph{worst} per-design coverage
-of any \cleo{} arm --- $U_{15} = 510$, below $T{=}0.7$. Left unconstrained the
+of any \cleo{} arm --- $U_{15} = 506$, below $T{=}0.7$. Left unconstrained the
 policy converges onto a narrow solution. The KL weight against the base model is
 what holds the distribution open, and it is the control the library application
 needs.
@@ -154,10 +154,10 @@ needs.
 Sweeping that weight over $\{0, 0.005, 0.01, 0.02, 0.05, 0.1\}$ shows it is a
 well-behaved control with an interior optimum rather than a knob that has to be
 tuned. Success falls monotonically, \SIrange{83}{10}{\percent}, and per-design
-coverage rises monotonically, $U_{15}$ \numrange{510}{881}; the total distinct
+coverage rises monotonically, $U_{15}$ \numrange{506}{878}; the total distinct
 substitutions a library actually contains is the product of the two and is flat
 within noise across $w \in [0.01, 0.05]$ (\numrange{2480}{2501}) before
-collapsing to \num{1743} at $w = 0.1$, where too few designs pass for
+collapsing to \num{1731} at $w = 0.1$, where too few designs pass for
 per-design exploration to accumulate. The value used throughout,
 $w = \num{0.02}$, sits in the middle of that plateau, so the reported numbers do
 not depend on having found a sharp optimum.
