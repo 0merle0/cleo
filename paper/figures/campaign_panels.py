@@ -438,62 +438,76 @@ def variants_real(budget, k, aa=AA, c=COST_BP, h=ADAPTER_BP, m=MIN_BP):
 
 
 def cost_size():
-    """Library size against budget, idealised. Log-log, so a different price
-    per base slides every curve sideways without changing its shape.
+    """How library size scales with cost -- the scaling law itself.
 
-    The two horizontal rules are the point of the panel: what the budget buys
-    runs past what can be built, and far past what can be screened, at a spend
-    that is small next to the cost of the experiment around it.
+    Taking logs of S = (B/B1)^k, where B1 = 3Lc is the cost of one full-length
+    gene:
+
+        log S = k (log B - log B1)
+
+    which on log-log axes is a straight line of slope k through the single
+    point (B1, 1). So the whole model is a fan: every k is a line, k is the
+    slope, and they all pivot on the cost of one gene. k = 1 is the line you
+    get without recombination at all -- buy v genes, have v sequences -- and
+    the distance from it to any other line is what cutting and reassembling
+    buys for the same money.
+
+    The right panel inverts it to the question anyone actually asks: what does
+    a target library size cost, and how much of that is the vendor's order
+    minimum rather than the model.
     """
-    fig, ax = plt.subplots(figsize=(6.0, 4.0))
-    grid(ax, "both")
-    TOP = 1e18
-    B = np.logspace(np.log10(500), np.log10(1e6), 300)
-    v = variants_naive(B)
-    for k, col in zip([2, 4, 6, 8, 16],
-                      ["#C7D2E4", "#8FA8C8", C_RL, "#1F3D63", "#0F2440"]):
-        y = v ** k
-        ax.plot(B, y, color=col, lw=1.8, zorder=3)
-        if y[-1] > TOP:                      # label where the curve exits
+    B1 = 3 * AA * COST_BP                       # one full-length gene
+    fig, (a, b) = plt.subplots(1, 2, figsize=(7.4, 3.6))
+
+    grid(a, "both")
+    TOP, XMAX = 1e18, 1e6
+    B = np.logspace(np.log10(B1), np.log10(XMAX), 400)
+    ks = [1, 2, 3, 4, 6, 8, 12, 16]
+    cols = plt.cm.YlGnBu(np.linspace(0.32, 0.95, len(ks)))
+    for k, col in zip(ks, cols):
+        y = (B / B1) ** k
+        a.plot(B, y, color=col, lw=1.7, zorder=3)
+        if y[-1] > TOP:                          # label where it leaves the box
             xb = B[np.argmax(y > TOP)]
-            ax.annotate(f"$k{{=}}{k}$", (xb, TOP), xytext=(2, -11),
-                        textcoords="offset points", fontsize=8, color=col)
+            a.annotate(f"{k}", (xb, TOP), xytext=(1, -10),
+                       textcoords="offset points", fontsize=8, color=col,
+                       ha="center")
         else:
-            ax.annotate(f"$k{{=}}{k}$", (B[-1], y[-1]), xytext=(5, -3),
-                        textcoords="offset points", fontsize=8, color=col)
+            a.annotate(f"$k{{=}}{k}$", (B[-1], y[-1]), xytext=(4, -3),
+                       textcoords="offset points", fontsize=8, color=col)
+    a.annotate("$k =$", (2.2e2, TOP), xytext=(0, -10), ha="right",
+               textcoords="offset points", fontsize=8, color="#6B7280")
+    a.scatter([B1], [1], s=42, color=C_WARN, ec="white", lw=1.2, zorder=5)
+    a.annotate(f"one gene, \\${B1:.0f}: every line pivots here",
+               (B1, 1), xytext=(9, -11), textcoords="offset points",
+               fontsize=7.5, color=C_WARN)
+    a.annotate("$S = (B/B_1)^{k}$\n$\\log S = k\\,(\\log B - \\log B_1)$",
+               (0.97, 0.11), xycoords="axes fraction", ha="right",
+               fontsize=9, color=C_INK)
+    a.set_xscale("log"); a.set_yscale("log")
+    a.set_xlim(B1 * 0.5, XMAX); a.set_ylim(0.25, TOP)
+    a.set_xlabel("synthesis budget (\\$)")
+    a.set_ylabel("library size (recombinants)")
+    a.set_title("slope is $k$; $k = 1$ is no recombination", loc="left",
+                fontsize=8.5)
 
-    for yv, lab in ((1e9, "~$10^9$ transformants: one-pot assembly ceiling"),
-                    (3135, "3,135 wells: the PETase screen actually run")):
-        ax.axhline(yv, color="#6B7280", lw=1.0, ls=(0, (3, 3)), zorder=2)
-        ax.annotate(lab, (5.6e2, yv), xytext=(0, 4), textcoords="offset points",
-                    ha="left", fontsize=7.5, color="#6B7280",
-                    bbox=dict(fc="white", ec="none", pad=1.0))
-
-    thresh = PARENTS * 3 * AA * COST_BP
-    ax.axvspan(thresh, 2e6, color=C_WARN, alpha=0.05, zorder=0)
-    ax.axvline(thresh, color=C_WARN, lw=1.2, ls=(0, (4, 3)), zorder=2)
-    ax.annotate(f"\\${thresh:,.0f}", (thresh * 1.15, 1.4e2), fontsize=8,
-                color=C_WARN, va="bottom",
-                bbox=dict(fc="white", ec="none", pad=1.0))
-
-    pet_min = PETASE["protein_parts"] * MIN_BP * COST_BP
-    pet_ord = PETASE["dna_parts"] * MIN_BP * COST_BP
-    ax.plot([pet_min, pet_ord], [PETASE["size"]] * 2, color=C_CHIM4, lw=1.0, zorder=4)
-    for x, mk in ((pet_min, "o"), (pet_ord, "s")):
-        ax.scatter([x], [PETASE["size"]], marker=mk, s=50, color=C_CHIM4,
-                   ec="white", lw=1.2, zorder=5)
-    ax.annotate("PETase library, $1.1\\times10^{7}$ recombinants:\n"
-                f"{PETASE['protein_parts']} distinct parts (circle) ordered as\n"
-                f"{PETASE['dna_parts']:,} DNA parts (square)",
-                (pet_ord, PETASE["size"]), xytext=(10, -2),
-                textcoords="offset points", fontsize=7, color=C_CHIM4, va="top")
-
-    ax.set_xscale("log"); ax.set_yscale("log")
-    ax.set_xlim(500, 2e6); ax.set_ylim(1e2, TOP)
-    ax.set_xlabel(f"synthesis budget (\\$, Twist eBlocks at \\${COST_BP:.2f} per base)")
-    ax.set_ylabel("library size (recombinants)")
-    ax.set_title(f"{AA}-aa enzyme cut into $k$ equal fragments; "
-                 f"$v = B/(3Lc)$ variants per slot", loc="left", fontsize=8.5)
+    grid(b, "both")
+    kk = np.arange(2, 17)
+    targets = [(1e4, "$10^{4}$"), (1e9, "$10^{9}$"), (1e12, "$10^{12}$")]
+    for (S, lab), col in zip(targets, ["#9FB6D1", C_RL, "#0F2440"]):
+        ideal = [B1 * S ** (1 / k) for k in kk]
+        real = [COST_BP * k * billable_bp(k) * S ** (1 / k) for k in kk]
+        b.plot(kk, ideal, color=col, lw=1.2, ls=(0, (4, 3)), zorder=2)
+        b.plot(kk, real, color=col, lw=2.0, zorder=3)
+        b.annotate(lab, (kk[0], real[0]), xytext=(6, 2),
+                   textcoords="offset points", fontsize=8, color=col)
+    b.set_yscale("log"); b.set_xlim(1.4, 16.8); b.set_ylim(50, 3e8)
+    b.set_xticks([2, 4, 6, 8, 10, 12, 14, 16])
+    b.set_xlabel("$k$, fragments per construct")
+    b.set_ylabel("budget to reach that library size (\\$)")
+    b.set_title("dashed: model. solid: after the order minimum", loc="left",
+                fontsize=8.5)
+    fig.tight_layout()
     save(fig, "panel_cost_size"); plt.close(fig)
 
 

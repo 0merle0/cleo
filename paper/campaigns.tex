@@ -361,26 +361,31 @@ equivalent costs \$42, so \$\num{10000} stocks \num{238} variants in every
 slot regardless of how finely it is cut.
 
 \begin{figure}[H]\centering
-  \includegraphics[width=0.92\textwidth]{figures/pdf/panel_cost_size.pdf}
-  \caption{Both axes are logarithmic, so a different price per base slides
-  every curve sideways without changing its shape --- the figure is reusable at
-  any quote. The PETase library is shown twice because it was ordered twice
-  over: \num{128} distinct protein parts realised as \num{1920} DNA parts, a
-  $15\times$ redundancy that is the dominant term in what was actually spent.}
+  \includegraphics[width=\textwidth]{figures/pdf/panel_cost_size.pdf}
+  \caption{Left: taking logs, $\log S = k(\log B - \log B_1)$, so on log--log
+  axes the entire model is a fan --- every $k$ is a straight line of slope $k$,
+  and all of them pivot on the cost of one full-length gene. $k = 1$ is the
+  line you get without recombination at all: buy $v$ genes, have $v$
+  sequences. The vertical distance from that line to any other is what cutting
+  and reassembling buys for the same money. Because the axes are logarithmic a
+  different price per base slides the pivot sideways and changes nothing else.
+  Right: the same model inverted to the question actually asked --- what a
+  target library size costs, and how much of that is the vendor's order
+  minimum rather than the model.}
 \end{figure}
 
 \begin{reading}
-Synthesis is not the binding constraint, and it is not close. At \$\num{10000}
---- less than the folding compute behind a single campaign above --- the
-affordable library at $k = 6$ is $\num{1.8e14}$ recombinants, five orders of
-magnitude past what one-pot assembly can transform and eleven past what the
-PETase screen actually read. The budget buys sequence space nobody can look at.
-\limit{Three things bind first, all of them visible in the earlier panels.
-\textbf{Parents:} $v$ variants per slot needs $v$ passing designs, and past
-\$\num{10752} the \num{256}-parent libraries of C6 and C7 run out before the
-money does. \textbf{Assembly:} ${\sim}10^{9}$ transformants. \textbf{Screening:}
-\num{3135} wells, in the one screen this project has run. Cost sets the ceiling;
-it has never set the floor.}
+The scaling is $S \propto B^{k}$, so $k$ sets how steeply library size answers
+to money and nothing else in the model does. Going from no recombination to
+$k = 6$ turns a \$\num{10000} order from \num{238} sequences into
+$\num{1.8e14}$. Reaching $10^{12}$ recombinants costs \$\num{42000} at
+$k = 4$ and \$\num{1329} at $k = 8$ --- the same library, a factor of 32
+cheaper, for cutting it twice as finely.
+\limit{Nothing in this figure is measured; it is arithmetic on a price. It also
+says nothing about whether the library \emph{works}, which is the entire
+subject of C6 and C7 --- two libraries of identical size can differ by 50
+points of pass rate. Read it as the budget axis of a decision whose other axes
+are elsewhere in this document.}
 \end{reading}
 
 \begin{figure}[H]\centering
@@ -407,6 +412,18 @@ on the axis C6 measures --- where fidelity and coverage trade --- and on how
 many junctions an assembly will actually tolerate. The cost model only says
 that money will not make that choice for you.}
 \end{reading}
+
+\paragraph{What binds instead.} Three things run out before the budget does,
+and two of them are measured earlier in this document. \textbf{Parents:}
+stocking $v$ variants in a slot needs $v$ passing designs, so the
+\num{256}-parent libraries of C6 and C7 are exhausted at \$\num{10752} --- past
+that point the policy is the limit, not the order. \textbf{Assembly:}
+${\sim}10^{9}$ transformants from a one-pot reaction. \textbf{Screening:}
+\num{3135} wells, in the one screen this project has run, against the
+$\num{1.1e7}$ recombinants that library spanned. At \$\num{10000} and $k = 6$
+the model offers $\num{1.8e14}$, which is five orders past what can be built
+and eleven past what can be read. Synthesis sets the ceiling of this programme;
+it has never set the floor.
 
 \clearpage
 \section{Three arcs these panels will carry}
