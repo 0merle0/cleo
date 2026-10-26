@@ -24,6 +24,14 @@ contain is a closed-loop activity campaign --- see
 ``What this does not show'' at the end, and the plan in
 \texttt{archive/results\_petase.tex}.}
 
+\plan{\textbf{Two subsections moved out of this file on 2026-10-25}, verbatim:
+``Zero-shot prediction is lightly predictive'' and ``\dots and it does not
+transfer to a second enzyme'' are now Section~\ref{sec:res:ranking}, where the
+restart needs them to carry the introduction's ranking claim. The \plan{} block
+above still describes them as part of this section; that framing is yours to
+redo. What is left here is the physical result --- the library was built,
+assembled and measured.}
+
 \subsection*{The library is the method, physically}
 
 The assayed library is a five-fragment Golden Gate recombination library over a
@@ -44,177 +52,6 @@ library recombined across parents at this mutational depth is mostly not dead.
 That is the assumption Section~\ref{sec:res:fragments} names as load-bearing --
 that fragments contribute roughly independently to foldability -- and it is the
 only direct experimental test of it in this paper.
-
-\subsection*{Zero-shot prediction is lightly predictive}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\textwidth]{figures/pdf/petase_zeroshot.pdf}
-  \caption{\textbf{Structure-prediction confidence against measured activity
-  for 3{,}135 recombined PETase designs.}
-  (a) The strongest zero-shot signal is local and state-specific: per-atom
-  pLDDT over the active site of the \emph{tetrahedral adduct}. Selecting
-  the top 5\% by this metric returns top-decile actives at $2.8\times$ the base
-  rate. (b) Activity by design round, on the single screen run. (c) The
-  control: distance from the design parent ranks activity better than any
-  prediction does. The 20 open red points are a selected set re-assayed in a
-  different run of the same assay and are never pooled into a correlation.}
-  \label{fig:petase-zeroshot}
-\end{figure}
-
-Every design was folded by AF3 in two states --- the Michaelis complex and a
-covalent \emph{tetrahedral adduct} --- and scored on 52 confidence and geometry
-metrics. The adduct is not an acyl-enzyme intermediate, although the column is
-named \texttt{acyl\_*}: AF3 strips the leaving hydrogens but keeps the leaving
-oxygens, so the acid --OH survives and the bonded carbon stays
-4-coordinate. Both enzymes in the transfer comparison below model the same
-species, so that comparison is unaffected --- but the state is the adduct, and
-calling it the acyl-enzyme intermediate would misstate which chemistry the
-predictor was scored on. Table~\ref{tab:petase-zeroshot} gives the ranking against measured
-activity.
-
-\begin{table}[h]
-  \centering
-  \small
-  \begin{tabular}{llrr}
-    \toprule
-    Predictor & What it measures & Spearman $\rho$ & $n$ \\
-    \midrule
-    \multicolumn{4}{l}{\emph{Zero-shot, AF3}} \\
-    \quad acyl His107-NE2 pLDDT      & catalytic atom, acyl state & $+0.60$ & 2{,}548 \\
-    \quad acyl active-site pLDDT     & active-site shell, acyl state & $+0.58$ & 2{,}548 \\
-    \quad acyl PAE Ser66$\leftrightarrow$His107 & triad geometry & $-0.47$ & 2{,}548 \\
-    \quad substrate interface PAE (min) & protein--ligand placement & $-0.43$ & 2{,}616 \\
-    \quad substrate pTM               & global confidence & $+0.36$ & 2{,}616 \\
-    \quad substrate ipTM              & global interface confidence & $+0.32$ & 2{,}616 \\
-    \midrule
-    \multicolumn{4}{l}{\emph{Zero-shot, sequence only}} \\
-    \quad mutations from parent      & distance, no structure at all & $-0.65$ & 3{,}135 \\
-    \midrule
-    \multicolumn{4}{l}{\emph{Supervised, held out} (RidgeCV, 200 stratified splits)} \\
-    \quad AF3 features               & & $+0.73 \pm 0.02$ & \\
-    \quad Rosetta features           & & $+0.75 \pm 0.01$ & \\
-    \quad AF3 $+$ Rosetta            & & $+0.80 \pm 0.01$ & \\
-    \bottomrule
-  \end{tabular}
-  \caption{\textbf{Ranking power against measured activity.} Zero-shot rows are
-  univariate Spearman on the screen run. Global confidence is roughly half as
-  informative as a local, state-specific measurement at the catalytic atoms.}
-  \label{tab:petase-zeroshot}
-\end{table}
-
-Three readings, in the order that matters.
-
-\textbf{The useful signal is local and state-specific, not global.} pTM and ipTM
---- the metrics a design pipeline reaches for by default --- reach $\rho \approx
-0.35$. Per-atom pLDDT at the catalytic histidine of the \emph{tetrahedral
-adduct} reaches $0.60$. The gain comes from scoring the chemically
-relevant state at the chemically relevant atoms, which is an argument for
-building the covalent intermediate into the oracle rather than for folding
-harder.
-
-\textbf{It is a real signal, and it is light.} Selecting the top 5\% of the
-library by active-site pLDDT returns a top-decile-active design 28\% of the
-time against a 10\% base rate: a $2.8\times$ enrichment, falling to $1.9\times$
-if 25\% of the library is kept. That is worth having when the alternative is
-random ordering, and it is nowhere near a filter one would trust to replace an
-assay.
-
-\textbf{And a cheaper predictor beats it.} Mutation count from the parent, which
-requires no structure prediction at all, ranks activity at $\rho = -0.65$ ---
-better than any AF3 metric in the table (Figure~\ref{fig:petase-zeroshot}c).
-This is the comparison a zero-shot claim has to clear and it does not clear it.
-What survives is that the AF3 signal is not merely that confound re-expressed:
-restricted to the 2{,}539 designs at least 20 mutations from the parent, active-site
-pLDDT still gives $\rho = +0.59$. Within single 5-mutation bands it ranges from
-$+0.05$ nearest the parent to $+0.59$ at \numrange{30}{34} mutations, and is
-indistinguishable from zero in the three most distant bands
-(\numrange{-0.01}{+0.09} beyond 50). Prediction adds something to distance; it
-does not dominate it --- but it adds it only in the middle of the range, and the
-band-wise view is what shows that the pooled $+0.59$ is not uniform.
-
-\subsection*{\dots and it does not transfer to a second enzyme}
-
-The $\rho = 0.60$ above is a property of this scaffold, not of the method. The
-same two-state fold and the same metric pipeline were run against a second,
-unrelated serine hydrolase --- \texttt{super}, a 160-aa de novo design
-(Ser128/His95/Asp53, 4-methylumbelliferyl butyrate, 2{,}509 purified designs
-measured over 2.51 decades). Correlating each metric's \emph{usefulness} on one
-enzyme against its usefulness on the other asks whether a predictor chosen once
-can be reused. It cannot.
-
-\begin{table}[h]
-  \centering\small
-  \begin{tabular}{@{}llrrc@{}}
-    \toprule
-    State & Concept & PETase $\rho$ & \texttt{super} $\rho$ & Same sign \\
-    \midrule
-    acyl      & His catalytic-N pLDDT  & $+0.600$ & $-0.147$ & no \\
-    acyl      & active-site pLDDT      & $+0.587$ & $-0.076$ & no \\
-    acyl      & His pLDDT              & $+0.573$ & $-0.080$ & no \\
-    acyl      & Ser pLDDT              & $+0.542$ & $-0.054$ & no \\
-    acyl      & Ser-OG pLDDT           & $+0.526$ & $-0.075$ & no \\
-    acyl      & ligand pLDDT (mean)    & $+0.424$ & $-0.045$ & no \\
-    substrate & Ser pLDDT              & $+0.385$ & $-0.179$ & no \\
-    delta     & interface PAE (min)    & $+0.371$ & $-0.177$ & no \\
-    substrate & pTM                    & $+0.348$ & $-0.116$ & no \\
-    delta     & His catalytic-N pLDDT  & $+0.345$ & $-0.049$ & no \\
-    \midrule
-    \multicolumn{2}{@{}l}{mean of these ten}       & $+0.470$ & $-0.100$ & 0/10 \\
-    \multicolumn{2}{@{}l}{all 49 shared concepts}  & \multicolumn{2}{c}{$\rho_{\rho} = -0.604$} & 10/49 \\
-    \bottomrule
-  \end{tabular}
-  \caption{\textbf{The zero-shot correlation does not survive an enzyme swap.}
-  Every one of PETase's ten most strongly positive AF3 predictors inverts on a
-  second serine hydrolase. Ranked by $|\rho|$ instead, one of the top ten keeps
-  its sign --- the claim is about the predictors anyone would actually pick,
-  which are the positive ones. $\rho_{\rho}$ is the Spearman between the two enzymes' per-metric
-  Spearmans across all 49 shared concepts: $+1$ would mean a predictor can be
-  picked once and reused, $0$ that one enzyme says nothing about the other, and
-  a negative value that it actively misleads. Sign agreement of 10/49 is worse
-  than the ${\sim}24$ expected by chance. Source:
-  \texttt{figures/data/petase\_super\_af3\_transfer.csv}.}
-  \label{tab:petase-super-transfer}
-\end{table}
-
-Rosetta fails differently and more mildly: $\rho_{\rho} = +0.035$ over 66 shared
-concepts with 33/66 sign agreement, which is exactly chance. That is \emph{no}
-transferable signal rather than an inverted one, a weaker claim than AF3's.
-
-The nuance is worth stating, because it is the one place anything survives.
-PETase's three strongest Rosetta predictors are all His--Asp distance terms, and
-all three \emph{keep their sign} on \texttt{super} while collapsing in
-magnitude: $-0.502 \rightarrow -0.072$, $-0.484 \rightarrow -0.023$,
-$-0.410 \rightarrow -0.030$, a 7--21$\times$ shrink. Catalytic-geometry strain
-points the same way on both enzymes and nearly stops mattering; it is the only
-concept family here that does. Rank agreement over all 66 concepts is still nil,
-so this does not rescue selection --- but it is a different failure from AF3's
-outright inversion, and the direction is not random.
-
-What \emph{does} replicate is a methodological fact about the two predictor
-families. On both enzymes, Rosetta carries substantial information AF3 cannot
-reconstruct while the reverse is largely false: predicting Rosetta features from
-AF3 gives a median cross-validated $R^2$ of $0.145$ on PETase and $0.199$ on
-\texttt{super}, against $0.556$ and $0.527$ in the other direction. The most
-private features are relax-ensemble \emph{variance} terms, for which a single
-structure prediction has no analogue. Same asymmetry, same magnitude, both
-enzymes.
-
-\textbf{This is the wet-lab counterpart of the transfer gap in
-Section~\ref{sec:res:frontier}.} There, a policy trained inside a structure
-predictor scored higher under that predictor than under a held-out one. Here, a
-predictor that ranks function on the target it was calibrated against
-anti-ranks it on the next target. Both say the same thing: a structure
-predictor's agreement with the quantity you care about is a property of the
-specific system, re-earned per target, never inherited.
-
-That conclusion is an argument \emph{for} the library, not against it. If
-zero-shot oracle scores could be trusted across targets, the right strategy
-would be to rank a large virtual set and order the top of it. Because they
-cannot, the ordering has to be decided by something the oracle does not control
---- which is what a combinatorially compatible library at a $67\%$ register rate
-buys: enough physically assemblable, measurable diversity that the experiment,
-not the predictor, does the selecting.
 
 \subsection*{Searching the library moves activity}
 

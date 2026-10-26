@@ -1,0 +1,90 @@
+% The cost argument. New file, 2026-10-25, for the restarted framing: the
+% introduction's "cost prohibitive" is currently an assertion, and this is
+% where it becomes arithmetic.
+%
+% Deliberately a scaffold. The figures, the identity and the numbers are here
+% because they are infrastructure; the argument is yours to write. The same
+% material is worked through at length in campaigns.pdf \S11 if you want a
+% draft to react to rather than a blank page.
+\section{What a combinatorial library costs}
+\label{sec:res:cost}
+
+\plan{\textbf{Yours to write.} The job of this section, given where it now
+sits: Section~\ref{sec:res:ranking} has just established that nothing ranks the
+candidates, so the obvious move is to order them all. This section is why that
+is not available, and why the combinatorial form is not merely cheaper but
+\emph{differently} priced --- exponential in $k$ where a one-sequence-per-well
+library is linear.
+
+The one-line version: a million unique full-length genes is \$42M; the same
+million as a $k = 6$ combinatorial library is under \$500.}
+
+A protein of $L$ amino acids is $3L$ bases. Cut it into $k$ equal fragments and
+each fragment is $3L/k$ bases, so a budget $B$ at a price $c$ per base buys
+
+\begin{equation}
+  v \;=\; \frac{B}{3Lc}
+  \qquad\text{variants per slot,}\qquad
+  S \;=\; v^{k} \;=\; \left(\frac{B}{3Lc}\right)^{k}
+  \qquad\text{recombinants.}
+  \label{eq:cost}
+\end{equation}
+
+\noindent
+There is no $k$ in $v$: cutting into $k$ pieces buys $k$ times as many
+fragments, each $1/k$ as long, and the two cancel. Taking logs,
+$\log S = k(\log B - \log B_1)$ for $B_1 = 3Lc$ the cost of one full-length
+gene, so on logarithmic axes the model is a fan of straight lines of slope $k$,
+all pivoting on $B_1$.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/pdf/panel_cost_size.pdf}
+  \caption{Left: Equation~\ref{eq:cost} drawn. $k = 1$ is the line without
+  recombination --- buy $v$ genes, have $v$ sequences --- and the vertical
+  distance from it to any other line is what recombination buys for the same
+  money. Because the axes are logarithmic a different price per base slides the
+  pivot sideways and changes nothing else. Right: the same model inverted ---
+  what a target library size costs, and how much of that is the vendor's order
+  minimum rather than the model.}
+  \label{fig:cost-size}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/pdf/panel_cost_k.pdf}
+  \caption{Vendor terms, which Equation~\ref{eq:cost} ignores. A fragment is
+  billed at $\max(m,\, 3L/k + h)$ for an order minimum $m$ and $h$ bases of
+  Golden Gate sites and overhangs. On a \num{200}-aa enzyme the minimum binds
+  from $k = 3$ onward and by $k = 8$ three quarters of every base bought is
+  padding. The library still grows with $k$ --- the exponent beats the division
+  --- so cost does not select a $k$.}
+  \label{fig:cost-k}
+\end{figure}
+
+\plan{\textbf{Numbers that are settled}, at Twist eBlock pricing
+(\$0.07 per base, confirmed) for a \num{200}-aa enzyme:
+\begin{planlist}
+  \item One full-length gene is \$42. A \$\num{10000} order therefore stocks
+        \num{238} variants in every slot, \emph{however finely it is cut}.
+  \item At $k = 6$ that is $\num{1.8e14}$ recombinants, against \num{238}
+        sequences without recombination.
+  \item Reaching $10^{12}$ recombinants costs \$\num{42000} at $k = 4$ and
+        \$\num{1329} at $k = 8$.
+\end{planlist}
+
+\textbf{And the honest limits}, which belong in the text rather than a
+footnote. The order minimum $m = \num{300}$ bases and adapter overhead
+$h = \num{40}$ bases are \emph{assumed} and should be checked against a live
+quote; the price per base is not assumed. Nothing in this section is measured
+--- it is arithmetic on a price --- and it says nothing about whether a library
+\emph{works}, which is Section~\ref{sec:res:fragments}. Two libraries of
+identical size differ by 50 points of pass rate.
+
+\textbf{What binds before the budget does}, all three worth stating because
+they are the reason this section is not the end of the argument: stocking $v$
+variants needs $v$ passing designs, so the \num{256}-parent libraries run out
+at \$\num{10752}; one-pot assembly gives ${\sim}10^{9}$ transformants; and the
+one screen this project has run read \num{3135} wells. Synthesis sets the
+ceiling. It has never set the floor --- which is what the rest of the paper is
+about.}

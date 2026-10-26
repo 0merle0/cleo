@@ -51,13 +51,23 @@
 \input{methods/method}
 
 % --- Results -------------------------------------------------------------
-% Order inherited from the previous framing and NOT yet revisited for this
-% one. frontier.tex argues the RL result first, which under the new framing is
-% a method property rather than the headline. The library result (fragments)
-% and the assayed library (experimental) may want to lead instead.
-\input{results/frontier}
+% Reordered 2026-10-25 to the spine the new introduction sets up:
+%
+%   can't rank  ->  can't afford to order everything  ->  so build a library
+%
+% ranking   the measurement behind "nearly impossible to rank". Lifted
+%           verbatim out of experimental.tex, where it was a subsection.
+% cost      the arithmetic behind "cost prohibitive". New, scaffolded.
+% fragments the library itself: recombination works, and what makes it work.
+% experimental  one built, assembled and assayed.
+% frontier  support, not headline: why the policy rather than temperature.
+%           Still carries its old section title, which claims the result the
+%           previous framing led with. Retitling it is a writing decision.
+\input{results/ranking}
+\input{results/cost}
 \input{results/fragments}
 \input{results/experimental}
+\input{results/frontier}
 
 \input{conclusion}
 
