@@ -1,0 +1,367 @@
+% The narrative deck. Built with `make campaigns` -> campaigns.pdf
+%
+% A fourth document, alongside main.tex (the paper), notebook.tex (the AME
+% programme record) and library_notebook.tex (the library arc).
+%
+% This one exists for a different job from all three: choosing what the paper
+% argues, before it argues it. Every campaign in the project measures the same
+% two quantities -- how much of a library folds, and how much sequence space it
+% covers -- and each one puts a different dial on the trade between them. Here
+% each campaign gets one panel, the tree it came from, and the one thing it
+% cannot say. The arcs at the end are then picked from the panels rather than
+% assembled around a conclusion already chosen.
+%
+% Figures: paper/figures/campaign_panels.py -> figures/svg/panel_c*.svg
+\documentclass[11pt]{article}
+
+\input{preamble}
+
+% Each section IS one panel, so a float that drifts to the next page separates
+% a figure from the reading written about it. [H] pins them in place.
+\usepackage{float}
+
+\newcommand{\provenance}[1]{%
+  {\footnotesize\color{cleoGray}\texttt{#1}}\par\vspace{0.4em}}
+
+% "What it shows" against "what it can't say", side by side, because the second
+% is the part that gets lost when a panel is lifted into a paper.
+\newenvironment{reading}%
+  {\par\vspace{0.6em}\noindent\begin{minipage}[t]{0.47\textwidth}%
+   \footnotesize\textbf{What it shows.}\ }%
+  {\end{minipage}\par\vspace{0.9em}}
+\newcommand{\limit}[1]{%
+  \end{minipage}\hfill\begin{minipage}[t]{0.47\textwidth}%
+  \footnotesize\textcolor{cleoRed}{\textbf{What it can't say.}}\ #1}
+
+\title{\cleo{}: ten campaigns, one trade}
+\author{}
+\date{Narrative deck --- compiled \today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+One panel per experimental campaign, on matched axes where the axes are
+genuinely matched. The recurring quantity is a Pareto trade: oracle pass rate
+against sequence diversity, first over single designs and then over the
+recombined library that the combinatorial filter actually produces. The
+closing section names three narrative arcs these panels will carry, with the
+panel that argues against each. This document is for choosing the argument,
+not for making it.
+\end{abstract}
+
+\vspace{1em}
+\noindent\textbf{How to read every panel.} Up is a library with fewer dead
+wells. Right is a library covering more sequence space. $U_{15}$ is the count
+of distinct (position, residue) substitutions rarefied to 15 passing designs
+over 300 draws, measured against the per-position modal residue of the
+LigandMPNN temperature sweep on the same backbone --- the reference under which
+the published baseline comparator reproduces. Library diversity is the same
+quantity over passing library members, rarefied to a matched count, so an arm
+cannot win it merely by having more of its library fold.
+
+\clearpage
+\tableofcontents
+\clearpage
+
+\section{C1 --- Temperature is the dial everyone already has}
+\provenance{experiments/ame/tempsweep · M0097\_1ctt · LigandMPNN, 96 designs per T}
+
+The comparator campaign. Sampling temperature is how diversity is bought out of
+LigandMPNN today, and it charges pass rate for every point of coverage.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=0.82\textwidth]{figures/pdf/panel_c1.pdf}
+  \caption{Six independent operating points, shaded light to dark by
+  temperature. They are deliberately not joined: a line between them would
+  assert a continuity nobody measured. $T = 1.0$ is omitted --- at
+  \SI{4.2}{\percent} pass, too few designs survive to rarefy to 15; its mean
+  pairwise Hamming is 126.3.}
+\end{figure}
+
+\begin{reading}
+The best diversity the baseline reaches while still folding is
+$U_{15} = \num{607}$ at \SI{26.0}{\percent} pass, at $T = 0.7$. Past that the
+curve falls off a cliff.
+\limit{One backbone. $T = 0.3$ scores \emph{below} $T = 0.2$ on pass rate, so
+even the baseline curve is not monotone at $n = 96$ --- read the shape, not the
+individual points.}
+\end{reading}
+
+\section{C2 --- The KL anchor is the dial RL adds}
+\provenance{experiments/ame/klsweep\_table.py · run\_M0097\_1ctt\_cond9\_14\_klw* · 200 steps, 640 designs per arm}
+
+Six arms of one config differing only in \texttt{kl\_weight}. The anchor holds
+the policy near the pretrained model, so raising it trades pass rate back for
+coverage --- the same trade as temperature, on a different mechanism.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{figures/pdf/panel_c2.pdf}
+  \caption{Left: dashed segments show the ordering of \texttt{kl\_weight} only,
+  not an interpolation. Right: raw $U$ peaks at $w = 0.02$ and then
+  \emph{falls} to \num{1731} at $w = 0.10$, because so few designs pass that
+  there is nothing left to count, while rarefied $U_{15}$ keeps climbing. The
+  gap between those two curves is the whole argument for rarefaction. Every
+  cell regenerates from \texttt{klsweep\_table.py}, the single definition of
+  these numbers.}
+\end{figure}
+
+\begin{reading}
+$w = 0.02$ buys $U_{15} = \num{803}$ at \SI{56.7}{\percent} pass. The dial is
+real and it is smooth over four orders of magnitude of weight.
+\limit{One seed per arm. Two unseeded runs of one config on this benchmark gave
+\SI{68.8}{\percent} and \SI{89.6}{\percent} control pass --- a 21-point swing,
+wider than the gap between the first two arms here.}
+\end{reading}
+
+\section{C3 --- The two dials are not on the same frontier}
+\provenance{C1 × C2 overlaid · same backbone, same reference, same $U_{15}$ estimator}
+
+C1 and C2 share a backbone, a reference sequence and a rarefaction depth, so
+their points go on one axis pair without rescaling. This is the comparison the
+paper is built on.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=0.86\textwidth]{figures/pdf/panel_c3.pdf}
+  \caption{The shaded quadrant is everything that dominates the baseline's best
+  folding point: $U_{15} > \num{607}$ \emph{and} pass $>$ \SI{26.0}{\percent}.
+  Three KL arms sit inside it; no temperature setting does.}
+\end{figure}
+
+\begin{reading}
+A frontier \emph{shift}, not a point win. RL does not merely pick a better spot
+on the existing trade --- it moves the achievable set outward. At $w = 0.02$ the
+policy carries $1.32\times$ the baseline's coverage at $2.2\times$ its pass
+rate.
+\limit{Mean pairwise Hamming at $w = 0.02$ is 114.4 against the baseline's
+100.5 at $T = 0.7$: comparable, not better. The win is in \emph{distinct
+substitutions at matched design count}, and the claim should be stated that
+narrowly.}
+\end{reading}
+
+\clearpage
+\section{C4 --- Which part of the method did the work}
+\provenance{experiments/ame/\ldots\_conv200\{\_legacy, \_surr, (none), \_kl\} · one backbone, four objectives}
+
+An A/B ladder over the objective itself: the legacy reward, then the surrogate
+fix, the log-prob fix, and the KL anchor on top. Each row is the row above it
+plus one change.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{figures/pdf/panel_c4.pdf}
+  \caption{Two charts rather than two $y$-axes on one. The category order is
+  the order the fixes were applied, which is itself information.}
+\end{figure}
+
+\begin{reading}
+The first three steps move pass rate around and barely touch coverage
+($\num{468} \to \num{571} \to \num{506}$). \textbf{Only the KL anchor moves
+$U_{15}$}, by \num{297} points. The diversity result is attributable to one
+component.
+\limit{The surrogate-fix arm is the \emph{best} on pass rate
+(\SI{88.8}{\percent}) and is not the arm the paper headlines. All are single
+draws; the six replicates behind this family run 571, 510, 544 with the fix and
+506, 511, 410 without --- means 542 and 476, every one under the baseline's
+\num{607}.}
+\end{reading}
+
+\section{C5 --- Recombining across backbones, easy to nearly impossible}
+\provenance{experiments/ame/r1panel/recomb · 9 backbones · 256 recombinants per cell, AF3 best-of-5}
+
+The first campaign at library scale: cut passing designs into fragments,
+recombine across parents, fold the chimeras. Backbones are ordered by how dead
+the RFdiffusion2 benchmark finds them, which is the axis along which the result
+matters.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=0.82\textwidth]{figures/pdf/panel_c5.pdf}
+  \caption{Each line is one backbone, sampled at $T = 1.0$ to the RL policy.
+  Mean \SI{53.5}{\percent} against \SI{30.5}{\percent}, RL ahead on 8 of 9. The
+  single loss, in red, is M0050\_1dbt at \SI{97}{\percent} dead, where both arms
+  are in single digits.}
+\end{figure}
+
+\begin{reading}
+The gain is largest exactly where the benchmark is hardest --- M0255\_1mg5 at
+\SI{77}{\percent} dead goes \num{25.8} to \num{79.3}. An improvement on an easy
+backbone is a convenience; this is a different kind of claim.
+\limit{Four backbones have no diversity reading --- too few passing members on
+one arm to rarefy against --- so the diversity comparison is 6 of 8, not 9 of 9.
+The two arms also differ in parent count, which is why C6 rarefies.}
+\end{reading}
+
+\clearpage
+\section{C6 --- The combinatorial filter, as a Pareto}
+\provenance{r1panel + fragbsweep/fragb16 ($k = 4$) + fragk ($k = 16$) · 3 backbones · all arms batch 16}
+
+Library pass rate against library diversity, for four ways of producing the
+parents. Both axes are properties of the \emph{recombined} library. This is the
+panel the thesis stands on.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{figures/pdf/panel_c6.pdf}
+  \caption{Faceted by backbone rather than overlaid: the arms cross each other
+  in diversity, so one axis draws four long segments over one another and the
+  shape of any single backbone becomes unreadable. Axes are shared. On
+  M0315\_1ey3 the two chimera arms very nearly coincide
+  (\num{1087.5}/\SI{97.3}{\percent} and \num{1083.5}/\SI{98.4}{\percent}) and
+  plot as one point.}
+\end{figure}
+
+\begin{reading}
+RL moves up and right of sampled on all three backbones --- a genuine
+dominance. The chimera objective then moves up again (\SI{93.4}{\percent}
+against \SI{76.7}{\percent}, 3 of 3) \textbf{and back to the left}: diversity
+\num{895.5} against \num{1139.4}, losing on 3 of 3. Cutting at $k = 16$ instead
+of $4$ recovers part of it (\num{951.6}) at the same pass rate.
+\limit{No arm here dominates every other. The chimera objective trades coverage
+for fidelity and \textbf{$k$ is the dial along that trade}. The paper currently
+argues for the chimera arm on pass rate alone; this panel is why that has to be
+stated as a position on a frontier rather than as a win.}
+\end{reading}
+
+\section{C7 --- How much of C6 could be a lucky seed}
+\provenance{experiments/ame/\{r1rep,fragb32\} · T2 library eval · 256 parents + 256 recombinants per cell}
+
+Two plain-RL replicates per backbone, differing only in \texttt{seed}, bound
+what a good draw buys. The chimera arm is then placed against that band.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=0.78\textwidth]{figures/pdf/panel_c7.pdf}
+  \caption{Bars span the two plain-RL seeds; the point is the chimera arm.
+  Margins over the top of the band are $+25.8$, $+52.0$ and $+34.8$ points ---
+  three to six times the largest seed-to-seed difference.}
+\end{figure}
+
+\begin{reading}
+This is why a single chimera seed is worth something here when single-seed
+results usually are not: the effect clears the whole measured band on every
+backbone.
+\limit{The band is measured on plain-RL/RF3 arms. \textbf{No pool arm has ever
+been run twice}, so the chimera point's own error bar is unmeasured. The
+contrast varies objective \emph{and} oracle together and cannot apportion the
+gain. Quote the recombinant pass rate, never retention --- retention swings
+$0.767 \to 1.611$ on an unchanged config.}
+\end{reading}
+
+\clearpage
+\section{C8 --- Whether the training number was ever honest}
+\provenance{experiments/ame/\{fragbsweep,fragb16,fragb32\}/offline\_probe · 38 held-out AF3 probe points}
+
+The reward sits inside a structure predictor, so a training pass rate is not
+evidence on its own. Gap $=$ oracle-balanced training level minus held-out AF3
+on chimeras rebuilt deterministically from the same step's parents.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{figures/pdf/panel_c8.pdf}
+  \caption{Above the zero line the training number overstates. Pooled over all
+  38 points: mean $+0.015$, median $-0.000$, with 7 of 38 overstating by more
+  than $0.10$. The pooled mean is carried by the two smallest cells, so it is
+  quoted with its breakdown or not at all.}
+\end{figure}
+
+\begin{reading}
+At batch 16 and 32 the in-loop number is honest to within $0.005$. The one
+contrast that isolates the oracle --- \texttt{fragb32} against
+\texttt{fragb32rf3}, both batch 32, both chimera-objective, both self-resumed
+--- puts \textbf{the oracle pool at $0.046$} of avoided overstatement.
+\limit{The hatched arm, \texttt{fragrl4} at $+0.279$, warm-starts from a
+\texttt{fragrl3} checkpoint while the pool arms start fresh. It varies
+initialisation as well as oracle: it is the arm the project started from, never
+the controlled contrast. Neither arm in the controlled pair is replicated in
+seed.}
+\end{reading}
+
+\section{C9 --- The only campaign with a wet lab in it}
+\provenance{adaptyv\_library · de novo PETase, 209\,aa, 5 fragments · 3,135 wells assayed}
+
+128 protein parts over five slots spanning $1.1 \times 10^{7}$ recombinants;
+1,920 BsaI DNA blocks, one-pot assembly, one well per recombinant.
+\textbf{\SI{67}{\percent} registered above background at a median of 29
+mutations from the parent.}
+
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{figures/pdf/panel_c9.pdf}
+  \caption{Left: scoring the right state at the right atoms is worth roughly
+  $2\times$ the global number. But distance from the parent ranks activity at
+  $-0.65$, better than any AF3 metric, so the zero-shot claim is made only on
+  the \num{2539} designs $\geq 20$ mutations out, where active-site pLDDT still
+  gives $+0.59$. Right: median activity by distance bin, log scale.}
+\end{figure}
+
+\begin{reading}
+The independence assumption that \texttt{results/fragments.tex} names as
+load-bearing survives a physical test. Searching the library does move activity:
+median $2.2 \to 12.2$ across four rounds, best recombinant $20.5 \to 31.7$, with
+the highest of all four ($47.8$) in round~2.
+\limit{No wild-type comparator was assayed, so no fold-over-parent number
+exists --- the archived $250\times$ was always a placeholder. The 20 designs
+scoring above 100 are a different assay run with no shared normalising control,
+so nothing crosses that line. And on this scaffold recombination at depth bought
+reachable diversity and a \SI{67}{\percent} register rate, \emph{not} a better
+enzyme than local work.}
+\end{reading}
+
+\clearpage
+\section{C10 --- The same pipeline on a second enzyme, and it inverts}
+\provenance{paper/figures/data/petase\_super\_*\_transfer.csv · second de novo hydrolase, 160\,aa, 2,509 purified}
+
+Each point is one metric, plotted by how well it predicted activity on PETase
+against how well it predicted on \texttt{super}. On the diagonal the metric
+transfers; in the off-diagonal quadrants it points the wrong way.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=0.86\textwidth]{figures/pdf/panel_c10.pdf}
+  \caption{AF3 concepts: $\rho$-of-$\rho$s $= -0.604$ over 49 shared concepts,
+  with only 10 of 49 agreeing in sign against ${\sim}24$ expected by chance.
+  All ten of PETase's strongest predictors invert, mean $+0.470 \to -0.100$.
+  Rosetta fails more mildly --- $+0.035$, 33 of 66 --- i.e. no transferable
+  signal rather than an inverted one.}
+\end{figure}
+
+\begin{reading}
+One family survives: PETase's three strongest Rosetta predictors are all
+His--Asp distance terms, and all three \textbf{keep their sign} while collapsing
+7--21$\times$ in magnitude. Catalytic-geometry strain points the same way on
+both enzymes and nearly stops mattering --- the only concept family that does.
+\limit{This is the wet-lab counterpart of C8, and it is the strongest argument
+in the paper for the library strategy: a predictor's agreement with the quantity
+you care about is a property of the specific system, re-earned per target, never
+inherited. Because zero-shot scores do not transfer, selection has to be done by
+experiment --- which is what a combinatorially compatible library at a
+\SI{67}{\percent} register rate is for.}
+\end{reading}
+
+\clearpage
+\section{Three arcs these panels will carry}
+
+Each arc names the panels that carry it and the panel that argues against it.
+
+\paragraph{Arc 1 --- RL moves the frontier.}
+C1 $\to$ C2 $\to$ C3 as the spine, C5 for breadth, C6 for the library payoff.
+\emph{Against it:} C4, where only one of four components moves coverage at all,
+and the best pass rate belongs to an arm the paper does not headline.
+
+\paragraph{Arc 2 --- fragments are the unit.}
+C6 $\to$ C7 as the spine, C9 for physical realizability. \emph{Against it:} C6
+again --- the chimera objective loses diversity on 3 of 3 backbones, so
+``recombinable'' is bought, not free.
+
+\paragraph{Arc 3 --- you cannot predict, so you must order.}
+C8 $\to$ C10 as the spine, with C6 as the thing you order and C9 as proof it
+assembles. \emph{Against it:} nothing in these panels. It rests on the two
+strongest results in the project --- 38 probe points and two independent enzyme
+screens --- and it makes the diversity/fidelity frontier the deliverable rather
+than the claim.
+
+\vspace{1em}
+\noindent\textbf{What is not regenerable.} Table~1's \cleo{} rows cannot be
+rebuilt: \texttt{backbone19} and \texttt{selection2} were pruned and no archive
+survives, which also breaks \texttt{ame\_diversity.py},
+\texttt{ame\_frontier.py} and \texttt{ame\_novelty.py}. The panels here avoid
+those trees entirely.
+
+\end{document}

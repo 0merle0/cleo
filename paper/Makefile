@@ -1,4 +1,4 @@
-.PHONY: pdf notebook library all svg2pdf clean watch
+.PHONY: pdf notebook library campaigns all svg2pdf clean watch
 
 LATEX = latexmk -pdf -interaction=nonstopmode -halt-on-error
 SVG_DIR = figures/svg
@@ -22,7 +22,7 @@ PDFS := $(patsubst $(SVG_DIR)/%.svg,$(PDF_DIR)/%.pdf,$(SVGS))
 # `make pdf` builds the paper only. The experimental record is a separate
 # document with a separate reader -- see the header of notebook.tex for why the
 # two are not one file. `make all` builds both.
-all: pdf notebook library
+all: pdf notebook library campaigns
 
 pdf: svg2pdf
 	$(LATEX) main.tex
@@ -34,6 +34,11 @@ notebook: svg2pdf
 # programme, and the arc that retired three of its claims.
 library: svg2pdf
 	$(LATEX) library_notebook.tex
+
+# The narrative deck: one panel per campaign, for choosing what the paper
+# argues before it argues it. See the header of campaigns.tex.
+campaigns: svg2pdf
+	$(LATEX) campaigns.tex
 
 svg2pdf: $(PDFS)
 
