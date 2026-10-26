@@ -18,6 +18,11 @@ axis. The answer is the gap between the curves:
                   further than `ame_granularity.py` implies;
   gap persists -> the decline is physical, and that is the method's boundary.
 
+Top row is that comparison per backbone; bottom left is the gap itself against
+k; bottom right is library diversity, which does not order in k and is plotted
+against k rather than against pass rate so that it cannot be read as a
+frontier.
+
 Three things to know about what is being compared.
 
 **Retention is the recombinant pass rate, undivided.** Recombinants are built
@@ -200,64 +205,64 @@ def panel_retention(d, fig, gs):
     return axes
 
 
-def panel_rates(d, ax):
-    """Recombinant rate against the unselected sample rate it came from.
+def panel_gap(d, ax):
+    """How far training at k lifts retention above cutting a k=4 policy at k.
 
-    Not a ratio -- the two are plotted side by side because the sample rate is
-    a property of the policy and the recombinant rate is a property of its
-    fragments, and k moves only the second.
+    The difference the top row shows three times, read off one axis so its
+    trend in k is visible. A gap that widens with k is the signature of
+    train/test mismatch: the further the recombination is from what the policy
+    was trained on, the more training at k recovers.
     """
     for site in sorted(BB):
-        g = d[(d.site == site) & (d.cond == "trained")].sort_values("k")
+        g = (d[d.site == site].pivot(index="k", columns="cond",
+                                     values="retention")
+             .dropna().sort_index())
         if not len(g):
             continue
-        ax.plot(g.k, 100 * g.retention, "-", color=C["trained"], lw=2,
-                marker=MARK[site], ms=7, mec=C["trained"], mfc=C["trained"],
-                label=None)
-        ax.plot(g.k, 100 * g.sample_pass, "--", color=PALETTE["gray"], lw=1.5,
-                marker=MARK[site], ms=6, mec=PALETTE["gray"], mfc="white",
-                label=None)
-    # Identity is the marker, the measured quantity is the colour+dash; a
-    # legend keyed on one backbone's two lines would claim the other two are
-    # something else.
-    h = [Line2D([], [], color=C["trained"], lw=2, label="recombinants"),
-         Line2D([], [], color=PALETTE["gray"], lw=1.5, ls="--",
-                label="unselected sample")]
-    h += [Line2D([], [], color=PALETTE["gray"], lw=0, marker=MARK[s_], ms=6,
-                 mfc="white", mec=PALETTE["gray"], label=s_)
-          for s_ in sorted(BB)]
+        ax.plot(g.index, 100 * (g.trained - g.posthoc), "-",
+                color=C["trained"], lw=1.5, marker=MARK[site], ms=8,
+                mec="white", mew=1, label=site)
+    ax.axhline(0, color=PALETTE["gray"], lw=1)
+    ax.set_xscale("log", base=2)
+    ax.set_xticks([2, 8, 16])
+    ax.set_xticklabels(["2", "8", "16"])
+    ax.set_xlabel("fragments per design, $k$")
+    ax.set_ylabel("retention gained by training at $k$ (pts)")
+    ax.set_title("the gap widens with $k$", fontsize=10)
+    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    grid(ax)
+
+
+def panel_diversity(d, ax):
+    """Library diversity against k, trained-at-k only.
+
+    Plotted against k rather than against pass rate. An earlier version drew
+    diversity-vs-pass with k labelled along the path, which looks like a
+    frontier -- but the points are not ordered in k on any backbone, so the
+    curve implied a trade-off the data does not show. Drawn this way the
+    non-monotonicity is visible as what it is.
+
+    Rarefied within each backbone to that backbone's smallest passing count,
+    so the levels are comparable down a column but not across backbones; the
+    three series are offset in absolute height for that reason.
+    """
+    for site in sorted(BB):
+        g = (d[(d.site == site) & (d.cond == "trained")]
+             .dropna(subset=["diversity"]).sort_values("k"))
+        if not len(g):
+            continue
+        n = int(g.rarefied_to.iloc[0])
+        ax.plot(g.k, g.diversity, "-", color=C["trained"], lw=1.5,
+                marker=MARK[site], ms=8, mec="white", mew=1,
+                label=f"{site} (rarefied to {n})")
     ax.set_xscale("log", base=2)
     ax.set_xticks([2, 4, 8, 16])
     ax.set_xticklabels(["2", "4", "8", "16"])
     ax.set_xlabel("fragments per design, $k$")
-    ax.set_ylabel("pass rate (%)")
-    ax.set_title("recombinants vs the sample they came from", fontsize=10)
-    ax.legend(handles=h, frameon=False, fontsize=7, loc="lower left", ncol=2)
+    ax.set_ylabel("distinct substitutions (rarefied)")
+    ax.set_title("diversity does not order in $k$", fontsize=10)
+    ax.legend(frameon=False, fontsize=8, loc="lower right")
     grid(ax)
-
-
-def panel_trade(d, ax):
-    """Library pass against library diversity, k labelled along each path."""
-    for site in sorted(BB):
-        g = d[(d.site == site) & (d.cond == "trained")
-              ].dropna(subset=["diversity"]).sort_values("k")
-        if not len(g):
-            continue
-        ax.plot(g.diversity, 100 * g.retention, "-", color=C["trained"],
-                lw=1.5, alpha=0.6, zorder=2)
-        ax.plot(g.diversity, 100 * g.retention, MARK[site], ms=8,
-                color=C["trained"], mec="white", mew=1, zorder=3,
-                label=site)
-        for r in g.itertuples():
-            ax.annotate(f"$k$={r.k}", (r.diversity, 100 * r.retention),
-                        textcoords="offset points", xytext=(6, 5),
-                        fontsize=7, color=PALETTE["gray"])
-    ax.margins(x=0.12)
-    ax.set_xlabel("distinct substitutions in passing library (rarefied)")
-    ax.set_ylabel("library pass rate (%)")
-    ax.set_title("up and to the right is better", fontsize=10)
-    ax.legend(frameon=False, fontsize=8, loc="lower left")
-    grid(ax, axis="both")
 
 
 def grid(ax, axis="y"):
@@ -316,8 +321,8 @@ def main():
     fig = plt.figure(figsize=(11, 7.4))
     gs = fig.add_gridspec(2, 6, height_ratios=[1, 1], hspace=0.45, wspace=0.55)
     panel_retention(d, fig, gs)
-    panel_rates(d, fig.add_subplot(gs[1, 0:2]))
-    panel_trade(d, fig.add_subplot(gs[1, 3:6]))
+    panel_gap(d, fig.add_subplot(gs[1, 0:3]))
+    panel_diversity(d, fig.add_subplot(gs[1, 3:6]))
     save(fig, "ame_fragk")
     d.drop(columns=["seqs"]).to_csv(HERE / "data" / "ame_fragk.csv", index=False)
     print(f"wrote {HERE / 'data' / 'ame_fragk.csv'}")
