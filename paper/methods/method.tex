@@ -1,0 +1,40 @@
+% Method. Your draft of 2026-10-25, mechanical fixes only --- see intro.tex.
+% The detailed pipeline (configs, oracles, reward aggregation) stays in
+% methods/overview.tex, which this section currently duplicates in part.
+\section{Method}
+
+We find that we can train for the objective of maximizing the ability of
+fragments from ProteinMPNN\todo{sentence is incomplete --- maximizing their
+ability to \emph{what}? recombine? fold when recombined?}. To do this we take a
+protein of length $L$ and we split it up into $K$ fragments such that each
+fragment $f_i$ is approximately $L/K$ amino acids long. Fragments are
+purposely built to be equal length to make DNA assembly easier, and empirically
+we do not find that it matters so much how you split up the protein (i.e.\
+secondary structure, domains, etc.). We find that it is possible to find a
+space of protein fragments that are highly combinable while also still diverse.
+By treating the ProteinMPNN decoder as a policy conditioned on the encoded
+backbone, we can do a short RL trajectory to align the decoder to the space of
+highly compatible combinatorial fragments. For an encoded backbone we decode
+$B$ sequences, then we split each into fragments, sample the fragments into a
+larger pool of sequences $B \times 4$ such that each fragment is seen 4 times
+in different combinations. When each sequence is folded a score is computed by
+measuring RMSDs in the active site and confidence. We aggregate these into a
+score for each fragment by averaging the score across all the sequences that
+fragment was contained in. We provide rewards at the fragment level when we go
+to update the policy. This means that each fragment in a given sequence will
+receive a different reward. In practice there might be some issues here because
+as the fragments are being decoded they will condition on other fragments as
+well, but empirically this objective seems to be stable and optimizes with the
+GRPO objective~\cite{shao2024deepseekmath}.
+
+\plan{Three details from the implementation that this paragraph does not yet
+state, all of which a referee will ask for.
+(i)~\textbf{The pool contains unrecombined parents.} \texttt{build\_chimeras}
+maps $(\rho, i)$ to parent $(i + \rho j) \bmod B$, so the $\rho = 0$ rotation
+returns the parent itself --- 32 of every 128 chimeras at every $k$. Whether
+that is deliberate (an anchor on the parental distribution) is worth one
+sentence either way.
+(ii)~\textbf{Only $k = 4$ was ever trained.} Everything in this paper about
+granularity re-cuts $k = 4$ designs post hoc.
+(iii)~\textbf{The fold is best-of-5.} That is the AME benchmark's own unit;
+a single-sample run measures something the benchmark does not.}

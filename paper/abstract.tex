@@ -1,33 +1,13 @@
+% Yours to write. Deliberately empty rather than scaffolded: the previous
+% abstract carried bracketed placeholders ([3.98], [XX], [10^X], [250]) that
+% reached the rendered PDF for weeks because \draftmodetrue does not hide them.
+% An empty abstract is honest about its state; a fake one is not.
 \begin{abstract}
-\plan{Science abstract target: ${\sim}125$ words. Written last, on purpose ---
-it should compress the actual results rather than lead them. The structure below
-follows the three-move spine: frontier, fragments, PETase. Numbers in
-\texttt{[brackets]} are the ones that must be filled from measurement, not
-estimated.}
-\begin{planlist}
-  \item \textbf{Hook.} De novo design now produces enzyme backbones faster than
-        they can be optimized. Optimization needs libraries that are large,
-        diverse \emph{and} target-specific; existing methods deliver at most two
-        of the three.
-  \item \textbf{Move 1 --- the frontier.} GRPO fine-tuning of LigandMPNN
-        against a structure-prediction reward moves the diversity/fidelity
-        trade-off rather than sliding along it: on a public benchmark,
-        \textbf{[3.98]}$\times$ the pass rate at matched sequence diversity.
-  \item \textbf{Move 2 --- the fragments.} Splitting designs at fixed boundaries
-        and recombining across them turns $\sum_i |F_i|$ synthesized parts into
-        $\prod_i |F_i|$ testable variants, and the recombinants retain
-        \textbf{[XX]}\,\% of the parental pass rate --- a physically buildable
-        library of \textbf{[10\^{}X]} members.
-  \item \textbf{Move 3 --- the demonstration.} Three rounds of closed-loop
-        optimization on a de novo PETase: a pilot library on a fluorogenic
-        probe, a larger library on a PET-proximal substrate, and a third
-        library designed from the accumulated sequence--activity data.
-  \item \textbf{Headline.} The best construct is \textbf{[250]}$\times$ faster
-        than the starting design and exceeds every characterized natural enzyme
-        on the same probe.
-  \item \textbf{Implication.} Function-aligned search plus manufacturing-aware
-        library construction plus an experimental closed loop is a general
-        recipe for de novo enzyme optimization.
-\end{planlist}
-\todo{abstract --- write once the fragment and PETase numbers land}
+\noindent
+\plan{Abstract --- yours. The numbers that are settled and quotable, if you
+want them to hand: library pass \SI{53.5}{\percent} against
+\SI{30.5}{\percent} sampled over 9 backbones; the chimera objective at
+\SI{93.4}{\percent} on 3 of 3; \num{3135} wells assayed at a
+\SI{67}{\percent} register rate, median 29 mutations from the parent; and the
+cost identity, $S = (B/3Lc)^{k}$.}
 \end{abstract}
