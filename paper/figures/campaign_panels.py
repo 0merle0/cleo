@@ -375,7 +375,173 @@ def c10():
     save(fig, "panel_c10"); plt.close(fig)
 
 
+
+
+# ---------------------------------------------------------------------------
+# Cost. Not a campaign -- no data, a design calculation -- but it is the
+# question every one of the campaigns above is eventually answerable to.
+#
+# The model, stated so it can be argued with:
+#
+#   A protein of L amino acids is 3L bp. Split it into k equal fragments and
+#   each fragment is 3L/k bp. With a budget B and synthesis priced at c per
+#   base, you can buy B/c bases, which is B/(3Lc) full-length-equivalents of
+#   DNA. Spread over k slots, the number of variants you can stock per slot is
+#
+#       v = B / (3 L c)          <- note: no k in it
+#
+#   because cutting into k pieces buys k times as many fragments, each 1/k as
+#   long. The two cancel exactly. Recombining across slots then gives
+#
+#       S = v^k = (B / (3 L c))^k
+#
+#   So in the idealised model k is a pure exponent on a number set entirely by
+#   budget, and doubling the budget multiplies library size by 2^k.
+#
+# Two corrections that are not optional in practice:
+#
+#   adapters  Each fragment needs its own Golden Gate sites and overhangs,
+#             h bp that are paid for and are not payload. Cost per fragment is
+#             c(3L/k + h), so the fragment count no longer scales as k.
+#   minimum   Synthesis is sold with a minimum billable length m. Below it you
+#             pay for m and receive 3L/k. On a 200-aa
+#             protein that floor binds from k = 3 onward, and by k = 8 most of
+#             every base bought is padding.
+#
+# Both are vendor terms rather than physics, so they are parameters here.
+# COST_BP is Twist eBlock pricing, confirmed. MIN_BP and ADAPTER_BP are
+# order-of-magnitude placeholders and are the two numbers to check against a
+# live quote before anyone plans a spend from this figure.
+AA = 200             # enzyme length in amino acids
+COST_BP = 0.07       # $/base, Twist eBlocks
+ADAPTER_BP = 40      # Golden Gate sites + overhangs per fragment (assumed)
+MIN_BP = 300         # minimum billable fragment length (assumed)
+PARENTS = 256          # parents per cell in the T2 library evaluations (C6, C7)
+# The PETase library as actually ordered: 5 slots, 25-26 variants each = 128
+# distinct protein parts spanning 1.1e7 recombinants, but 1,920 DNA parts were
+# ordered to realise them. The gap is what redundancy costs.
+PETASE = dict(aa=209, k=5, per_slot=25.6, size=1.1e7, protein_parts=128,
+              dna_parts=1920)
+
+
+def variants_naive(budget, aa=AA, c=COST_BP):
+    return budget / (3 * aa * c)
+
+
+def billable_bp(k, aa=AA, h=ADAPTER_BP, m=MIN_BP):
+    """-> bp charged for one fragment, after adapters and the order minimum."""
+    return max(m, 3 * aa / k + h)
+
+
+def variants_real(budget, k, aa=AA, c=COST_BP, h=ADAPTER_BP, m=MIN_BP):
+    return budget / (c * k * billable_bp(k, aa, h, m))
+
+
+def cost_size():
+    """Library size against budget, idealised. Log-log, so a different price
+    per base slides every curve sideways without changing its shape.
+
+    The two horizontal rules are the point of the panel: what the budget buys
+    runs past what can be built, and far past what can be screened, at a spend
+    that is small next to the cost of the experiment around it.
+    """
+    fig, ax = plt.subplots(figsize=(6.0, 4.0))
+    grid(ax, "both")
+    TOP = 1e18
+    B = np.logspace(np.log10(500), np.log10(1e6), 300)
+    v = variants_naive(B)
+    for k, col in zip([2, 4, 6, 8, 16],
+                      ["#C7D2E4", "#8FA8C8", C_RL, "#1F3D63", "#0F2440"]):
+        y = v ** k
+        ax.plot(B, y, color=col, lw=1.8, zorder=3)
+        if y[-1] > TOP:                      # label where the curve exits
+            xb = B[np.argmax(y > TOP)]
+            ax.annotate(f"$k{{=}}{k}$", (xb, TOP), xytext=(2, -11),
+                        textcoords="offset points", fontsize=8, color=col)
+        else:
+            ax.annotate(f"$k{{=}}{k}$", (B[-1], y[-1]), xytext=(5, -3),
+                        textcoords="offset points", fontsize=8, color=col)
+
+    for yv, lab in ((1e9, "~$10^9$ transformants: one-pot assembly ceiling"),
+                    (3135, "3,135 wells: the PETase screen actually run")):
+        ax.axhline(yv, color="#6B7280", lw=1.0, ls=(0, (3, 3)), zorder=2)
+        ax.annotate(lab, (5.6e2, yv), xytext=(0, 4), textcoords="offset points",
+                    ha="left", fontsize=7.5, color="#6B7280",
+                    bbox=dict(fc="white", ec="none", pad=1.0))
+
+    thresh = PARENTS * 3 * AA * COST_BP
+    ax.axvspan(thresh, 2e6, color=C_WARN, alpha=0.05, zorder=0)
+    ax.axvline(thresh, color=C_WARN, lw=1.2, ls=(0, (4, 3)), zorder=2)
+    ax.annotate(f"\\${thresh:,.0f}", (thresh * 1.15, 1.4e2), fontsize=8,
+                color=C_WARN, va="bottom",
+                bbox=dict(fc="white", ec="none", pad=1.0))
+
+    pet_min = PETASE["protein_parts"] * MIN_BP * COST_BP
+    pet_ord = PETASE["dna_parts"] * MIN_BP * COST_BP
+    ax.plot([pet_min, pet_ord], [PETASE["size"]] * 2, color=C_CHIM4, lw=1.0, zorder=4)
+    for x, mk in ((pet_min, "o"), (pet_ord, "s")):
+        ax.scatter([x], [PETASE["size"]], marker=mk, s=50, color=C_CHIM4,
+                   ec="white", lw=1.2, zorder=5)
+    ax.annotate("PETase library, $1.1\\times10^{7}$ recombinants:\n"
+                f"{PETASE['protein_parts']} distinct parts (circle) ordered as\n"
+                f"{PETASE['dna_parts']:,} DNA parts (square)",
+                (pet_ord, PETASE["size"]), xytext=(10, -2),
+                textcoords="offset points", fontsize=7, color=C_CHIM4, va="top")
+
+    ax.set_xscale("log"); ax.set_yscale("log")
+    ax.set_xlim(500, 2e6); ax.set_ylim(1e2, TOP)
+    ax.set_xlabel(f"synthesis budget (\\$, Twist eBlocks at \\${COST_BP:.2f} per base)")
+    ax.set_ylabel("library size (recombinants)")
+    ax.set_title(f"{AA}-aa enzyme cut into $k$ equal fragments; "
+                 f"$v = B/(3Lc)$ variants per slot", loc="left", fontsize=8.5)
+    save(fig, "panel_cost_size"); plt.close(fig)
+
+
+def cost_k():
+    """What the order minimum does to the idealised answer."""
+    fig, (a, b) = plt.subplots(1, 2, figsize=(7.4, 3.1),
+                               gridspec_kw={"width_ratios": [1.15, 1]})
+    grid(a, "both")
+    ks = np.arange(2, 25)
+    for B, col in ((2000, "#9FB6D1"), (10000, C_RL), (50000, "#0F2440")):
+        ideal = [variants_naive(B) ** k for k in ks]
+        real = [max(variants_real(B, k), 1e-9) ** k for k in ks]
+        a.plot(ks, ideal, color=col, lw=1.3, ls=(0, (4, 3)), zorder=2)
+        a.plot(ks, real, color=col, lw=2.0, zorder=3)
+        a.annotate(f"\\${B:,}", (ks[-1], min(real[-1], 6e24)), xytext=(5, -3),
+                   textcoords="offset points", fontsize=8, color=col)
+    a.set_yscale("log"); a.set_ylim(1e2, 1e26); a.set_xlim(1.5, 27)
+    a.set_xlabel("$k$, fragments per construct")
+    a.set_ylabel("library size (recombinants)")
+    a.set_title("dashed: idealised. solid: after adapters and the order minimum",
+                loc="left", fontsize=8)
+
+    grid(b)
+    kk = [2, 3, 4, 6, 8, 12, 16]
+    payload = np.array([3 * AA / k for k in kk])
+    adapter = np.full(len(kk), float(ADAPTER_BP))
+    padding = np.array([max(0.0, MIN_BP - 3 * AA / k - ADAPTER_BP) for k in kk])
+    b.bar(range(len(kk)), payload, 0.62, color=C_RL, label="payload", zorder=2)
+    b.bar(range(len(kk)), adapter, 0.62, bottom=payload, color=C_SAMP,
+          label="adapters", zorder=2)
+    b.bar(range(len(kk)), padding, 0.62, bottom=payload + adapter, color="white",
+          ec=C_WARN, hatch="///", lw=0.9, label="paid, not received", zorder=2)
+    b.axhline(MIN_BP, color=C_WARN, lw=1.0, ls=(0, (3, 3)), zorder=3)
+    b.annotate(f"{MIN_BP} bp order minimum", (len(kk) - 0.5, MIN_BP),
+               xytext=(0, 4), textcoords="offset points", ha="right",
+               fontsize=7.5, color=C_WARN)
+    b.set_xticks(range(len(kk))); b.set_xticklabels([str(k) for k in kk])
+    b.set_xlabel("$k$, fragments per construct")
+    b.set_ylabel("bp billed per fragment")
+    b.set_ylim(0, 380)
+    b.legend(frameon=False, fontsize=7.5, loc="lower left", ncol=1)
+    b.set_title("what a base buys", loc="left", fontsize=8)
+    fig.tight_layout()
+    save(fig, "panel_cost_k"); plt.close(fig)
+
+
 if __name__ == "__main__":
     plt.rcParams["text.usetex"] = False
-    for fn in (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10):
+    for fn in (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10,
+               cost_size, cost_k):
         fn()

@@ -336,6 +336,79 @@ experiment --- which is what a combinatorially compatible library at a
 \end{reading}
 
 \clearpage
+\section{What a library costs}
+\provenance{design calculation, not a campaign · Twist eBlocks at \$0.07 per base · 200\,aa enzyme}
+
+Every campaign above is eventually answerable to this one. A protein of $L$
+amino acids is $3L$ bases. Cut it into $k$ equal fragments and each fragment is
+$3L/k$ bases, so a budget $B$ at a price $c$ per base buys
+
+\begin{equation*}
+  v \;=\; \frac{B}{3Lc} \quad\text{variants per slot,}
+  \qquad
+  S \;=\; v^{k} \;=\; \left(\frac{B}{3Lc}\right)^{k} \quad\text{recombinants.}
+\end{equation*}
+
+\noindent
+There is no $k$ in $v$, and that is the whole point: cutting into $k$ pieces
+buys $k$ times as many fragments, each $1/k$ as long, and the two cancel
+exactly. \textbf{$k$ is a pure exponent on a number set entirely by budget.}
+Doubling the budget multiplies the library by $2^{k}$ --- at $k = 6$, twice the
+money is 64 times the library.
+
+For a \num{200}-aa enzyme at \$0.07 per base, one full-length
+equivalent costs \$42, so \$\num{10000} stocks \num{238} variants in every
+slot regardless of how finely it is cut.
+
+\begin{figure}[H]\centering
+  \includegraphics[width=0.92\textwidth]{figures/pdf/panel_cost_size.pdf}
+  \caption{Both axes are logarithmic, so a different price per base slides
+  every curve sideways without changing its shape --- the figure is reusable at
+  any quote. The PETase library is shown twice because it was ordered twice
+  over: \num{128} distinct protein parts realised as \num{1920} DNA parts, a
+  $15\times$ redundancy that is the dominant term in what was actually spent.}
+\end{figure}
+
+\begin{reading}
+Synthesis is not the binding constraint, and it is not close. At \$\num{10000}
+--- less than the folding compute behind a single campaign above --- the
+affordable library at $k = 6$ is $\num{1.8e14}$ recombinants, five orders of
+magnitude past what one-pot assembly can transform and eleven past what the
+PETase screen actually read. The budget buys sequence space nobody can look at.
+\limit{Three things bind first, all of them visible in the earlier panels.
+\textbf{Parents:} $v$ variants per slot needs $v$ passing designs, and past
+\$\num{10752} the \num{256}-parent libraries of C6 and C7 run out before the
+money does. \textbf{Assembly:} ${\sim}10^{9}$ transformants. \textbf{Screening:}
+\num{3135} wells, in the one screen this project has run. Cost sets the ceiling;
+it has never set the floor.}
+\end{reading}
+
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{figures/pdf/panel_cost_k.pdf}
+  \caption{Left: the idealised exponent against what vendor terms actually
+  deliver. Right: a fragment is billed at $\max(m,\, 3L/k + h)$, for an order
+  minimum $m$ and $h$ bases of Golden Gate sites and overhangs. On a
+  \num{200}-aa enzyme the minimum binds from $k = 3$ onward, and by $k = 8$
+  three quarters of every base bought is padding. \textbf{$m$ and $h$ are
+  assumed} --- \num{300} and \num{40} bases --- and are the two numbers to
+  check against a live quote before anyone plans a spend from this figure. The
+  \$0.07 per base is not assumed.}
+\end{figure}
+
+\begin{reading}
+The order minimum is what converts $k$ from free to expensive. Idealised, $k$
+costs nothing; after the minimum, going from $k = 4$ to $k = 16$ at
+\$\num{10000} drops the variants per slot from \num{119} to \num{30}, and the
+library still grows --- $\num{2e8}$ to $\num{3.8e23}$ --- because the exponent
+beats the division. The penalty is real and it loses anyway.
+\limit{So this calculation does \emph{not} pick a $k$. Within everything
+synthesis charges for, larger $k$ always wins, which means $k$ has to be chosen
+on the axis C6 measures --- where fidelity and coverage trade --- and on how
+many junctions an assembly will actually tolerate. The cost model only says
+that money will not make that choice for you.}
+\end{reading}
+
+\clearpage
 \section{Three arcs these panels will carry}
 
 Each arc names the panels that carry it and the panel that argues against it.
