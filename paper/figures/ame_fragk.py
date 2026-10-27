@@ -73,11 +73,19 @@ from analyze_selection2 import as_matrix  # noqa: E402
 BB = {"M0097": "run_M0097_1ctt_cond9_14",
       "M0255": "run_M0255_1mg5_cond17_66",
       "M0315": "run_M0315_1ey3_cond18_25"}
-# k=4 anchor lives in a different family per backbone; first hit wins.
+# Fallbacks, used only until the in-family run exists. E18b trains k=4 inside
+# `fragk` on all three backbones and reruns M0315/k=16 (cancelled by SIGTERM at
+# step 166) as `fragk16b`, which makes every level a matched 200 steps. Until
+# those land, k=4 falls back to the batch-size sweep's borrowed anchor at
+# 150/300/152 steps. `resolve()` prefers the in-family run whenever it is on
+# disk, so this script needs no edit on the day they finish -- and `matched`
+# records which was actually used, so the figure and table can say so.
 ANCHOR = {"M0097": ("fragbsweep", "bs16"),
           "M0255": ("fragb16", "bs16"),
           "M0315": ("fragb16", "bs16")}
-TRAINED_K = (2, 8, 16)
+TRAINED_K = (2, 4, 8, 16, 36, 64)
+# The post-hoc arm re-cuts one k=4-trained policy and only covers these.
+POSTHOC_K = (2, 6, 8, 12, 16, 24, 36)
 C = {"trained": PALETTE["blue"], "posthoc": PALETTE["gray"]}
 MARK = {"M0097": "o", "M0255": "s", "M0315": "^"}
 
@@ -96,28 +104,58 @@ def subs(seqs, ref):
                 for j in range(M.shape[1]) if M[i, j] != ref[j]})
 
 
-def cell(site, k):
-    """-> (eval parents csv, recomb chimeras csv) for one trained-at-k cell."""
-    if k == 4:
-        fam, suf = ANCHOR[site]
-    else:
-        fam, suf = "fragk", f"fragk{k}"
-    stem = f"{BB[site]}_{suf}"
+def paths(fam, stem):
     return (AME / fam / "eval" / stem / f"{stem}_af3scored.csv",
             AME / fam / "recomb" / f"{stem}_scored.csv")
+
+
+def resolve(site, k):
+    """-> (eval csv, recomb csv, matched) for one trained-at-k cell.
+
+    Prefers the in-family 200-step run and falls back to a borrowed one, so
+    this returns the best cell available on any given day. `matched` is False
+    only when the fallback was taken, which is what the hollow marker and the
+    table's footnote key off -- never a hardcoded "k == 4".
+    """
+    cands = [("fragk", f"{BB[site]}_fragk{k}")]
+    if k == 16:                      # the SIGTERM rerun supersedes the original
+        cands.insert(0, ("fragk", f"{BB[site]}_fragk16b"))
+    if k == 4:
+        fam, suf = ANCHOR[site]
+        cands.append((fam, f"{BB[site]}_{suf}"))
+    for fam, stem in cands:
+        ev, rc = paths(fam, stem)
+        if ev.exists() and rc.exists():
+            return ev, rc, fam == "fragk", fam, stem
+    fam, stem = cands[0]
+    return (*paths(fam, stem), True, fam, stem)
+
+
+def train_steps(fam, stem):
+    """-> steps this cell actually trained for, so raggedness is data."""
+    f = AME / fam / stem / stem / f"{stem}_train_metrics.csv"
+    if not f.exists():
+        return float("nan")
+    return float(pd.read_csv(f, usecols=["step"]).step.max() + 1)
+
+
+def cell(site, k):
+    ev, rc, *_ = resolve(site, k)
+    return ev, rc
 
 
 def collect_trained():
     """-> rows for policies recombined at the k they were trained at."""
     rows = []
     for site in BB:
-        for k in (4,) + TRAINED_K:
-            ev, rc = cell(site, k)
+        for k in TRAINED_K:
+            ev, rc, matched, fam, stem = resolve(site, k)
             if not (ev.exists() and rc.exists()):
                 continue
             par_seqs, par = pass_rate(ev)
             chi_seqs, chi = pass_rate(rc)
-            rows.append(dict(site=site, k=k, cond="trained",
+            rows.append(dict(site=site, k=k, cond="trained", matched=matched,
+                             steps=train_steps(fam, stem),
                              sample_pass=par, retention=chi,
                              n_pass=len(chi_seqs), seqs=chi_seqs))
     return rows
@@ -138,7 +176,8 @@ def collect_posthoc():
             continue
         _, par = pass_rate(ev[0])
         chi_seqs, chi = pass_rate(f)
-        rows.append(dict(site=site, k=k, cond="posthoc",
+        rows.append(dict(site=site, k=k, cond="posthoc", matched=True,
+                         steps=float("nan"),
                          sample_pass=par, retention=chi,
                          n_pass=len(chi_seqs), seqs=chi_seqs))
     return rows
@@ -184,15 +223,16 @@ def panel_retention(d, fig, gs):
                 continue
             ax.plot(g.k, 100 * g.retention, "-", color=C[cond], lw=2, zorder=2,
                     label=lbl if i == 0 else None)
-            # k=4 is the anchor whose training length is not matched: hollow.
+            # A cell drawn hollow is one whose training length is not matched
+            # to the rest of the sweep -- a borrowed run, not an in-family one.
             for r in g.itertuples():
-                hollow = (cond == "trained" and r.k == 4)
+                hollow = (cond == "trained" and not r.matched)
                 ax.plot(r.k, 100 * r.retention, MARK[site], ms=8, zorder=3,
                         mfc="white" if hollow else C[cond],
                         mec=C[cond], mew=2)
         ax.set_xscale("log", base=2)
-        ax.set_xticks([2, 4, 8, 16, 36])
-        ax.set_xticklabels(["2", "4", "8", "16", "36"])
+        ax.set_xticks([2, 4, 8, 16, 36, 64])
+        ax.set_xticklabels(["2", "4", "8", "16", "36", "64"])
         ax.set_xlabel("fragments per design, $k$")
         ax.set_title(site, fontsize=10)
         ax.axhline(50, color=PALETTE["red"], lw=1, ls=":", zorder=1)
@@ -224,8 +264,8 @@ def panel_gap(d, ax):
                 mec="white", mew=1, label=site)
     ax.axhline(0, color=PALETTE["gray"], lw=1)
     ax.set_xscale("log", base=2)
-    ax.set_xticks([2, 8, 16])
-    ax.set_xticklabels(["2", "8", "16"])
+    ax.set_xticks([2, 4, 8, 16, 36])
+    ax.set_xticklabels(["2", "4", "8", "16", "36"])
     ax.set_xlabel("fragments per design, $k$")
     ax.set_ylabel("retention gained by training at $k$ (pts)")
     ax.set_title("the gap widens with $k$", fontsize=10)
@@ -256,8 +296,8 @@ def panel_diversity(d, ax):
                 marker=MARK[site], ms=8, mec="white", mew=1,
                 label=f"{site} (rarefied to {n})")
     ax.set_xscale("log", base=2)
-    ax.set_xticks([2, 4, 8, 16])
-    ax.set_xticklabels(["2", "4", "8", "16"])
+    ax.set_xticks([2, 4, 8, 16, 36, 64])
+    ax.set_xticklabels(["2", "4", "8", "16", "36", "64"])
     ax.set_xlabel("fragments per design, $k$")
     ax.set_ylabel("distinct substitutions (rarefied)")
     ax.set_title("diversity does not order in $k$", fontsize=10)
@@ -284,7 +324,7 @@ def report(d):
         index=False, float_format=lambda v: f"{v:.1f}"))
 
     print("\nretention, trained at k vs trained at k=4 and cut at k:")
-    for k in TRAINED_K:
+    for k in sorted(set(TRAINED_K) & set(POSTHOC_K)):
         a = d[(d.cond == "trained") & (d.k == k)].set_index("site").retention
         b = d[(d.cond == "posthoc") & (d.k == k)].set_index("site").retention
         both = a.index.intersection(b.index)
@@ -296,7 +336,7 @@ def report(d):
               f"gap {gap.mean():+5.1f} pts   "
               f"higher on {(gap > 0).sum()}/{len(both)} backbones")
 
-    miss = [(s, k) for s in BB for k in (4,) + TRAINED_K
+    miss = [(s, k) for s in BB for k in TRAINED_K
             if not len(d[(d.site == s) & (d.cond == 'trained') & (d.k == k)])]
     if miss:
         print("\nMISSING trained-at-k cells (jobs still running or failed):")
@@ -328,18 +368,34 @@ def write_tex(d):
         + " & mean gap \\\\",
         "\\midrule",
     ]
+    ragged = []
     for k in ks:
         cells, gaps = [], []
         for s_ in sites:
-            g = d[(d.site == s_) & (d.k == k)].set_index("cond").retention
+            row = d[(d.site == s_) & (d.k == k)].set_index("cond")
+            g = row.retention
             tr = g.get("trained"); ph = g.get("posthoc")
-            cells.append(f"{100 * tr:.1f}" if tr == tr and tr is not None else "--")
+            # A trained cell whose run length is not matched to the sweep is
+            # daggered rather than silently mixed in with the matched ones.
+            mark = ""
+            if tr is not None and tr == tr and not row.matched.get("trained", True):
+                mark = "\\,$\\dag$"
+                ragged.append(f"{s_} k={k} at "
+                              f"{row.steps.get('trained', float('nan')):.0f} steps")
+            cells.append(f"{100 * tr:.1f}{mark}" if tr == tr and tr is not None else "--")
             cells.append(f"{100 * ph:.1f}" if ph == ph and ph is not None else "--")
             if tr is not None and ph is not None and tr == tr and ph == ph:
                 gaps.append(100 * (tr - ph))
         gap = f"{sum(gaps) / len(gaps):+.1f}" if gaps else "--"
         lines.append(f"{k} & " + " & ".join(cells) + f" & {gap} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
+    if ragged:
+        lines.insert(0, "% $\\dag$ training length NOT matched to the rest of "
+                        "the sweep (200 steps): " + "; ".join(ragged) + ".")
+        print("\nDAGGERED in the table (run length not matched): "
+              + "; ".join(ragged))
+    else:
+        lines.insert(0, "% every trained cell ran a matched 200 steps.")
     TEX_OUT.parent.mkdir(parents=True, exist_ok=True)
     TEX_OUT.write_text("\n".join(lines) + "\n")
     print(f"wrote {TEX_OUT}")
