@@ -70,22 +70,47 @@ KS = (2, 4, 8, 16, 36, 64)
 # trend and drawn hollow, and the comparison that carries a claim is over
 # MATCHED. `steps` is carried in the output so this stays checkable rather than
 # resting on this comment.
-MATCHED = (2, 8, 16, 36, 64)
+MATCHED_STEPS = 200.0
 MARK = {"M0097": "o", "M0255": "s", "M0315": "^"}
 BLUE = PALETTE["blue"]
 
 
-def cell(site, k):
-    fam, suf = ANCHOR[site] if k == 4 else ("fragk", f"fragk{k}")
-    stem = f"{BB[site]}_{suf}"
+def candidates(site, k):
+    """-> (family, stem) to try, best first.
+
+    E18b trained k=4 in-family and reran M0315/k=16 as `fragk16b` after its
+    SIGTERM at step 166, so every level is a matched 200 steps. The borrowed
+    anchor stays last as a fallback for a tree where E18b has not run.
+    """
+    c = [("fragk", f"{BB[site]}_fragk{k}")]
+    if k == 16:
+        c.insert(0, ("fragk", f"{BB[site]}_fragk16b"))
+    if k == 4:
+        fam, suf = ANCHOR[site]
+        c.append((fam, f"{BB[site]}_{suf}"))
+    return c
+
+
+def resolve(site, k):
+    """-> (eval csv, recomb csv, family, stem) for the best cell on disk."""
+    for fam, stem in candidates(site, k):
+        ev = AME / fam / "eval" / stem / f"{stem}_af3scored.csv"
+        rc = AME / fam / "recomb" / f"{stem}_scored.csv"
+        if ev.exists() and rc.exists():
+            return ev, rc, fam, stem
+    fam, stem = candidates(site, k)[0]
     return (AME / fam / "eval" / stem / f"{stem}_af3scored.csv",
-            AME / fam / "recomb" / f"{stem}_scored.csv")
+            AME / fam / "recomb" / f"{stem}_scored.csv", fam, stem)
+
+
+def cell(site, k):
+    ev, rc, *_ = resolve(site, k)
+    return ev, rc
 
 
 def train_steps(site, k):
     """-> how many steps this cell actually trained for, or nan."""
-    fam, suf = ANCHOR[site] if k == 4 else ("fragk", f"fragk{k}")
-    stem = f"{BB[site]}_{suf}"
+    _, _, fam, stem = resolve(site, k)
     p = AME / fam / stem / stem / f"{stem}_train_metrics.csv"
     if not p.exists():
         return float("nan")
@@ -135,7 +160,7 @@ def collect(draws, rng):
             counts = slot_counts(par, k)
             pools[(site, k)] = chi
             rows.append(dict(
-                site=site, k=k, matched=k in MATCHED,
+                site=site, k=k, matched=train_steps(site, k) == MATCHED_STEPS,
                 steps=train_steps(site, k),
                 parents=len(par), n_pass=len(chi),
                 reach=float(np.sum(np.log10(counts))),
@@ -156,7 +181,8 @@ def collect(draws, rng):
     d["substitution"] = np.nan
     for site in BB:
         g = {k: v for (s_, k), v in pools.items() if s_ == site}
-        m = {k: v for k, v in g.items() if k in MATCHED}
+        ok = set(d[(d.site == site) & d.matched].k)
+        m = {k: v for k, v in g.items() if k in ok}
         if len(m) < 2:
             continue
         n = min(len(v) for v in m.values())
@@ -221,7 +247,7 @@ def report(d):
               f"collision {a.collision:.3f} -> {b.collision:.3f}   "
               f"substitution {a.substitution:.0f} -> {b.substitution:.0f}   "
               f"pairwise {a.pairwise:.1f} -> {b.pairwise:.1f}")
-    miss = [(s_, k) for s_ in BB for k in MATCHED
+    miss = [(s_, k) for s_ in BB for k in KS
             if not len(d[(d.site == s_) & (d.k == k)])]
     if miss:
         print("\nMISSING cells (not yet folded):")

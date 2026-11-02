@@ -68,17 +68,30 @@ RAMP = ["#A5C3DF", "#7FA5CC", "#5A87B4", "#3C6A99", "#2A4F78", "#15314D"]
 COLOR = dict(zip(KS, RAMP))
 METRICS = [("frag_chimera_pass", "in-loop chimera pass rate", None),
            ("frag_chimera_rmsd", r"chimera RMSD ($\AA$)", None)]
-# The latest step present in all eighteen cells. A matched-step comparison has
-# to happen at or before this, which is the whole difficulty: see report().
-COMMON = 149
+# The latest step present in all eighteen cells. Before E18b this was 149 and
+# a matched-step comparison had to happen at or before it; now every cell runs
+# the full 200, so the line simply marks the common endpoint.
+COMMON = 199
 
 
 def metrics_path(site, k):
-    """-> the train_metrics.csv for one cell, or None if it never ran."""
-    fam, suf = ANCHOR[site] if k == 4 else ("fragk", f"fragk{k}")
-    stem = f"{BB[site]}_{suf}"
-    p = AME / fam / stem / stem / f"{stem}_train_metrics.csv"
-    return p if p.exists() else None
+    """-> the train_metrics.csv for the best cell on disk, or None.
+
+    E18b trained k=4 in-family and reran M0315/k=16 as `fragk16b`, so all
+    eighteen are a matched 200 steps. The borrowed anchor is kept last as a
+    fallback for a tree where E18b has not run.
+    """
+    c = [("fragk", f"{BB[site]}_fragk{k}")]
+    if k == 16:
+        c.insert(0, ("fragk", f"{BB[site]}_fragk16b"))
+    if k == 4:
+        fam, suf = ANCHOR[site]
+        c.append((fam, f"{BB[site]}_{suf}"))
+    for fam, stem in c:
+        p = AME / fam / stem / stem / f"{stem}_train_metrics.csv"
+        if p.exists():
+            return p
+    return None
 
 
 def load():
@@ -116,14 +129,14 @@ def panel(ax, d, site, col, window, first):
         g = d[(d.site == site) & (d.k == k)].sort_values("step")
         if not len(g):
             continue
-        ls = "--" if k == 4 else "-"
+        ls = "-"
         ax.plot(g.step, g[col], ls, color=COLOR[k], lw=0.8, alpha=0.22,
                 zorder=2)
         ax.plot(g.step, smooth(g[col], window), ls, color=COLOR[k], lw=1.8,
                 zorder=3)
     ax.axvline(COMMON, color=PALETTE["gray"], lw=1, ls=":", zorder=1)
-    ax.set_xlim(0, 305)
-    ax.set_xticks([0, 100, 200, 300])
+    ax.set_xlim(0, 205)
+    ax.set_xticks([0, 50, 100, 150, 200])
     grid(ax)
     if not first:
         ax.tick_params(labelleft=False)
@@ -165,17 +178,16 @@ def figure(d, window):
                 ax.set_xlabel("training step")
         axes[0].set_ylabel(lbl)
 
-    handles = [Line2D([], [], color=COLOR[k], lw=2,
-                      ls="--" if k == 4 else "-", label=f"$k={k}$")
+    handles = [Line2D([], [], color=COLOR[k], lw=2, label=f"$k={k}$")
                for k in KS]
     handles.append(Line2D([], [], color=PALETTE["gray"], lw=0, marker="o",
                           ms=4, mec="white", label="in-loop AF3 pass"))
     handles.append(Line2D([], [], color=PALETTE["gray"], lw=1, ls=":",
-                          label=f"step {COMMON}: last step all 18 share"))
+                          label=f"step {COMMON}: common endpoint"))
     fig.legend(handles=handles, frameon=False, fontsize=8, ncol=8,
                loc="lower center", bbox_to_anchor=(0.5, -0.02))
     fig.suptitle("fragment-count sweep, per-step training history "
-                 "($k=4$ dashed: unmatched run length)", fontsize=10)
+                 "(all 18 cells matched at 200 steps)", fontsize=10)
     return fig
 
 
