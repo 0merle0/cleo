@@ -161,9 +161,6 @@ def draw_landscape(ax, title, axis_labels=False):
     # third is not coloured either -- tinting only "this work" would say the
     # comparison was decided before the reader got to it.
     ax.set_title(title, fontsize=fs(9), pad=7, color="black")
-    # Labelled on the leftmost panel only. All three share one set of axes --
-    # same landscape, same framing, same limits -- so repeating the pair three
-    # times would assert a difference between them that does not exist.
     if axis_labels:
         ax.set_xlabel("Sequence space", fontsize=fs(8), labelpad=3)
         ax.set_ylabel("Sequence space", fontsize=fs(8), labelpad=3)
@@ -203,7 +200,7 @@ def panel_naive(ax, rng):
     misses most of them -- but the specific miss shown is a pick, and no
     reader should take it for a measurement.
     """
-    draw_landscape(ax, "Naive combinatorial assembly")
+    draw_landscape(ax, "Naive combinatorial assembly", axis_labels=True)
     r = np.random.default_rng(50)
     xs = np.sort(r.uniform(0.05, 0.95, 6))
     ys = np.sort(r.uniform(0.05, 0.95, 6))
@@ -233,7 +230,7 @@ def panel_ours(ax, rng):
     as a catalogue of full genes, which is the thing the method exists to
     avoid.
     """
-    draw_landscape(ax, "This work")
+    draw_landscape(ax, "This work", axis_labels=True)
     xs = rng.uniform(0.05, 0.95, 14)
     ys = rng.uniform(0.05, 0.95, 14)
     cand = _clip(np.array([(x, y) for x in xs for y in ys], float)
@@ -299,27 +296,48 @@ def crossing_costs(S, series):
 
 
 def mark_level(ax, S, series):
-    """Draw the reference level and a dot where each arm crosses it.
+    """Draw the reference level, a dot per arm, and each arm's price beside it.
 
-    NO text in the data area. The four prices used to be annotated at their
-    crossings, with an alternate-above-below rule and per-arm overrides to
-    keep them off the curves. That worked at 11 inches and stopped working at
-    page width: the labels are the same size while the axes got smaller, the
-    three cheap arms cross within two decades of each other, and the steep
-    arms pass within a glyph of their own price.
+    Placement is per rank in cost, as (y-factor, x-factor, ha). The rule is
+    not "alternate above and below" -- that was the old rule and it fails
+    here, because the three cheap arms are NEAR-VERTICAL at this level. A
+    steep line stays within a few points of the same x over a wide range of
+    y, so moving a label up or down does not move it off the line; only
+    moving it sideways does.
 
-    The prices now ride in the legend entries instead. Each arm already has a
-    legend row, so the price costs no extra ink, it cannot collide with
-    anything, and it sits beside the colour that identifies the arm.
+    So every label sits just off the level line and is pushed sideways into
+    the gap beside its own arm, with the side chosen per arm:
+
+        k=8   left   nothing is left of the cheapest arm but the axis
+        k=4   right  its left is where k=8 sits, 1.2 decades away
+        k=2   left   six decades of clear space
+        whole left   same, and it cannot run off the right edge
+
+    The gaps are what the panel's extra width bought. At the old width the
+    k=8/k=4 gap was 20 pt and the label 24 pt, which is why these lived in
+    the legend for a while.
     """
-    # Named in the legend, not on the plot. Putting it top left was tried --
-    # that corner looks empty, but the k=4 and k=8 arms pass through it on
-    # their way up, and both struck the text out.
     ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1,
                label=r"$10^{12}$ variants")
-    for (x, c) in sorted(((float(library_cost(np.array(S), k)), c)
-                          for _, k, c in series), key=lambda t: t[0]):
+    # The side follows from the direction the curve moves, which is the part
+    # that was got wrong first: every arm RISES, so dropping below the level
+    # line puts the curve to your LEFT and lifting above it puts the curve to
+    # your RIGHT. A label therefore goes opposite to the way it was offset --
+    # below-line labels to the right of the arm, above-line labels to its
+    # left. Offsetting a below-line label leftward, which looks symmetric,
+    # walks it straight into its own curve.
+    PLACE = [(2.2, 0.80, "right"),    # k=8    above, so left
+             (0.45, 1.25, "left"),    # k=4    below, so right
+             (0.45, 1.25, "left"),    # k=2    below, so right
+             (2.2, 0.80, "right")]    # whole  above, so left (and cannot
+                                      #        run off the right edge)
+    marks = sorted(((float(library_cost(np.array(S), k)), c)
+                    for _, k, c in series), key=lambda t: t[0])
+    for i, (x, c) in enumerate(marks):
         ax.plot([x], [S], "o", ms=6.5, mfc=c, mec="white", mew=1.4, zorder=4)
+        yf, xf, ha = PLACE[i]
+        ax.annotate(money(x), xy=(x, S), xytext=(x * xf, S * yf),
+                    fontsize=fs(7.5), color=c, ha=ha, va="center", zorder=5)
 
 
 def panel_cost(ax):
@@ -341,12 +359,11 @@ def panel_cost(ax):
               ("$k=4$", 4, SEQUENTIAL[3]),
               ("$k=8$", 8, SEQUENTIAL[2])]
     LEVEL = 1e12
-    price = crossing_costs(LEVEL, series)
     for lab, k, c in series:
         bp = max(PROT_AA * BP_PER_AA / k, MIN_BP)
         S = (cost / (k * bp * COST_PER_BP)) ** k
         ax.loglog(cost, S, "-", color=c, lw=2.2, zorder=3,
-                  label=f"{lab}  ({money(price[lab])})")
+                  label=lab)
     mark_level(ax, LEVEL, series)
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
@@ -413,7 +430,12 @@ def panel_lab(ax, rng):
     the cost argument Figure 1 makes.
     """
     ax.set_xlim(0, 10)
-    ax.set_ylim(0, 3.2)
+    # 2.35, not 3.2. The schematic only ever reaches y=2.17, so a third of the
+    # axes box was empty -- and since the panel letter is placed at the box's
+    # top, "d" floated in that emptiness, level with panel (b)'s x-axis and
+    # reading as though it belonged there. The row's height ratio comes down
+    # with it so the drawing keeps its proportions.
+    ax.set_ylim(0, 2.35)
     ax.axis("off")
 
     # Horizontal budget. The axes is ~440 pt wide, so one x-unit is ~44 pt and
@@ -513,7 +535,7 @@ def main():
     # square inside each cell and centres it: while the row was short they
     # were height-limited at 1.12 in inside cells 1.55 in wide, and every
     # spare inch of the row went to margin instead of to the plots.
-    outer = fig.add_gridspec(3, 1, height_ratios=[1.90, 1.22, 1.00],
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.90, 1.40, 0.76],
                              hspace=0.34)
     # The legend belongs to the landscapes, so it lives INSIDE their row --
     # tight under the three panels, with the full row gap below it.
@@ -523,7 +545,7 @@ def main():
     # explains and panels b/c, which it has nothing to do with, and the gap is
     # also where panel b's letter sits. Pulling it up into row 0 settles the
     # question of which panels it belongs to and clears the gap in one move.
-    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.45)
+    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.30)
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
@@ -537,9 +559,13 @@ def main():
     fitness_key(ax_o)
     landscape_legend(fig.add_subplot(top[1]))
 
-    mid = outer[1].subgridspec(1, 2, width_ratios=[1.06, 1.0], wspace=0.22)
-    ax_obj = fig.add_subplot(mid[0, 0])
-    ax_cost = fig.add_subplot(mid[0, 1])
+    # Cost on the LEFT and wider than the fold beside it. The prices are drawn
+    # at their crossings again rather than carried in the legend, and that
+    # only works if the arms are far enough apart in x to take a label
+    # between them -- which is bought with axes width, not with font size.
+    mid = outer[1].subgridspec(1, 2, width_ratios=[1.45, 0.72], wspace=0.20)
+    ax_cost = fig.add_subplot(mid[0, 0])
+    ax_obj = fig.add_subplot(mid[0, 1])
     ax_lab = fig.add_subplot(outer[2])
     panel_object(ax_obj)
     panel_cost(ax_cost)
@@ -583,8 +609,8 @@ def main():
     def left_edge(axes):
         return min(inv.transform((extent(a).x0, 0))[0] for a in axes)
 
-    x_left = left_edge([ax_e, ax_obj, ax_lab])
-    x_right = left_edge([ax_cost])
+    x_left = left_edge([ax_e, ax_cost, ax_lab])
+    x_right = left_edge([ax_obj])
 
     # Y comes from each panel's MEASURED top, not from a fraction of its own
     # height. The fractions (1.12, 1.20, 1.06) had to be hand-tuned per panel
@@ -595,8 +621,8 @@ def main():
     def top_of(ax):
         return inv.transform((0, extent(ax).y1))[1] + 0.006
 
-    for ax, lab, x in ((ax_e, "a", x_left), (ax_obj, "b", x_left),
-                       (ax_cost, "c", x_right), (ax_lab, "d", x_left)):
+    for ax, lab, x in ((ax_e, "a", x_left), (ax_cost, "b", x_left),
+                       (ax_obj, "c", x_right), (ax_lab, "d", x_left)):
         fig.text(x, top_of(ax), lab, fontsize=PANEL_LABEL_PT,
                  fontweight="bold", va="bottom", ha="left")
 
