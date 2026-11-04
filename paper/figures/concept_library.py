@@ -282,7 +282,7 @@ def panel_ours(ax, rng):
 
 def fitness_key(ax):
     """A direction, not a scale -- the landscape is illustrative."""
-    cb = ax.inset_axes([1.045, 0.02, 0.032, 0.80])
+    cb = ax.inset_axes([1.105, 0.16, 0.032, 0.78])
     g = np.linspace(0, 1, 256).reshape(-1, 1)
     cb.imshow(g, aspect="auto", origin="lower", cmap=TERRAIN,
               extent=(0, 1, 0, 1))
