@@ -417,103 +417,27 @@ def panel_object(ax):
     cheap, they share this camera, and either arrangement is a few lines away
     if a later figure wants one.
 
-    Bovine trypsin (2PTN chain A, 223 residues), not the PETase this project
-    optimises: Figure 1 is about what a combinatorial library IS, and using
-    the target would imply the idea is specific to it.
+    2FX2 rather than the PETase this project optimises: Figure 1 is about what
+    a combinatorial library IS, and using the target would imply the idea is
+    specific to it. Chosen by measuring secondary structure across a dozen
+    candidates (39.5% helix, 32.7% strand), and at 147 aa its k=4 fragments
+    are 37 residues -- inside the 20-50 band the method recommends.
 
-    The zoom is the point of the panel, not decoration. Trypsin's catalytic
-    triad lands on three DIFFERENT fragments under the same equal-count split:
-
-        His57   fragment 1      His-Asp 2.67 A
-        Asp102  fragment 2      His-Ser 3.02 A
-        Ser195  fragment 4      Asp-Ser 6.77 A, so no dash between them
-
-    Each residue takes its own fragment's colour, so the three colours in the
-    zoom ARE three fragments. Fragment 3 contributes no catalytic residue; the
-    caption says so rather than letting the figure imply four.
-
-    This replaced flavodoxin (2FX2), which was chosen for its secondary
-    structure and gave 37-residue fragments. It has no triad -- its functional
-    site is a cofactor pocket -- so a His/Asp/Ser drawn on it would have been
-    invented. Trypsin's 56-residue fragments sit just outside the 20-50 band
-    the method recommends, which the caption states rather than hiding.
+    A magnified catalytic triad was built here and then removed. It needed a
+    different protein -- flavodoxin has no triad, its functional site is a
+    cofactor pocket -- and trypsin's k=4 fragments are 56 residues, outside
+    the band above. render.py's git history has the triad and zoom-box code,
+    including the trick that made the zoom box land in the right place:
+    render the site as spheres through the FOLD's camera and read its ink
+    centroid, rather than placing the box by eye.
     """
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
 
-    fig = ax.get_figure()
-    W_in, H_in = fig.get_size_inches()
-    pos = ax.get_position()
-
-    def extent_ax(name, centre, width_pts):
-        """-> (x0, y0, w, h) of a placed image, in this axes' coordinates.
-
-        `place` sizes in points, so the width in axes units is points over the
-        axes' own width in points; the height then follows from the image's
-        aspect AND the axes' aspect, which are different numbers. Getting this
-        from the image rather than assuming square is what keeps the zoom box
-        on the picture it frames.
-        """
-        im = trimmed(name)
-        w = width_pts / 72 / (W_in * pos.width)
-        h = (w * im.shape[0] / im.shape[1]
-             * (W_in * pos.width) / (H_in * pos.height))
-        return centre[0] - w / 2, centre[1] - h / 2, w, h
-
-    # Sized against the panel's actual width (~187 pt). The first attempt
-    # asked for 80 + 150 pt inside 162 pt and the zoom simply sat on top of
-    # the fold.
-    fold_c, fold_w = (0.185, 0.62), 66
-    zoom_c, zoom_w = (0.700, 0.58), 108
-    place(ax, "whole", fold_c, fold_w)
-    place(ax, "triad", zoom_c, zoom_w)
-
-    fx0, fy0, fw, fh = extent_ax("whole", fold_c, fold_w)
-    zx0, zy0, zw, zh = extent_ax("triad", zoom_c, zoom_w)
-    # Pad the zoom frame off the sticks. The box is the image's own extent,
-    # so without this the border runs exactly along the outermost atom and
-    # the serine reads as clipped rather than framed.
-    PAD = 1.24
-    zx0 -= zw * (PAD - 1) / 2
-    zy0 -= zh * (PAD - 1) / 2
-    zw, zh = zw * PAD, zh * PAD
-
-    # Where IS the active site in that fold image? Measured, not guessed.
-    #
-    # render.py --site also emits sitemark.png: the three triad residues as
-    # spheres through the WHOLE FOLD's camera. Its ink centroid, as a
-    # fraction of the fold's own ink box, is where the site sits in the
-    # picture. A hand-placed box looks right once and is wrong the next time
-    # the view, the protein or the zoom changes -- and all three changed in
-    # the course of building this panel.
-    fy, fxs = np.nonzero(mpimg.imread(PNG / "whole.png")[:, :, 3] > 0.02)
-    my, mx = np.nonzero(mpimg.imread(PNG / "sitemark.png")[:, :, 3] > 0.02)
-    u = (mx.mean() - fxs.min()) / (fxs.max() - fxs.min())
-    v = (my.mean() - fy.min()) / (fy.max() - fy.min())
-    sx, sy = fx0 + u * fw, fy0 + (1 - v) * fh
-
-    # The source box takes the DESTINATION's aspect, so the two rectangles are
-    # the same shape and the pair reads as one magnification. Sizing them
-    # independently made the triad overflow its own frame.
-    bw = fw * 0.34
-    bh = bw * (zh / zw) * (W_in * pos.width) / (H_in * pos.height)
-    ax.add_patch(Rectangle((sx - bw / 2, sy - bh / 2), bw, bh, fill=False,
-                           ec=PALETTE["gray"], lw=0.9, zorder=6))
-    ax.add_patch(Rectangle((zx0, zy0), zw, zh, fill=False,
-                           ec=PALETTE["gray"], lw=0.9, zorder=6))
-
-    # Two leaders, corner to corner, so it reads as a magnification rather
-    # than as two unrelated pictures.
-    for top in (1, 0):
-        ax.plot([sx + bw / 2, zx0],
-                [sy - bh / 2 + bh * top, zy0 + zh * top],
-                "-", color=PALETTE["gray"], lw=0.7, zorder=5, clip_on=False)
-
-    ax.text(fold_c[0], 0.10, "$k=4$ fragments", ha="center", fontsize=fs(7))
-    ax.text(zoom_c[0], 0.10, "catalytic triad", ha="center", fontsize=fs(7))
-    ax.text(zoom_c[0], -0.01, "three fragments, one site", ha="center",
-            fontsize=fs(6.5), color=PALETTE["gray"])
+    # The fold alone, centred. The zoom, its two frames and the measured
+    # box placement are gone -- see the docstring.
+    place(ax, "whole", (0.5, 0.5), 150)
 
 
 # ---------------------------------------------------------------- panel (d)

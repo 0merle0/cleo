@@ -25,24 +25,19 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from palette import FRAGMENT  # noqa: E402
 
-# Bovine trypsin, 2PTN chain A, 223 residues.
+# 2FX2, flavodoxin, chain A, 147 residues.
 #
-# It replaced 2FX2 (flavodoxin) when the figure needed a catalytic triad.
-# Flavodoxin has none -- its functional site is a cofactor pocket -- so a
-# His/Asp/Ser triad drawn on it would have been invented. Trypsin's is real
-# and, better, it SPANS THE CUT: under the same equal-count split,
+# Chosen by measuring secondary structure across a dozen candidates (39.5%
+# helix, 32.7% strand), and at 147 aa its k=4 fragments are 37 residues --
+# inside the 20-50 band the method recommends.
 #
-#     His57  -> fragment 1      His-Asp 2.67 A
-#     Asp102 -> fragment 2      His-Ser 3.02 A
-#     Ser195 -> fragment 4      Asp-Ser 6.77 A (they do not contact)
-#
-# Three of the four fragments carry one catalytic residue each, which is the
-# figure's whole point about where boundaries fall.
-#
-# The cost: at 223 residues the k=4 fragments are 56 residues, just outside
-# the 20-50 band the method recommends, where flavodoxin's were 37. The
-# caption states the number rather than repeating the old claim.
-PDB = HERE / "pdb" / "2ptn_A.pdb"
+# It was briefly replaced by trypsin (2PTN) so that panel (c) could show a
+# His/Asp/Ser catalytic triad, which flavodoxin does not have. That zoom was
+# dropped, and the protein came back with it: trypsin's k=4 fragments are 56
+# residues, outside the band. pdb/2ptn_A.pdb is kept -- the triad spans three
+# fragments (His57/Asp102/Ser195 on fragments 1/2/4) and that is worth
+# keeping to hand if a later figure wants it.
+PDB = HERE / "pdb" / "2fx2_A.pdb"
 STYLE = HERE / "style_modern.pml"
 GHOST = HERE / "style_ghost.pml"
 OUT = HERE / "png"
@@ -145,26 +140,6 @@ def run(text, tag):
 # be eight times the pixels for a tenth the size.
 VAR_PX = 2000
 
-# --- the catalytic triad --------------------------------------------------
-#
-# Sticks only, no cofactor and no cartoon: the zoom is three side chains and
-# the two hydrogen bonds between them. Each residue takes its own fragment's
-# colour, so the three colours in the zoom ARE three fragments.
-#
-# An earlier version of this panel drew flavodoxin's FMN pocket with the
-# cofactor in grey. It was replaced, not just recoloured -- see the note on
-# PDB above for why the protein changed.
-SITE_PX = 2200
-TRIAD = [(57, 0, "HIS"),      # fragment 1
-         (102, 1, "ASP"),     # fragment 2
-         (195, 3, "SER")]     # fragment 4
-# The two real catalytic hydrogen bonds. Asp102 and Ser195 are 6.77 A apart
-# and are NOT joined -- the charge relay runs through the histidine, and
-# drawing a third dash would assert a contact that is not there.
-TRIAD_HB = [((57, "ND1"), (102, "OD2")),
-            ((57, "NE2"), (195, "OG"))]
-
-
 def shade(hex_c, f):
     """-> `hex_c` lightened toward white by (1-f). f=1 is the base colour."""
     r, g, b = hexrgb(hex_c)
@@ -207,83 +182,15 @@ def variants(n, k):
         print(f"  rendered var{v+1}")
 
 
-def site():
-    """Render the catalytic triad: three side chains, two hydrogen bonds.
-
-    Sticks only. No cartoon and no cofactor -- the panel beside it already
-    shows the fold, and anything else in this frame competes with the three
-    colours that carry the point.
-    """
-    sel = "+".join(str(n) for n, _, _ in TRIAD)
-    lines = [f"load {PDB}, prot", "hide everything", f"@{STYLE}",
-             "set ray_opaque_background, 0",
-             "set stick_radius, 0.20",
-             "set dash_color, black", "set dash_width, 2.4",
-             "set dash_gap, 0.24", "set dash_length, 0.32",
-             "set label_size, 0",
-             f"show sticks, prot and resi {sel} and not (name C+N+O)"]
-    for n, f, _ in TRIAD:
-        r, g, b = hexrgb(FRAGMENT[f])
-        lines.append(f"set_color tri{n}, [{r:.4f}, {g:.4f}, {b:.4f}]")
-        lines.append(f"color tri{n}, prot and resi {n}")
-    for i, ((n1, a1), (n2, a2)) in enumerate(TRIAD_HB):
-        lines.append(f"distance hb{i}, prot and resi {n1} and name {a1}, "
-                     f"prot and resi {n2} and name {a2}")
-    lines += ["hide labels",
-              f"orient prot and resi {sel}", "turn x, -8",
-              f"zoom prot and resi {sel}, 1.6",
-              f"png {OUT / 'triad.png'}, width={SITE_PX}, "
-              f"height={SITE_PX}, dpi=300, ray=1"]
-    f = OUT / "_site.pml"
-    f.write_text("\n".join(lines) + "\n")
-    r = pymol_run(f)
-    if r.returncode != 0:
-        sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
-    f.unlink()
-    print("  rendered triad")
-
-
-def sitemark():
-    """Render the triad as spheres in the WHOLE FOLD's camera.
-
-    This is not a figure, it is a measurement. The zoom box drawn over the
-    fold in panel (c) has to sit where the active site actually is, and the
-    only reliable way to know that in image pixels is to render the site
-    alone through the same camera and find its centroid. A hand-picked
-    fraction of the frame goes silently wrong the moment the view changes.
-    """
-    sel = "+".join(str(n) for n, _, _ in TRIAD)
-    lines = [f"load {PDB}, prot", "hide everything", f"@{STYLE}",
-             "set ray_opaque_background, 0",
-             f"show spheres, prot and resi {sel}",
-             "color black, prot",
-             "orient prot", "turn x, -8", "zoom prot, 2",
-             f"png {OUT / 'sitemark.png'}, width={PX}, height={PX}, "
-             "dpi=300, ray=1"]
-    f = OUT / "_mark.pml"
-    f.write_text("\n".join(lines) + "\n")
-    r = pymol_run(f)
-    if r.returncode != 0:
-        sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
-    f.unlink()
-    print("  rendered sitemark")
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-k", type=int, default=4)
     ap.add_argument("--variants", type=int, default=0,
                     help="render only N recombinant variants, then stop")
-    ap.add_argument("--site", action="store_true",
-                    help="render only the FMN pocket, then stop")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     if a.variants:
         variants(a.variants, a.k)
-        return
-    if a.site:
-        site()
-        sitemark()
         return
     OUT.mkdir(parents=True, exist_ok=True)
     bs = bounds(a.k)
