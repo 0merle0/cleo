@@ -294,7 +294,7 @@ def fitness_key(ax):
             color=PALETTE["gray"], transform=cb.transAxes)
     cb.text(1.5, 0.0, "low", ha="left", va="center", fontsize=6.6,
             color=PALETTE["gray"], transform=cb.transAxes)
-    cb.text(-0.9, 0.5, "fitness", rotation=90, ha="center", va="center",
+    cb.text(-0.9, 0.5, "Fitness", rotation=90, ha="center", va="center",
             fontsize=7.5, color=PALETTE["gray"], transform=cb.transAxes)
 
 
@@ -373,8 +373,8 @@ def panel_cost(ax):
     mark_level(ax, 1e12, series, r"$10^{12}$ variants", 1e10)
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
-    ax.set_xlabel("synthesis cost (\\$)")
-    ax.set_ylabel("library size, distinct sequences")
+    ax.set_xlabel("Synthesis cost (\\$)")
+    ax.set_ylabel("Library size, distinct sequences")
     ax.legend(frameon=False, fontsize=8, loc="lower right")
     ax.set_axisbelow(True)
     for sp in ("top", "right"):
