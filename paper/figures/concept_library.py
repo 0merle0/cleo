@@ -193,31 +193,17 @@ def panel_cost(ax):
 
 
 # ---------------------------------------------------------------- panel (c)
-def frag_angle(name):
-    """-> direction (radians) from the fold's centre to this fragment's ink.
-
-    Every structure PNG shares one camera, so where a fragment sits inside its
-    own frame IS where it sits in the fold. That is what lets the exploded
-    copy be pushed out on the correct side rather than parked in an arbitrary
-    corner. Requires transparent frames -- see render.py.
-    """
-    im = mpimg.imread(PNG / f"{name}.png")
-    ys, xs = np.nonzero(im[:, :, 3] > 0.02)
-    h, w = im.shape[:2]
-    return np.arctan2((1 - ys.mean() / h) - 0.5, xs.mean() / w - 0.5)
-
-
 def panel_object(ax):
-    """The fold, with its four fragments pulled out around it.
+    """The fold in full colour, with its four fragments laid out beneath it.
 
-    The centre is the same structure with its colours blended toward grey, so
-    it reads as context -- the isolated copies around it carry the colour.
+    Every view comes from one PyMOL session with the camera set once, so the
+    fragments are the fold's own pieces at the fold's own scale -- not four
+    separate renders that happen to sit side by side.
 
-    Placement keeps the fragments' rotational ORDER but not their exact
-    angles. Two of 2FX2's four sit only 16 degrees apart as seen from the
-    centre, so pushing each straight out along its own bearing overlaps them;
-    spacing them evenly around the circle in the order they actually occur
-    keeps the mapping readable and guarantees they clear each other.
+    They are trimmed to their ink but share ONE zoom, which is what keeps that
+    true: trimming alone is fine (the row shows each piece centred in its
+    cell), but trimming and then fitting each to its cell would rescale them
+    independently and a short fragment would look as big as a long one.
 
     2FX2 rather than the PETase this project optimises: Figure 1 is about what
     a combinatorial library IS, and using the target would imply the idea is
@@ -225,21 +211,27 @@ def panel_object(ax):
     candidates (39.5% helix, 32.7% strand), and at 147 aa its k=4 fragments
     are 37 residues -- inside the 20-50 band the method recommends.
     """
+    ROW_Y, ZF = 0.15, 0.030
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    cx, cy, Z, R = 0.50, 0.50, 0.052, 0.31
-
-    order = sorted(range(K), key=lambda i: frag_angle(f"iso{i+1}") % (2 * np.pi))
-    base = frag_angle(f"iso{order[0]+1}") % (2 * np.pi)
-    for slot, i in enumerate(order):
-        a = base + slot * 2 * np.pi / K
-        ux, uy = np.cos(a), np.sin(a)
-        ax.plot([cx + ux * 0.10, cx + ux * (R - 0.10)],
-                [cy + uy * 0.10, cy + uy * (R - 0.10)],
-                "-", color=INK["ghost"], lw=0.9, zorder=1)
-        place_raw(ax, f"iso{i+1}", (cx + ux * R, cy + uy * R), Z)
-    place_raw(ax, "dim", (cx, cy), Z)
+    place(ax, "whole", (0.5, 0.72), 0.050)
+    ax.annotate("", xy=(0.5, 0.345), xytext=(0.5, 0.425),
+                arrowprops=dict(arrowstyle="-|>", color=PALETTE["gray"],
+                                lw=1.3, mutation_scale=12))
+    # Slot number sits above its fragment, at a height derived from that
+    # fragment's OWN extent. A fixed offset cannot work: these are pieces of
+    # one fold, so their shapes differ -- iso4 is 57% taller than iso1 -- and
+    # any constant that clears the tallest floats above the rest.
+    fig = ax.figure
+    fig.canvas.draw()
+    ax_pts = ax.get_window_extent().height * 72.0 / fig.dpi
+    for i in range(K):
+        x = 0.13 + i * 0.246
+        half = (trimmed(f"iso{i+1}").shape[0] * ZF / 2.0) / ax_pts
+        ax.text(x, ROW_Y + half + 0.025, f"{i+1}", ha="center", va="bottom",
+                fontsize=9, color=FRAGMENT[i], fontweight="bold")
+        place(ax, f"iso{i+1}", (x, ROW_Y), ZF)
 
 
 # ---------------------------------------------------------------- panel (d)

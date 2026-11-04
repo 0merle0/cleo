@@ -9,9 +9,8 @@ specific to it, and the PETase is saved for the results.
 Style lives in style_modern.pml and is shared by every protein figure, so a
 change there propagates rather than being re-tuned per figure.
 
-PyMOL cannot emit usable vector output for cartoons, so these are PNGs at
-2200px -- roughly 550 dpi at the size Figure 1 uses them. Everything else in
-the figure stays vector.
+PyMOL cannot emit usable vector output for cartoons, so these are PNGs.
+Everything else in the figure stays vector.
 
     uv run python paper/figures/structures/render.py
     uv run python paper/figures/structures/render.py --only whole
@@ -29,7 +28,10 @@ PDB = HERE / "pdb" / "2fx2_A.pdb"
 STYLE = HERE / "style_modern.pml"
 GHOST = HERE / "style_ghost.pml"
 OUT = HERE / "png"
-PX = 2200
+# 3600 px. These are composited at roughly a sixth of the page width, so this
+# is ~1200 dpi on the printed figure -- the cartoon outlines are hairlines and
+# show their stair-stepping at anything less.
+PX = 3600
 
 
 def residues():
