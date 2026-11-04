@@ -61,11 +61,14 @@ finds a variant with 250x increase in catalytic activity.
   robust, not because the boundaries are structurally meaningful, and at this
   length the four fragments are \SI{37}{} residues each --- inside the
   \SIrange{20}{50}{} band the method recommends.
-  \textbf{(b)}~Ordering $N$ distinct sequences as whole genes costs
-  $N\times\$42$ at eBlock pricing for a 200-aa enzyme; ordering the same $N$
-  as a combinatorial library costs $N^{1/k}\times\$42$, because what is bought
-  is $k$ sets of parts rather than $N$ products. At $10^{12}$ variants that is
-  \$42T against \$1.3k.
+  \textbf{(b)}~What a given spend buys. Whole genes cost
+  \$42 each at eBlock pricing for a 200-aa enzyme, so library size is linear
+  in spend; a combinatorial library buys $k$ sets of parts instead of $N$
+  products, and size goes as the $k$th power of what each slot can hold.
+  eBlocks are billed at a 300-bp minimum, which binds from $k=2$ on, so past
+  that point cutting finer stops buying shorter DNA and only buys more pieces
+  of it. Reaching $10^{12}$ variants costs \$42T as whole genes, \$42M at
+  $k=2$, \$84k at $k=4$ and \$5.3k at $k=8$.
   \textbf{(c)}~The method. A backbone conditions the ProteinMPNN decoder, which
   is treated as a policy; the sequences it emits are cut at the fragment
   boundaries, recombined across parents, and folded best-of-5. Each fragment is

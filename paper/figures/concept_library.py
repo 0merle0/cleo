@@ -109,37 +109,53 @@ def grid(ax):
 
 # ---------------------------------------------------------------- panel (a)
 def panel_cost(ax):
-    """What N sequences cost, bought whole against bought as parts.
+    """What a given spend buys, as a library size.
 
-    One hue, dark to light, because k is an ordered quantity -- whole genes are
-    k=1 and belong on the same ramp as the rest, not in a separate colour.
+    Axes are cost on x and library size on y: the question is what you GET for
+    what you PAY, so the thing bought belongs on the dependent axis. Plotted
+    the other way the four arms converge at the left and their cost labels
+    stack on top of each other; this way the reference line at 10^12 variants
+    is horizontal and the four prices spread along it.
+
+    One hue, dark to light, because k is ordered -- whole genes are k=1 and
+    belong on the same ramp, not in a colour of their own. k=8 sits on the
+    palette's categorical blue exactly.
     """
-    S = np.logspace(1, 15, 400)
+    cost = np.logspace(2, 15, 400)
     series = [("whole gene", 1, SEQUENTIAL[5]),
               ("$k=2$", 2, SEQUENTIAL[4]),
               ("$k=4$", 4, SEQUENTIAL[3]),
               ("$k=8$", 8, SEQUENTIAL[2])]
     for lab, k, c in series:
-        ax.loglog(S, library_cost(S, k), "-", color=c, lw=2.2, label=lab,
-                  zorder=3)
-    # Every arm priced at one library size, so the column of labels is the
-    # comparison: one number per k, read straight down.
-    ax.axvline(1e12, color=GREY, lw=1, ls=":", zorder=1)
-    for lab, k, c in series:
-        y = float(library_cost(np.array(1e12), k))
-        ax.plot([1e12], [y], "o", ms=7, mfc=c, mec="white", mew=1.4, zorder=4)
-        ax.annotate(money(y), xy=(1e12, y), xytext=(1e12 * 0.45, y),
-                    fontsize=9.5, color=c, ha="right", va="center", zorder=5)
-    ax.set_xlim(10, 1e16)
-    ax.set_ylim(80, 1e18)
-    ax.text(1e12, 3e17, r"$10^{12}$ variants", ha="center", fontsize=7.5,
+        bp = max(PROT_AA * BP_PER_AA / k, MIN_BP)
+        S = (cost / (k * bp * COST_PER_BP)) ** k
+        ax.loglog(cost, S, "-", color=c, lw=2.2, label=lab, zorder=3)
+    ax.axhline(1e12, color=GREY, lw=1, ls=":", zorder=1)
+    # Every price goes to the RIGHT of its point and just below the line. The
+    # arms are steep and widely spaced in cost (5.3k, 84k, 42M, 42T), so that
+    # wedge is empty for all four; putting labels above or alternating lands
+    # them on the neighbouring arm.
+    marks = sorted(((float(library_cost(np.array(1e12), k)), c)
+                    for _, k, c in series), key=lambda t: t[0])
+    for i, (x, c) in enumerate(marks):
+        ax.plot([x], [1e12], "o", ms=7, mfc=c, mec="white", mew=1.4, zorder=4)
+        # k=8 and k=4 sit only 16x apart in cost -- closer than a label is
+        # wide -- so one offset cannot separate them. Heights alternate, and
+        # the dearest arm labels inward so it does not run off the axis.
+        dy = 0.30 if i % 2 == 0 else 0.055
+        if i == len(marks) - 1:
+            xt, ha = x * 0.45, "right"
+        else:
+            xt, ha = x * 2.2, "left"
+        ax.annotate(money(x), xy=(x, 1e12), xytext=(xt, 1e12 * dy),
+                    fontsize=9.5, color=c, ha=ha, va="top", zorder=5)
+    ax.set_xlim(1e2, 1e15)
+    ax.set_ylim(10, 1e16)
+    ax.text(1.4e2, 1e12 * 2.2, r"$10^{12}$ variants", ha="left", fontsize=7.5,
             color=PALETTE["gray"])
-    ax.set_xlabel("library size, distinct sequences")
-    ax.set_ylabel("synthesis cost (\\$)")
-    ax.set_title("buying parts, not products", fontsize=10)
-    ax.legend(frameon=False, fontsize=8, loc="upper left")
-    # No grid: four straight lines on a log-log plot read off the labelled
-    # column at 10^12, and the rules were competing with them.
+    ax.set_xlabel("synthesis cost (\\$)")
+    ax.set_ylabel("library size, distinct sequences")
+    ax.legend(frameon=False, fontsize=8, loc="lower right")
     ax.set_axisbelow(True)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
@@ -158,7 +174,6 @@ def panel_object(ax):
     ax.set_ylim(0, 1)
     ax.axis("off")
     place(ax, "whole", (0.5, 0.50), 0.125)
-    ax.set_title(f"one fold, {K} parts", fontsize=10)
 
 
 # ---------------------------------------------------------------- panel (d)
@@ -249,8 +264,7 @@ def panel_loop(ax, rng):
     ax.text(8.38, 0.22, r"$\rho=0$ returns the parent, so this rate is not a "
                         "retention", ha="center", fontsize=6.4,
             color=PALETTE["gray"], style="italic")
-    ax.set_title("the policy is trained on how well its fragments recombine",
-                 fontsize=10, loc="left")
+
 
 
 def main():
