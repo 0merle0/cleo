@@ -286,6 +286,11 @@ def panel_ours(ax, rng):
             mec=INK["ghost"], mew=0.7, ls="none", zorder=4)
     draw_designs(ax, cand[mask])
     draw_start(ax)
+    # One legend for the whole row. The star is in all three panels but is
+    # explained only here, because a key repeated three times costs three
+    # times the terrain and says the same thing.
+    ax.plot([], [], marker="*", ms=10, mfc="white", mec=DOT, mew=1.1,
+            ls="none", label="parent design")
     ax.plot([], [], "o", ms=2.6, mfc="none", mec=INK["ghost"], mew=0.7,
             ls="none", label="filtered out")
     ax.plot([], [], "o", ms=3.8, mfc=DOT, mec="white", mew=0.55, ls="none",
