@@ -56,6 +56,12 @@ def hexrgb(h):
     return tuple(int(h.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4))
 
 
+def muted(hex_c, f=0.55):
+    """-> `hex_c` blended toward light grey, for the recessive centre copy."""
+    r, g, b = hexrgb(hex_c)
+    return tuple(v + (0.88 - v) * f for v in (r, g, b))
+
+
 def script(sel_lines, out_png, k, ghost=False):
     defs = []
     for i in range(k):
@@ -93,26 +99,63 @@ def run(text, tag):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-k", type=int, default=4)
-    ap.add_argument("--only", default=None)
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     bs = bounds(a.k)
     print(f"{PDB.stem}, {len(residues())} residues -> {bs}")
 
-    jobs = {
-        "whole": [f"color frag{i}, resi {lo}-{hi}" for i, (lo, hi) in enumerate(bs)],
-        "grey": ["color grey72, prot"],
-    }
-    for i, (lo, hi) in enumerate(bs):
-        jobs[f"frag{i+1}"] = ["color grey90, prot",
-                              "set cartoon_transparency, 0.85, prot",
-                              f"color frag{i}, resi {lo}-{hi}",
-                              f"set cartoon_transparency, 0.0, resi {lo}-{hi}"]
+    # ONE PyMOL session for every view. The exploded panel only works if the
+    # isolated fragments share a camera with the whole fold -- rendered in
+    # separate sessions they each get their own `orient`, and a reader cannot
+    # map a fragment back to where it sits. So the view is set once, up front,
+    # and nothing after it touches the camera.
+    lines = [f"load {PDB}, prot", "hide everything", "show cartoon, prot",
+             f"@{STYLE}",
+             # The style sets an opaque background for standalone renders.
+             # These are composited, so each frame must be transparent --
+             # otherwise every image is a white square that paints over
+             # whatever it overlaps, and alpha-based trimming sees ink
+             # everywhere.
+             "set ray_opaque_background, 0"]
+    for i in range(a.k):
+        r, g, b = hexrgb(FRAGMENT[i])
+        lines.append(f"set_color frag{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
+        r, g, b = muted(FRAGMENT[i])
+        lines.append(f"set_color dim{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
+    lines += ["orient prot", "turn x, -8", "zoom prot, 2"]
 
-    for tag, sel in jobs.items():
-        if a.only and tag != a.only:
-            continue
-        run(script(sel, OUT / f"{tag}.png", a.k, ghost=(tag == "grey")), tag)
+    def png(tag):
+        return f"png {OUT / f'{tag}.png'}, width={PX}, height={PX}, dpi=300, ray=1"
+
+    # Full colour, whole fold.
+    lines += ["show cartoon, prot"]
+    lines += [f"color frag{i}, resi {lo}-{hi}" for i, (lo, hi) in enumerate(bs)]
+    lines.append(png("whole"))
+
+    # The recessive centre of the exploded panel: same fold, colours pulled
+    # toward grey so the isolated fragments around it carry the colour.
+    lines += [f"color dim{i}, resi {lo}-{hi}" for i, (lo, hi) in enumerate(bs)]
+    lines.append(png("dim"))
+
+    # One fragment at a time, alone, in full colour and in the SAME frame.
+    for i, (lo, hi) in enumerate(bs):
+        lines += ["hide everything",
+                  f"show cartoon, prot and resi {lo}-{hi}",
+                  f"color frag{i}, resi {lo}-{hi}",
+                  png(f"iso{i+1}")]
+
+    # A colourless copy for the schematic's "backbone" input.
+    lines += ["hide everything", "show cartoon, prot", f"@{GHOST}",
+              "color grey72, prot", png("grey")]
+
+    f = OUT / "_all.pml"
+    f.write_text("\n".join(lines) + "\n")
+    r = subprocess.run(["pymol", "-cqk", str(f)], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
+    f.unlink()
+    for t in ["whole", "dim", "grey"] + [f"iso{i+1}" for i in range(a.k)]:
+        print(f"  rendered {t}")
 
 
 if __name__ == "__main__":

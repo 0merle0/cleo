@@ -100,6 +100,21 @@ def place(ax, name, xy, zoom):
                                  frameon=False, box_alignment=(0.5, 0.5)))
 
 
+def place_raw(ax, name, xy, zoom):
+    """Place a structure PNG UNTRIMMED, so every image keeps one frame.
+
+    `place` crops to the ink, which is right for a single structure and fatal
+    for the exploded panel: cropping rescales each fragment to fill its own
+    box, so they stop sharing a camera and stop sharing a size. Untrimmed, a
+    fragment sits at its true position inside a mostly transparent frame, and
+    offsetting the frame slides the fragment outward by exactly that much.
+    """
+    im = mpimg.imread(PNG / f"{name}.png")
+    ax.add_artist(AnnotationBbox(OffsetImage(im, zoom=zoom), xy,
+                                 frameon=False, box_alignment=(0.5, 0.5),
+                                 annotation_clip=False))
+
+
 def grid(ax):
     ax.grid(True, color=INK["grid"], lw=0.7, zorder=0)
     ax.set_axisbelow(True)
@@ -178,18 +193,53 @@ def panel_cost(ax):
 
 
 # ---------------------------------------------------------------- panel (c)
-def panel_object(ax):
-    """The thing itself: one fold, cut into k equal fragments.
+def frag_angle(name):
+    """-> direction (radians) from the fold's centre to this fragment's ink.
 
-    1TIM rather than the PETase this project optimises -- the idea is not
-    specific to the target, and showing the target here would suggest it is.
-    The residue ranges that used to sit under this are gone: they are an
-    implementation detail of one protein and were competing with the fold.
+    Every structure PNG shares one camera, so where a fragment sits inside its
+    own frame IS where it sits in the fold. That is what lets the exploded
+    copy be pushed out on the correct side rather than parked in an arbitrary
+    corner. Requires transparent frames -- see render.py.
+    """
+    im = mpimg.imread(PNG / f"{name}.png")
+    ys, xs = np.nonzero(im[:, :, 3] > 0.02)
+    h, w = im.shape[:2]
+    return np.arctan2((1 - ys.mean() / h) - 0.5, xs.mean() / w - 0.5)
+
+
+def panel_object(ax):
+    """The fold, with its four fragments pulled out around it.
+
+    The centre is the same structure with its colours blended toward grey, so
+    it reads as context -- the isolated copies around it carry the colour.
+
+    Placement keeps the fragments' rotational ORDER but not their exact
+    angles. Two of 2FX2's four sit only 16 degrees apart as seen from the
+    centre, so pushing each straight out along its own bearing overlaps them;
+    spacing them evenly around the circle in the order they actually occur
+    keeps the mapping readable and guarantees they clear each other.
+
+    2FX2 rather than the PETase this project optimises: Figure 1 is about what
+    a combinatorial library IS, and using the target would imply the idea is
+    specific to it. Chosen by measuring secondary structure across a dozen
+    candidates (39.5% helix, 32.7% strand), and at 147 aa its k=4 fragments
+    are 37 residues -- inside the 20-50 band the method recommends.
     """
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    place(ax, "whole", (0.5, 0.50), 0.125)
+    cx, cy, Z, R = 0.50, 0.50, 0.052, 0.31
+
+    order = sorted(range(K), key=lambda i: frag_angle(f"iso{i+1}") % (2 * np.pi))
+    base = frag_angle(f"iso{order[0]+1}") % (2 * np.pi)
+    for slot, i in enumerate(order):
+        a = base + slot * 2 * np.pi / K
+        ux, uy = np.cos(a), np.sin(a)
+        ax.plot([cx + ux * 0.10, cx + ux * (R - 0.10)],
+                [cy + uy * 0.10, cy + uy * (R - 0.10)],
+                "-", color=INK["ghost"], lw=0.9, zorder=1)
+        place_raw(ax, f"iso{i+1}", (cx + ux * R, cy + uy * R), Z)
+    place_raw(ax, "dim", (cx, cy), Z)
 
 
 # ---------------------------------------------------------------- panel (d)
