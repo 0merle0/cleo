@@ -25,7 +25,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from palette import FRAGMENT  # noqa: E402
 
-PDB = HERE / "pdb" / "1tim_A.pdb"
+PDB = HERE / "pdb" / "2fx2_A.pdb"
 STYLE = HERE / "style_modern.pml"
 GHOST = HERE / "style_ghost.pml"
 OUT = HERE / "png"
@@ -97,7 +97,7 @@ def main():
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     bs = bounds(a.k)
-    print(f"1TIM chain A, {len(residues())} residues -> {bs}")
+    print(f"{PDB.stem}, {len(residues())} residues -> {bs}")
 
     jobs = {
         "whole": [f"color frag{i}, resi {lo}-{hi}" for i, (lo, hi) in enumerate(bs)],

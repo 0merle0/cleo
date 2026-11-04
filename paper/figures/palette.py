@@ -43,11 +43,11 @@ SEQUENTIAL. Categorical colors on an ordered axis throw away the ordering.
 ORDERED = [
     ("blue",   "#4499E7"),   # good_blue
     ("yellow", "#FAC72C"),   # golden_yellow
-    ("purple", "#B41F85"),   # ipd_purple / magenta
+    ("green",  "#AAC32F"),   # soft_green
     ("red",    "#E44A3E"),   # fire_red
+    ("purple", "#B41F85"),   # ipd_purple / magenta -- the 5th slot
     ("orange", "#FF8C00"),   # vivid_orange   -- see conflicts above
     ("teal",   "#28B0C1"),   # good_teal      -- see conflicts above
-    ("green",  "#AAC32F"),   # soft_green     -- see conflicts above
 ]
 
 PALETTE = dict(ORDERED)
