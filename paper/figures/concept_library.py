@@ -108,6 +108,36 @@ def grid(ax):
 
 
 # ---------------------------------------------------------------- panel (a)
+def mark_level(ax, S, series, label):
+    """Draw one library size as a reference line with a price on every arm.
+
+    Label placement is the whole difficulty. The arms are not evenly spaced in
+    cost, and how close the two cheapest sit depends on the level: at 10^12
+    they are 16x apart, at 10^6 only 2.8x -- far closer than a label is wide.
+    So prices alternate ABOVE and BELOW the line rather than being staggered in
+    height, which separates neighbours whatever the spacing, and the dearest
+    arm labels inward so it cannot run off the axis.
+    """
+    ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1)
+    # The level caption goes at the RIGHT end of its line. On the left it
+    # lands in the cluster of prices, which is tightest exactly where the
+    # cheapest arms meet the line.
+    ax.text(6e14, S * 1.5, label, ha="right", fontsize=7.5,
+            color=PALETTE["gray"])
+    marks = sorted(((float(library_cost(np.array(S), k)), c)
+                    for _, k, c in series), key=lambda t: t[0])
+    for i, (x, c) in enumerate(marks):
+        ax.plot([x], [S], "o", ms=6.5, mfc=c, mec="white", mew=1.4, zorder=4)
+        up = i % 2 == 1
+        y, va = (S * 3.2, "bottom") if up else (S * 0.32, "top")
+        if i == len(marks) - 1:
+            xt, ha = x * 0.5, "right"
+        else:
+            xt, ha = x * 1.6, "left"
+        ax.annotate(money(x), xy=(x, S), xytext=(xt, y), fontsize=8.5,
+                    color=c, ha=ha, va=va, zorder=5)
+
+
 def panel_cost(ax):
     """What a given spend buys, as a library size.
 
@@ -130,29 +160,10 @@ def panel_cost(ax):
         bp = max(PROT_AA * BP_PER_AA / k, MIN_BP)
         S = (cost / (k * bp * COST_PER_BP)) ** k
         ax.loglog(cost, S, "-", color=c, lw=2.2, label=lab, zorder=3)
-    ax.axhline(1e12, color=GREY, lw=1, ls=":", zorder=1)
-    # Every price goes to the RIGHT of its point and just below the line. The
-    # arms are steep and widely spaced in cost (5.3k, 84k, 42M, 42T), so that
-    # wedge is empty for all four; putting labels above or alternating lands
-    # them on the neighbouring arm.
-    marks = sorted(((float(library_cost(np.array(1e12), k)), c)
-                    for _, k, c in series), key=lambda t: t[0])
-    for i, (x, c) in enumerate(marks):
-        ax.plot([x], [1e12], "o", ms=7, mfc=c, mec="white", mew=1.4, zorder=4)
-        # k=8 and k=4 sit only 16x apart in cost -- closer than a label is
-        # wide -- so one offset cannot separate them. Heights alternate, and
-        # the dearest arm labels inward so it does not run off the axis.
-        dy = 0.30 if i % 2 == 0 else 0.055
-        if i == len(marks) - 1:
-            xt, ha = x * 0.45, "right"
-        else:
-            xt, ha = x * 2.2, "left"
-        ax.annotate(money(x), xy=(x, 1e12), xytext=(xt, 1e12 * dy),
-                    fontsize=9.5, color=c, ha=ha, va="top", zorder=5)
+    mark_level(ax, 1e12, series, r"$10^{12}$ variants")
+    mark_level(ax, 1e6, series, r"$10^{6}$ variants")
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
-    ax.text(1.4e2, 1e12 * 2.2, r"$10^{12}$ variants", ha="left", fontsize=7.5,
-            color=PALETTE["gray"])
     ax.set_xlabel("synthesis cost (\\$)")
     ax.set_ylabel("library size, distinct sequences")
     ax.legend(frameon=False, fontsize=8, loc="lower right")

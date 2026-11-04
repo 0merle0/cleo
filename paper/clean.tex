@@ -67,8 +67,12 @@ finds a variant with 250x increase in catalytic activity.
   products, and size goes as the $k$th power of what each slot can hold.
   eBlocks are billed at a 300-bp minimum, which binds from $k=2$ on, so past
   that point cutting finer stops buying shorter DNA and only buys more pieces
-  of it. Reaching $10^{12}$ variants costs \$42T as whole genes, \$42M at
-  $k=2$, \$84k at $k=4$ and \$5.3k at $k=8$.
+  of it. Two library sizes are
+  priced on every arm. Reaching $10^{6}$ variants costs \$42M as whole genes
+  against \$945 at $k=8$; reaching $10^{12}$ costs \$42T against \$5.3k.
+  The gap widens with library size, which is the point --- a combinatorial
+  library gets cheaper, relative to ordering the same set outright, exactly
+  where ordering outright becomes impossible.
   \textbf{(c)}~The method. A backbone conditions the ProteinMPNN decoder, which
   is treated as a policy; the sequences it emits are cut at the fragment
   boundaries, recombined across parents, and folded best-of-5. Each fragment is
