@@ -161,8 +161,15 @@ def draw_landscape(ax, title, axis_labels=False):
     # third is not coloured either -- tinting only "this work" would say the
     # comparison was decided before the reader got to it.
     ax.set_title(title, fontsize=fs(9), pad=7, color="black")
+    # ONE label for the row, on the leftmost panel's y-axis.
+    #
+    # Both axes on all three was tried: six copies of "Sequence space" around
+    # three panels that share one set of axes, which reads as six different
+    # things being named. There are no ticks and no units, so the label is
+    # saying what the plane IS, and the plane is the same in all three -- it
+    # only needs saying once. The x-axis goes unlabelled for the same reason:
+    # it is the same space as y.
     if axis_labels:
-        ax.set_xlabel("Sequence space", fontsize=fs(8), labelpad=3)
         ax.set_ylabel("Sequence space", fontsize=fs(8), labelpad=3)
 
 
@@ -200,7 +207,7 @@ def panel_naive(ax, rng):
     misses most of them -- but the specific miss shown is a pick, and no
     reader should take it for a measurement.
     """
-    draw_landscape(ax, "Naive combinatorial assembly", axis_labels=True)
+    draw_landscape(ax, "Naive combinatorial assembly")
     r = np.random.default_rng(50)
     xs = np.sort(r.uniform(0.05, 0.95, 6))
     ys = np.sort(r.uniform(0.05, 0.95, 6))
@@ -230,7 +237,7 @@ def panel_ours(ax, rng):
     as a catalogue of full genes, which is the thing the method exists to
     avoid.
     """
-    draw_landscape(ax, "This work", axis_labels=True)
+    draw_landscape(ax, "This work")
     xs = rng.uniform(0.05, 0.95, 14)
     ys = rng.uniform(0.05, 0.95, 14)
     cand = _clip(np.array([(x, y) for x in xs for y in ys], float)
@@ -574,7 +581,7 @@ def main():
     # explains and panels b/c, which it has nothing to do with, and the gap is
     # also where panel b's letter sits. Pulling it up into row 0 settles the
     # question of which panels it belongs to and clears the gap in one move.
-    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.16)
+    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.06)
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
