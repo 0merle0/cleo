@@ -173,7 +173,7 @@ def _clip(p):
     return np.clip(p, 0.03, 0.97)
 
 
-def draw_landscape(ax, title, title_color=None):
+def draw_landscape(ax, title):
     n = 320
     g = np.linspace(0, 1, n)
     X, Y = np.meshgrid(g, g)
@@ -189,8 +189,11 @@ def draw_landscape(ax, title, title_color=None):
     for sp in ax.spines.values():
         sp.set_color(INK["grid"])
         sp.set_linewidth(0.9)
-    ax.set_title(title, fontsize=9, pad=7,
-                 color=title_color or PALETTE["gray"])
+    # Black, not the grey used for secondary labels elsewhere: these three
+    # name the arms being contrasted and are the panel's primary text. The
+    # third is not coloured either -- tinting only "this work" would say the
+    # comparison was decided before the reader got to it.
+    ax.set_title(title, fontsize=9, pad=7, color="black")
 
 
 def draw_designs(ax, pts, ms=3.8):
@@ -206,7 +209,7 @@ def draw_start(ax):
 
 def panel_epcr(ax, rng):
     """Mutagenesis walks: dense, but it never leaves the parent's basin."""
-    draw_landscape(ax, "error-prone PCR")
+    draw_landscape(ax, "Error-prone PCR")
     pts = _clip(rng.normal(START, 0.055, size=(N_ORDER, 2)))
     draw_designs(ax, pts)
     draw_start(ax)
@@ -227,7 +230,7 @@ def panel_naive(ax, rng):
     misses most of them -- but the specific miss shown is a pick, and no
     reader should take it for a measurement.
     """
-    draw_landscape(ax, "naive combinatorial assembly")
+    draw_landscape(ax, "Naive combinatorial assembly")
     r = np.random.default_rng(50)
     xs = np.sort(r.uniform(0.05, 0.95, 6))
     ys = np.sort(r.uniform(0.05, 0.95, 6))
@@ -256,8 +259,7 @@ def panel_ours(ax, rng):
     N_ORDER, identical to the other two panels, so the three differ in WHERE
     the designs go and not in how many there are.
     """
-    draw_landscape(ax, "stringent filtering (this work)",
-                   title_color=PALETTE["blue"])
+    draw_landscape(ax, "This work")
     xs = rng.uniform(0.05, 0.95, 14)
     ys = rng.uniform(0.05, 0.95, 14)
     cand = _clip(np.array([(x, y) for x in xs for y in ys], float)
