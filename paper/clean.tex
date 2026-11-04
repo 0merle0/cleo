@@ -50,10 +50,19 @@ optimize enzymes. For a de novo designed PETase we demonstrate our platform
 finds a variant with 250x increase in catalytic activity.
 \end{abstract}
 
-\begin{figure}[t]
+% Figure 1's legend sits on the page AFTER the figure.
+%
+% The float carries no \caption, so it does not step the figure counter; the
+% \captionof below does, and the numbering comes out the same. Done this way
+% rather than with an empty second float, which WOULD step the counter and
+% silently renumber the method figure.
+\begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth]{concept_library.pdf}
-  \caption{\textbf{A combinatorial library, and the loop around it.}
+\end{figure}
+
+\clearpage
+\noindent\captionof{figure}{\textbf{A combinatorial library, and the loop around it.}
   \textcolor{cleoRed}{[PLACEHOLDER --- the prose is yours. Kept short so the
   float fits; the facts below are the ones a reader cannot get from the
   picture.]}
@@ -69,8 +78,8 @@ finds a variant with 250x increase in catalytic activity.
   \textbf{(d)}~The experimental loop. The arrow returns to the \emph{selector},
   not the library: parts are synthesised once and each round changes only
   which of them get combined.}
-  \label{fig:concept}
-\end{figure}
+\label{fig:concept}
+\clearpage
 
 \begin{figure}[t]
   \centering
