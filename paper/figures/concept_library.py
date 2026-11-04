@@ -194,16 +194,17 @@ def panel_cost(ax):
 
 # ---------------------------------------------------------------- panel (c)
 def panel_object(ax):
-    """The fold in full colour, with its four fragments laid out beneath it.
+    """The fold itself, cut into k fragments and coloured by slot.
 
-    Every view comes from one PyMOL session with the camera set once, so the
-    fragments are the fold's own pieces at the fold's own scale -- not four
-    separate renders that happen to sit side by side.
+    Just the assembled structure. Two richer arrangements were built and
+    dropped: an exploded view with the fold dimmed at the centre and the
+    fragments pushed out around it, and a two-row version with the fold above
+    and the pieces below. Both showed the same thing the colours already show,
+    and both cost most of the panel to say it.
 
-    They are trimmed to their ink but share ONE zoom, which is what keeps that
-    true: trimming alone is fine (the row shows each piece centred in its
-    cell), but trimming and then fitting each to its cell would rescale them
-    independently and a short fragment would look as big as a long one.
+    render.py still emits the extra views (`dim`, `iso1`..`isoK`) -- they are
+    cheap, they share this camera, and either arrangement is a few lines away
+    if a later figure wants one.
 
     2FX2 rather than the PETase this project optimises: Figure 1 is about what
     a combinatorial library IS, and using the target would imply the idea is
@@ -211,27 +212,10 @@ def panel_object(ax):
     candidates (39.5% helix, 32.7% strand), and at 147 aa its k=4 fragments
     are 37 residues -- inside the 20-50 band the method recommends.
     """
-    ROW_Y, ZF = 0.15, 0.030
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    place(ax, "whole", (0.5, 0.72), 0.050)
-    ax.annotate("", xy=(0.5, 0.345), xytext=(0.5, 0.425),
-                arrowprops=dict(arrowstyle="-|>", color=PALETTE["gray"],
-                                lw=1.3, mutation_scale=12))
-    # Slot number sits above its fragment, at a height derived from that
-    # fragment's OWN extent. A fixed offset cannot work: these are pieces of
-    # one fold, so their shapes differ -- iso4 is 57% taller than iso1 -- and
-    # any constant that clears the tallest floats above the rest.
-    fig = ax.figure
-    fig.canvas.draw()
-    ax_pts = ax.get_window_extent().height * 72.0 / fig.dpi
-    for i in range(K):
-        x = 0.13 + i * 0.246
-        half = (trimmed(f"iso{i+1}").shape[0] * ZF / 2.0) / ax_pts
-        ax.text(x, ROW_Y + half + 0.025, f"{i+1}", ha="center", va="bottom",
-                fontsize=9, color=FRAGMENT[i], fontweight="bold")
-        place(ax, f"iso{i+1}", (x, ROW_Y), ZF)
+    place(ax, "whole", (0.5, 0.5), 0.082)
 
 
 # ---------------------------------------------------------------- panel (d)
