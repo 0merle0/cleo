@@ -38,6 +38,7 @@ import numpy as np
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+from matplotlib.transforms import blended_transform_factory
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -151,7 +152,12 @@ PEAKS = [
     (0.31, 0.78, 0.070, 0.66),
 ]
 START = (0.26, 0.32)
-N_ORDER = 36            # designs actually ordered -- the SAME for all three
+# Variants actually built and screened -- the SAME for all three panels, so
+# they differ in WHERE the budget goes and not in how much of it there is.
+# Deliberately not called "ordered": what gets ordered in the two
+# combinatorial arms is FRAGMENTS, and the full-length variants are assembled
+# from them. That distinction is the method, so the panel must not blur it.
+N_VARIANTS = 36
 DOT = "#1F2937"
 
 # White through the house blue ramp, stopping at the mid step. The darkest two
@@ -205,7 +211,7 @@ def draw_landscape(ax, title, axis_labels=False):
 
 
 def draw_designs(ax, pts, ms=3.8):
-    """The designs that were ordered and built."""
+    """The full-length variants that were built and screened."""
     ax.plot(pts[:, 0], pts[:, 1], "o", ms=ms, mfc=DOT, mec="white", mew=0.55,
             ls="none", zorder=5)
 
@@ -218,7 +224,7 @@ def draw_start(ax):
 def panel_epcr(ax, rng):
     """Mutagenesis walks: dense, but it never leaves the parent's basin."""
     draw_landscape(ax, "Error-prone PCR", axis_labels=True)
-    pts = _clip(rng.normal(START, 0.055, size=(N_ORDER, 2)))
+    pts = _clip(rng.normal(START, 0.055, size=(N_VARIANTS, 2)))
     draw_designs(ax, pts)
     draw_start(ax)
 
@@ -253,21 +259,27 @@ def panel_naive(ax, rng):
 
 
 def panel_ours(ax, rng):
-    """Generate the same combinatorial reach, then filter hard before ordering.
+    """Generate the same combinatorial reach, then filter hard before building.
 
     The point of the panel is that the filter IS the search. A policy-designed
     library spans the space as widely as the naive one -- the faint open
-    candidates -- but only what survives folding and scoring gets built, and
-    those survivors sit on the optima. The budget of filled points is
-    N_ORDER, identical to the other two panels, so the three differ in WHERE
-    the designs go and not in how many there are.
+    candidates -- but only what survives folding and scoring stays in the
+    library, and those survivors sit on the optima. The filled points number
+    N_VARIANTS, identical to the other two panels.
+
+    The legend says "assembled from library" and not "ordered" on purpose.
+    What is ordered is FRAGMENTS -- each full-length variant is built by
+    assembling one fragment per slot, which is exactly why the cost argument
+    in panel (c) holds. A legend reading "ordered" would quietly describe this
+    as a catalogue of full genes, which is the thing the method exists to
+    avoid.
     """
     draw_landscape(ax, "This work")
     xs = rng.uniform(0.05, 0.95, 14)
     ys = rng.uniform(0.05, 0.95, 14)
     cand = _clip(np.array([(x, y) for x in xs for y in ys], float)
                  + rng.normal(0, 0.010, (196, 2)))
-    keep = np.argsort(fitness(cand[:, 0], cand[:, 1]))[-N_ORDER:]
+    keep = np.argsort(fitness(cand[:, 0], cand[:, 1]))[-N_VARIANTS:]
     mask = np.zeros(len(cand), bool)
     mask[keep] = True
     ax.plot(cand[~mask, 0], cand[~mask, 1], "o", ms=2.6, mfc="none",
@@ -277,7 +289,7 @@ def panel_ours(ax, rng):
     ax.plot([], [], "o", ms=2.6, mfc="none", mec=INK["ghost"], mew=0.7,
             ls="none", label="filtered out")
     ax.plot([], [], "o", ms=3.8, mfc=DOT, mec="white", mew=0.55, ls="none",
-            label="ordered")
+            label="assembled from library")
     ax.legend(fontsize=6.8, loc="lower left", handletextpad=0.3,
               borderpad=0.35, labelspacing=0.25, frameon=True,
               facecolor="white", edgecolor="none", framealpha=0.88)
@@ -527,10 +539,36 @@ def main():
     panel_cost(ax_cost)
     panel_loop(ax_loop, rng)
 
-    for ax, lab, dy in ((ax_e, "a", 1.20), (ax_obj, "b", 1.12),
-                        (ax_cost, "c", 1.12), (ax_loop, "d", 1.12)):
-        ax.text(-0.02, dy, lab, transform=ax.transAxes, fontsize=12,
-                fontweight="bold", va="top", ha="right")
+    # Panel letters are placed in FIGURE x, not axes x.
+    #
+    # The old placement was transAxes -0.02, i.e. 2% of each axes' OWN width to
+    # the left of it. The four axes have four different widths and four
+    # different left edges, so that put the four letters at four different
+    # absolute positions -- a ragged left margin that is visible down the page.
+    #
+    # Instead: measure each column's true left edge, tick labels and axis
+    # labels included, and justify every letter in that column to it. a, b and
+    # d share the left column and therefore share one x; c is justified to the
+    # left edge of the right-hand column's content, which is the same rule
+    # applied to the only panel that is not in the left column.
+    fig.canvas.draw()
+    rend = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+
+    def left_edge(axes):
+        return min(inv.transform((a.get_tightbbox(rend).x0, 0))[0]
+                   for a in axes)
+
+    x_left = left_edge([ax_e, ax_obj, ax_loop])
+    x_right = left_edge([ax_cost])
+    for ax, lab, x, dy in ((ax_e, "a", x_left, 1.20),
+                           (ax_obj, "b", x_left, 1.12),
+                           (ax_cost, "c", x_right, 1.12),
+                           (ax_loop, "d", x_left, 1.12)):
+        ax.text(x, dy, lab,
+                transform=blended_transform_factory(fig.transFigure,
+                                                    ax.transAxes),
+                fontsize=12, fontweight="bold", va="top", ha="left")
     # dpi=900, NOT the house default of 300.
     #
     # This is what actually set the structures' resolution, and it is easy to
