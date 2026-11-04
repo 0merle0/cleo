@@ -227,6 +227,15 @@ def panel_epcr(ax, rng):
     pts = _clip(rng.normal(START, 0.055, size=(N_VARIANTS, 2)))
     draw_designs(ax, pts)
     draw_start(ax)
+    # Keyed here rather than in the third panel: the star means the same thing
+    # in all three, and this is the one the reader looks at first. Set at
+    # lower centre, not lower left -- the mutagenesis cloud reaches into that
+    # corner, and a legend over the sampled designs hides the panel's point.
+    ax.plot([], [], marker="*", ms=10, mfc="white", mec=DOT, mew=1.1,
+            ls="none", label="parent design")
+    ax.legend(fontsize=6.8, loc="lower center", handletextpad=0.3,
+              borderpad=0.35, frameon=True, facecolor="white",
+              edgecolor="none", framealpha=0.88)
 
 
 def panel_naive(ax, rng):
@@ -286,11 +295,8 @@ def panel_ours(ax, rng):
             mec=INK["ghost"], mew=0.7, ls="none", zorder=4)
     draw_designs(ax, cand[mask])
     draw_start(ax)
-    # One legend for the whole row. The star is in all three panels but is
-    # explained only here, because a key repeated three times costs three
-    # times the terrain and says the same thing.
-    ax.plot([], [], marker="*", ms=10, mfc="white", mec=DOT, mew=1.1,
-            ls="none", label="parent design")
+    # The star is keyed in the first panel, where it is first seen. Only the
+    # two point styles are keyed here, because only this panel has both.
     ax.plot([], [], "o", ms=2.6, mfc="none", mec=INK["ghost"], mew=0.7,
             ls="none", label="filtered out")
     ax.plot([], [], "o", ms=3.8, mfc=DOT, mec="white", mew=0.55, ls="none",
