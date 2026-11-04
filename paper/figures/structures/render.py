@@ -25,15 +25,31 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from palette import FRAGMENT  # noqa: E402
 
-PDB = HERE / "pdb" / "2fx2_A.pdb"
+# Bovine trypsin, 2PTN chain A, 223 residues.
+#
+# It replaced 2FX2 (flavodoxin) when the figure needed a catalytic triad.
+# Flavodoxin has none -- its functional site is a cofactor pocket -- so a
+# His/Asp/Ser triad drawn on it would have been invented. Trypsin's is real
+# and, better, it SPANS THE CUT: under the same equal-count split,
+#
+#     His57  -> fragment 1      His-Asp 2.67 A
+#     Asp102 -> fragment 2      His-Ser 3.02 A
+#     Ser195 -> fragment 4      Asp-Ser 6.77 A (they do not contact)
+#
+# Three of the four fragments carry one catalytic residue each, which is the
+# figure's whole point about where boundaries fall.
+#
+# The cost: at 223 residues the k=4 fragments are 56 residues, just outside
+# the 20-50 band the method recommends, where flavodoxin's were 37. The
+# caption states the number rather than repeating the old claim.
+PDB = HERE / "pdb" / "2ptn_A.pdb"
 STYLE = HERE / "style_modern.pml"
 GHOST = HERE / "style_ghost.pml"
 OUT = HERE / "png"
-# 6000 px. The protein prints about 1.86 inches wide, so 3600 was already
-# ~1930 dpi on the page and 6000 is ~3200 -- both far past what print needs.
-# The reason to go higher is on-screen zoom, not the printed figure. If an
-# edge looks soft it is antialiasing, not pixel count: see style_modern.pml.
-PX = 6000
+# 3000 px. The fold now prints ~0.9 inch wide beside its zoom, not 1.9, so
+# this is still ~3300 dpi on the page. If an edge looks soft it is
+# antialiasing, not pixel count: see style_modern.pml.
+PX = 3000
 
 
 def residues():
@@ -129,73 +145,24 @@ def run(text, tag):
 # be eight times the pixels for a tenth the size.
 VAR_PX = 2000
 
-# --- the active site ------------------------------------------------------
+# --- the catalytic triad --------------------------------------------------
 #
-# 2FX2 is a flavodoxin, and its cofactor pocket makes the figure's point
-# without any invention: FMN is hydrogen-bonded by residues from THREE
-# DIFFERENT QUARTERS of the chain. Measured on the deposited structure
-# (chain A + FMN, pdb/2fx2_site.pdb), closest polar contact per residue:
+# Sticks only, no cofactor and no cartoon: the zoom is three side chains and
+# the two hydrogen bonds between them. Each residue takes its own fragment's
+# colour, so the three colours in the zoom ARE three fragments.
 #
-#   fragment 1   Ser10 2.58, Thr11 2.73, Thr12 2.68, Gly13 3.16, Asn14 2.71
-#   fragment 2   Ser58 2.61, Thr59 2.63, Trp60 3.32, Asp62 3.36
-#   fragment 3   Asp95 3.15, Tyr100 3.13, Cys102 2.90
-#   fragment 4   -- nothing within 4.5 A
-#
-# One residue per contacting fragment is drawn, so the three colours in the
-# zoom are three fragments and nothing else. Fragment 4 contributes no
-# contact, which the caption should say rather than the figure imply.
-SITE_PDB = HERE / "pdb" / "2fx2_site.pdb"
-SITE_PX = 2600
-SITE_RES = [(12, 0, "OG1", "O3P"),    # Thr12  fragment 1
-            (58, 1, "OG", "O1P"),     # Ser58  fragment 2
-            (95, 2, "N", "O2")]       # Asp95  fragment 3, backbone donor
-
-
-def site():
-    """Render the FMN pocket: three fragments' residues, H-bonds drawn."""
-    bs = bounds(4)
-    # Only the three contacting loops are drawn, not the whole fold.
-    #
-    # The first attempt showed the entire cartoon at cartoon_transparency
-    # 0.72 as a backdrop. Two things went wrong: ray_trace_mode 1 renders
-    # transparency badly and left black patches across the ribbon, and even
-    # faded the fold buried the cofactor it was supposed to frame. Three short
-    # loops give the same context and leave the site visible.
-    LOOPS = "9-16+56-63+93-102"
-    lines = [f"load {SITE_PDB}, site", "hide everything",
-             f"show cartoon, site and polymer and resi {LOOPS}", f"@{STYLE}",
-             "set ray_opaque_background, 0",
-             "set cartoon_transparency, 0",
-             "set cartoon_tube_radius, 0.22",
-             "set stick_radius, 0.16",
-             "set dash_color, black", "set dash_width, 2.2",
-             "set dash_gap, 0.22", "set dash_length, 0.30",
-             "set label_size, 0", "set ray_trace_mode, 1"]
-    for i, (lo, hi) in enumerate(bs):
-        r, g, b = hexrgb(FRAGMENT[i])
-        lines.append(f"set_color frag{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
-        lines.append(f"color frag{i}, site and polymer and resi {lo}-{hi}")
-    lines += ["show sticks, resn FMN", "color grey45, resn FMN",
-              "set stick_radius, 0.13, resn FMN"]
-    sel = "+".join(str(n) for n, _, _, _ in SITE_RES)
-    lines += [f"show sticks, site and polymer and resi {sel}"]
-    for n, f, at, fat in SITE_RES:
-        lines.append(f"color frag{f}, site and resi {n}")
-        lines.append(
-            f"distance hb{n}, site and resi {n} and name {at}, "
-            f"resn FMN and name {fat}")
-    lines += ["hide labels",
-              f"orient resn FMN or (site and resi {sel})",
-              "turn x, -10", "turn y, 25", "zoom resn FMN, 6.0",
-              f"png {OUT / 'site.png'}, width={SITE_PX}, "
-              f"height={SITE_PX}, dpi=300, ray=1"]
-    f = OUT / "_site.pml"
-    f.write_text("\n".join(lines) + "\n")
-    r = pymol_run(f)
-    if r.returncode != 0:
-        sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
-    f.unlink()
-    print("  rendered site")
+# An earlier version of this panel drew flavodoxin's FMN pocket with the
+# cofactor in grey. It was replaced, not just recoloured -- see the note on
+# PDB above for why the protein changed.
+SITE_PX = 2200
+TRIAD = [(57, 0, "HIS"),      # fragment 1
+         (102, 1, "ASP"),     # fragment 2
+         (195, 3, "SER")]     # fragment 4
+# The two real catalytic hydrogen bonds. Asp102 and Ser195 are 6.77 A apart
+# and are NOT joined -- the charge relay runs through the histidine, and
+# drawing a third dash would assert a contact that is not there.
+TRIAD_HB = [((57, "ND1"), (102, "OD2")),
+            ((57, "NE2"), (195, "OG"))]
 
 
 def shade(hex_c, f):
@@ -240,6 +207,68 @@ def variants(n, k):
         print(f"  rendered var{v+1}")
 
 
+def site():
+    """Render the catalytic triad: three side chains, two hydrogen bonds.
+
+    Sticks only. No cartoon and no cofactor -- the panel beside it already
+    shows the fold, and anything else in this frame competes with the three
+    colours that carry the point.
+    """
+    sel = "+".join(str(n) for n, _, _ in TRIAD)
+    lines = [f"load {PDB}, prot", "hide everything", f"@{STYLE}",
+             "set ray_opaque_background, 0",
+             "set stick_radius, 0.20",
+             "set dash_color, black", "set dash_width, 2.4",
+             "set dash_gap, 0.24", "set dash_length, 0.32",
+             "set label_size, 0",
+             f"show sticks, prot and resi {sel} and not (name C+N+O)"]
+    for n, f, _ in TRIAD:
+        r, g, b = hexrgb(FRAGMENT[f])
+        lines.append(f"set_color tri{n}, [{r:.4f}, {g:.4f}, {b:.4f}]")
+        lines.append(f"color tri{n}, prot and resi {n}")
+    for i, ((n1, a1), (n2, a2)) in enumerate(TRIAD_HB):
+        lines.append(f"distance hb{i}, prot and resi {n1} and name {a1}, "
+                     f"prot and resi {n2} and name {a2}")
+    lines += ["hide labels",
+              f"orient prot and resi {sel}", "turn x, -8",
+              f"zoom prot and resi {sel}, 1.6",
+              f"png {OUT / 'triad.png'}, width={SITE_PX}, "
+              f"height={SITE_PX}, dpi=300, ray=1"]
+    f = OUT / "_site.pml"
+    f.write_text("\n".join(lines) + "\n")
+    r = pymol_run(f)
+    if r.returncode != 0:
+        sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
+    f.unlink()
+    print("  rendered triad")
+
+
+def sitemark():
+    """Render the triad as spheres in the WHOLE FOLD's camera.
+
+    This is not a figure, it is a measurement. The zoom box drawn over the
+    fold in panel (c) has to sit where the active site actually is, and the
+    only reliable way to know that in image pixels is to render the site
+    alone through the same camera and find its centroid. A hand-picked
+    fraction of the frame goes silently wrong the moment the view changes.
+    """
+    sel = "+".join(str(n) for n, _, _ in TRIAD)
+    lines = [f"load {PDB}, prot", "hide everything", f"@{STYLE}",
+             "set ray_opaque_background, 0",
+             f"show spheres, prot and resi {sel}",
+             "color black, prot",
+             "orient prot", "turn x, -8", "zoom prot, 2",
+             f"png {OUT / 'sitemark.png'}, width={PX}, height={PX}, "
+             "dpi=300, ray=1"]
+    f = OUT / "_mark.pml"
+    f.write_text("\n".join(lines) + "\n")
+    r = pymol_run(f)
+    if r.returncode != 0:
+        sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
+    f.unlink()
+    print("  rendered sitemark")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-k", type=int, default=4)
@@ -254,6 +283,7 @@ def main():
         return
     if a.site:
         site()
+        sitemark()
         return
     OUT.mkdir(parents=True, exist_ok=True)
     bs = bounds(a.k)

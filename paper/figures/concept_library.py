@@ -35,7 +35,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+import matplotlib.image as mpimg
+from matplotlib.patches import (FancyArrowPatch, FancyBboxPatch,
+                                Rectangle)
 from matplotlib.transforms import blended_transform_factory
 
 HERE = Path(__file__).resolve().parent
@@ -43,7 +45,7 @@ sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
 from palette import (INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
                      PANEL_LABEL_PT, SEQUENTIAL, fs)
-from schematic import (FRAGMENT, _shade, arrow, box,  # noqa: E402
+from schematic import (FRAGMENT, PNG, _shade, arrow, box,  # noqa: E402
                        place, trimmed)
 
 PNG = HERE / "structures" / "png"
@@ -329,7 +331,7 @@ def mark_level(ax, S, series):
     # ($42M) and where whole genes do ($42T). Top left was tried and failed --
     # that corner looks empty but the k=4 and k=8 arms climb through it. Here
     # the nearest arm is whole genes, four decades below at this x.
-    ax.text(1e10, S * 1.7, r"$10^{12}$ variants", ha="center", va="bottom",
+    ax.text(1e11, S * 1.7, r"$10^{12}$ variants", ha="center", va="bottom",
             fontsize=fs(7), color=PALETTE["gray"])
     # The side follows from the direction the curve moves, which is the part
     # that was got wrong first: every arm RISES, so dropping below the level
@@ -338,11 +340,18 @@ def mark_level(ax, S, series):
     # below-line labels to the right of the arm, above-line labels to its
     # left. Offsetting a below-line label leftward, which looks symmetric,
     # walks it straight into its own curve.
-    PLACE = [(2.2, 0.80, "right"),    # k=8    above, so left
-             (0.45, 1.25, "left"),    # k=4    below, so right
-             (0.45, 1.25, "left"),    # k=2    below, so right
-             (2.2, 0.80, "right")]    # whole  above, so left (and cannot
-                                      #        run off the right edge)
+    # The y-factors are deliberately large. Standing the labels well off the
+    # level line also buys their horizontal clearance, because the arms are
+    # steep: a label lifted to 6x the level sits beside a part of its own
+    # curve that has moved much further right than at 2.2x. Distance from the
+    # line and distance from the curve are the same move here.
+    PLACE = [(6.0, 0.80, "right"),    # k=8    above, so left
+             (0.16, 1.25, "left"),    # k=4    below, so right
+             (0.16, 1.25, "left"),    # k=2    below, so right
+             (0.16, 1.25, "left")]    # whole  below, so right
+    # The whole-gene price moved BELOW the line to clear the level caption,
+    # which sits above it. Below means right of its arm, and right of 4.2e13
+    # needs room -- hence the x-axis running to 1e16 rather than 1e15.
     marks = sorted(((float(library_cost(np.array(S), k)), c)
                     for _, k, c in series), key=lambda t: t[0])
     for i, (x, c) in enumerate(marks):
@@ -377,7 +386,7 @@ def panel_cost(ax):
         ax.loglog(cost, S, "-", color=c, lw=2.2, zorder=3,
                   label=lab)
     mark_level(ax, LEVEL, series)
-    ax.set_xlim(1e2, 1e15)
+    ax.set_xlim(1e2, 1e16)
     ax.set_ylim(10, 1e16)
     ax.set_xlabel("Synthesis cost (\\$)")
     ax.set_ylabel("Library size")
@@ -408,39 +417,102 @@ def panel_object(ax):
     cheap, they share this camera, and either arrangement is a few lines away
     if a later figure wants one.
 
-    2FX2 rather than the PETase this project optimises: Figure 1 is about what
-    a combinatorial library IS, and using the target would imply the idea is
-    specific to it. Chosen by measuring secondary structure across a dozen
-    candidates (39.5% helix, 32.7% strand), and at 147 aa its k=4 fragments
-    are 37 residues -- inside the 20-50 band the method recommends.
+    Bovine trypsin (2PTN chain A, 223 residues), not the PETase this project
+    optimises: Figure 1 is about what a combinatorial library IS, and using
+    the target would imply the idea is specific to it.
 
-    The zoom beside it is the point of the panel, not decoration. 2FX2's FMN
-    pocket is built from three different quarters of the chain, which is
-    measured rather than arranged -- closest polar contact to the cofactor,
-    per fragment:
+    The zoom is the point of the panel, not decoration. Trypsin's catalytic
+    triad lands on three DIFFERENT fragments under the same equal-count split:
 
-        fragment 1   Ser10 2.58, Thr11 2.73, Thr12 2.68, Asn14 2.71 A
-        fragment 2   Ser58 2.61, Thr59 2.63, Asp62 3.36 A
-        fragment 3   Asp95 3.15, Tyr100 3.13, Cys102 2.90 A
-        fragment 4   nothing within 4.5 A
+        His57   fragment 1      His-Asp 2.67 A
+        Asp102  fragment 2      His-Ser 3.02 A
+        Ser195  fragment 4      Asp-Ser 6.77 A, so no dash between them
 
-    One residue per contacting fragment is drawn, so the three colours in the
-    zoom are three fragments and nothing else. Fragment 4 contributes no
-    contact; the caption says so rather than letting the figure imply four.
+    Each residue takes its own fragment's colour, so the three colours in the
+    zoom ARE three fragments. Fragment 3 contributes no catalytic residue; the
+    caption says so rather than letting the figure imply four.
+
+    This replaced flavodoxin (2FX2), which was chosen for its secondary
+    structure and gave 37-residue fragments. It has no triad -- its functional
+    site is a cofactor pocket -- so a His/Asp/Ser drawn on it would have been
+    invented. Trypsin's 56-residue fragments sit just outside the 20-50 band
+    the method recommends, which the caption states rather than hiding.
     """
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    # The zoom is drawn LARGER than the fold. The fold is a restatement --
-    # the same four colours already appear in panel (d) -- while the pocket is
-    # the only place the figure shows why fragment boundaries matter for
-    # function, and its three sticks and two dashes need the room.
-    place(ax, "whole", (0.195, 0.62), 62)
-    place(ax, "site", (0.730, 0.62), 112)
-    arrow(ax, (0.395, 0.62), (0.470, 0.62), lw=1.1)
-    ax.text(0.195, 0.16, "$k=4$ fragments", ha="center", fontsize=fs(7))
-    ax.text(0.730, 0.16, "cofactor site", ha="center", fontsize=fs(7))
-    ax.text(0.730, 0.04, "three fragments, one pocket", ha="center",
+
+    fig = ax.get_figure()
+    W_in, H_in = fig.get_size_inches()
+    pos = ax.get_position()
+
+    def extent_ax(name, centre, width_pts):
+        """-> (x0, y0, w, h) of a placed image, in this axes' coordinates.
+
+        `place` sizes in points, so the width in axes units is points over the
+        axes' own width in points; the height then follows from the image's
+        aspect AND the axes' aspect, which are different numbers. Getting this
+        from the image rather than assuming square is what keeps the zoom box
+        on the picture it frames.
+        """
+        im = trimmed(name)
+        w = width_pts / 72 / (W_in * pos.width)
+        h = (w * im.shape[0] / im.shape[1]
+             * (W_in * pos.width) / (H_in * pos.height))
+        return centre[0] - w / 2, centre[1] - h / 2, w, h
+
+    # Sized against the panel's actual width (~187 pt). The first attempt
+    # asked for 80 + 150 pt inside 162 pt and the zoom simply sat on top of
+    # the fold.
+    fold_c, fold_w = (0.185, 0.62), 66
+    zoom_c, zoom_w = (0.700, 0.58), 108
+    place(ax, "whole", fold_c, fold_w)
+    place(ax, "triad", zoom_c, zoom_w)
+
+    fx0, fy0, fw, fh = extent_ax("whole", fold_c, fold_w)
+    zx0, zy0, zw, zh = extent_ax("triad", zoom_c, zoom_w)
+    # Pad the zoom frame off the sticks. The box is the image's own extent,
+    # so without this the border runs exactly along the outermost atom and
+    # the serine reads as clipped rather than framed.
+    PAD = 1.24
+    zx0 -= zw * (PAD - 1) / 2
+    zy0 -= zh * (PAD - 1) / 2
+    zw, zh = zw * PAD, zh * PAD
+
+    # Where IS the active site in that fold image? Measured, not guessed.
+    #
+    # render.py --site also emits sitemark.png: the three triad residues as
+    # spheres through the WHOLE FOLD's camera. Its ink centroid, as a
+    # fraction of the fold's own ink box, is where the site sits in the
+    # picture. A hand-placed box looks right once and is wrong the next time
+    # the view, the protein or the zoom changes -- and all three changed in
+    # the course of building this panel.
+    fy, fxs = np.nonzero(mpimg.imread(PNG / "whole.png")[:, :, 3] > 0.02)
+    my, mx = np.nonzero(mpimg.imread(PNG / "sitemark.png")[:, :, 3] > 0.02)
+    u = (mx.mean() - fxs.min()) / (fxs.max() - fxs.min())
+    v = (my.mean() - fy.min()) / (fy.max() - fy.min())
+    sx, sy = fx0 + u * fw, fy0 + (1 - v) * fh
+
+    # The source box takes the DESTINATION's aspect, so the two rectangles are
+    # the same shape and the pair reads as one magnification. Sizing them
+    # independently made the triad overflow its own frame.
+    bw = fw * 0.34
+    bh = bw * (zh / zw) * (W_in * pos.width) / (H_in * pos.height)
+    ax.add_patch(Rectangle((sx - bw / 2, sy - bh / 2), bw, bh, fill=False,
+                           ec=PALETTE["gray"], lw=0.9, zorder=6))
+    ax.add_patch(Rectangle((zx0, zy0), zw, zh, fill=False,
+                           ec=PALETTE["gray"], lw=0.9, zorder=6))
+
+    # Two leaders, corner to corner, so it reads as a magnification rather
+    # than as two unrelated pictures.
+    for top in (1, 0):
+        ax.plot([sx + bw / 2, zx0],
+                [sy - bh / 2 + bh * top, zy0 + zh * top],
+                "-", color=PALETTE["gray"], lw=0.7, zorder=5, clip_on=False)
+
+    ax.text(fold_c[0], 0.10, "$k=4$ fragments", ha="center", fontsize=fs(7))
+    ax.text(zoom_c[0], 0.10, "catalytic triad", ha="center", fontsize=fs(7))
+    ax.text(zoom_c[0], -0.01, "three fragments, one site", ha="center",
             fontsize=fs(6.5), color=PALETTE["gray"])
 
 
@@ -599,7 +671,7 @@ def main():
     # at their crossings again rather than carried in the legend, and that
     # only works if the arms are far enough apart in x to take a label
     # between them -- which is bought with axes width, not with font size.
-    mid = outer[1].subgridspec(1, 2, width_ratios=[1.20, 0.97], wspace=0.20)
+    mid = outer[1].subgridspec(1, 2, width_ratios=[1.02, 1.15], wspace=0.17)
     ax_cost = fig.add_subplot(mid[0, 0])
     ax_obj = fig.add_subplot(mid[0, 1])
     ax_lab = fig.add_subplot(outer[2])
