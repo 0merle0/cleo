@@ -84,7 +84,10 @@ set cartoon_loop_quality, 12
 # needed help -- at default they go to hairlines at column width.
 set cartoon_oval_width, 0.40
 set cartoon_rect_width, 0.40
-set cartoon_fancy_helices, 1
+# fancy_helices OFF. It gives the helix ribbon a rounded, raised edge --
+# with reflect_power back at 1 the shading already carries that form, and
+# the two together read as over-modelled.
+set cartoon_fancy_helices, 0
 # cartoon_dumbbell_radius is left at its default. Rounding the ribbon edges
 # was swept at 0.26 / 0.40 / 0.55 and reverted -- PyMOL gives little visible
 # change on strands (cartoon_fancy_sheets barely moves them), so the effect

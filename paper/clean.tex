@@ -55,7 +55,16 @@ finds a variant with 250x increase in catalytic activity.
   \includegraphics[width=\textwidth]{concept_library.pdf}
   \caption{\textbf{A combinatorial library, and the policy that makes one
   assemblable.}
-  \textbf{(a)}~One fold cut into $k=4$ equal fragments, shown on flavodoxin
+  \textbf{(a)}~\textcolor{cleoRed}{[PLACEHOLDER --- your words.]} The same
+  toy fitness landscape, four optima of unequal height, searched three ways
+  with the same number of ordered designs ($N=36$). Error-prone PCR stays
+  inside the parent's basin. Naive combinatorial assembly builds the product
+  of parts chosen without regard to fitness, so it reaches much further but
+  spends most of its designs in valleys and here misses the global optimum
+  entirely. Stringent filtering generates the same combinatorial reach (open
+  points) and orders only what survives scoring (filled), placing the same
+  budget on the optima. Illustrative: no axis here is measured.
+  \textbf{(b)}~One fold cut into $k=4$ equal fragments, shown on flavodoxin
   (2FX2, chain A, 147 residues; \SI{39}{\percent} helix,
   \SI{33}{\percent} strand). Colours mark the four fragments along the
   chain. Equal
@@ -63,7 +72,7 @@ finds a variant with 250x increase in catalytic activity.
   structurally meaningful, and at this length the four fragments are
   \SI{37}{} residues each --- inside the \SIrange{20}{50}{} band the method
   recommends.
-  \textbf{(b)}~What a given spend buys. Whole genes cost
+  \textbf{(c)}~What a given spend buys. Whole genes cost
   \$42 each at eBlock pricing for a 200-aa enzyme, so library size is linear
   in spend; a combinatorial library buys $k$ sets of parts instead of $N$
   products, and size goes as the $k$th power of what each slot can hold.
@@ -71,7 +80,7 @@ finds a variant with 250x increase in catalytic activity.
   that point cutting finer stops buying shorter DNA and only buys more pieces
   of it. Reaching $10^{12}$ variants costs \$42T as whole genes, \$42M at
   $k=2$, \$84k at $k=4$ and \$5.3k at $k=8$.
-  \textbf{(c)}~The method. A backbone conditions the ProteinMPNN decoder, which
+  \textbf{(d)}~The method. A backbone conditions the ProteinMPNN decoder, which
   is treated as a policy; the sequences it emits are cut at the fragment
   boundaries, recombined across parents, and folded best-of-5. Each fragment is
   scored by the recombinants it appears in, and that per-fragment reward drives

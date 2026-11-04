@@ -36,7 +36,8 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -133,6 +134,169 @@ def grid(ax):
 
 
 # ---------------------------------------------------------------- panel (a)
+#
+# A toy fitness landscape, drawn to contrast three ways of spending the SAME
+# number of ordered designs. Nothing here is measured -- it is an argument
+# about search strategy, made before any data, and the panel should be read
+# that way.
+#
+# Four optima of unequal height, over a rugged background. The parent design
+# sits on a decent but not-best one, which is the situation every campaign
+# actually starts from.
+PEAKS = [
+    # cx,   cy,    width, height
+    (0.26, 0.32, 0.085, 0.78),   # the parent's own optimum -- good, not best
+    (0.70, 0.74, 0.095, 1.00),   # the global optimum
+    (0.79, 0.27, 0.078, 0.88),
+    (0.31, 0.78, 0.070, 0.66),
+]
+START = (0.26, 0.32)
+N_ORDER = 36            # designs actually ordered -- the SAME for all three
+DOT = "#1F2937"
+
+# White through the house blue ramp, stopping at the mid step. The darkest two
+# steps are deliberately unused: peaks have to stay light enough that the
+# sampled designs drawn on top of them still read.
+TERRAIN = LinearSegmentedColormap.from_list(
+    "cleo_terrain", ["#FFFFFF", "#FFFFFF", "#DCEBFB", SEQUENTIAL[0],
+                     SEQUENTIAL[1], SEQUENTIAL[2], SEQUENTIAL[3]])
+
+
+def fitness(x, y):
+    """-> the toy landscape: four gaussian optima plus gentle ruggedness."""
+    z = sum(a * np.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * s * s))
+            for cx, cy, s, a in PEAKS)
+    return z + 0.02 * np.sin(4 * np.pi * x) * np.sin(3.5 * np.pi * y)
+
+
+def _clip(p):
+    return np.clip(p, 0.03, 0.97)
+
+
+def draw_landscape(ax, title, title_color=None):
+    n = 320
+    g = np.linspace(0, 1, n)
+    X, Y = np.meshgrid(g, g)
+    Z = fitness(X, Y)
+    ax.contourf(X, Y, Z, levels=12, cmap=TERRAIN, zorder=0)
+    ax.contour(X, Y, Z, levels=12, colors="white", linewidths=0.5,
+               alpha=0.85, zorder=1)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for sp in ax.spines.values():
+        sp.set_color(INK["grid"])
+        sp.set_linewidth(0.9)
+    ax.set_title(title, fontsize=9, pad=7,
+                 color=title_color or PALETTE["gray"])
+
+
+def draw_designs(ax, pts, ms=3.8):
+    """The designs that were ordered and built."""
+    ax.plot(pts[:, 0], pts[:, 1], "o", ms=ms, mfc=DOT, mec="white", mew=0.55,
+            ls="none", zorder=5)
+
+
+def draw_start(ax):
+    ax.plot(*START, marker="*", ms=12, mfc="white", mec=DOT, mew=1.1,
+            ls="none", zorder=6)
+
+
+def panel_epcr(ax, rng):
+    """Mutagenesis walks: dense, but it never leaves the parent's basin."""
+    draw_landscape(ax, "error-prone PCR")
+    pts = _clip(rng.normal(START, 0.055, size=(N_ORDER, 2)))
+    draw_designs(ax, pts)
+    draw_start(ax)
+
+
+def panel_naive(ax, rng):
+    """Combinatorial assembly with parts chosen without regard to fitness.
+
+    Drawn as a PRODUCT SET rather than a cloud, because that is what assembly
+    actually builds: pick 6 variants for block 1 and 6 for block 2 and you get
+    their 36 combinations, not 36 free points. The variants are drawn
+    uniformly -- naive means the parts were not selected for anything.
+
+    The seed is chosen, and that is worth stating plainly: of the first 400,
+    seed 50 is one where the uniform draws happen to leave the global optimum
+    uncovered while still catching two others. That outcome is typical rather
+    than engineered -- a coarse product set in a landscape of narrow optima
+    misses most of them -- but the specific miss shown is a pick, and no
+    reader should take it for a measurement.
+    """
+    draw_landscape(ax, "naive combinatorial assembly")
+    r = np.random.default_rng(50)
+    xs = np.sort(r.uniform(0.05, 0.95, 6))
+    ys = np.sort(r.uniform(0.05, 0.95, 6))
+    pts = _clip(np.array([(x, y) for x in xs for y in ys], float)
+                + rng.normal(0, 0.012, (36, 2)))
+    draw_designs(ax, pts)
+    draw_start(ax)
+    cx, cy, w, _ = PEAKS[1]
+    ax.add_patch(Circle((cx, cy), w * 1.55, fill=False, ec=PALETTE["red"],
+                        lw=1.1, ls=(0, (2.5, 2)), zorder=6))
+    ax.annotate("missed", xy=(cx + w * 1.45, cy - w * 0.6),
+                xytext=(0.985, 0.55), fontsize=7.5, color=PALETTE["red"],
+                ha="right", va="center", zorder=7,
+                bbox=dict(fc="white", ec="none", pad=1.0, alpha=0.85),
+                arrowprops=dict(arrowstyle="-", lw=0.8,
+                                color=PALETTE["red"], shrinkA=1, shrinkB=1))
+
+
+def panel_ours(ax, rng):
+    """Generate the same combinatorial reach, then filter hard before ordering.
+
+    The point of the panel is that the filter IS the search. A policy-designed
+    library spans the space as widely as the naive one -- the faint open
+    candidates -- but only what survives folding and scoring gets built, and
+    those survivors sit on the optima. The budget of filled points is
+    N_ORDER, identical to the other two panels, so the three differ in WHERE
+    the designs go and not in how many there are.
+    """
+    draw_landscape(ax, "stringent filtering (this work)",
+                   title_color=PALETTE["blue"])
+    xs = rng.uniform(0.05, 0.95, 14)
+    ys = rng.uniform(0.05, 0.95, 14)
+    cand = _clip(np.array([(x, y) for x in xs for y in ys], float)
+                 + rng.normal(0, 0.010, (196, 2)))
+    keep = np.argsort(fitness(cand[:, 0], cand[:, 1]))[-N_ORDER:]
+    mask = np.zeros(len(cand), bool)
+    mask[keep] = True
+    ax.plot(cand[~mask, 0], cand[~mask, 1], "o", ms=2.6, mfc="none",
+            mec=INK["ghost"], mew=0.7, ls="none", zorder=4)
+    draw_designs(ax, cand[mask])
+    draw_start(ax)
+    ax.plot([], [], "o", ms=2.6, mfc="none", mec=INK["ghost"], mew=0.7,
+            ls="none", label="filtered out")
+    ax.plot([], [], "o", ms=3.8, mfc=DOT, mec="white", mew=0.55, ls="none",
+            label="ordered")
+    ax.legend(fontsize=6.8, loc="lower left", handletextpad=0.3,
+              borderpad=0.35, labelspacing=0.25, frameon=True,
+              facecolor="white", edgecolor="none", framealpha=0.88)
+
+
+def fitness_key(ax):
+    """A direction, not a scale -- the landscape is illustrative."""
+    cb = ax.inset_axes([1.045, 0.02, 0.032, 0.80])
+    g = np.linspace(0, 1, 256).reshape(-1, 1)
+    cb.imshow(g, aspect="auto", origin="lower", cmap=TERRAIN,
+              extent=(0, 1, 0, 1))
+    cb.set_xticks([])
+    cb.set_yticks([])
+    for sp in cb.spines.values():
+        sp.set_color(INK["grid"])
+    cb.text(1.5, 1.0, "high", ha="left", va="center", fontsize=6.6,
+            color=PALETTE["gray"], transform=cb.transAxes)
+    cb.text(1.5, 0.0, "low", ha="left", va="center", fontsize=6.6,
+            color=PALETTE["gray"], transform=cb.transAxes)
+    cb.text(-0.9, 0.5, "fitness", rotation=90, ha="center", va="center",
+            fontsize=7.5, color=PALETTE["gray"], transform=cb.transAxes)
+
+
+# ---------------------------------------------------------------- panel (b)
 def mark_level(ax, S, series, label, label_x):
     """Draw one library size as a reference line with a price on every arm.
 
@@ -323,16 +487,33 @@ def panel_loop(ax, rng):
 def main():
     rng = np.random.default_rng(3)
     plt.rcParams["text.usetex"] = False
-    fig = plt.figure(figsize=(11, 7.6))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1.22, 0.78],
-                          width_ratios=[1.06, 1.0], hspace=0.30, wspace=0.22)
-    panel_object(fig.add_subplot(gs[0, 0]))
-    panel_cost(fig.add_subplot(gs[0, 1]))
-    panel_loop(fig.add_subplot(gs[1, :]), rng)
-    for ax, lab in zip(fig.axes, "abc"):
-        ax.text(-0.02, 1.12, f"\\textbf{{{lab}}}" if False else lab,
-                transform=ax.transAxes, fontsize=12, fontweight="bold",
-                va="top", ha="right")
+    fig = plt.figure(figsize=(11, 11.0))
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.12, 1.22, 0.78],
+                             hspace=0.30)
+    # The three landscapes share a row and a letter: they are one argument
+    # seen three ways, not three findings, and lettering them a/b/c would
+    # promise the reader three separate results.
+    top = outer[0].subgridspec(1, 3, wspace=0.11)
+    ax_e = fig.add_subplot(top[0, 0])
+    ax_n = fig.add_subplot(top[0, 1])
+    ax_o = fig.add_subplot(top[0, 2])
+    panel_epcr(ax_e, rng)
+    panel_naive(ax_n, rng)
+    panel_ours(ax_o, rng)
+    fitness_key(ax_o)
+
+    mid = outer[1].subgridspec(1, 2, width_ratios=[1.06, 1.0], wspace=0.22)
+    ax_obj = fig.add_subplot(mid[0, 0])
+    ax_cost = fig.add_subplot(mid[0, 1])
+    ax_loop = fig.add_subplot(outer[2])
+    panel_object(ax_obj)
+    panel_cost(ax_cost)
+    panel_loop(ax_loop, rng)
+
+    for ax, lab, dy in ((ax_e, "a", 1.20), (ax_obj, "b", 1.12),
+                        (ax_cost, "c", 1.12), (ax_loop, "d", 1.12)):
+        ax.text(-0.02, dy, lab, transform=ax.transAxes, fontsize=12,
+                fontweight="bold", va="top", ha="right")
     # dpi=900, NOT the house default of 300.
     #
     # This is what actually set the structures' resolution, and it is easy to
