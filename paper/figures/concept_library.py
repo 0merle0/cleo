@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -173,7 +173,7 @@ def _clip(p):
     return np.clip(p, 0.03, 0.97)
 
 
-def draw_landscape(ax, title):
+def draw_landscape(ax, title, axis_labels=False):
     n = 320
     g = np.linspace(0, 1, n)
     X, Y = np.meshgrid(g, g)
@@ -194,6 +194,14 @@ def draw_landscape(ax, title):
     # third is not coloured either -- tinting only "this work" would say the
     # comparison was decided before the reader got to it.
     ax.set_title(title, fontsize=9, pad=7, color="black")
+    # Labelled on the leftmost panel only. All three share one set of axes --
+    # same landscape, same framing, same limits -- so repeating the pair three
+    # times would assert a difference between them that does not exist.
+    if axis_labels:
+        ax.set_xlabel("Sequence space", fontsize=8,
+                      color=PALETTE["gray"], labelpad=3)
+        ax.set_ylabel("Sequence space", fontsize=8,
+                      color=PALETTE["gray"], labelpad=3)
 
 
 def draw_designs(ax, pts, ms=3.8):
@@ -209,7 +217,7 @@ def draw_start(ax):
 
 def panel_epcr(ax, rng):
     """Mutagenesis walks: dense, but it never leaves the parent's basin."""
-    draw_landscape(ax, "Error-prone PCR")
+    draw_landscape(ax, "Error-prone PCR", axis_labels=True)
     pts = _clip(rng.normal(START, 0.055, size=(N_ORDER, 2)))
     draw_designs(ax, pts)
     draw_start(ax)
@@ -238,15 +246,10 @@ def panel_naive(ax, rng):
                 + rng.normal(0, 0.012, (36, 2)))
     draw_designs(ax, pts)
     draw_start(ax)
-    cx, cy, w, _ = PEAKS[1]
-    ax.add_patch(Circle((cx, cy), w * 1.55, fill=False, ec=PALETTE["red"],
-                        lw=1.1, ls=(0, (2.5, 2)), zorder=6))
-    ax.annotate("missed", xy=(cx + w * 1.45, cy - w * 0.6),
-                xytext=(0.985, 0.55), fontsize=7.5, color=PALETTE["red"],
-                ha="right", va="center", zorder=7,
-                bbox=dict(fc="white", ec="none", pad=1.0, alpha=0.85),
-                arrowprops=dict(arrowstyle="-", lw=0.8,
-                                color=PALETTE["red"], shrinkA=1, shrinkB=1))
+    # The ring and "missed" callout that used to mark PEAKS[1] are gone. The
+    # empty optimum reads on its own against the two that carry points, and the
+    # annotation was the only red in the row -- a colour that elsewhere in this
+    # figure means a fragment.
 
 
 def panel_ours(ax, rng):
