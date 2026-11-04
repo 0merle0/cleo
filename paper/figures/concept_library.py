@@ -322,6 +322,15 @@ def mark_level(ax, S, series, label, label_x):
             color=PALETTE["gray"])
     marks = sorted(((float(library_cost(np.array(S), k)), c)
                     for _, k, c in series), key=lambda t: t[0])
+    # The alternation is a good default and gets two of the four right. The
+    # cheapest arm is the one it cannot place: at this level k=8 crosses so
+    # far left that a label set below-right of the point lies along the k=4
+    # curve and is struck through by it. Overrides are keyed by rank in cost,
+    # which is what the alternation itself is keyed by.
+    OVERRIDE = {
+        0: (0.62, 3.2, "right", "bottom"),   # $5.3k -- above-left, off the line
+        1: (2.6, 3.2, "left", "bottom"),     # $84k  -- further right, clear of 0
+    }
     for i, (x, c) in enumerate(marks):
         ax.plot([x], [S], "o", ms=6.5, mfc=c, mec="white", mew=1.4, zorder=4)
         up = i % 2 == 1
@@ -330,6 +339,9 @@ def mark_level(ax, S, series, label, label_x):
             xt, ha = x * 0.5, "right"
         else:
             xt, ha = x * 1.6, "left"
+        if i in OVERRIDE:
+            fx, fy, ha, va = OVERRIDE[i]
+            xt, y = x * fx, S * fy
         ax.annotate(money(x), xy=(x, S), xytext=(xt, y), fontsize=8.5,
                     color=c, ha=ha, va=va, zorder=5)
 
