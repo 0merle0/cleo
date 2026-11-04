@@ -111,18 +111,24 @@ def grid(ax):
 def mark_level(ax, S, series, label):
     """Draw one library size as a reference line with a price on every arm.
 
-    Label placement is the whole difficulty. The arms are not evenly spaced in
-    cost, and how close the two cheapest sit depends on the level: at 10^12
-    they are 16x apart, at 10^6 only 2.8x -- far closer than a label is wide.
-    So prices alternate ABOVE and BELOW the line rather than being staggered in
-    height, which separates neighbours whatever the spacing, and the dearest
-    arm labels inward so it cannot run off the axis.
+    Only 10^12 is drawn. A second level at 10^6 was tried and removed: it
+    doubled the labels for a ratio the single level already states, and the
+    panel got busy enough that the arms stopped being the thing you see.
+
+    Label placement stays parameterised by level because that is where the
+    difficulty is. The arms are not evenly spaced in cost, and how close the
+    two cheapest sit depends on the level -- 16x apart at 10^12 but only 2.8x
+    at 10^6, far closer than a label is wide. Prices therefore alternate ABOVE
+    and BELOW the line rather than being staggered in height, which separates
+    neighbours whatever the spacing, and the dearest arm labels inward so it
+    cannot run off the axis.
     """
     ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1)
-    # The level caption goes at the RIGHT end of its line. On the left it
-    # lands in the cluster of prices, which is tightest exactly where the
-    # cheapest arms meet the line.
-    ax.text(6e14, S * 1.5, label, ha="right", fontsize=7.5,
+    # Caption at the LEFT end, above the line. The first price placed above
+    # the line is the second-cheapest arm, which is decades to the right, so
+    # this corner is empty. (It was on the right while a second level was
+    # drawn, where it crowded the dearest arm's price.)
+    ax.text(1.4e2, S * 1.6, label, ha="left", fontsize=7.5,
             color=PALETTE["gray"])
     marks = sorted(((float(library_cost(np.array(S), k)), c)
                     for _, k, c in series), key=lambda t: t[0])
@@ -161,7 +167,6 @@ def panel_cost(ax):
         S = (cost / (k * bp * COST_PER_BP)) ** k
         ax.loglog(cost, S, "-", color=c, lw=2.2, label=lab, zorder=3)
     mark_level(ax, 1e12, series, r"$10^{12}$ variants")
-    mark_level(ax, 1e6, series, r"$10^{6}$ variants")
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
     ax.set_xlabel("synthesis cost (\\$)")
