@@ -1,0 +1,35 @@
+# Rendered by paper/figures/structures/render.py -- do not run directly.
+# Placeholders: __PDB__ __OUT__ __COLORS__ __SEL__ __MODE__
+load __PDB__, prot
+hide everything
+show cartoon, prot
+bg_color white
+set ray_opaque_background, 0
+
+# Sleek illustrative style: flat shading with a thin dark outline, which is the
+# visual language of figs/frag_animation.gif. Specular highlights are off --
+# they read as noise at figure scale and fight the fragment colours.
+set ray_trace_mode, 1
+set ray_trace_color, grey20
+set ray_trace_gain, 0.08
+set antialias, 2
+set specular, 0
+set spec_reflect, 0
+set ambient, 0.38
+set direct, 0.55
+set reflect, 0.12
+set cartoon_fancy_helices, 1
+set cartoon_smooth_loops, 1
+set cartoon_highlight_color, grey90
+set cartoon_transparency, 0
+set depth_cue, 0
+set ray_shadows, 0
+
+__COLORS__
+__SEL__
+
+orient prot
+turn x, -10
+zoom prot, 3
+set ray_trace_frames, 1
+png __OUT__, width=1600, height=1600, dpi=300, ray=1
