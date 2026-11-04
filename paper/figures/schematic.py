@@ -59,7 +59,7 @@ def bar(ax, x, y, w, h, colors, shades=None, lw=0.7, edge=None):
         # band and is only legal with a second cue -- the stroke is that cue.
         ax.add_patch(FancyBboxPatch(
             (a + 0.004, y), w / n - 0.008, h,
-            boxstyle="round,pad=0,rounding_size=0.008",
+            boxstyle="square,pad=0",
             fc=_shade(c, f),
             ec=edge if edge else FRAGMENT[i % len(FRAGMENT)], lw=0.7,
             zorder=3))
@@ -73,7 +73,7 @@ def _shade(hex_c, f):
 
 def box(ax, xy, w, h, label, sub=None, fc="white", title_size=8.5):
     ax.add_patch(FancyBboxPatch(xy, w, h,
-                                boxstyle="round,pad=0,rounding_size=0.03",
+                                boxstyle="square,pad=0",
                                 fc=fc, ec=PALETTE["gray"], lw=1.1, zorder=3))
     ax.text(xy[0] + w / 2, xy[1] + h * (0.62 if sub else 0.5), label,
             ha="center", va="center", fontsize=fs(title_size), zorder=4)

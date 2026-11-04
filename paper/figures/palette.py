@@ -138,6 +138,10 @@ def _apply():
         "xtick.labelsize": 8,
         "ytick.labelsize": 8,
         "legend.fontsize": MIN_FONT,
+        # Square corners everywhere. matplotlib rounds legend frames by
+        # default, which is the one rounded corner a figure gets without
+        # anyone drawing it.
+        "legend.fancybox": False,
     })
 
 

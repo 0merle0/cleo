@@ -186,15 +186,6 @@ def panel_epcr(ax, rng):
     pts = _clip(rng.normal(START, 0.055, size=(N_VARIANTS, 2)))
     draw_designs(ax, pts)
     draw_start(ax)
-    # Keyed here rather than in the third panel: the star means the same thing
-    # in all three, and this is the one the reader looks at first. Set at
-    # lower centre, not lower left -- the mutagenesis cloud reaches into that
-    # corner, and a legend over the sampled designs hides the panel's point.
-    ax.plot([], [], marker="*", ms=10, mfc="white", mec=DOT, mew=1.1,
-            ls="none", label="parent design")
-    ax.legend(fontsize=fs(6.8), loc="lower center", handletextpad=0.3,
-              borderpad=0.35, frameon=True, facecolor="white",
-              edgecolor="none", framealpha=0.88)
 
 
 def panel_naive(ax, rng):
@@ -254,15 +245,6 @@ def panel_ours(ax, rng):
             mec=INK["ghost"], mew=0.7, ls="none", zorder=4)
     draw_designs(ax, cand[mask])
     draw_start(ax)
-    # The star is keyed in the first panel, where it is first seen. Only the
-    # two point styles are keyed here, because only this panel has both.
-    ax.plot([], [], "o", ms=2.6, mfc="none", mec=INK["ghost"], mew=0.7,
-            ls="none", label="filtered out")
-    ax.plot([], [], "o", ms=3.8, mfc=DOT, mec="white", mew=0.55, ls="none",
-            label="assembled from library")
-    ax.legend(fontsize=fs(6.8), loc="lower left", handletextpad=0.3,
-              borderpad=0.35, labelspacing=0.25, frameon=True,
-              facecolor="white", edgecolor="none", framealpha=0.88)
 
 
 def fitness_key(ax):
@@ -281,6 +263,33 @@ def fitness_key(ax):
             transform=cb.transAxes)
     cb.text(-0.9, 0.5, "Fitness", rotation=90, ha="center", va="center",
             fontsize=fs(7.5), transform=cb.transAxes)
+
+
+def landscape_legend(ax):
+    """One legend for all three landscapes, in a row, in its OWN gridspec cell.
+
+    It was two legends inside two panels: the star keyed in the first, the
+    point styles in the third. Both sat on terrain and had to be squeezed into
+    whichever corner the samples left free, which is why they ended up at
+    different corners from each other.
+
+    Pulled out, it needs a cell of its own rather than the gap between rows.
+    Anchored into that gap it kept landing beside the NEXT row's panel letter,
+    which also lives there -- close enough to read as one band, even when the
+    boxes did not technically overlap. A dedicated row cannot do that.
+    """
+    from matplotlib.lines import Line2D
+    ax.axis("off")
+    handles = [
+        Line2D([], [], marker="*", ms=10, mfc="white", mec=DOT, mew=1.1,
+               ls="none", label="parent design"),
+        Line2D([], [], marker="o", ms=2.6, mfc="none", mec=INK["ghost"],
+               mew=0.7, ls="none", label="filtered out"),
+        Line2D([], [], marker="o", ms=3.8, mfc=DOT, mec="white", mew=0.55,
+               ls="none", label="assembled from library"),
+    ]
+    ax.legend(handles=handles, loc="upper center", ncol=len(handles), frameon=False,
+              fontsize=fs(7), handletextpad=0.4, columnspacing=3.0)
 
 
 # ---------------------------------------------------------------- panel (b)
@@ -433,7 +442,7 @@ def panel_lab(ax, rng):
         for j in range(n_per_slot):
             ax.add_patch(FancyBboxPatch(
                 (x0 + i * (bw + 0.07), y0 + j * (bh + 0.07)), bw, bh,
-                boxstyle="round,pad=0,rounding_size=0.03",
+                boxstyle="square,pad=0",
                 fc=_shade(FRAGMENT[i], rng.uniform(0.40, 1.0)),
                 ec=FRAGMENT[i], lw=0.5, zorder=3))
     lib_w = K * bw + (K - 1) * 0.07
@@ -461,7 +470,7 @@ def panel_lab(ax, rng):
         cx = 4.65 + n * 0.90
         place(ax, f"var{n+1}", (cx, 1.72), 30)
         ax.add_patch(FancyBboxPatch((cx - 0.19, 1.22), 0.38, 0.055,
-                                    boxstyle="round,pad=0,rounding_size=0.02",
+                                    boxstyle="square,pad=0",
                                     fc=VAR_C[n], ec="none", zorder=4))
     ax.text(5.55, 0.99, "assembled variants", ha="center", fontsize=fs(7))
     ax.text(5.55, 0.76, "one part per slot", ha="center", fontsize=fs(6.5),
@@ -510,8 +519,10 @@ def main():
     # Authored at page width, so a point here is a point on the page and the
     # MIN_FONT floor is real. See palette.PAGE_WIDTH_IN.
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 6.7))
-    outer = fig.add_gridspec(3, 1, height_ratios=[1.12, 1.22, 1.00],
-                             hspace=0.30)
+    # Four rows, not three: the landscapes' shared legend gets a cell of its
+    # own between row 0 and row 1. See landscape_legend.
+    outer = fig.add_gridspec(4, 1, height_ratios=[1.12, 0.10, 1.22, 1.00],
+                             hspace=0.34)
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
@@ -523,11 +534,12 @@ def main():
     panel_naive(ax_n, rng)
     panel_ours(ax_o, rng)
     fitness_key(ax_o)
+    landscape_legend(fig.add_subplot(outer[1]))
 
-    mid = outer[1].subgridspec(1, 2, width_ratios=[1.06, 1.0], wspace=0.22)
+    mid = outer[2].subgridspec(1, 2, width_ratios=[1.06, 1.0], wspace=0.22)
     ax_obj = fig.add_subplot(mid[0, 0])
     ax_cost = fig.add_subplot(mid[0, 1])
-    ax_lab = fig.add_subplot(outer[2])
+    ax_lab = fig.add_subplot(outer[3])
     panel_object(ax_obj)
     panel_cost(ax_cost)
     panel_lab(ax_lab, rng)
@@ -554,14 +566,21 @@ def main():
 
     x_left = left_edge([ax_e, ax_obj, ax_lab])
     x_right = left_edge([ax_cost])
-    for ax, lab, x, dy in ((ax_e, "a", x_left, 1.20),
-                           (ax_obj, "b", x_left, 1.12),
-                           (ax_cost, "c", x_right, 1.20),
-                           (ax_lab, "d", x_left, 1.06)):
-        ax.text(x, dy, lab,
-                transform=blended_transform_factory(fig.transFigure,
-                                                    ax.transAxes),
-                fontsize=PANEL_LABEL_PT, fontweight="bold", va="top", ha="left")
+
+    # Y comes from each panel's MEASURED top, not from a fraction of its own
+    # height. The fractions (1.12, 1.20, 1.06) had to be hand-tuned per panel
+    # because each axes is a different height, and they then moved again every
+    # time the row spacing changed -- which is how "c" kept landing on the
+    # cost panel's rotated y-label. A fixed gap above the measured top, title
+    # and axis labels included, holds whatever the layout does.
+    def top_of(ax):
+        return inv.transform((0, ax.get_tightbbox(rend).y1))[1] + 0.004
+
+    for ax, lab, x in ((ax_e, "a", x_left), (ax_obj, "b", x_left),
+                       (ax_cost, "c", x_right), (ax_lab, "d", x_left)):
+        fig.text(x, top_of(ax), lab, fontsize=PANEL_LABEL_PT,
+                 fontweight="bold", va="bottom", ha="left")
+
     # dpi=900, NOT the house default of 300.
     #
     # This is what actually set the structures' resolution, and it is easy to
