@@ -15,16 +15,28 @@
 # Chosen from a 20-setting sweep rendered side by side (outline weight,
 # ray_trace_mode, lighting, cartoon geometry, transparency). What that showed:
 #
-#   outline weight   ray_trace_gain 0.1 and 1.0 are indistinguishable. Edge
-#                    width follows resolution, not gain, so the low value is
-#                    kept and nothing is bought by raising it.
+#   outline weight   ray_trace_gain 0.1 and 1.0 are indistinguishable in EDGE
+#                    WIDTH -- width follows resolution, not gain. But gain also
+#                    darkens interior creases, and that part is NOT cosmetic
+#                    (see lighting).
 #   trace mode       0 has no edges and reads weakest. 3 QUANTISES COLOUR --
 #                    orange went fluorescent -- which is disqualifying when
 #                    colour carries fragment identity. 1 is the one to use.
 #                    2 is line art with colour stripped, useful for a ghosted
 #                    structure (see GHOST below) and nothing else.
-#   lighting         flat / modelled / glossy / matte are nearly the same once
-#                    outlines are on. Not worth tuning.
+#   lighting         WRONG in the first sweep. `reflect_power 0` makes diffuse
+#                    falloff perfectly flat, so every ribbon rendered as one
+#                    solid fill and the fold had no form at all -- a helix read
+#                    as a flat zigzag, not a tube. That is invisible at the
+#                    thumbnail size the sweep was judged at and obvious at
+#                    print size. reflect_power is back at PyMOL's default 1,
+#                    with ambient down and direct up to keep the midtones from
+#                    washing out. Cast shadows (ray_shadow on, shadow_mode 2)
+#                    were tried with it and rejected: they muddy whichever
+#                    colour sits under another, and green took it worst.
+#                    Ambient occlusion and a specular highlight were also tried
+#                    -- AO barely moves cartoons, and specular puts a gloss on
+#                    the light colours that fights fragment identity.
 #   cartoon geometry THE setting that matters. Inflating loops is what keeps
 #                    the fold legible at column width.
 #   transparency     0.25 and 0.45 both wash out badly on white. Opaque.
@@ -42,13 +54,17 @@ set ray_shadow, off
 # --- outlined, flat-lit ---------------------------------------------------
 set ray_trace_mode, 1
 set ray_trace_color, black
-set ray_trace_gain, 0.1
+# Gain darkens interior creases as well as drawing the outline. 0.1 gave a
+# clean edge around a shape with nothing inside it.
+set ray_trace_gain, 0.45
 set ray_trace_disco_factor, 1
 set specular, 0
-set ambient, 0.40
-set direct, 0.45
+# These four are one setting. reflect_power 0 (what this file used to say) is
+# flat shading -- do not set it back without re-reading the lighting note above.
+set ambient, 0.28
+set direct, 0.58
 set reflect, 1
-set reflect_power, 0
+set reflect_power, 1
 
 # --- cartoon geometry -----------------------------------------------------
 set cartoon_sampling, 12

@@ -333,7 +333,20 @@ def main():
         ax.text(-0.02, 1.12, f"\\textbf{{{lab}}}" if False else lab,
                 transform=ax.transAxes, fontsize=12, fontweight="bold",
                 va="top", ha="right")
-    save(fig, "concept_library")
+    # dpi=900, NOT the house default of 300.
+    #
+    # This is what actually set the structures' resolution, and it is easy to
+    # miss: matplotlib resamples an embedded image to the size it is DRAWN at,
+    # in pixels. The fold is placed 228 pt = 3.17 in wide, so at dpi=300 it was
+    # resampled to 950 px -- throwing away all but a fifth of a 6000 px render
+    # and landing at exactly 300 dpi on the page, which is print-minimum and
+    # soft on screen. Raising PX in structures/render.py could not fix this and
+    # never will: the ceiling is here.
+    #
+    # The ink in whole.png is 4615 px across, so the source supports 1457 dpi
+    # at this width. 900 asks for 2850 px, comfortably inside that; going past
+    # ~1450 would just upsample.
+    save(fig, "concept_library", dpi=900)
 
 
 if __name__ == "__main__":
