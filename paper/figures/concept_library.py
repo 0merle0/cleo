@@ -47,12 +47,42 @@ PNG = HERE / "structures" / "png"
 K = 4
 L_AA = 247                      # 1TIM chain A, the subject of panel (a)
 BP_PER_AA = 3
-COST_PER_BP = 0.07              # Twist eBlock, approx; $42 for a 200-aa gene
+COST_PER_BP = 0.07              # Twist eBlock, approx
+MIN_BP = 300                    # eBlock minimum billed length
+PROT_AA = 200                   # the enzyme being priced
 GREY = INK["muted"]
 
 
-def gene_cost(n_aa=200):
+def gene_cost(n_aa=PROT_AA):
+    """-> cost of one full-length gene. 200 aa = 600 bp = $42."""
     return n_aa * BP_PER_AA * COST_PER_BP
+
+
+def library_cost(S, k, n_aa=PROT_AA):
+    """-> cost of a library of S sequences built from k slots.
+
+    Equal numbers of variants per slot, so S = P^k, P = S^(1/k), and the order
+    is k*P fragments. The floor is what makes this non-trivial: an eBlock is
+    billed at MIN_BP even when the fragment is shorter, so cutting finer stops
+    buying shorter DNA and only buys MORE pieces of it. At 200 aa the floor
+    binds from k=2 on -- 600/k bp is exactly 300 at k=2 and below it after --
+    so beyond k=2 the per-fragment price is flat and the k*P factor dominates.
+
+    An earlier version priced the library as 3*L*P bases with no floor, which
+    made every k look equally cheap per part: it understated k=4 by 2x and k=8
+    by 4x, and implied cutting finer was always cheaper. It is not.
+    """
+    bp = np.maximum(n_aa * BP_PER_AA / k, MIN_BP)
+    return k * S ** (1 / k) * bp * COST_PER_BP
+
+
+def money(v):
+    """-> a price as it would be written, not in scientific notation."""
+    for cut, suf in ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "k")):
+        if v >= cut:
+            x = v / cut
+            return f"\\${x:.0f}{suf}" if x >= 10 else f"\\${x:.1f}{suf}"
+    return f"\\${v:.0f}"
 
 
 def trimmed(name):
@@ -84,31 +114,35 @@ def panel_cost(ax):
     One hue, dark to light, because k is an ordered quantity -- whole genes are
     k=1 and belong on the same ramp as the rest, not in a separate colour.
     """
-    S = np.logspace(1, 12, 300)
-    unit = gene_cost()
+    S = np.logspace(1, 15, 400)
     series = [("whole gene", 1, SEQUENTIAL[5]),
               ("$k=2$", 2, SEQUENTIAL[4]),
               ("$k=4$", 4, SEQUENTIAL[3]),
               ("$k=8$", 8, SEQUENTIAL[2])]
     for lab, k, c in series:
-        ax.loglog(S, S ** (1 / k) * unit, "-", color=c, lw=2.2, label=lab,
+        ax.loglog(S, library_cost(S, k), "-", color=c, lw=2.2, label=lab,
                   zorder=3)
+    # Every arm priced at one library size, so the column of labels is the
+    # comparison: one number per k, read straight down.
     ax.axvline(1e12, color=GREY, lw=1, ls=":", zorder=1)
-    for k, c, lab, dy in ((1, SEQUENTIAL[5], r"\$42T", 3.2),
-                          (8, SEQUENTIAL[2], r"\$1.3k", 0.26)):
-        y = 1e12 ** (1 / k) * unit
+    for lab, k, c in series:
+        y = float(library_cost(np.array(1e12), k))
         ax.plot([1e12], [y], "o", ms=7, mfc=c, mec="white", mew=1.4, zorder=4)
-        ax.annotate(lab, xy=(1e12, y), xytext=(1e12 * 0.55, y * dy),
-                    fontsize=9.5, color=c, ha="right", zorder=5)
-    ax.set_xlim(10, 3e13)
-    ax.set_ylim(40, 1e16)
-    ax.text(1e12, 2e15, r"$10^{12}$ variants", ha="center", fontsize=7.5,
+        ax.annotate(money(y), xy=(1e12, y), xytext=(1e12 * 0.45, y),
+                    fontsize=9.5, color=c, ha="right", va="center", zorder=5)
+    ax.set_xlim(10, 1e16)
+    ax.set_ylim(400, 1e18)
+    ax.text(1e12, 3e17, r"$10^{12}$ variants", ha="center", fontsize=7.5,
             color=PALETTE["gray"])
     ax.set_xlabel("library size, distinct sequences")
     ax.set_ylabel("synthesis cost (\\$)")
     ax.set_title("buying parts, not products", fontsize=10)
     ax.legend(frameon=False, fontsize=8, loc="upper left")
-    grid(ax)
+    # No grid: four straight lines on a log-log plot read off the labelled
+    # column at 10^12, and the rules were competing with them.
+    ax.set_axisbelow(True)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
 
 
 # ---------------------------------------------------------------- panel (c)
