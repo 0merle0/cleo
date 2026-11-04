@@ -293,53 +293,33 @@ def landscape_legend(ax):
 
 
 # ---------------------------------------------------------------- panel (b)
-def mark_level(ax, S, series, label):
-    """Draw one library size as a reference line with a price on every arm.
+def crossing_costs(S, series):
+    """-> {label: cost} where each arm reaches a library of `S` sequences."""
+    return {lab: float(library_cost(np.array(S), k)) for lab, k, _ in series}
 
-    Only 10^12 is drawn. A second level at 10^6 was tried and removed: it
-    doubled the labels for a ratio the single level already states, and the
-    panel got busy enough that the arms stopped being the thing you see.
 
-    Label placement stays parameterised by level because that is where the
-    difficulty is. The arms are not evenly spaced in cost, and how close the
-    two cheapest sit depends on the level -- 16x apart at 10^12 but only 2.8x
-    at 10^6, far closer than a label is wide. Prices therefore alternate ABOVE
-    and BELOW the line rather than being staggered in height, which separates
-    neighbours whatever the spacing, and the dearest arm labels inward so it
-    cannot run off the axis.
+def mark_level(ax, S, series):
+    """Draw the reference level and a dot where each arm crosses it.
+
+    NO text in the data area. The four prices used to be annotated at their
+    crossings, with an alternate-above-below rule and per-arm overrides to
+    keep them off the curves. That worked at 11 inches and stopped working at
+    page width: the labels are the same size while the axes got smaller, the
+    three cheap arms cross within two decades of each other, and the steep
+    arms pass within a glyph of their own price.
+
+    The prices now ride in the legend entries instead. Each arm already has a
+    legend row, so the price costs no extra ink, it cannot collide with
+    anything, and it sits beside the colour that identifies the arm.
     """
-    # The level is named in the LEGEND, not on the line.
-    #
-    # It was captioned inline until the figure moved to page width. At
-    # page-size type the string is about four decades wide and there is no
-    # gap left that holds it: along the line it hits a price, below-left it
-    # crosses the steep arms where they converge, and the right end has only
-    # about one clear decade. A line's meaning belongs in the legend anyway.
-    ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1, label=label)
-    marks = sorted(((float(library_cost(np.array(S), k)), c)
-                    for _, k, c in series), key=lambda t: t[0])
-    # The alternation is a good default and gets two of the four right. The
-    # cheapest arm is the one it cannot place: at this level k=8 crosses so
-    # far left that a label set below-right of the point lies along the k=4
-    # curve and is struck through by it. Overrides are keyed by rank in cost,
-    # which is what the alternation itself is keyed by.
-    OVERRIDE = {
-        0: (0.95, 3.2, "right", "bottom"),   # $5.3k -- above-left, off the line
-        1: (2.6, 3.2, "left", "bottom"),     # $84k  -- further right, clear of 0
-    }
-    for i, (x, c) in enumerate(marks):
+    # Named in the legend, not on the plot. Putting it top left was tried --
+    # that corner looks empty, but the k=4 and k=8 arms pass through it on
+    # their way up, and both struck the text out.
+    ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1,
+               label=r"$10^{12}$ variants")
+    for (x, c) in sorted(((float(library_cost(np.array(S), k)), c)
+                          for _, k, c in series), key=lambda t: t[0]):
         ax.plot([x], [S], "o", ms=6.5, mfc=c, mec="white", mew=1.4, zorder=4)
-        up = i % 2 == 1
-        y, va = (S * 3.2, "bottom") if up else (S * 0.32, "top")
-        if i == len(marks) - 1:
-            xt, ha = x * 0.5, "right"
-        else:
-            xt, ha = x * 1.6, "left"
-        if i in OVERRIDE:
-            fx, fy, ha, va = OVERRIDE[i]
-            xt, y = x * fx, S * fy
-        ax.annotate(money(x), xy=(x, S), xytext=(xt, y), fontsize=fs(8.5),
-                    color=c, ha=ha, va=va, zorder=5)
 
 
 def panel_cost(ax):
@@ -360,17 +340,26 @@ def panel_cost(ax):
               ("$k=2$", 2, SEQUENTIAL[4]),
               ("$k=4$", 4, SEQUENTIAL[3]),
               ("$k=8$", 8, SEQUENTIAL[2])]
+    LEVEL = 1e12
+    price = crossing_costs(LEVEL, series)
     for lab, k, c in series:
         bp = max(PROT_AA * BP_PER_AA / k, MIN_BP)
         S = (cost / (k * bp * COST_PER_BP)) ** k
-        ax.loglog(cost, S, "-", color=c, lw=2.2, label=lab, zorder=3)
-    mark_level(ax, 1e12, series, r"$10^{12}$ variants")
+        ax.loglog(cost, S, "-", color=c, lw=2.2, zorder=3,
+                  label=f"{lab}  ({money(price[lab])})")
+    mark_level(ax, LEVEL, series)
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
     ax.set_xlabel("Synthesis cost (\\$)")
     ax.set_ylabel("Library size (unique sequences)")
-    ax.legend(frameon=False, fontsize=fs(8), loc="lower right",
-              labelspacing=0.35, handlelength=1.8)
+    # Opaque, because the whole-gene arm runs straight through where this
+    # sits. A frameless legend over a data line is worse than a framed one.
+    # Tight enough to sit entirely UNDER the whole-gene arm, which is the
+    # only line that reaches this corner. Opaque anyway, as a backstop.
+    ax.legend(fontsize=fs(7), loc="lower right", labelspacing=0.22,
+              handlelength=1.4, handletextpad=0.5, frameon=True,
+              facecolor="white", edgecolor="none", framealpha=1.0,
+              borderpad=0.3, borderaxespad=0.4).set_zorder(6)
     ax.set_axisbelow(True)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
@@ -518,8 +507,13 @@ def main():
     plt.rcParams["text.usetex"] = False
     # Authored at page width, so a point here is a point on the page and the
     # MIN_FONT floor is real. See palette.PAGE_WIDTH_IN.
-    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 6.7))
-    outer = fig.add_gridspec(3, 1, height_ratios=[1.26, 1.22, 1.00],
+    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 7.3))
+    # Row 0 is given enough height for the landscapes to reach their CELL
+    # WIDTH. They are square (aspect equal), so matplotlib shrinks them to a
+    # square inside each cell and centres it: while the row was short they
+    # were height-limited at 1.12 in inside cells 1.55 in wide, and every
+    # spare inch of the row went to margin instead of to the plots.
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.90, 1.22, 1.00],
                              hspace=0.34)
     # The legend belongs to the landscapes, so it lives INSIDE their row --
     # tight under the three panels, with the full row gap below it.
@@ -567,9 +561,27 @@ def main():
     rend = fig.canvas.get_renderer()
     inv = fig.transFigure.inverted()
 
+    def extent(ax):
+        """-> the axes' true display bbox, labels and ticks included.
+
+        NOT ax.get_tightbbox alone. On the cost panel it reports a top of
+        386.8 px while the rotated y-label actually reaches 400.2 -- it
+        under-measures rotated text -- and a panel letter placed against it
+        lands ON the y-label however much padding is added. That is what kept
+        dragging "c" back onto "Library size (unique sequences)" after three
+        attempts to fix it by moving the letter.
+        """
+        from matplotlib.transforms import Bbox
+        boxes = [ax.get_tightbbox(rend), ax.get_window_extent(rend)]
+        parts = [ax.title, ax.xaxis.label, ax.yaxis.label]
+        parts += ax.get_xticklabels() + ax.get_yticklabels()
+        for t in parts:
+            if t.get_text().strip() and t.get_visible():
+                boxes.append(t.get_window_extent(rend))
+        return Bbox.union(boxes)
+
     def left_edge(axes):
-        return min(inv.transform((a.get_tightbbox(rend).x0, 0))[0]
-                   for a in axes)
+        return min(inv.transform((extent(a).x0, 0))[0] for a in axes)
 
     x_left = left_edge([ax_e, ax_obj, ax_lab])
     x_right = left_edge([ax_cost])
@@ -581,7 +593,7 @@ def main():
     # cost panel's rotated y-label. A fixed gap above the measured top, title
     # and axis labels included, holds whatever the layout does.
     def top_of(ax):
-        return inv.transform((0, ax.get_tightbbox(rend).y1))[1] + 0.004
+        return inv.transform((0, extent(ax).y1))[1] + 0.006
 
     for ax, lab, x in ((ax_e, "a", x_left), (ax_obj, "b", x_left),
                        (ax_cost, "c", x_right), (ax_lab, "d", x_left)):
