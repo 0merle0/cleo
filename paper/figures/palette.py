@@ -43,6 +43,22 @@ PALETTE = {
 # Fragment slot identity, in order. Slot i gets FRAGMENT[i].
 FRAGMENT = [PALETTE["blue"], PALETTE["orange"], PALETTE["green"], PALETTE["red"]]
 
+# Softened fills for large areas -- a cartoon, a filled block -- where the
+# saturated colors are too heavy. How soft is a measurement, not a taste:
+# lightening in OKLab L and cutting chroma costs CVD separation fast.
+#
+#     +0.06 L, 0.88 chroma   CVD 6.8   <- this set, legal with 2nd encoding
+#     +0.10 L, 0.80 chroma   CVD 6.0   on the hard floor
+#     +0.18 L, 0.62 chroma   CVD 4.6   below it, no remedy
+#     +0.24 L, 0.52 chroma   CVD 3.5   below it, no remedy
+#
+# 6.8 sits in the 6-8 band, which is permitted ONLY when something other than
+# hue also carries identity. In the figures that use these, two things do:
+# position along the chain, and the matching saturated FRAGMENT color as the
+# stroke. Do not use these as the sole cue, and do not lighten them further --
+# the next step down is already unreadable for a protanope.
+FRAGMENT_SOFT = ["#456D97", "#E19547", "#63A781", "#BF5551"]
+
 # The only fifth color that clears the floor against the base four (dE 8.1).
 # Bright violet, and it does not sit comfortably with the others -- use it
 # only when a fifth slot genuinely cannot be avoided.

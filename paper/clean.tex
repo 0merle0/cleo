@@ -36,7 +36,7 @@ combinatorial libraries. Traditional library generation methods rely on error
 prone PCR or natural fragment shuffling to generate diversity. Such approaches
 do not take into account the filtering of designs through structure prediction
 models or other desired oracles. We demonstrate the ability to post-train
-inverse folding models to design fragments with filter pass rates of 53.5\% and
+inverse folding models to design fragments with filter pass rates of 93.4\% and
 libraries which can easily scale beyond $10^{12}$ individually addressable
 variants. Our post-training framework enables control over the search space by
 centering the library around a reference sequence with tunable mutation
@@ -55,17 +55,16 @@ finds a variant with 250x increase in catalytic activity.
   \includegraphics[width=\textwidth]{concept_library.pdf}
   \caption{\textbf{A combinatorial library, and the policy that makes one
   assemblable.}
-  \textbf{(a)}~Ordering $N$ distinct sequences as individual genes costs
-  $N\times\$42$ at eBlock pricing for a 200-aa enzyme; ordering the same $N$ as
-  a combinatorial library costs $N^{1/k}\times\$42$, because what is bought is
-  $k$ sets of parts rather than $N$ products. At $10^{6}$ sequences that is
-  \$42M against \$420.
-  \textbf{(b)}~At a fixed synthesis budget the reachable library size grows as
-  $S=P^{k}$, which invites cutting into ever more fragments.
-  \textbf{(c)}~The object: a 209-residue PETase cut into $k=4$ equal fragments,
-  coloured by slot. Equal lengths are chosen so that assembly is robust, not
-  because the boundaries are structurally meaningful.
-  \textbf{(d)}~The method. A backbone conditions the ProteinMPNN decoder, which
+  \textbf{(a)}~One fold cut into $k=4$ equal fragments, shown on
+  triosephosphate isomerase (1TIM, chain A, 247 residues). Equal lengths are
+  chosen so that assembly is robust, not because the boundaries are
+  structurally meaningful.
+  \textbf{(b)}~Ordering $N$ distinct sequences as whole genes costs
+  $N\times\$42$ at eBlock pricing for a 200-aa enzyme; ordering the same $N$
+  as a combinatorial library costs $N^{1/k}\times\$42$, because what is bought
+  is $k$ sets of parts rather than $N$ products. At $10^{12}$ variants that is
+  \$42T against \$1.3k.
+  \textbf{(c)}~The method. A backbone conditions the ProteinMPNN decoder, which
   is treated as a policy; the sequences it emits are cut at the fragment
   boundaries, recombined across parents, and folded best-of-5. Each fragment is
   scored by the recombinants it appears in, and that per-fragment reward drives

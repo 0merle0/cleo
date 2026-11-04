@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Render the PETase fold, split into k fragments, for the Figure 1 schematic.
+"""Render a fold split into k fragments, for the Figure 1 schematic.
 
-Writes transparent PNGs that the figure script composites. PyMOL cannot emit
-usable vector output for cartoons, so these are raster by necessity; everything
-else in the figure stays vector, and `figio` still enforces SVG for the figure
-itself. 1600px at the sizes used here is ~500 dpi on the page.
+The subject is 1TIM (triosephosphate isomerase, chain A, 247 residues) --
+deliberately NOT the PETase this project optimises. Figure 1 is about what a
+combinatorial library IS; using the target here would imply the idea is
+specific to it, and the PETase is saved for the results.
 
-The style matches figs/frag_animation.gif -- flat fill with a thin dark outline
-(ray_trace_mode 1) -- because that is the visual language the project already
-uses for this idea, and a reader who has seen the repo should recognise it.
+Style lives in style_modern.pml and is shared by every protein figure, so a
+change there propagates rather than being re-tuned per figure.
 
-    uv run python paper/figures/structures/render.py            # all views
+PyMOL cannot emit usable vector output for cartoons, so these are PNGs at
+2200px -- roughly 550 dpi at the size Figure 1 uses them. Everything else in
+the figure stays vector.
+
+    uv run python paper/figures/structures/render.py
     uv run python paper/figures/structures/render.py --only whole
 """
 import argparse
@@ -19,35 +22,62 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CLEO = HERE.parents[2]
 sys.path.insert(0, str(HERE.parent))
-from palette import FRAGMENT  # noqa: E402
+from palette import FRAGMENT, FRAGMENT_SOFT  # noqa: E402
 
-PDB = CLEO / "templates" / "structure" / "momi_petase_reference_structure.pdb"
-TEMPLATE = HERE / "render_fragments.pml.in"
+PDB = HERE / "pdb" / "1tim_A.pdb"
+STYLE = HERE / "style_modern.pml"
 OUT = HERE / "png"
-L = 209                      # CA residues in the reference structure
+PX = 2200
+
+
+def residues():
+    """-> sorted CA residue numbers actually present (the file has a gap)."""
+    nums = []
+    for line in PDB.read_text().splitlines():
+        if line.startswith("ATOM") and line[12:16].strip() == "CA":
+            nums.append(int(line[22:26]))
+    return sorted(set(nums))
 
 
 def bounds(k):
-    """-> k equal 1-indexed inclusive residue ranges, as the method splits."""
-    edges = [round(i * L / k) for i in range(k + 1)]
-    return [(edges[i] + 1, edges[i + 1]) for i in range(k)]
+    """-> k contiguous, near-equal residue ranges over the residues present.
+
+    Split on the ORDER of residues rather than on numbering, so a gap in the
+    PDB does not hand one fragment fewer residues than its neighbours.
+    """
+    r = residues()
+    edges = [round(i * len(r) / k) for i in range(k + 1)]
+    return [(r[edges[i]], r[edges[i + 1] - 1]) for i in range(k)]
 
 
-def pml(colors, sel_lines, out_png):
-    t = TEMPLATE.read_text()
-    cdefs = "\n".join(f"set_color frag{i}, [{r/255:.4f}, {g/255:.4f}, {b/255:.4f}]"
-                      for i, (r, g, b) in enumerate(colors))
-    return (t.replace("__PDB__", str(PDB))
-             .replace("__OUT__", str(out_png))
-             .replace("__COLORS__", cdefs)
-             .replace("__SEL__", "\n".join(sel_lines)))
+def hexrgb(h):
+    return tuple(int(h.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4))
 
 
-def run(script, tag):
+def script(sel_lines, out_png, k):
+    defs = []
+    for i in range(k):
+        for nm, pal in (("frag", FRAGMENT), ("soft", FRAGMENT_SOFT)):
+            r, g, b = hexrgb(pal[i])
+            defs.append(f"set_color {nm}{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
+    return "\n".join([
+        f"load {PDB}, prot",
+        "hide everything",
+        "show cartoon, prot",
+        f"@{STYLE}",
+        *defs,
+        *sel_lines,
+        "orient prot",
+        "turn x, -8",
+        "zoom prot, 2",
+        f"png {out_png}, width={PX}, height={PX}, dpi=300, ray=1",
+    ])
+
+
+def run(text, tag):
     f = OUT / f"_{tag}.pml"
-    f.write_text(script)
+    f.write_text(text)
     r = subprocess.run(["pymol", "-cq", str(f)], capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit(f"pymol failed on {tag}:\n{r.stdout}\n{r.stderr}")
@@ -61,29 +91,23 @@ def main():
     ap.add_argument("--only", default=None)
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    cols = [tuple(int(FRAGMENT[i].lstrip("#")[j:j+2], 16) for j in (0, 2, 4))
-            for i in range(a.k)]
     bs = bounds(a.k)
+    print(f"1TIM chain A, {len(residues())} residues -> {bs}")
 
-    jobs = {}
-    # The whole fold, every fragment in its own colour.
-    jobs["whole"] = [f"color frag{i}, resi {lo}-{hi}" for i, (lo, hi) in enumerate(bs)]
-    # One image per fragment: that fragment coloured, the rest ghosted away.
-    # Used for the parts rack, so each slot shows what it contributes.
+    jobs = {
+        "whole": [f"color soft{i}, resi {lo}-{hi}" for i, (lo, hi) in enumerate(bs)],
+        "grey": ["color grey80, prot"],
+    }
     for i, (lo, hi) in enumerate(bs):
-        jobs[f"frag{i+1}"] = [
-            "color grey85, prot",
-            "set cartoon_transparency, 0.82, prot",
-            f"color frag{i}, resi {lo}-{hi}",
-            f"set cartoon_transparency, 0.0, resi {lo}-{hi}",
-        ]
-    # The uncut parent, for the "before" state.
-    jobs["grey"] = ["color grey75, prot"]
+        jobs[f"frag{i+1}"] = ["color grey90, prot",
+                              "set cartoon_transparency, 0.85, prot",
+                              f"color soft{i}, resi {lo}-{hi}",
+                              f"set cartoon_transparency, 0.0, resi {lo}-{hi}"]
 
     for tag, sel in jobs.items():
         if a.only and tag != a.only:
             continue
-        run(pml(cols, sel, OUT / f"{tag}.png"), tag)
+        run(script(sel, OUT / f"{tag}.png", a.k), tag)
 
 
 if __name__ == "__main__":
