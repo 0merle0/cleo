@@ -317,8 +317,13 @@ def mark_level(ax, S, series):
     k=8/k=4 gap was 20 pt and the label 24 pt, which is why these lived in
     the legend for a while.
     """
-    ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1,
-               label=r"$10^{12}$ variants")
+    ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1)
+    # Named on the line, in the six-decade gap between where k=2 crosses
+    # ($42M) and where whole genes do ($42T). Top left was tried and failed --
+    # that corner looks empty but the k=4 and k=8 arms climb through it. Here
+    # the nearest arm is whole genes, four decades below at this x.
+    ax.text(1e10, S * 1.7, r"$10^{12}$ variants", ha="center", va="bottom",
+            fontsize=fs(7), color=PALETTE["gray"])
     # The side follows from the direction the curve moves, which is the part
     # that was got wrong first: every arm RISES, so dropping below the level
     # line puts the curve to your LEFT and lifting above it puts the curve to
@@ -368,7 +373,7 @@ def panel_cost(ax):
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
     ax.set_xlabel("Synthesis cost (\\$)")
-    ax.set_ylabel("Library size (unique sequences)")
+    ax.set_ylabel("Library size")
     # Opaque, because the whole-gene arm runs straight through where this
     # sits. A frameless legend over a data line is worse than a framed one.
     # Tight enough to sit entirely UNDER the whole-gene arm, which is the
@@ -401,11 +406,35 @@ def panel_object(ax):
     specific to it. Chosen by measuring secondary structure across a dozen
     candidates (39.5% helix, 32.7% strand), and at 147 aa its k=4 fragments
     are 37 residues -- inside the 20-50 band the method recommends.
+
+    The zoom beside it is the point of the panel, not decoration. 2FX2's FMN
+    pocket is built from three different quarters of the chain, which is
+    measured rather than arranged -- closest polar contact to the cofactor,
+    per fragment:
+
+        fragment 1   Ser10 2.58, Thr11 2.73, Thr12 2.68, Asn14 2.71 A
+        fragment 2   Ser58 2.61, Thr59 2.63, Asp62 3.36 A
+        fragment 3   Asp95 3.15, Tyr100 3.13, Cys102 2.90 A
+        fragment 4   nothing within 4.5 A
+
+    One residue per contacting fragment is drawn, so the three colours in the
+    zoom are three fragments and nothing else. Fragment 4 contributes no
+    contact; the caption says so rather than letting the figure imply four.
     """
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    place(ax, "whole", (0.5, 0.5), 135)
+    # The zoom is drawn LARGER than the fold. The fold is a restatement --
+    # the same four colours already appear in panel (d) -- while the pocket is
+    # the only place the figure shows why fragment boundaries matter for
+    # function, and its three sticks and two dashes need the room.
+    place(ax, "whole", (0.195, 0.62), 62)
+    place(ax, "site", (0.730, 0.62), 112)
+    arrow(ax, (0.395, 0.62), (0.470, 0.62), lw=1.1)
+    ax.text(0.195, 0.16, "$k=4$ fragments", ha="center", fontsize=fs(7))
+    ax.text(0.730, 0.16, "cofactor site", ha="center", fontsize=fs(7))
+    ax.text(0.730, 0.04, "three fragments, one pocket", ha="center",
+            fontsize=fs(6.5), color=PALETTE["gray"])
 
 
 # ---------------------------------------------------------------- panel (d)
@@ -545,7 +574,7 @@ def main():
     # explains and panels b/c, which it has nothing to do with, and the gap is
     # also where panel b's letter sits. Pulling it up into row 0 settles the
     # question of which panels it belongs to and clears the gap in one move.
-    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.30)
+    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.16)
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
@@ -563,7 +592,7 @@ def main():
     # at their crossings again rather than carried in the legend, and that
     # only works if the arms are far enough apart in x to take a label
     # between them -- which is bought with axes width, not with font size.
-    mid = outer[1].subgridspec(1, 2, width_ratios=[1.45, 0.72], wspace=0.20)
+    mid = outer[1].subgridspec(1, 2, width_ratios=[1.20, 0.97], wspace=0.20)
     ax_cost = fig.add_subplot(mid[0, 0])
     ax_obj = fig.add_subplot(mid[0, 1])
     ax_lab = fig.add_subplot(outer[2])
@@ -621,9 +650,16 @@ def main():
     def top_of(ax):
         return inv.transform((0, extent(ax).y1))[1] + 0.006
 
-    for ax, lab, x in ((ax_e, "a", x_left), (ax_cost, "b", x_left),
-                       (ax_obj, "c", x_right), (ax_lab, "d", x_left)):
-        fig.text(x, top_of(ax), lab, fontsize=PANEL_LABEL_PT,
+    # b and c share ONE baseline -- the higher of the two panels' tops.
+    # Letting each find its own put them at different heights, because the
+    # cost panel carries a stack of tick and axis labels above its frame and
+    # the fold beside it carries none.
+    y_mid = max(top_of(ax_cost), top_of(ax_obj))
+    for ax, lab, x, y in ((ax_e, "a", x_left, top_of(ax_e)),
+                          (ax_cost, "b", x_left, y_mid),
+                          (ax_obj, "c", x_right, y_mid),
+                          (ax_lab, "d", x_left, top_of(ax_lab))):
+        fig.text(x, y, lab, fontsize=PANEL_LABEL_PT,
                  fontweight="bold", va="bottom", ha="left")
 
     # dpi=900, NOT the house default of 300.

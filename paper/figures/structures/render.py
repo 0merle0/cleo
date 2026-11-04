@@ -16,6 +16,7 @@ Everything else in the figure stays vector.
     uv run python paper/figures/structures/render.py --only whole
 """
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -65,6 +66,31 @@ def muted(hex_c, f=0.55):
     return tuple(v + (0.88 - v) * f for v in (r, g, b))
 
 
+def pymol_run(script_path):
+    """Run `pymol -cqk` on a script, OUTSIDE whatever venv is active.
+
+    The Debian `pymol` wrapper is a shell script that calls `python3`. Under
+    `uv run` that resolves to the project venv, which has no pymol module, and
+    every render dies with "No module named 'pymol'" even though PyMOL is
+    installed system-wide. Stripping the venv from the child's environment
+    lets the wrapper find the interpreter it was built against.
+
+    -k: do NOT read ~/.pymolrc. A personal rc otherwise applies to every
+    render -- the one on the original machine set cartoon_transparency 0.45 --
+    so figures would silently depend on whose account built them.
+    """
+    env = dict(os.environ)
+    venv = env.pop("VIRTUAL_ENV", None)
+    env.pop("PYTHONHOME", None)
+    env.pop("PYTHONPATH", None)
+    if venv:
+        bad = str(Path(venv) / "bin")
+        env["PATH"] = os.pathsep.join(
+            p for p in env.get("PATH", "").split(os.pathsep) if p != bad)
+    return subprocess.run(["pymol", "-cqk", str(script_path)],
+                          capture_output=True, text=True, env=env)
+
+
 def script(sel_lines, out_png, k, ghost=False):
     defs = []
     for i in range(k):
@@ -91,8 +117,7 @@ def run(text, tag):
     # -k: do NOT read ~/.pymolrc. A personal rc silently applies to every
     # render -- this one sets cartoon_transparency 0.45 -- so without it the
     # paper's figures depend on whose machine built them.
-    r = subprocess.run(["pymol", "-cqk", str(f)],
-                       capture_output=True, text=True)
+    r = pymol_run(f)
     if r.returncode != 0:
         sys.exit(f"pymol failed on {tag}:\n{r.stdout}\n{r.stderr}")
     f.unlink()
@@ -103,6 +128,74 @@ def run(text, tag):
 # 2000 px is ~3100 dpi there -- the 6000 px used for the hero structure would
 # be eight times the pixels for a tenth the size.
 VAR_PX = 2000
+
+# --- the active site ------------------------------------------------------
+#
+# 2FX2 is a flavodoxin, and its cofactor pocket makes the figure's point
+# without any invention: FMN is hydrogen-bonded by residues from THREE
+# DIFFERENT QUARTERS of the chain. Measured on the deposited structure
+# (chain A + FMN, pdb/2fx2_site.pdb), closest polar contact per residue:
+#
+#   fragment 1   Ser10 2.58, Thr11 2.73, Thr12 2.68, Gly13 3.16, Asn14 2.71
+#   fragment 2   Ser58 2.61, Thr59 2.63, Trp60 3.32, Asp62 3.36
+#   fragment 3   Asp95 3.15, Tyr100 3.13, Cys102 2.90
+#   fragment 4   -- nothing within 4.5 A
+#
+# One residue per contacting fragment is drawn, so the three colours in the
+# zoom are three fragments and nothing else. Fragment 4 contributes no
+# contact, which the caption should say rather than the figure imply.
+SITE_PDB = HERE / "pdb" / "2fx2_site.pdb"
+SITE_PX = 2600
+SITE_RES = [(12, 0, "OG1", "O3P"),    # Thr12  fragment 1
+            (58, 1, "OG", "O1P"),     # Ser58  fragment 2
+            (95, 2, "N", "O2")]       # Asp95  fragment 3, backbone donor
+
+
+def site():
+    """Render the FMN pocket: three fragments' residues, H-bonds drawn."""
+    bs = bounds(4)
+    # Only the three contacting loops are drawn, not the whole fold.
+    #
+    # The first attempt showed the entire cartoon at cartoon_transparency
+    # 0.72 as a backdrop. Two things went wrong: ray_trace_mode 1 renders
+    # transparency badly and left black patches across the ribbon, and even
+    # faded the fold buried the cofactor it was supposed to frame. Three short
+    # loops give the same context and leave the site visible.
+    LOOPS = "9-16+56-63+93-102"
+    lines = [f"load {SITE_PDB}, site", "hide everything",
+             f"show cartoon, site and polymer and resi {LOOPS}", f"@{STYLE}",
+             "set ray_opaque_background, 0",
+             "set cartoon_transparency, 0",
+             "set cartoon_tube_radius, 0.22",
+             "set stick_radius, 0.16",
+             "set dash_color, black", "set dash_width, 2.2",
+             "set dash_gap, 0.22", "set dash_length, 0.30",
+             "set label_size, 0", "set ray_trace_mode, 1"]
+    for i, (lo, hi) in enumerate(bs):
+        r, g, b = hexrgb(FRAGMENT[i])
+        lines.append(f"set_color frag{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
+        lines.append(f"color frag{i}, site and polymer and resi {lo}-{hi}")
+    lines += ["show sticks, resn FMN", "color grey45, resn FMN",
+              "set stick_radius, 0.13, resn FMN"]
+    sel = "+".join(str(n) for n, _, _, _ in SITE_RES)
+    lines += [f"show sticks, site and polymer and resi {sel}"]
+    for n, f, at, fat in SITE_RES:
+        lines.append(f"color frag{f}, site and resi {n}")
+        lines.append(
+            f"distance hb{n}, site and resi {n} and name {at}, "
+            f"resn FMN and name {fat}")
+    lines += ["hide labels",
+              f"orient resn FMN or (site and resi {sel})",
+              "turn x, -10", "turn y, 25", "zoom resn FMN, 6.0",
+              f"png {OUT / 'site.png'}, width={SITE_PX}, "
+              f"height={SITE_PX}, dpi=300, ray=1"]
+    f = OUT / "_site.pml"
+    f.write_text("\n".join(lines) + "\n")
+    r = pymol_run(f)
+    if r.returncode != 0:
+        sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
+    f.unlink()
+    print("  rendered site")
 
 
 def shade(hex_c, f):
@@ -139,8 +232,7 @@ def variants(n, k):
                      f"height={VAR_PX}, dpi=300, ray=1")
     f = OUT / "_var.pml"
     f.write_text("\n".join(lines) + "\n")
-    r = subprocess.run(["pymol", "-cqk", str(f)], capture_output=True,
-                       text=True)
+    r = pymol_run(f)
     if r.returncode != 0:
         sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
     f.unlink()
@@ -153,10 +245,15 @@ def main():
     ap.add_argument("-k", type=int, default=4)
     ap.add_argument("--variants", type=int, default=0,
                     help="render only N recombinant variants, then stop")
+    ap.add_argument("--site", action="store_true",
+                    help="render only the FMN pocket, then stop")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     if a.variants:
         variants(a.variants, a.k)
+        return
+    if a.site:
+        site()
         return
     OUT.mkdir(parents=True, exist_ok=True)
     bs = bounds(a.k)
@@ -208,7 +305,7 @@ def main():
 
     f = OUT / "_all.pml"
     f.write_text("\n".join(lines) + "\n")
-    r = subprocess.run(["pymol", "-cqk", str(f)], capture_output=True, text=True)
+    r = pymol_run(f)
     if r.returncode != 0:
         sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
     f.unlink()
