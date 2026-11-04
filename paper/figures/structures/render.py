@@ -28,10 +28,11 @@ PDB = HERE / "pdb" / "2fx2_A.pdb"
 STYLE = HERE / "style_modern.pml"
 GHOST = HERE / "style_ghost.pml"
 OUT = HERE / "png"
-# 3600 px. These are composited at roughly a sixth of the page width, so this
-# is ~1200 dpi on the printed figure -- the cartoon outlines are hairlines and
-# show their stair-stepping at anything less.
-PX = 3600
+# 6000 px. The protein prints about 1.86 inches wide, so 3600 was already
+# ~1930 dpi on the page and 6000 is ~3200 -- both far past what print needs.
+# The reason to go higher is on-screen zoom, not the printed figure. If an
+# edge looks soft it is antialiasing, not pixel count: see style_modern.pml.
+PX = 6000
 
 
 def residues():

@@ -95,12 +95,22 @@ def trimmed(name):
     return im
 
 
-def place(ax, name, xy, zoom):
-    ax.add_artist(AnnotationBbox(OffsetImage(trimmed(name), zoom=zoom), xy,
-                                 frameon=False, box_alignment=(0.5, 0.5)))
+def place(ax, name, xy, width_pts):
+    """Draw a structure PNG `width_pts` wide, whatever its pixel size.
+
+    Sized in POINTS, not by OffsetImage's zoom. zoom is per-pixel, so a figure
+    written against it silently rescales every structure whenever the render
+    resolution changes -- raising PX from 3600 to 6000 blew the fold out of
+    its panel and over the one below. Point width is what the layout actually
+    means, and it holds across re-renders.
+    """
+    im = trimmed(name)
+    ax.add_artist(AnnotationBbox(
+        OffsetImage(im, zoom=width_pts / im.shape[1]), xy,
+        frameon=False, box_alignment=(0.5, 0.5)))
 
 
-def place_raw(ax, name, xy, zoom):
+def place_raw(ax, name, xy, width_pts):
     """Place a structure PNG UNTRIMMED, so every image keeps one frame.
 
     `place` crops to the ink, which is right for a single structure and fatal
@@ -110,9 +120,9 @@ def place_raw(ax, name, xy, zoom):
     offsetting the frame slides the fragment outward by exactly that much.
     """
     im = mpimg.imread(PNG / f"{name}.png")
-    ax.add_artist(AnnotationBbox(OffsetImage(im, zoom=zoom), xy,
-                                 frameon=False, box_alignment=(0.5, 0.5),
-                                 annotation_clip=False))
+    ax.add_artist(AnnotationBbox(
+        OffsetImage(im, zoom=width_pts / im.shape[1]), xy,
+        frameon=False, box_alignment=(0.5, 0.5), annotation_clip=False))
 
 
 def grid(ax):
@@ -123,7 +133,7 @@ def grid(ax):
 
 
 # ---------------------------------------------------------------- panel (a)
-def mark_level(ax, S, series, label):
+def mark_level(ax, S, series, label, label_x):
     """Draw one library size as a reference line with a price on every arm.
 
     Only 10^12 is drawn. A second level at 10^6 was tried and removed: it
@@ -139,11 +149,12 @@ def mark_level(ax, S, series, label):
     cannot run off the axis.
     """
     ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1)
-    # Caption at the LEFT end, above the line. The first price placed above
-    # the line is the second-cheapest arm, which is decades to the right, so
-    # this corner is empty. (It was on the right while a second level was
-    # drawn, where it crowded the dearest arm's price.)
-    ax.text(1.4e2, S * 1.6, label, ha="left", fontsize=7.5,
+    # Caption goes in the widest gap ALONG the line, which is between the two
+    # dearest arms -- k=2 meets this level at ~$42M and whole genes at ~$42T,
+    # six decades apart, and nothing else crosses in between. Both ends of the
+    # line were tried and both crowd a price: the left end sits in the cluster
+    # where the cheap arms converge, the right end runs into the dearest one.
+    ax.text(label_x, S * 1.6, label, ha="center", fontsize=7.5,
             color=PALETTE["gray"])
     marks = sorted(((float(library_cost(np.array(S), k)), c)
                     for _, k, c in series), key=lambda t: t[0])
@@ -181,7 +192,7 @@ def panel_cost(ax):
         bp = max(PROT_AA * BP_PER_AA / k, MIN_BP)
         S = (cost / (k * bp * COST_PER_BP)) ** k
         ax.loglog(cost, S, "-", color=c, lw=2.2, label=lab, zorder=3)
-    mark_level(ax, 1e12, series, r"$10^{12}$ variants")
+    mark_level(ax, 1e12, series, r"$10^{12}$ variants", 1e10)
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
     ax.set_xlabel("synthesis cost (\\$)")
@@ -215,7 +226,7 @@ def panel_object(ax):
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    place(ax, "whole", (0.5, 0.5), 0.082)
+    place(ax, "whole", (0.5, 0.5), 228)
 
 
 # ---------------------------------------------------------------- panel (d)
@@ -266,7 +277,7 @@ def panel_loop(ax, rng):
     ax.set_ylim(0, 3.1)
     ax.axis("off")
 
-    place(ax, "grey", (0.72, 2.05), 0.040)
+    place(ax, "grey", (0.72, 2.05), 108)
     ax.text(0.72, 1.14, "backbone", ha="center", fontsize=8)
     arrow(ax, (1.32, 2.05), (1.92, 2.05))
 

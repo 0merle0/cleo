@@ -32,7 +32,10 @@
 bg_color white
 set ray_opaque_background, 1
 set orthoscopic, 1
-set antialias, 2
+# antialias 3, not 2. Edge quality on the ray-traced outline is set here,
+# not by output resolution -- a soft-looking hairline is undersampled, not
+# under-resolved.
+set antialias, 3
 set depth_cue, 0
 set ray_shadow, off
 
