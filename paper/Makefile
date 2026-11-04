@@ -1,4 +1,4 @@
-.PHONY: pdf notebook library campaigns all svg2pdf clean watch
+.PHONY: pdf clean-pdf notebook library campaigns all svg2pdf clean watch
 
 LATEX = latexmk -pdf -interaction=nonstopmode -halt-on-error
 SVG_DIR = figures/svg
@@ -26,6 +26,11 @@ all: pdf notebook library campaigns
 
 pdf: svg2pdf
 	$(LATEX) main.tex
+
+# The forward-building document: title, abstract, and the figures that are
+# settled. See the header of clean.tex for why it is separate from main.tex.
+clean-pdf: svg2pdf
+	$(LATEX) clean.tex
 
 notebook: svg2pdf
 	$(LATEX) notebook.tex
