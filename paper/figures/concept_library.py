@@ -389,7 +389,7 @@ def panel_cost(ax):
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
     ax.set_xlabel("Synthesis cost (\\$)")
-    ax.set_ylabel("Library size, distinct sequences")
+    ax.set_ylabel("Library size (unique sequences)")
     ax.legend(frameon=False, fontsize=8, loc="lower right")
     ax.set_axisbelow(True)
     for sp in ("top", "right"):
