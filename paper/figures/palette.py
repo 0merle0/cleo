@@ -1,68 +1,60 @@
 """Shared color palette for figures.
 
-Mirrors the LaTeX colors defined in preamble.tex. Import this from any
-plotting script so figures stay visually consistent with the rendered paper.
+Mirrors the LaTeX colors in preamble.tex and the named colors in the author's
+~/.pymolrc, so a figure, a structure render and the rendered paper all agree.
 
-**The four base colors are colorblind-safe as a set; keep them that way.**
-They were checked by simulating protanopia, deuteranopia and tritanopia and
-measuring OKLab separation between every pair, not by eye. The original
-cleoOrange (#D97A29) and cleoGreen (#4A8C5A) failed that check: a protanope
-saw orange and green at dE 5.1, below the hard floor of 6, and green/red sat
-at 6.3 for a deuteranope. Both were nudged by the smallest amount that clears
-dE 8 while staying recognisably the same hue, so the document did not have to
-be recolored:
+**This is the author's own "good"/IPD family, not an invented one.** It was
+adopted after rendering twelve candidate palettes on the same structure; these
+read best, and they also measure better than the set they replaced -- provided
+they are used IN ORDER.
 
-    cleoOrange  #D97A29 -> #D47F12
-    cleoGreen   #4A8C5A -> #47966C
+Order matters because a document uses N colors at a time, so what counts is
+the worst pair among however many a figure uses, not the whole family's worst
+pair. Greedily ordered from `good_blue`, measuring OKLab separation under
+simulated protanopia, deuteranopia and tritanopia:
 
-Blue and red were already safe and are unchanged. Worst pair is now orange vs
-green at 8.1 (protan); every pair clears 15 for normal vision.
+    1 good_blue       #4499E7
+    2 golden_yellow   #FAC72C   first 2: CVD 31.9
+    3 ipd_purple      #B41F85   first 3: CVD 16.9
+    4 fire_red        #E44A3E   first 4: CVD 13.3   <- FRAGMENT
+    5 vivid_orange    #FF8C00   first 5: CVD  5.8   below floor
+    6 good_teal       #28B0C1   first 6: CVD  3.2   below floor
+    7 soft_green      #AAC32F   first 7: CVD  1.9   below floor
 
-**FRAGMENT is four colors, and that is a decision, not an oversight.** Six
-categorical hues that survive color-vision deficiency need high chroma and
-come out neon, which is wrong for this document; every muted fifth color
-tested against the base four collapsed below the floor (#7E57A8 at 4.8,
-#6A4C93 at 1.8, #2F8E9E at 3.9). Four is also what the method recommends --
-4-6 fragments of 20-50 aa -- and what Figure 1 shows. A figure that genuinely
-needs five or six slots can lean on position along the chain as secondary
-encoding, which fragments carry for free; it should not invent a fifth hue.
+The first four are comfortably clear of the dE 8 target. Past four the family
+runs out: these are the conflicting pairs, and they cannot be fixed by
+reordering, only by not using both members together.
 
-For an ORDERED quantity -- k itself, a sweep, anything with a magnitude --
-use SEQUENTIAL, not FRAGMENT. Categorical colors on an ordered axis throw
-away the ordering.
+    good_blue / good_teal        3.2
+    soft_green / vivid_orange    1.9
+    soft_green / golden_yellow   4.3
+    golden_yellow / vivid_orange 5.8
+
+So a five-or-more-way figure needs something other than hue to separate the
+extra series -- position, a marker, a direct label. `soft_green` and
+`good_teal` are the two to avoid pairing with anything; they are fine alone
+against a neutral background.
+
+For an ORDERED quantity -- k, a sweep, anything with a magnitude -- use
+SEQUENTIAL. Categorical colors on an ordered axis throw away the ordering.
 """
 
-PALETTE = {
-    "blue":   "#2E5C8A",
-    "orange": "#D47F12",
-    "green":  "#47966C",
-    "red":    "#B23A3A",
-    "gray":   "#6B7280",
-}
+# The family, in the order they should be used.
+ORDERED = [
+    ("blue",   "#4499E7"),   # good_blue
+    ("yellow", "#FAC72C"),   # golden_yellow
+    ("purple", "#B41F85"),   # ipd_purple / magenta
+    ("red",    "#E44A3E"),   # fire_red
+    ("orange", "#FF8C00"),   # vivid_orange   -- see conflicts above
+    ("teal",   "#28B0C1"),   # good_teal      -- see conflicts above
+    ("green",  "#AAC32F"),   # soft_green     -- see conflicts above
+]
+
+PALETTE = dict(ORDERED)
+PALETTE["gray"] = "#6B7280"
 
 # Fragment slot identity, in order. Slot i gets FRAGMENT[i].
-FRAGMENT = [PALETTE["blue"], PALETTE["orange"], PALETTE["green"], PALETTE["red"]]
-
-# Softened fills for large areas -- a cartoon, a filled block -- where the
-# saturated colors are too heavy. How soft is a measurement, not a taste:
-# lightening in OKLab L and cutting chroma costs CVD separation fast.
-#
-#     +0.06 L, 0.88 chroma   CVD 6.8   <- this set, legal with 2nd encoding
-#     +0.10 L, 0.80 chroma   CVD 6.0   on the hard floor
-#     +0.18 L, 0.62 chroma   CVD 4.6   below it, no remedy
-#     +0.24 L, 0.52 chroma   CVD 3.5   below it, no remedy
-#
-# 6.8 sits in the 6-8 band, which is permitted ONLY when something other than
-# hue also carries identity. In the figures that use these, two things do:
-# position along the chain, and the matching saturated FRAGMENT color as the
-# stroke. Do not use these as the sole cue, and do not lighten them further --
-# the next step down is already unreadable for a protanope.
-FRAGMENT_SOFT = ["#456D97", "#E19547", "#63A781", "#BF5551"]
-
-# The only fifth color that clears the floor against the base four (dE 8.1).
-# Bright violet, and it does not sit comfortably with the others -- use it
-# only when a fifth slot genuinely cannot be avoided.
-FRAGMENT_5 = "#9B5DE5"
+FRAGMENT = [hex for _, hex in ORDERED[:4]]
 
 # One hue, light -> dark, for ordered quantities such as k.
 SEQUENTIAL = ["#A5C3DF", "#7FA5CC", "#5A87B4", "#3C6A99", "#2A4F78", "#15314D"]

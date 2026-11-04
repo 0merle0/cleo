@@ -41,7 +41,7 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
-from palette import FRAGMENT, FRAGMENT_SOFT, INK, PALETTE, SEQUENTIAL  # noqa: E402
+from palette import FRAGMENT, INK, PALETTE, SEQUENTIAL  # noqa: E402
 
 PNG = HERE / "structures" / "png"
 K = 4
@@ -131,7 +131,7 @@ def panel_cost(ax):
         ax.annotate(money(y), xy=(1e12, y), xytext=(1e12 * 0.45, y),
                     fontsize=9.5, color=c, ha="right", va="center", zorder=5)
     ax.set_xlim(10, 1e16)
-    ax.set_ylim(400, 1e18)
+    ax.set_ylim(80, 1e18)
     ax.text(1e12, 3e17, r"$10^{12}$ variants", ha="center", fontsize=7.5,
             color=PALETTE["gray"])
     ax.set_xlabel("library size, distinct sequences")
@@ -225,13 +225,13 @@ def panel_loop(ax, rng):
 
     # Cut into k fragments: the same bars, now coloured by slot.
     for j in range(4):
-        bar(ax, 5.83, 2.46 - 0.21 * j, 1.25, 0.14, FRAGMENT_SOFT)
+        bar(ax, 5.83, 2.46 - 0.21 * j, 1.25, 0.14, FRAGMENT)
     ax.text(6.45, 1.44, f"cut into $k={K}$", ha="center", fontsize=8)
     arrow(ax, (7.15, 2.05), (7.70, 2.05))
 
     # Recombinants: one fragment per slot, drawn from different parents.
     for j in range(4):
-        bar(ax, 7.75, 2.46 - 0.21 * j, 1.25, 0.14, FRAGMENT_SOFT,
+        bar(ax, 7.75, 2.46 - 0.21 * j, 1.25, 0.14, FRAGMENT,
             shades=rng.uniform(0.45, 1.0, K))
     ax.text(8.37, 1.44, "recombinants", ha="center", fontsize=8)
 

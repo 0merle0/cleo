@@ -23,10 +23,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
-from palette import FRAGMENT, FRAGMENT_SOFT  # noqa: E402
+from palette import FRAGMENT  # noqa: E402
 
 PDB = HERE / "pdb" / "1tim_A.pdb"
 STYLE = HERE / "style_modern.pml"
+GHOST = HERE / "style_ghost.pml"
 OUT = HERE / "png"
 PX = 2200
 
@@ -55,17 +56,17 @@ def hexrgb(h):
     return tuple(int(h.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4))
 
 
-def script(sel_lines, out_png, k):
+def script(sel_lines, out_png, k, ghost=False):
     defs = []
     for i in range(k):
-        for nm, pal in (("frag", FRAGMENT), ("soft", FRAGMENT_SOFT)):
-            r, g, b = hexrgb(pal[i])
-            defs.append(f"set_color {nm}{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
+        r, g, b = hexrgb(FRAGMENT[i])
+        defs.append(f"set_color frag{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
     return "\n".join([
         f"load {PDB}, prot",
         "hide everything",
         "show cartoon, prot",
         f"@{STYLE}",
+        *(["@" + str(GHOST)] if ghost else []),
         *defs,
         *sel_lines,
         "orient prot",
@@ -78,7 +79,11 @@ def script(sel_lines, out_png, k):
 def run(text, tag):
     f = OUT / f"_{tag}.pml"
     f.write_text(text)
-    r = subprocess.run(["pymol", "-cq", str(f)], capture_output=True, text=True)
+    # -k: do NOT read ~/.pymolrc. A personal rc silently applies to every
+    # render -- this one sets cartoon_transparency 0.45 -- so without it the
+    # paper's figures depend on whose machine built them.
+    r = subprocess.run(["pymol", "-cqk", str(f)],
+                       capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit(f"pymol failed on {tag}:\n{r.stdout}\n{r.stderr}")
     f.unlink()
@@ -95,19 +100,19 @@ def main():
     print(f"1TIM chain A, {len(residues())} residues -> {bs}")
 
     jobs = {
-        "whole": [f"color soft{i}, resi {lo}-{hi}" for i, (lo, hi) in enumerate(bs)],
-        "grey": ["color grey80, prot"],
+        "whole": [f"color frag{i}, resi {lo}-{hi}" for i, (lo, hi) in enumerate(bs)],
+        "grey": ["color grey72, prot"],
     }
     for i, (lo, hi) in enumerate(bs):
         jobs[f"frag{i+1}"] = ["color grey90, prot",
                               "set cartoon_transparency, 0.85, prot",
-                              f"color soft{i}, resi {lo}-{hi}",
+                              f"color frag{i}, resi {lo}-{hi}",
                               f"set cartoon_transparency, 0.0, resi {lo}-{hi}"]
 
     for tag, sel in jobs.items():
         if a.only and tag != a.only:
             continue
-        run(script(sel, OUT / f"{tag}.png", a.k), tag)
+        run(script(sel, OUT / f"{tag}.png", a.k, ghost=(tag == "grey")), tag)
 
 
 if __name__ == "__main__":
