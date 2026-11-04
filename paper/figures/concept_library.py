@@ -519,27 +519,34 @@ def main():
     # Authored at page width, so a point here is a point on the page and the
     # MIN_FONT floor is real. See palette.PAGE_WIDTH_IN.
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 6.7))
-    # Four rows, not three: the landscapes' shared legend gets a cell of its
-    # own between row 0 and row 1. See landscape_legend.
-    outer = fig.add_gridspec(4, 1, height_ratios=[1.12, 0.10, 1.22, 1.00],
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.26, 1.22, 1.00],
                              hspace=0.34)
+    # The legend belongs to the landscapes, so it lives INSIDE their row --
+    # tight under the three panels, with the full row gap below it.
+    #
+    # It was a row of its own between row 0 and row 1, and before that it was
+    # anchored into that gap. Both put it midway between the landscapes it
+    # explains and panels b/c, which it has nothing to do with, and the gap is
+    # also where panel b's letter sits. Pulling it up into row 0 settles the
+    # question of which panels it belongs to and clears the gap in one move.
+    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.45)
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
-    top = outer[0].subgridspec(1, 3, wspace=0.11)
-    ax_e = fig.add_subplot(top[0, 0])
-    ax_n = fig.add_subplot(top[0, 1])
-    ax_o = fig.add_subplot(top[0, 2])
+    land = top[0].subgridspec(1, 3, wspace=0.11)
+    ax_e = fig.add_subplot(land[0, 0])
+    ax_n = fig.add_subplot(land[0, 1])
+    ax_o = fig.add_subplot(land[0, 2])
     panel_epcr(ax_e, rng)
     panel_naive(ax_n, rng)
     panel_ours(ax_o, rng)
     fitness_key(ax_o)
-    landscape_legend(fig.add_subplot(outer[1]))
+    landscape_legend(fig.add_subplot(top[1]))
 
-    mid = outer[2].subgridspec(1, 2, width_ratios=[1.06, 1.0], wspace=0.22)
+    mid = outer[1].subgridspec(1, 2, width_ratios=[1.06, 1.0], wspace=0.22)
     ax_obj = fig.add_subplot(mid[0, 0])
     ax_cost = fig.add_subplot(mid[0, 1])
-    ax_lab = fig.add_subplot(outer[3])
+    ax_lab = fig.add_subplot(outer[2])
     panel_object(ax_obj)
     panel_cost(ax_cost)
     panel_lab(ax_lab, rng)
