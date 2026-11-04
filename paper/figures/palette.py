@@ -57,7 +57,14 @@ PALETTE["gray"] = "#6B7280"
 FRAGMENT = [hex for _, hex in ORDERED[:4]]
 
 # One hue, light -> dark, for ordered quantities such as k.
-SEQUENTIAL = ["#A5C3DF", "#7FA5CC", "#5A87B4", "#3C6A99", "#2A4F78", "#15314D"]
+#
+# Built around PALETTE["blue"], which sits at index 2 EXACTLY -- the ramp is
+# the categorical blue extended in both directions rather than a separate blue
+# that happens to look similar. Same OKLab hue (249.1 deg) throughout, with
+# chroma tapering toward both ends as a sequential ramp should. If the
+# palette's blue changes, regenerate this rather than hand-editing it.
+SEQUENTIAL = ["#BADBFD", "#7FBDFA", "#4499E7", "#216CAD", "#004A80", "#002D52"]
+assert SEQUENTIAL[2] == PALETTE["blue"], "ramp must pass through the palette blue"
 
 # Neutrals for context: un-highlighted structure, grid lines, rules.
 INK = {"muted": "#9CA3AF", "grid": "#E5E7EB", "ghost": "#D1D5DB"}
