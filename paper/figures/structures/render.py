@@ -99,10 +99,65 @@ def run(text, tag):
     print(f"  rendered {tag}")
 
 
+# Variants for the lab-in-the-loop panel. Printed ~46 pt (0.64 in) wide, so
+# 2000 px is ~3100 dpi there -- the 6000 px used for the hero structure would
+# be eight times the pixels for a tenth the size.
+VAR_PX = 2000
+
+
+def shade(hex_c, f):
+    """-> `hex_c` lightened toward white by (1-f). f=1 is the base colour."""
+    r, g, b = hexrgb(hex_c)
+    return tuple(v + (1 - v) * (1 - f) for v in (r, g, b))
+
+
+def variants(n, k):
+    """Render `n` copies of the fold, each a different combination of tints.
+
+    Same backbone, same camera, same fragment boundaries -- only the per-slot
+    tint changes, which is exactly what a recombinant is: one fragment per
+    slot, drawn from different parents. Rendering them in one session keeps
+    the camera identical, so the reader reads the colour difference and not a
+    pose difference.
+    """
+    import numpy as np
+    rng = np.random.default_rng(11)
+    bs = bounds(k)
+    lines = [f"load {PDB}, prot", "hide everything", "show cartoon, prot",
+             f"@{STYLE}", "set ray_opaque_background, 0",
+             "orient prot", "turn x, -8", "zoom prot, 2"]
+    for v in range(n):
+        # Spread the tints: every variant gets at least one near-full and one
+        # clearly pale slot, so no two read as the same design at thumbnail
+        # size.
+        fs_ = rng.permutation(np.linspace(0.42, 1.0, k))
+        for i, (lo, hi) in enumerate(bs):
+            r, g, b = shade(FRAGMENT[i], fs_[i])
+            lines.append(f"set_color v{v}s{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
+            lines.append(f"color v{v}s{i}, resi {lo}-{hi}")
+        lines.append(f"png {OUT / f'var{v+1}.png'}, width={VAR_PX}, "
+                     f"height={VAR_PX}, dpi=300, ray=1")
+    f = OUT / "_var.pml"
+    f.write_text("\n".join(lines) + "\n")
+    r = subprocess.run(["pymol", "-cqk", str(f)], capture_output=True,
+                       text=True)
+    if r.returncode != 0:
+        sys.exit(f"pymol failed:\n{r.stdout}\n{r.stderr}")
+    f.unlink()
+    for v in range(n):
+        print(f"  rendered var{v+1}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-k", type=int, default=4)
+    ap.add_argument("--variants", type=int, default=0,
+                    help="render only N recombinant variants, then stop")
     a = ap.parse_args()
+    OUT.mkdir(parents=True, exist_ok=True)
+    if a.variants:
+        variants(a.variants, a.k)
+        return
     OUT.mkdir(parents=True, exist_ok=True)
     bs = bounds(a.k)
     print(f"{PDB.stem}, {len(residues())} residues -> {bs}")

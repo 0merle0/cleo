@@ -68,3 +68,71 @@ assert SEQUENTIAL[2] == PALETTE["blue"], "ramp must pass through the palette blu
 
 # Neutrals for context: un-highlighted structure, grid lines, rules.
 INK = {"muted": "#9CA3AF", "grid": "#E5E7EB", "ghost": "#D1D5DB"}
+
+
+# ---------------------------------------------------------------- typography
+#
+# Applied at import. Every figure script imports this module, so this is the
+# one place that makes the document's figures agree on type -- the alternative
+# is a style call each script can forget, which is how a document ends up with
+# three fonts in it.
+#
+# Arial, because the journal asks for a sans and Arial is the one actually
+# installed here (Helvetica is not; matplotlib would silently fall back to
+# DejaVu Sans and the figures would not match the request). The fallbacks after
+# it are metric-compatible, so a machine without Arial gets the same layout.
+MIN_FONT = 7.0
+
+# The floor above is in POINTS ON THE PRINTED PAGE, which is the only place a
+# font size means anything. It is therefore only true if the figure is
+# authored at the width it is printed at.
+#
+# This document is letter with 1-inch margins, so \textwidth is 6.5in. A
+# figure built at figsize=(11, h) and included at width=\textwidth is scaled
+# by 6.5/11 = 0.59 on its way in, and a label set at "7pt" arrives at 4.1pt.
+# Every figure here is therefore sized PAGE_WIDTH_IN wide (or a stated
+# fraction of it), and structures placed with `place` are sized in the same
+# points.
+PAGE_WIDTH_IN = 6.5
+
+_SANS = ["Arial", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]
+
+
+def fs(size):
+    """-> `size`, clamped up to MIN_FONT.
+
+    Use this for EVERY fontsize in a figure rather than writing the number
+    directly. A floor that lives in a comment gets broken the next time a
+    label needs to squeeze into a corner; this one cannot be.
+    """
+    return max(float(size), MIN_FONT)
+
+
+def _apply():
+    import matplotlib as mpl
+    mpl.rcParams.update({
+        "font.family": "sans-serif",
+        "font.sans-serif": _SANS,
+        "mathtext.fontset": "custom",
+        "mathtext.rm": "Arial",
+        "mathtext.it": "Arial:italic",
+        "mathtext.bf": "Arial:bold",
+        # Black for everything that is text. Spines and grid stay neutral --
+        # they are rules, not labels.
+        "text.color": "black",
+        "axes.labelcolor": "black",
+        "axes.titlecolor": "black",
+        "xtick.color": "black",
+        "ytick.color": "black",
+        "xtick.labelcolor": "black",
+        "ytick.labelcolor": "black",
+        "font.size": MIN_FONT,
+        "axes.titlesize": 9,
+        "axes.labelsize": 9,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "legend.fontsize": MIN_FONT,
+    })
+
+
+_apply()

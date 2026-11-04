@@ -43,7 +43,8 @@ from matplotlib.transforms import blended_transform_factory
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
-from palette import FRAGMENT, INK, PALETTE, SEQUENTIAL  # noqa: E402
+from palette import (FRAGMENT, INK, PAGE_WIDTH_IN, PALETTE, SEQUENTIAL,  # noqa: E402
+                     fs)
 
 PNG = HERE / "structures" / "png"
 K = 4
@@ -199,15 +200,13 @@ def draw_landscape(ax, title, axis_labels=False):
     # name the arms being contrasted and are the panel's primary text. The
     # third is not coloured either -- tinting only "this work" would say the
     # comparison was decided before the reader got to it.
-    ax.set_title(title, fontsize=9, pad=7, color="black")
+    ax.set_title(title, fontsize=fs(9), pad=7, color="black")
     # Labelled on the leftmost panel only. All three share one set of axes --
     # same landscape, same framing, same limits -- so repeating the pair three
     # times would assert a difference between them that does not exist.
     if axis_labels:
-        ax.set_xlabel("Sequence space", fontsize=8,
-                      color=PALETTE["gray"], labelpad=3)
-        ax.set_ylabel("Sequence space", fontsize=8,
-                      color=PALETTE["gray"], labelpad=3)
+        ax.set_xlabel("Sequence space", fontsize=fs(8), labelpad=3)
+        ax.set_ylabel("Sequence space", fontsize=fs(8), labelpad=3)
 
 
 def draw_designs(ax, pts, ms=3.8):
@@ -233,7 +232,7 @@ def panel_epcr(ax, rng):
     # corner, and a legend over the sampled designs hides the panel's point.
     ax.plot([], [], marker="*", ms=10, mfc="white", mec=DOT, mew=1.1,
             ls="none", label="parent design")
-    ax.legend(fontsize=6.8, loc="lower center", handletextpad=0.3,
+    ax.legend(fontsize=fs(6.8), loc="lower center", handletextpad=0.3,
               borderpad=0.35, frameon=True, facecolor="white",
               edgecolor="none", framealpha=0.88)
 
@@ -301,7 +300,7 @@ def panel_ours(ax, rng):
             ls="none", label="filtered out")
     ax.plot([], [], "o", ms=3.8, mfc=DOT, mec="white", mew=0.55, ls="none",
             label="assembled from library")
-    ax.legend(fontsize=6.8, loc="lower left", handletextpad=0.3,
+    ax.legend(fontsize=fs(6.8), loc="lower left", handletextpad=0.3,
               borderpad=0.35, labelspacing=0.25, frameon=True,
               facecolor="white", edgecolor="none", framealpha=0.88)
 
@@ -316,16 +315,16 @@ def fitness_key(ax):
     cb.set_yticks([])
     for sp in cb.spines.values():
         sp.set_color(INK["grid"])
-    cb.text(1.5, 1.0, "high", ha="left", va="center", fontsize=6.6,
-            color=PALETTE["gray"], transform=cb.transAxes)
-    cb.text(1.5, 0.0, "low", ha="left", va="center", fontsize=6.6,
-            color=PALETTE["gray"], transform=cb.transAxes)
+    cb.text(1.5, 1.0, "high", ha="left", va="center", fontsize=fs(6.6),
+            transform=cb.transAxes)
+    cb.text(1.5, 0.0, "low", ha="left", va="center", fontsize=fs(6.6),
+            transform=cb.transAxes)
     cb.text(-0.9, 0.5, "Fitness", rotation=90, ha="center", va="center",
-            fontsize=7.5, color=PALETTE["gray"], transform=cb.transAxes)
+            fontsize=fs(7.5), transform=cb.transAxes)
 
 
 # ---------------------------------------------------------------- panel (b)
-def mark_level(ax, S, series, label, label_x):
+def mark_level(ax, S, series, label):
     """Draw one library size as a reference line with a price on every arm.
 
     Only 10^12 is drawn. A second level at 10^6 was tried and removed: it
@@ -340,14 +339,14 @@ def mark_level(ax, S, series, label, label_x):
     neighbours whatever the spacing, and the dearest arm labels inward so it
     cannot run off the axis.
     """
-    ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1)
-    # Caption goes in the widest gap ALONG the line, which is between the two
-    # dearest arms -- k=2 meets this level at ~$42M and whole genes at ~$42T,
-    # six decades apart, and nothing else crosses in between. Both ends of the
-    # line were tried and both crowd a price: the left end sits in the cluster
-    # where the cheap arms converge, the right end runs into the dearest one.
-    ax.text(label_x, S * 1.6, label, ha="center", fontsize=7.5,
-            color=PALETTE["gray"])
+    # The level is named in the LEGEND, not on the line.
+    #
+    # It was captioned inline until the figure moved to page width. At
+    # page-size type the string is about four decades wide and there is no
+    # gap left that holds it: along the line it hits a price, below-left it
+    # crosses the steep arms where they converge, and the right end has only
+    # about one clear decade. A line's meaning belongs in the legend anyway.
+    ax.axhline(S, color=GREY, lw=1, ls=":", zorder=1, label=label)
     marks = sorted(((float(library_cost(np.array(S), k)), c)
                     for _, k, c in series), key=lambda t: t[0])
     # The alternation is a good default and gets two of the four right. The
@@ -356,7 +355,7 @@ def mark_level(ax, S, series, label, label_x):
     # curve and is struck through by it. Overrides are keyed by rank in cost,
     # which is what the alternation itself is keyed by.
     OVERRIDE = {
-        0: (0.62, 3.2, "right", "bottom"),   # $5.3k -- above-left, off the line
+        0: (0.95, 3.2, "right", "bottom"),   # $5.3k -- above-left, off the line
         1: (2.6, 3.2, "left", "bottom"),     # $84k  -- further right, clear of 0
     }
     for i, (x, c) in enumerate(marks):
@@ -370,7 +369,7 @@ def mark_level(ax, S, series, label, label_x):
         if i in OVERRIDE:
             fx, fy, ha, va = OVERRIDE[i]
             xt, y = x * fx, S * fy
-        ax.annotate(money(x), xy=(x, S), xytext=(xt, y), fontsize=8.5,
+        ax.annotate(money(x), xy=(x, S), xytext=(xt, y), fontsize=fs(8.5),
                     color=c, ha=ha, va=va, zorder=5)
 
 
@@ -396,12 +395,13 @@ def panel_cost(ax):
         bp = max(PROT_AA * BP_PER_AA / k, MIN_BP)
         S = (cost / (k * bp * COST_PER_BP)) ** k
         ax.loglog(cost, S, "-", color=c, lw=2.2, label=lab, zorder=3)
-    mark_level(ax, 1e12, series, r"$10^{12}$ variants", 1e10)
+    mark_level(ax, 1e12, series, r"$10^{12}$ variants")
     ax.set_xlim(1e2, 1e15)
     ax.set_ylim(10, 1e16)
     ax.set_xlabel("Synthesis cost (\\$)")
     ax.set_ylabel("Library size (unique sequences)")
-    ax.legend(frameon=False, fontsize=8, loc="lower right")
+    ax.legend(frameon=False, fontsize=fs(8), loc="lower right",
+              labelspacing=0.35, handlelength=1.8)
     ax.set_axisbelow(True)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
@@ -430,106 +430,16 @@ def panel_object(ax):
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    place(ax, "whole", (0.5, 0.5), 228)
-
-
-# ---------------------------------------------------------------- panel (d)
-def bar(ax, x, y, w, h, colors, shades=None, lw=0.7, edge=None):
-    """A sequence drawn as k abutting blocks, optionally shade-varied."""
-    n = len(colors)
-    for i, c in enumerate(colors):
-        a = x + w * i / n
-        f = 1.0 if shades is None else shades[i]
-        # Soft fill, saturated stroke. The soft palette sits in the 6-8 CVD
-        # band and is only legal with a second cue -- the stroke is that cue.
-        ax.add_patch(FancyBboxPatch(
-            (a + 0.004, y), w / n - 0.008, h,
-            boxstyle="round,pad=0,rounding_size=0.008",
-            fc=_shade(c, f),
-            ec=edge if edge else FRAGMENT[i % len(FRAGMENT)], lw=0.7,
-            zorder=3))
-
-
-def _shade(hex_c, f):
-    """Lighten toward white by (1-f); f=1 is the base colour."""
-    r, g, b = (int(hex_c.lstrip("#")[i:i+2], 16) / 255 for i in (0, 2, 4))
-    return tuple(v + (1 - v) * (1 - f) for v in (r, g, b))
-
-
-def box(ax, xy, w, h, label, sub=None, fc="white"):
-    ax.add_patch(FancyBboxPatch(xy, w, h,
-                                boxstyle="round,pad=0,rounding_size=0.03",
-                                fc=fc, ec=PALETTE["gray"], lw=1.1, zorder=3))
-    ax.text(xy[0] + w / 2, xy[1] + h * (0.62 if sub else 0.5), label,
-            ha="center", va="center", fontsize=8.5, zorder=4)
-    if sub:
-        ax.text(xy[0] + w / 2, xy[1] + h * 0.26, sub, ha="center", va="center",
-                fontsize=6.8, color=PALETTE["gray"], zorder=4)
-
-
-def arrow(ax, p0, p1, color=None, rad=0.0, lw=1.4, ls="-"):
-    ax.add_patch(FancyArrowPatch(
-        p0, p1, arrowstyle="-|>", mutation_scale=11,
-        color=color or PALETTE["gray"], lw=lw, linestyle=ls,
-        connectionstyle=f"arc3,rad={rad}", zorder=2,
-        shrinkA=2, shrinkB=2))
-
-
-def panel_loop(ax, rng):
-    """backbone -> policy -> sequences -> fragments -> chimeras -> reward."""
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 3.1)
-    ax.axis("off")
-
-    place(ax, "grey", (0.72, 2.05), 108)
-    ax.text(0.72, 1.14, "backbone", ha="center", fontsize=8)
-    arrow(ax, (1.32, 2.05), (1.92, 2.05))
-
-    box(ax, (1.95, 1.62), 1.30, 0.86, "ProteinMPNN", "decoder as policy")
-    arrow(ax, (3.28, 2.05), (3.85, 2.05))
-
-    # B sequences, undifferentiated.
-    for j in range(4):
-        bar(ax, 3.90, 2.46 - 0.21 * j, 1.25, 0.14, [GREY] * K,
-            edge=INK['ghost'])
-    ax.text(4.52, 1.44, "$B$ sequences", ha="center", fontsize=8)
-    arrow(ax, (5.22, 2.05), (5.78, 2.05))
-
-    # Cut into k fragments: the same bars, now coloured by slot.
-    for j in range(4):
-        bar(ax, 5.83, 2.46 - 0.21 * j, 1.25, 0.14, FRAGMENT)
-    ax.text(6.45, 1.44, f"cut into $k={K}$", ha="center", fontsize=8)
-    arrow(ax, (7.15, 2.05), (7.70, 2.05))
-
-    # Recombinants: one fragment per slot, drawn from different parents.
-    for j in range(4):
-        bar(ax, 7.75, 2.46 - 0.21 * j, 1.25, 0.14, FRAGMENT,
-            shades=rng.uniform(0.45, 1.0, K))
-    ax.text(8.37, 1.44, "recombinants", ha="center", fontsize=8)
-
-    box(ax, (7.72, 0.42), 1.32, 0.68, "fold & score",
-        "best-of-5, motif RMSD")
-    arrow(ax, (8.38, 1.30), (8.38, 1.12))
-
-    # The feedback edge: this is the whole method.
-    arrow(ax, (7.70, 0.76), (2.60, 0.76), color=PALETTE["blue"], rad=0.0,
-          lw=1.6)
-    arrow(ax, (2.60, 0.76), (2.60, 1.60), color=PALETTE["blue"], lw=1.6)
-    ax.text(5.15, 0.88, "GRPO update: each fragment scored by the "
-                        "recombinants it appears in",
-            ha="center", fontsize=7.6, color=PALETTE["blue"])
-    ax.text(8.38, 0.22, r"$\rho=0$ returns the parent, so this rate is not a "
-                        "retention", ha="center", fontsize=6.4,
-            color=PALETTE["gray"], style="italic")
-
+    place(ax, "whole", (0.5, 0.5), 135)
 
 
 def main():
     rng = np.random.default_rng(3)
     plt.rcParams["text.usetex"] = False
-    fig = plt.figure(figsize=(11, 11.0))
-    outer = fig.add_gridspec(3, 1, height_ratios=[1.12, 1.22, 0.78],
-                             hspace=0.30)
+    # Authored at page width, so a point here is a point on the page and the
+    # MIN_FONT floor is real. See palette.PAGE_WIDTH_IN.
+    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 4.8))
+    outer = fig.add_gridspec(2, 1, height_ratios=[1.12, 1.22], hspace=0.30)
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
@@ -545,10 +455,8 @@ def main():
     mid = outer[1].subgridspec(1, 2, width_ratios=[1.06, 1.0], wspace=0.22)
     ax_obj = fig.add_subplot(mid[0, 0])
     ax_cost = fig.add_subplot(mid[0, 1])
-    ax_loop = fig.add_subplot(outer[2])
     panel_object(ax_obj)
     panel_cost(ax_cost)
-    panel_loop(ax_loop, rng)
 
     # Panel letters are placed in FIGURE x, not axes x.
     #
@@ -558,8 +466,8 @@ def main():
     # absolute positions -- a ragged left margin that is visible down the page.
     #
     # Instead: measure each column's true left edge, tick labels and axis
-    # labels included, and justify every letter in that column to it. a, b and
-    # d share the left column and therefore share one x; c is justified to the
+    # labels included, and justify every letter in that column to it. a and b
+    # share the left column and therefore share one x; c is justified to the
     # left edge of the right-hand column's content, which is the same rule
     # applied to the only panel that is not in the left column.
     fig.canvas.draw()
@@ -570,12 +478,11 @@ def main():
         return min(inv.transform((a.get_tightbbox(rend).x0, 0))[0]
                    for a in axes)
 
-    x_left = left_edge([ax_e, ax_obj, ax_loop])
+    x_left = left_edge([ax_e, ax_obj])
     x_right = left_edge([ax_cost])
     for ax, lab, x, dy in ((ax_e, "a", x_left, 1.20),
                            (ax_obj, "b", x_left, 1.12),
-                           (ax_cost, "c", x_right, 1.12),
-                           (ax_loop, "d", x_left, 1.12)):
+                           (ax_cost, "c", x_right, 1.12)):
         ax.text(x, dy, lab,
                 transform=blended_transform_factory(fig.transFigure,
                                                     ax.transAxes),

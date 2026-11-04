@@ -82,13 +82,30 @@ finds a variant with 250x increase in catalytic activity.
   that point cutting finer stops buying shorter DNA and only buys more pieces
   of it. Reaching $10^{12}$ variants costs \$42T as whole genes, \$42M at
   $k=2$, \$84k at $k=4$ and \$5.3k at $k=8$.
-  \textbf{(d)}~The method. A backbone conditions the ProteinMPNN decoder, which
-  is treated as a policy; the sequences it emits are cut at the fragment
+  }
+  \label{fig:concept}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{concept_loop.pdf}
+  \caption{\textbf{\textcolor{cleoRed}{[Figure 2 --- title is yours.]}}
+  \textbf{(a)}~The method. A backbone conditions the ProteinMPNN decoder,
+  which is treated as a policy; the sequences it emits are cut at the fragment
   boundaries, recombined across parents, and folded best-of-5. Each fragment is
   scored by the recombinants it appears in, and that per-fragment reward drives
   the GRPO update. The policy is therefore optimised for how well its fragments
-  \emph{recombine}, not for how good any single sequence is.}
-  \label{fig:concept}
+  \emph{recombine}, not for how good any single sequence is.
+  \textbf{(b)}~\textcolor{cleoRed}{[PLACEHOLDER --- your words.]} The
+  experimental loop. The ordered library is $k$ pools of parts, one per slot.
+  A surrogate ensemble trained on what has been measured so far selects one
+  part per slot; those designs are assembled, expressed and assayed; and the
+  measured activities retrain the selector. The arrow returns to the selector
+  and not to the library: the parts are synthesised once, and what each round
+  changes is which of them get combined. Schematic --- the progress curves are
+  illustrative and the structures are the same backbone coloured by which
+  part fills each slot.}
+  \label{fig:method}
 \end{figure}
 
 \end{document}
