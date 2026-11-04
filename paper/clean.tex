@@ -53,36 +53,22 @@ finds a variant with 250x increase in catalytic activity.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{concept_library.pdf}
-  \caption{\textbf{A combinatorial library, and the policy that makes one
-  assemblable.}
-  \textbf{(a)}~\textcolor{cleoRed}{[PLACEHOLDER --- your words.]} The same
-  toy fitness landscape, four optima of unequal height, searched three ways
-  with the same number of variants built and screened ($N=36$). Error-prone
-  PCR stays inside the parent's basin. Naive combinatorial assembly builds the
-  product of parts chosen without regard to fitness, so it reaches much
-  further but spends most of its variants in valleys and here leaves the
-  global optimum untouched. This work generates the same combinatorial reach
-  (open points) and keeps only what survives scoring (filled), assembling the
-  same number of variants onto the optima. In both combinatorial arms what is
-  ordered is fragments; the full-length variants are assembled from them.
-  Illustrative: no axis here is measured.
-  \textbf{(b)}~One fold cut into $k=4$ equal fragments, shown on flavodoxin
-  (2FX2, chain A, 147 residues; \SI{39}{\percent} helix,
-  \SI{33}{\percent} strand). Colours mark the four fragments along the
-  chain. Equal
-  lengths are chosen so that assembly is robust, not because the boundaries are
-  structurally meaningful, and at this length the four fragments are
-  \SI{37}{} residues each --- inside the \SIrange{20}{50}{} band the method
-  recommends.
-  \textbf{(c)}~What a given spend buys. Whole genes cost
-  \$42 each at eBlock pricing for a 200-aa enzyme, so library size is linear
-  in spend; a combinatorial library buys $k$ sets of parts instead of $N$
-  products, and size goes as the $k$th power of what each slot can hold.
-  eBlocks are billed at a 300-bp minimum, which binds from $k=2$ on, so past
-  that point cutting finer stops buying shorter DNA and only buys more pieces
-  of it. Reaching $10^{12}$ variants costs \$42T as whole genes, \$42M at
-  $k=2$, \$84k at $k=4$ and \$5.3k at $k=8$.
-  }
+  \caption{\textbf{A combinatorial library, and the loop around it.}
+  \textcolor{cleoRed}{[PLACEHOLDER --- the prose is yours. Kept short so the
+  float fits; the facts below are the ones a reader cannot get from the
+  picture.]}
+  \textbf{(a)}~One toy landscape searched three ways with the same number of
+  variants built and screened ($N=36$). Illustrative: no axis is measured.
+  \textbf{(b)}~One fold cut into $k=4$ equal fragments, on flavodoxin (2FX2
+  chain A, 147 residues). At this length the fragments are 37 residues --
+  inside the 20--50 band the method recommends.
+  \textbf{(c)}~eBlocks are billed at a 300-bp minimum, which binds from $k=2$
+  on, so past that point cutting finer stops buying shorter DNA and only buys
+  more pieces of it. $10^{12}$ variants costs \$42T as whole genes, \$42M at
+  $k=2$, \$84k at $k=4$, \$5.3k at $k=8$.
+  \textbf{(d)}~The experimental loop. The arrow returns to the \emph{selector},
+  not the library: parts are synthesised once and each round changes only
+  which of them get combined.}
   \label{fig:concept}
 \end{figure}
 
@@ -96,15 +82,7 @@ finds a variant with 250x increase in catalytic activity.
   scored by the recombinants it appears in, and that per-fragment reward drives
   the GRPO update. The policy is therefore optimised for how well its fragments
   \emph{recombine}, not for how good any single sequence is.
-  \textbf{(b)}~\textcolor{cleoRed}{[PLACEHOLDER --- your words.]} The
-  experimental loop. The ordered library is $k$ pools of parts, one per slot.
-  A surrogate ensemble trained on what has been measured so far selects one
-  part per slot; those designs are assembled, expressed and assayed; and the
-  measured activities retrain the selector. The arrow returns to the selector
-  and not to the library: the parts are synthesised once, and what each round
-  changes is which of them get combined. Schematic --- the progress curves are
-  illustrative and the structures are the same backbone coloured by which
-  part fills each slot.}
+}
   \label{fig:method}
 \end{figure}
 

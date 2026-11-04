@@ -21,12 +21,19 @@
 \usepackage{hyperref}
 \hypersetup{colorlinks=true, linkcolor=black, citecolor=black, urlcolor=blue}
 
-\usepackage{authblk}
+% authblk is loaded only if installed. Nothing here uses \affil -- it was
+% pulled in for author affiliations that were never written -- and on a
+% machine whose texlive lacks it the whole document stopped building over
+% a package it does not use.
+\IfFileExists{authblk.sty}{\usepackage{authblk}}{}
 
 % Allow hyphenation inside \texttt{}. Without this, snake_case identifiers
 % (mutation_diversity, consensus_divergence, ...) are unbreakable and push
 % lines into the margin. [htt] enables breaking in typewriter text.
-\usepackage[htt]{hyphenat}
+% Also optional: it only permits hyphenation inside \texttt, so a texlive
+% without it loses slightly worse line breaks around identifiers and
+% nothing else.
+\IfFileExists{hyphenat.sty}{\usepackage[htt]{hyphenat}}{}
 
 \graphicspath{{figures/pdf/}}
 
@@ -71,7 +78,11 @@
   \fi}
 
 % planlist: bulleted planning notes. Same visibility rules as \plan.
-\usepackage{comment}
+% `comment` is only needed by the \draftmodefalse branch below, and it is not
+% in every texlive. Where it is missing, planlist bodies are typeset into a
+% box that is then dropped -- the content does not reach the page either way.
+\IfFileExists{comment.sty}{\usepackage{comment}\newif\ifhavecomment
+  \havecommenttrue}{\newif\ifhavecomment\havecommentfalse}
 \newenvironment{planlistbody}%
   {\begingroup\small\color{cleoGray}%
    \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}%
@@ -79,7 +90,11 @@
 \ifdraftmode
   \newenvironment{planlist}{\begin{planlistbody}}{\end{planlistbody}}
 \else
-  \excludecomment{planlist}
+  \ifhavecomment
+    \excludecomment{planlist}
+  \else
+    \newenvironment{planlist}{\setbox0\vbox\bgroup}{\egroup}
+  \fi
 \fi
 
 % --- Status tags for the document index ---

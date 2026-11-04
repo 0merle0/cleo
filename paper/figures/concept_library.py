@@ -32,10 +32,8 @@ why an in-loop chimera pass rate is NOT comparable to a T2 retention number.
 import sys
 from pathlib import Path
 
-import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from matplotlib.transforms import blended_transform_factory
@@ -43,8 +41,10 @@ from matplotlib.transforms import blended_transform_factory
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
-from palette import (FRAGMENT, INK, PAGE_WIDTH_IN, PALETTE, SEQUENTIAL,  # noqa: E402
-                     fs)
+from palette import (INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
+                     PANEL_LABEL_PT, SEQUENTIAL, fs)
+from schematic import (FRAGMENT, _shade, arrow, box,  # noqa: E402
+                       place, trimmed)
 
 PNG = HERE / "structures" / "png"
 K = 4
@@ -86,46 +86,6 @@ def money(v):
             x = v / cut
             return f"\\${x:.0f}{suf}" if x >= 10 else f"\\${x:.1f}{suf}"
     return f"\\${v:.0f}"
-
-
-def trimmed(name):
-    """-> RGBA array cropped to its non-transparent bounding box."""
-    im = mpimg.imread(PNG / f"{name}.png")
-    if im.shape[2] == 4:
-        ys, xs = np.nonzero(im[:, :, 3] > 0.02)
-        if len(ys):
-            im = im[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
-    return im
-
-
-def place(ax, name, xy, width_pts):
-    """Draw a structure PNG `width_pts` wide, whatever its pixel size.
-
-    Sized in POINTS, not by OffsetImage's zoom. zoom is per-pixel, so a figure
-    written against it silently rescales every structure whenever the render
-    resolution changes -- raising PX from 3600 to 6000 blew the fold out of
-    its panel and over the one below. Point width is what the layout actually
-    means, and it holds across re-renders.
-    """
-    im = trimmed(name)
-    ax.add_artist(AnnotationBbox(
-        OffsetImage(im, zoom=width_pts / im.shape[1]), xy,
-        frameon=False, box_alignment=(0.5, 0.5)))
-
-
-def place_raw(ax, name, xy, width_pts):
-    """Place a structure PNG UNTRIMMED, so every image keeps one frame.
-
-    `place` crops to the ink, which is right for a single structure and fatal
-    for the exploded panel: cropping rescales each fragment to fill its own
-    box, so they stop sharing a camera and stop sharing a size. Untrimmed, a
-    fragment sits at its true position inside a mostly transparent frame, and
-    offsetting the frame slides the fragment outward by exactly that much.
-    """
-    im = mpimg.imread(PNG / f"{name}.png")
-    ax.add_artist(AnnotationBbox(
-        OffsetImage(im, zoom=width_pts / im.shape[1]), xy,
-        frameon=False, box_alignment=(0.5, 0.5), annotation_clip=False))
 
 
 def grid(ax):
@@ -433,13 +393,125 @@ def panel_object(ax):
     place(ax, "whole", (0.5, 0.5), 135)
 
 
+# ---------------------------------------------------------------- panel (d)
+# Colours for the three measured variants. One hue, three steps -- the
+# variants are not categories, they are three draws from one library, and the
+# same three steps key the structures, the progress curves and the points.
+VAR_C = [SEQUENTIAL[1], SEQUENTIAL[3], SEQUENTIAL[5]]
+
+
+def panel_lab(ax, rng):
+    """The experimental loop: library -> select -> assemble -> assay -> select.
+
+    The counterpart of panel (a). Panel (a) closes in silico against a folding
+    oracle and produces a library of parts; this one closes in the lab against
+    measured activity and chooses which parts to use next.
+
+    The returning arrow lands on the SELECTOR, not on the library. That is the
+    substantive claim of the panel and it is also what the code does: the
+    library is fixed once it is ordered, and what the measurements change is
+    the model that picks parts out of it. An arrow drawn back to the library
+    would say the parts are resynthesised each round, which would throw away
+    the cost argument Figure 1 makes.
+    """
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 3.2)
+    ax.axis("off")
+
+    # Horizontal budget. The axes is ~440 pt wide, so one x-unit is ~44 pt and
+    # a 7 pt label of n characters is roughly n*3.5/44 units. Every element
+    # below is placed against that, which is the step that was missing when
+    # this panel was first laid out against an 11-inch canvas.
+    #
+    # --- the fragment pool ------------------------------------------------
+    # Drawn as k slot-columns of tinted parts rather than as whole sequences,
+    # because that is what is physically in the tube: one pool per slot, and a
+    # design is one part taken from each.
+    x0, y0, bw, bh = 0.30, 1.02, 0.21, 0.145
+    n_per_slot = 5
+    for i in range(K):
+        for j in range(n_per_slot):
+            ax.add_patch(FancyBboxPatch(
+                (x0 + i * (bw + 0.07), y0 + j * (bh + 0.07)), bw, bh,
+                boxstyle="round,pad=0,rounding_size=0.03",
+                fc=_shade(FRAGMENT[i], rng.uniform(0.40, 1.0)),
+                ec=FRAGMENT[i], lw=0.5, zorder=3))
+    lib_w = K * bw + (K - 1) * 0.07
+    lib_cx = x0 + lib_w / 2
+    ax.text(lib_cx, y0 + n_per_slot * (bh + 0.07) + 0.07, "fragment library",
+            ha="center", fontsize=fs(7))
+    ax.text(lib_cx, 0.80, "one pool per slot", ha="center", fontsize=fs(6.5),
+            color=PALETTE["gray"])
+
+    arrow(ax, (x0 + lib_w + 0.08, 1.61), (1.95, 1.61))
+
+    # --- the selector -----------------------------------------------------
+    sel_x, sel_w = 2.00, 1.80
+    sel_cx = sel_x + sel_w / 2
+    box(ax, (sel_x, 1.26), sel_w, 0.70, "fragment selector",
+        "surrogate ensemble", title_size=8)
+    arrow(ax, (sel_x + sel_w, 1.61), (4.25, 1.61))
+
+    # --- the assembled variants -------------------------------------------
+    # One part per slot, so every design is the same fold in a different
+    # combination. Rendered from one camera (render.py --variants) so the
+    # reader sees the colour change and not a pose change. 30 pt at 0.90-unit
+    # spacing leaves a visible gap between them -- at 38 pt they touched.
+    for n in range(3):
+        cx = 4.65 + n * 0.90
+        place(ax, f"var{n+1}", (cx, 1.72), 30)
+        ax.add_patch(FancyBboxPatch((cx - 0.19, 1.22), 0.38, 0.055,
+                                    boxstyle="round,pad=0,rounding_size=0.02",
+                                    fc=VAR_C[n], ec="none", zorder=4))
+    ax.text(5.55, 0.99, "assembled variants", ha="center", fontsize=fs(7))
+    ax.text(5.55, 0.76, "one part per slot", ha="center", fontsize=fs(6.5),
+            color=PALETTE["gray"])
+
+    arrow(ax, (6.85, 1.61), (7.26, 1.61))
+
+    # --- the activity readout ---------------------------------------------
+    # Saturating progress curves, because an enzyme assay runs toward
+    # substrate depletion. Straight lines would say initial rates were the
+    # measurement, which is a different experiment. Each curve carries its
+    # variant's colour, so structure and trace are linked without a legend.
+    axi = ax.inset_axes([7.32, 1.20, 2.20, 1.10], transform=ax.transData)
+    t = np.linspace(0, 1, 160)
+    for k_rate, c in zip((1.1, 2.4, 5.2), VAR_C):
+        axi.plot(t, 1 - np.exp(-k_rate * t), color=c, lw=1.5, zorder=3)
+    axi.set_xlim(0, 1)
+    axi.set_ylim(0, 1.05)
+    axi.set_xticks([])
+    axi.set_yticks([])
+    axi.set_xlabel("time", fontsize=fs(6.5), labelpad=1.5)
+    axi.set_ylabel("activity", fontsize=fs(6.5), labelpad=1.5)
+    for sp in ("top", "right"):
+        axi.spines[sp].set_visible(False)
+    for sp in ("left", "bottom"):
+        axi.spines[sp].set_color(PALETTE["gray"])
+        axi.spines[sp].set_linewidth(0.8)
+    # Below the inset's own x-label, which is what it collided with before.
+    ax.text(8.42, 0.76, "measured activity", ha="center", fontsize=fs(7))
+
+    # --- back to the selector ---------------------------------------------
+    # Dropped from the plot's right edge, not from under its label: at x=8.42
+    # the descending arrow ran through "measured activity".
+    ret_x = 9.45
+    arrow(ax, (ret_x, 1.12), (ret_x, 0.40), color=PALETTE["blue"], lw=1.5)
+    arrow(ax, (ret_x, 0.40), (sel_cx, 0.40), color=PALETTE["blue"], lw=1.5)
+    arrow(ax, (sel_cx, 0.40), (sel_cx, 1.24), color=PALETTE["blue"], lw=1.5)
+    ax.text((sel_cx + ret_x) / 2, 0.19,
+            "measured activity retrains the selector", ha="center",
+            fontsize=fs(6.6))
+
+
 def main():
     rng = np.random.default_rng(3)
     plt.rcParams["text.usetex"] = False
     # Authored at page width, so a point here is a point on the page and the
     # MIN_FONT floor is real. See palette.PAGE_WIDTH_IN.
-    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 4.8))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1.12, 1.22], hspace=0.30)
+    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 6.7))
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.12, 1.22, 1.00],
+                             hspace=0.30)
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
@@ -455,8 +527,10 @@ def main():
     mid = outer[1].subgridspec(1, 2, width_ratios=[1.06, 1.0], wspace=0.22)
     ax_obj = fig.add_subplot(mid[0, 0])
     ax_cost = fig.add_subplot(mid[0, 1])
+    ax_lab = fig.add_subplot(outer[2])
     panel_object(ax_obj)
     panel_cost(ax_cost)
+    panel_lab(ax_lab, rng)
 
     # Panel letters are placed in FIGURE x, not axes x.
     #
@@ -478,15 +552,16 @@ def main():
         return min(inv.transform((a.get_tightbbox(rend).x0, 0))[0]
                    for a in axes)
 
-    x_left = left_edge([ax_e, ax_obj])
+    x_left = left_edge([ax_e, ax_obj, ax_lab])
     x_right = left_edge([ax_cost])
     for ax, lab, x, dy in ((ax_e, "a", x_left, 1.20),
                            (ax_obj, "b", x_left, 1.12),
-                           (ax_cost, "c", x_right, 1.12)):
+                           (ax_cost, "c", x_right, 1.20),
+                           (ax_lab, "d", x_left, 1.06)):
         ax.text(x, dy, lab,
                 transform=blended_transform_factory(fig.transFigure,
                                                     ax.transAxes),
-                fontsize=12, fontweight="bold", va="top", ha="left")
+                fontsize=PANEL_LABEL_PT, fontweight="bold", va="top", ha="left")
     # dpi=900, NOT the house default of 300.
     #
     # This is what actually set the structures' resolution, and it is easy to

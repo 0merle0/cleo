@@ -95,6 +95,12 @@ MIN_FONT = 7.0
 # points.
 PAGE_WIDTH_IN = 6.5
 
+# Panel letters. Science sets these at 8 pt bold and its other figure text at
+# 5-7 pt; 12 pt, which this document used, is larger than any journal
+# convention and was crowding the axis labels it sits beside. 9 pt keeps them
+# clearly dominant over the 7-9 pt body text without that.
+PANEL_LABEL_PT = 9.0
+
 _SANS = ["Arial", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]
 
 
