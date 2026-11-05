@@ -50,17 +50,23 @@ from concept_loop import panel_loop  # noqa: E402
 from figio import save  # noqa: E402
 from palette import (INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
                      PANEL_LABEL_PT, fs)
-from panel_vanilla import ARMC, gradient_marker  # noqa: E402
+from panel_vanilla import ARMC  # noqa: E402
 from panel_vanilla import collect as collect_vanilla
 from schematic import place  # noqa: E402
 
 SITES = ("M0097", "M0255", "M0315")
 
-
-def _pale(hex_c, f=0.42):
-    """-> `hex_c` lightened, so a legend key reads like the gradient marker."""
-    r, g, b = (int(hex_c.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4))
-    return tuple(c + (1 - c) * f for c in (r, g, b))
+# What each target actually is, checked against the PDB entries rather than
+# inferred from the ligand code -- 1EY3's ligand is DAK, which is NOT
+# dihydroxyacetone kinase but 4-(N,N-dimethylamino)cinnamoyl-CoA bound to an
+# enoyl-CoA hydratase. The three are deliberately unalike: a metal-dependent
+# hydrolase, a cofactor-dependent oxidoreductase and an acyl-CoA enzyme.
+ENZYME = {
+    "M0097": ("cytidine deaminase", "Zn$^{2+}$, nucleoside analogue"),
+    "M0255": ("alcohol dehydrogenase", "NADH, acetate"),
+    "M0315": ("enoyl-CoA hydratase", "acyl-CoA analogue"),
+}
+PDBID = {"M0097": "1ctt", "M0255": "1mg5", "M0315": "1ey3"}
 
 
 def panel_target(ax, site):
@@ -68,7 +74,11 @@ def panel_target(ax, site):
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    place(ax, f"target_{site}", (0.56, 0.50), 92)
+    place(ax, f"target_{site}", (0.56, 0.60), 88)
+    name, cofactor = ENZYME[site]
+    ax.text(0.56, 0.20, name, ha="center", va="center", fontsize=fs(7))
+    ax.text(0.56, 0.08, f"{cofactor} \u00b7 {PDBID[site]}", ha="center",
+            va="center", fontsize=fs(6.2), color=PALETTE["gray"])
 
 
 def panel_move(ax, v, p, site, show_x):
@@ -77,7 +87,8 @@ def panel_move(ax, v, p, site, show_x):
                 arrowprops=dict(arrowstyle="-|>", color=INK["ghost"], lw=1.3,
                                 shrinkA=7, shrinkB=9))
     for arm, r in (("vanilla", v), ("post", p)):
-        gradient_marker(ax, r.subs, r.success, ARMC[arm], size_pts=13.0)
+        ax.plot(r.subs, r.success, MARK[site], ms=8, zorder=4,
+                mfc=ARMC[arm], mec=ARMC[arm], mew=1.5)
     ax.set_ylim(0, 108)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
@@ -91,7 +102,15 @@ def panel_move(ax, v, p, site, show_x):
 
 def panel_k(ax, d, site, show_x):
     """Retention against k for ONE backbone, trained-at-k vs post-hoc cut."""
-    for cond in ("posthoc", "trained"):
+    # The trained-at-k arm only. The post-hoc arm -- one k=4 policy re-cut at
+    # every k -- was drawn here in grey and has been dropped to simplify.
+    #
+    # Worth knowing what went with it: the grey line was the control. Alone,
+    # this panel shows that retention falls as the library is cut finer; it
+    # no longer shows that training AT that k is what holds it up. That
+    # comparison now survives only as numbers in the caption (+8.3 points at
+    # k=2 rising to +32.2 at k=36), and ame_fragk.py still plots both.
+    for cond in ("trained",):
         g = d[(d.site == site) & (d.cond == cond)].sort_values("k")
         if not len(g):
             continue
@@ -141,7 +160,7 @@ def main():
     for i, site in enumerate(SITES):
         ax_s = fig.add_subplot(grid[i, 0])
         panel_target(ax_s, site)
-        ax_s.text(0.02, 0.5, site, transform=ax_s.transAxes, rotation=90,
+        ax_s.text(0.02, 0.60, site, transform=ax_s.transAxes, rotation=90,
                   ha="center", va="center", fontsize=fs(8))
 
         ax_v = fig.add_subplot(grid[i, 1], sharex=ax_v0, sharey=ax_v0)
@@ -157,18 +176,14 @@ def main():
 
     # One legend per plot column, on the top row only.
     first["v"].legend(handles=[
-        Line2D([], [], marker="o", ls="none", ms=7,
-               mfc=_pale(ARMC["vanilla"]), mec=ARMC["vanilla"], mew=1.1,
-               label="vanilla, $T$ pooled"),
-        Line2D([], [], marker="o", ls="none", ms=7,
-               mfc=_pale(ARMC["post"]), mec=ARMC["post"], mew=1.1,
-               label="post-trained")],
+        Line2D([], [], marker="o", ls="none", ms=7, mfc=ARMC["vanilla"],
+               mec=ARMC["vanilla"], label="vanilla, $T$ pooled"),
+        Line2D([], [], marker="o", ls="none", ms=7, mfc=ARMC["post"],
+               mec=ARMC["post"], label="post-trained")],
         frameon=False, fontsize=fs(6.4), loc="lower right",
         handletextpad=0.4, labelspacing=0.25)
     first["k"].legend(handles=[
-        Line2D([], [], color=C["trained"], lw=1.8, label="trained at $k$"),
-        Line2D([], [], color=C["posthoc"], lw=1.8,
-               label="$k=4$ policy, cut at $k$")],
+        Line2D([], [], color=C["trained"], lw=1.8, label="trained at $k$")],
         frameon=False, fontsize=fs(6.4), loc="lower left",
         handletextpad=0.6, labelspacing=0.25)
 

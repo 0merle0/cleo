@@ -124,11 +124,13 @@ finds a variant with 250x increase in catalytic activity.
   spread is genuinely wider coverage and not just a larger sample; two
   backbones move right as well as up, and M0315 trades 193 mutations for its
   48.8 points.
-  \textbf{(d)}~How far that holds as the library is cut finer. Blue: a policy
-  trained at that $k$. Grey: one $k=4$ policy re-cut at $k$ post hoc. Every
-  trained cell ran a matched 200 steps so budget cannot covary with $k$. The
-  advantage of training at $k$ widens monotonically, from $+8.3$ points at
-  $k=2$ to $+32.2$ at $k=36$.
+  \textbf{(d)}~How far that holds as the library is cut finer: a policy
+  trained at each $k$ and recombined at that same $k$, with every cell run
+  for a matched 200 steps so training budget cannot covary with $k$.
+  Retention is flat through $k=16$ --- 11-residue fragments --- and falls
+  away below that. Not shown, to keep the panel simple: the control arm, one
+  $k=4$ policy re-cut at every $k$, which training at $k$ beats by $+8.3$
+  points at $k=2$ rising monotonically to $+32.2$ at $k=36$.
   \textcolor{cleoRed}{Caveats that must survive into the text: every cell is
   single-seeded against a documented 21-point run-to-run swing; M0255 at
   $k=36$ and $k=64$ was still climbing at step 200, so those are lower
