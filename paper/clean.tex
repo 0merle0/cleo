@@ -94,31 +94,38 @@ finds a variant with 250x increase in catalytic activity.
 \clearpage
 \noindent\captionof{figure}{\textbf{Designing high-fidelity combinatorial
   libraries.} \textcolor{cleoRed}{[PLACEHOLDER --- the prose is yours.]}
-  \textbf{(a)}~The method. A backbone conditions the ProteinMPNN decoder,
-  treated as a policy; the sequences it emits are cut at the fragment
-  boundaries, recombined across parents, and folded best-of-5 against a
-  \emph{pool} of oracles (RF3, Boltz, Protenix) under a round robin. Each
-  fragment is scored by the recombinants it appears in, and that per-fragment
-  reward drives the GRPO update. AlphaFold3 is held out of training entirely
-  --- it is probed every 25 steps as a diagnostic, never as reward --- so
-  every number in (b)--(d) is scored by a predictor the policy never
-  optimised against.
-  \textbf{(b)}~Retention, the share of recombinants that still pass, against
-  the number of fragments per design. Blue: a policy trained at that $k$.
-  Grey: one policy trained at $k=4$ and re-cut at $k$ post hoc. Three
-  backbones, six trained $k$ levels, every trained cell at a matched 200
-  steps so training budget cannot covary with $k$.
-  \textbf{(c)}~The gap between the two, which widens monotonically with $k$
-  --- from $+8.3$ points at $k=2$ to $+32.2$ at $k=36$.
-  \textbf{(d)}~Rarefied substitution diversity over surviving fragments. It
-  does not order in $k$, which is what rules out the alternative explanation
-  for (b): a policy can satisfy ``make recombinable fragments'' by emitting
-  near-identical sequences, and retention alone cannot tell that apart from
-  genuine modularity.
+  \textbf{(a)}~How post-training works here. ProteinMPNN is pretrained and
+  emits whole sequences, so nothing in it says which fragments
+  \emph{recombine}; the method manufactures that signal. A batch is cut into
+  $k$ slots, chimeras are built by swapping slots between parents, each
+  chimera is folded, and every fragment is given the mean outcome of the
+  chimeras it appeared in --- here one fragment occurs in three, two of which
+  fold, so its reward is $2/3$. That per-fragment reward, not the parent's
+  score, drives the GRPO update. Folding during training is best-of-5 against
+  a \emph{pool} of RF3, Boltz and Protenix under a round robin; AlphaFold3 is
+  held out of training entirely and scores every number in (b)--(d).
+  \textbf{(b)}~Stock ProteinMPNN against the post-trained policy, for the
+  three backbones trained against the pool. Both arms are measured on the
+  same thing: sequences decoded from MPNN, cut at $k=4$, shuffled across
+  parents, reassembled, and folded --- never on parents. Arrows run from
+  vanilla to post-trained. Success rises on all three, by $+26.2$, $+60.2$
+  and $+48.8$ points. Distinct mutations are counted over \emph{passing}
+  recombinants only and rarefied to a matched survivor count, so a wider
+  spread is genuinely wider coverage and not just a larger sample; on that
+  measure two backbones move right as well as up and M0315 trades 193
+  mutations for its 48.8 points.
+  \textbf{(c)}~How much of the retention in (d) is owed to training at that
+  $k$ rather than to cutting a $k=4$ policy finer: $+8.3$ points at $k=2$,
+  rising monotonically to $+32.2$ at $k=36$.
+  \textbf{(d)}~Retention against the number of fragments per design. Blue: a
+  policy trained at that $k$. Grey: one $k=4$ policy re-cut at $k$ post hoc.
+  Every trained cell ran a matched 200 steps so budget cannot covary with
+  $k$.
   \textcolor{cleoRed}{Caveats that must survive into the text: every cell is
   single-seeded against a documented 21-point run-to-run swing; M0255 at
   $k=36$ and $k=64$ was still climbing at step 200, so those are lower
-  bounds.}}
+  bounds; and the vanilla arm in (b) is one pooled recombinant set per
+  backbone, not a per-temperature curve.}}
 \label{fig:libraries}
 \clearpage
 

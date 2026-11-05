@@ -43,8 +43,9 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from ame_fragk import (add_diversity, collect_posthoc,  # noqa: E402
-                       collect_trained, panel_diversity, panel_gap,
-                       panel_retention)
+                       collect_trained, panel_gap, panel_retention)
+from panel_vanilla import collect as collect_vanilla  # noqa: E402
+from panel_vanilla import panel_vanilla  # noqa: E402
 from concept_loop import panel_loop  # noqa: E402
 from figio import save  # noqa: E402
 from palette import PAGE_WIDTH_IN, PANEL_LABEL_PT  # noqa: E402
@@ -64,23 +65,25 @@ def main():
     # left and right edge instead of each being cropped to its own widest ink.
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.7))
     outer = fig.add_gridspec(3, 1, height_ratios=[0.80, 1.00, 1.00],
-                             hspace=0.55, left=0.095, right=0.985,
+                             hspace=0.60, left=0.095, right=0.985,
                              top=0.930, bottom=0.05)
 
     ax_m = fig.add_subplot(outer[0])
     panel_loop(ax_m, np.random.default_rng(3))
 
+    # (b) does post-training help at all, against stock ProteinMPNN;
+    # (c) how far the advantage carries in k. Both measured on recombinants.
+    mid = outer[1].subgridspec(1, 2, wspace=0.40)
+    ax_v = fig.add_subplot(mid[0, 0])
+    ax_g = fig.add_subplot(mid[0, 1])
+    panel_vanilla(collect_vanilla(rng=np.random.default_rng(0)), ax_v)
+    panel_gap(d, ax_g)
+
     # panel_retention indexes gs[0, 2i:2i+2], so it needs SIX columns but
     # only one row. Handing it the (2, 6) grid its own script uses left row 1
-    # empty -- half the band under panel (b) was dead space.
-    ret = outer[1].subgridspec(1, 6, wspace=0.55)
+    # empty -- half the band was dead space.
+    ret = outer[2].subgridspec(1, 6, wspace=0.55)
     panel_retention(d, fig, ret)
-
-    bot = outer[2].subgridspec(1, 2, wspace=0.42)
-    ax_g = fig.add_subplot(bot[0, 0])
-    ax_d = fig.add_subplot(bot[0, 1])
-    panel_gap(d, ax_g)
-    panel_diversity(d, ax_d)
 
     fig.canvas.draw()
     rend = fig.canvas.get_renderer()
@@ -96,15 +99,18 @@ def main():
                 boxes.append(t.get_window_extent(rend))
         return Bbox.union(boxes)
 
-    first_ret = fig.axes[1]
+    first_ret = [a for a in fig.axes if a.get_title() == "M0097"][0]
     x_left = min(inv.transform((extent(a).x0, 0))[0]
-                 for a in (ax_m, first_ret, ax_g))
-    for ax, lab in ((ax_m, "a"), (first_ret, "b"), (ax_g, "c"), (ax_d, "d")):
-        x = x_left if ax is not ax_d else \
-            inv.transform((extent(ax_d).x0, 0))[0]
-        y = inv.transform((0, extent(ax).y1))[1] + 0.006
-        fig.text(x, y, lab, fontsize=PANEL_LABEL_PT, fontweight="bold",
-                 va="bottom", ha="left")
+                 for a in (ax_m, ax_v, first_ret))
+    y_mid = max(inv.transform((0, extent(a).y1))[1] for a in (ax_v, ax_g))
+    for ax, lab, x, y in (
+            (ax_m, "a", x_left, None),
+            (ax_v, "b", x_left, y_mid),
+            (ax_g, "c", inv.transform((extent(ax_g).x0, 0))[0], y_mid),
+            (first_ret, "d", x_left, None)):
+        yy = y if y is not None else inv.transform((0, extent(ax).y1))[1]
+        fig.text(x, yy + 0.006, lab, fontsize=PANEL_LABEL_PT,
+                 fontweight="bold", va="bottom", ha="left")
 
     save(fig, "fig2_libraries", dpi=900, tight=False)
 
