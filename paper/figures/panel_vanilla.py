@@ -7,11 +7,31 @@ apart when its fragments are mixed, which is the failure this whole project
 is about, so parents are not what either arm is scored on here.
 
     vanilla    r1panel/*_baseline  -- stock ProteinMPNN sampled at
-               T = 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, pooled
+               T = 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, POOLED
     post       fragk/*_fragk4      -- the same backbone after GRPO
                post-training against the RF3/Boltz/Protenix pool
 
 Both recombinant sets are AF3-scored, and AF3 is in neither training loop.
+
+THE VANILLA POINT IS NOT ONE TEMPERATURE, and it is not a Pareto front.
+Matching every recombinant slot back to the parent carrying that exact
+subsequence (1024 slots per backbone, 0 unmatched) gives the mix actually
+used:
+
+    M0097   T=0.1 28.9%  0.2 23.3%  0.3 21.7%  0.5 15.8%  0.7 9.2%  1.0 1.1%
+    M0255   T=0.1 35.8%  0.2 18.8%  0.3 15.1%  0.5 20.5%  0.7 7.3%  1.0 2.3%
+    M0315   T=0.1 22.7%  0.2 17.9%  0.3 23.4%  0.5 22.2%  0.7 13.2% 1.0 0.7%
+
+The parent pool was uniform across the six temperatures; this skew toward low
+T is entirely the passing filter, and the slot distribution tracks the
+passing-parent distribution to within a point or two. So the grey marker is
+the whole sweep's filtered union -- a STRONGER baseline than any single
+temperature, not a weaker one.
+
+A genuine per-temperature front cannot be recovered from this data: only
+1-2% of recombinants are consistent with a single temperature, the other 98%
+mix fragments across temperatures. Building one needs recombination re-run
+from single-temperature fragment pools, about 4,600 AF3 folds.
 
 DIVERSITY IS RAREFIED, which is the point of care in this panel. Distinct
 substitutions are counted over PASSING recombinants, and an arm that passes
@@ -120,7 +140,7 @@ def panel_vanilla(d, ax):
     from matplotlib.lines import Line2D
     handles = [Line2D([], [], marker="o", ls="none", ms=7,
                       mfc=ARMC["vanilla"], mec=ARMC["vanilla"],
-                      label="vanilla ProteinMPNN"),
+                      label="vanilla, $T$ pooled"),
                Line2D([], [], marker="o", ls="none", ms=7,
                       mfc=ARMC["post"], mec=ARMC["post"],
                       label="post-trained")]

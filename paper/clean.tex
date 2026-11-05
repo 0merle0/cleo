@@ -105,7 +105,12 @@ finds a variant with 250x increase in catalytic activity.
   a \emph{pool} of RF3, Boltz and Protenix under a round robin; AlphaFold3 is
   held out of training entirely and scores every number in (b)--(d).
   \textbf{(b)}~Stock ProteinMPNN against the post-trained policy, for the
-  three backbones trained against the pool. Both arms are measured on the
+  three backbones trained against the pool. The vanilla arm is not a single
+  temperature: its fragments come from parents sampled at
+  $T=0.1$--$1.0$ and then filtered to those that pass, which skews the pool
+  toward low $T$ (for example 29\%, 23\%, 22\%, 16\%, 9\%, 1\% of fragment
+  slots on M0097). It is therefore the filtered union of the whole
+  temperature sweep rather than any one setting. Both arms are measured on the
   same thing: sequences decoded from MPNN, cut at $k=4$, shuffled across
   parents, reassembled, and folded --- never on parents. Arrows run from
   vanilla to post-trained. Success rises on all three, by $+26.2$, $+60.2$
