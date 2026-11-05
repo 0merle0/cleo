@@ -69,8 +69,14 @@ def panel_loop(ax, rng):
             shades=rng.uniform(0.45, 1.0, K))
     ax.text(8.37, 1.44, "recombinants", ha="center", fontsize=fs(8))
 
-    box(ax, (7.72, 0.42), 1.32, 0.68, "fold & score",
-        "best-of-5, motif RMSD")
+    # The oracle POOL, named. This is the method's central guard and the
+    # figure used to leave it as "fold & score": training runs a round robin
+    # over RF3, Boltz and Protenix, and AF3 is held out of it entirely --
+    # af3_probe_every is a diagnostic, not a reward. Every number reported
+    # downstream is scored by that held-out AF3, so training against the
+    # predictor you then report under cannot explain the result.
+    box(ax, (7.60, 0.42), 1.56, 0.68, "fold & score",
+        "RF3 / Boltz / Protenix", title_size=8)
     arrow(ax, (8.38, 1.30), (8.38, 1.12))
 
     # The feedback edge: this is the whole method.
@@ -84,11 +90,19 @@ def panel_loop(ax, rng):
     # box at x=7.72.
     ax.text(4.6, 0.88, "GRPO update: each fragment scored by its "
                        "recombinants", ha="center", fontsize=fs(7))
-    # Right-aligned to the panel edge: centred under the box it overflowed
+    # The two facts a reader needs before reading any number that follows:
+    # what the reward saw, and what the results are scored by. Both are
+    # right-aligned to the panel edge -- centred under the box they overflowed
     # the axes entirely.
-    ax.text(10.0, 0.16, r"$\rho=0$ returns the parent, so this rate is not a "
-                        "retention", ha="right", fontsize=fs(6.4),
+    # Both notes sit LEFT of the fold & score box, not under it. Right-
+    # aligned to the panel edge they ran straight through the box's own
+    # subtitle, which is at x > 7.6.
+    ax.text(4.6, 0.46, r"$\rho=0$ returns the parent, so this rate is not a "
+                       "retention", ha="center", fontsize=fs(6.4),
             style="italic")
+    ax.text(4.6, 0.12, "AF3 is held out of training; every reported number "
+                       "is scored by it", ha="center", fontsize=fs(6.6),
+            color=PALETTE["blue"])
 
 
 

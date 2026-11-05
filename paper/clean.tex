@@ -84,18 +84,42 @@ finds a variant with 250x increase in catalytic activity.
 \label{fig:concept}
 \clearpage
 
-\begin{figure}[t]
+% Figure 2 is the computational result, and its legend follows it the way
+% Figure 1's does.
+\begin{figure}[p]
   \centering
-  \includegraphics[width=\textwidth]{concept_loop.pdf}
-  \caption{\textbf{\textcolor{cleoRed}{[Figure 2 --- title is yours.]}}
-  \textbf{(a)}~The method. A backbone conditions the ProteinMPNN decoder,
-  which is treated as a policy; the sequences it emits are cut at the fragment
-  boundaries, recombined across parents, and folded best-of-5. Each fragment is
-  scored by the recombinants it appears in, and that per-fragment reward drives
-  the GRPO update. The policy is therefore optimised for how well its fragments
-  \emph{recombine}, not for how good any single sequence is.
-}
-  \label{fig:method}
+  \includegraphics[width=\textwidth]{fig2_libraries.pdf}
 \end{figure}
+
+\clearpage
+\noindent\captionof{figure}{\textbf{Designing high-fidelity combinatorial
+  libraries.} \textcolor{cleoRed}{[PLACEHOLDER --- the prose is yours.]}
+  \textbf{(a)}~The method. A backbone conditions the ProteinMPNN decoder,
+  treated as a policy; the sequences it emits are cut at the fragment
+  boundaries, recombined across parents, and folded best-of-5 against a
+  \emph{pool} of oracles (RF3, Boltz, Protenix) under a round robin. Each
+  fragment is scored by the recombinants it appears in, and that per-fragment
+  reward drives the GRPO update. AlphaFold3 is held out of training entirely
+  --- it is probed every 25 steps as a diagnostic, never as reward --- so
+  every number in (b)--(d) is scored by a predictor the policy never
+  optimised against.
+  \textbf{(b)}~Retention, the share of recombinants that still pass, against
+  the number of fragments per design. Blue: a policy trained at that $k$.
+  Grey: one policy trained at $k=4$ and re-cut at $k$ post hoc. Three
+  backbones, six trained $k$ levels, every trained cell at a matched 200
+  steps so training budget cannot covary with $k$.
+  \textbf{(c)}~The gap between the two, which widens monotonically with $k$
+  --- from $+8.3$ points at $k=2$ to $+32.2$ at $k=36$.
+  \textbf{(d)}~Rarefied substitution diversity over surviving fragments. It
+  does not order in $k$, which is what rules out the alternative explanation
+  for (b): a policy can satisfy ``make recombinable fragments'' by emitting
+  near-identical sequences, and retention alone cannot tell that apart from
+  genuine modularity.
+  \textcolor{cleoRed}{Caveats that must survive into the text: every cell is
+  single-seeded against a documented 21-point run-to-run swing; M0255 at
+  $k=36$ and $k=64$ was still climbing at step 200, so those are lower
+  bounds.}}
+\label{fig:libraries}
+\clearpage
 
 \end{document}
