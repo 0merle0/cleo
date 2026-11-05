@@ -84,6 +84,33 @@ finds a variant with 250x increase in catalytic activity.
 \label{fig:concept}
 \clearpage
 
+\noindent\textcolor{cleoRed}{[PLACEHOLDER --- the prose is yours. The
+numbers below are from \texttt{paper/figures/panel\_cost.py}, which prints
+them; do not retype them by hand.]}
+
+Post-training costs a fixed number of folds. A run is 200 steps, and
+\texttt{build\_chimeras} emits $\text{rotations}\times\text{batch}=64$
+chimeras per step, each folded best-of-5: $4\times16\times5=320$ folds per
+step, \SI{64000}{} in total. The bill does not grow with $k$ --- cutting a
+design finer does not fold more of it --- so one figure covers the whole
+sweep. The alternative is to fold your way to a usable library: generate with
+stock ProteinMPNN, fold every candidate, and keep what passes. At vanilla
+pass rate $p$, obtaining $S$ members that fold costs $5S/p$ folds, which is
+linear in $S$, where post-training is a constant \SI{64000}{} \emph{however
+large the library is} --- the enrichment lives in the policy, not in the
+members, so anything drawn from a trained policy inherits the higher pass
+rate without being folded at all.
+
+Below a few thousand members brute force is the cheaper option, and the
+break-even depends on how good the untrained model already was: \SI{3300}{}
+members at M0255's \SI{25.8}{\percent}, \SI{6300}{} at M0315's
+\SI{49.6}{\percent}, \SI{7700}{} at M0097's \SI{59.8}{\percent}. That
+range is the whole point. A combinatorial library is not a few thousand
+members: $k=4$ with 100 parts per slot is $10^{8}$, where filtering by
+folding would cost ${\sim}8{\times}10^{8}$ folds --- four orders of
+magnitude more than training once --- and at $10^{12}$ the comparison stops
+being a comparison.
+
 % Figure 2 is the computational result, and its legend follows it the way
 % Figure 1's does.
 \begin{figure}[p]
@@ -132,20 +159,6 @@ finds a variant with 250x increase in catalytic activity.
   Retention is flat through $k=16$ --- 11-residue fragments --- and falls
   away below that. The control --- one $k=4$ policy re-cut at every $k$, with no
   training at the finer granularity --- is in Fig.~\ref{fig:posthoc}.
-  \textbf{(c)}~What that costs, in folds. A run is 200 steps, and
-  \texttt{build\_chimeras} emits $\text{rotations}\times\text{batch}=64$
-  chimeras a step, each folded best-of-5: $4\times16\times5=320$ folds a
-  step, \SI{64000}{} in total. The bill is flat in $k$ --- cutting finer does
-  not fold more --- and flat in library size, because the enrichment lives in
-  the policy rather than in the members, so a design drawn from a trained
-  policy inherits the higher pass rate without being folded. The alternative
-  is to fold your way to a good library: at vanilla pass rate $p$, obtaining
-  $S$ members that fold costs $5S/p$ folds, which is linear in $S$. Below the
-  break-even (open circles; 3.3--7.7k members, depending on the backbone's
-  vanilla rate) brute force is cheaper and we say so. The point is that a
-  combinatorial library is not a few thousand members: $k=4$ with 100 parts
-  per slot is $10^8$, where filtering by folding would cost
-  ${\sim}8\times10^8$ folds against the same \SI{64000}{}.
   \textcolor{cleoRed}{Caveats that must survive into the text: every cell is
   single-seeded against a documented 21-point run-to-run swing; M0255 at
   $k=36$ and $k=64$ was still climbing at step 200, so those are lower

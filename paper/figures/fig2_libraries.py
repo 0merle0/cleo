@@ -50,8 +50,6 @@ from concept_loop import panel_loop  # noqa: E402
 from figio import save  # noqa: E402
 from palette import (INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
                      PANEL_LABEL_PT, fs)
-from panel_cost import (TRAIN_FOLDS, brute_force_folds,  # noqa: E402
-                        crossover)
 from panel_vanilla import ARMC  # noqa: E402
 from panel_vanilla import collect as collect_vanilla
 from schematic import place  # noqa: E402
@@ -136,42 +134,6 @@ def panel_k(ax, d, site, show_x):
     ax.tick_params(labelsize=fs(7))
 
 
-def panel_cost(ax, van):
-    """Folds to reach a library of size S: brute-force filtering vs training.
-
-    One grey line per backbone, because the brute-force bill depends on that
-    backbone's vanilla pass rate and those differ by more than 2x. The
-    training line is flat: the enrichment lives in the policy, so it does not
-    get more expensive as the library gets bigger.
-    """
-    S = np.logspace(2, 12, 200)
-    for site in SITES:
-        p = van.loc[(site, "vanilla")].success / 100
-        ax.loglog(S, brute_force_folds(S, p), "-", color=INK["muted"],
-                  lw=1.6, zorder=2)
-        ax.plot([crossover(p)], [TRAIN_FOLDS], "o", ms=5,
-                mfc="white", mec=INK["muted"], mew=1.3, zorder=4)
-    ax.axhline(TRAIN_FOLDS, color=ARMC["post"], lw=2.0, zorder=3)
-    ax.set_xlim(1e2, 1e12)
-    ax.set_ylim(1e3, 1e13)
-    ax.set_xlabel("library members that fold", fontsize=fs(7.5))
-    ax.set_ylabel("folds required", fontsize=fs(7.5))
-    ax.tick_params(labelsize=fs(7))
-    for sp in ("top", "right"):
-        ax.spines[sp].set_visible(False)
-    # Labels go where the OTHER line is not. The brute-force arms climb away
-    # to the right, so the flat training line is captioned out there; the
-    # break-even note sits below the flat line, left of where the arms cross
-    # it.
-    ax.text(2e7, TRAIN_FOLDS * 2.4, "post-training, once "
-            f"({TRAIN_FOLDS // 1000}k folds)", fontsize=fs(6.8),
-            color=ARMC["post"], va="bottom")
-    ax.text(2e9, 2e12, "fold every candidate", fontsize=fs(6.8),
-            color=PALETTE["gray"], ha="right", va="top")
-    ax.text(2e5, 6e3, "break-even", fontsize=fs(6.4),
-            color=PALETTE["gray"], va="center")
-
-
 def main():
     rng = np.random.default_rng(0)
     plt.rcParams["text.usetex"] = False
@@ -183,15 +145,17 @@ def main():
     van = collect_vanilla(rng=np.random.default_rng(0)).set_index(
         ["site", "arm"])
 
-    # 8.8 in, not 10.2. The page's text block is 9 in tall (letter, 1 in
-    # margins) and this figure prints at its authored size, so anything taller
-    # simply does not fit on a float page -- adding the cost row had pushed it
-    # over. The rows are trimmed rather than the figure scaled, because
-    # scaling would take the type below palette.MIN_FONT.
-    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.95))
-    outer = fig.add_gridspec(3, 1, height_ratios=[0.86, 2.10, 0.72],
-                             hspace=0.34, left=0.095, right=0.985,
-                             top=0.935, bottom=0.05)
+    # Two rows. A cost panel was built as a third and removed: it was one
+    # crossing of two lines, which is a sentence rather than a picture. The
+    # arithmetic lives in panel_cost.py, which prints the numbers for the
+    # text to quote.
+    #
+    # The page's text block is 9 in tall (letter, 1 in margins) and this
+    # figure prints at its authored size, so it has to stay under that.
+    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 7.5))
+    outer = fig.add_gridspec(2, 1, height_ratios=[0.86, 2.10],
+                             hspace=0.30, left=0.095, right=0.985,
+                             top=0.930, bottom=0.055)
     ax_a = fig.add_subplot(outer[0])
     panel_loop(ax_a, np.random.default_rng(3))
 
@@ -234,12 +198,6 @@ def main():
         frameon=False, fontsize=fs(6.4), loc="lower left",
         handletextpad=0.6, labelspacing=0.25)
 
-    # (c) the fold bill. Full width but short: it is one crossing of two
-    # lines, and the reader needs the decades on the axes more than area.
-    cost = outer[2].subgridspec(1, 2, width_ratios=[1.0, 0.95], wspace=0.30)
-    ax_c = fig.add_subplot(cost[0, 0])
-    panel_cost(ax_c, van)
-
     fig.canvas.draw()
     rend = fig.canvas.get_renderer()
     inv = fig.transFigure.inverted()
@@ -261,8 +219,7 @@ def main():
     y_row = max(inv.transform((0, extent(a).y1))[1]
                 for a in (first["s"], first["v"], first["k"]))
     for ax, lab, y in ((ax_a, "a", inv.transform((0, extent(ax_a).y1))[1]),
-                       (first["s"], "b", y_row),
-                       (ax_c, "c", inv.transform((0, extent(ax_c).y1))[1])):
+                       (first["s"], "b", y_row)):
         x = inv.transform((extent(ax).x0, 0))[0]
         fig.text(x, y + 0.006, lab, fontsize=PANEL_LABEL_PT,
                  fontweight="bold", va="bottom", ha="left")

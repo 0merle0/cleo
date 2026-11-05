@@ -47,3 +47,25 @@ def brute_force_folds(S, p):
 def crossover(p):
     """-> library size at which training costs the same as brute force."""
     return TRAIN_FOLDS * p / SAMPLES
+
+
+def report():
+    """Print the numbers the text quotes, so they are not retyped by hand."""
+    rates = {"M0097": 59.8, "M0255": 25.8, "M0315": 49.6}
+    print(f"training, one time: {TRAIN_FOLDS:,} folds "
+          f"({FOLDS_PER_STEP}/step x {TRAIN_STEPS} steps)")
+    print("  cross-check: 150-step k=4 anchor logged at 48,000; "
+          "batch 32 at 128 chimeras/step logged at 107,520 for 336 steps")
+    print("\nbreak-even against brute-force filtering:")
+    for site, pct in rates.items():
+        print(f"  {site}  vanilla {pct:4.1f}%  ->  "
+              f"{crossover(pct / 100):,.0f} members")
+    print("\nbrute force at scale (M0097's 59.8%):")
+    for S in (1e4, 1e6, 1e8, 1e12):
+        f = brute_force_folds(S, 0.598)
+        print(f"  S={S:>8.0e}  {f:>20,.0f} folds   "
+              f"{f / TRAIN_FOLDS:>14,.0f}x training")
+
+
+if __name__ == "__main__":
+    report()
