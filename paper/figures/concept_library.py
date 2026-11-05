@@ -45,7 +45,7 @@ sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
 from palette import (INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
                      PANEL_LABEL_PT, SEQUENTIAL, fs)
-from schematic import (FRAGMENT, PNG, _shade, arrow, box,  # noqa: E402
+from schematic import (FRAGMENT, PNG, _shade, arrow, bar, box,  # noqa: E402
                        place, trimmed)
 
 PNG = HERE / "structures" / "png"
@@ -413,44 +413,106 @@ def panel_cost(ax):
 
 # ---------------------------------------------------------------- panel (c)
 def panel_object(ax):
-    """The fold itself, cut into k fragments and coloured by slot.
+    """RESERVED. Panel (c) is deliberately empty for now.
 
-    Just the assembled structure. Two richer arrangements were built and
-    dropped: an exploded view with the fold dimmed at the centre and the
-    fragments pushed out around it, and a two-row version with the fold above
-    and the pieces below. Both showed the same thing the colours already show,
-    and both cost most of the panel to say it.
+    It held the fold, coloured by slot. That became redundant the moment the
+    combinatorial mechanism took the full-width row below: panel (d) opens on
+    the same fold and then does something with it, so showing it here first
+    said nothing twice.
 
-    render.py still emits the extra views (`dim`, `iso1`..`isoK`) -- they are
-    cheap, they share this camera, and either arrangement is a few lines away
-    if a later figure wants one.
+    The mechanism does NOT fit here instead. It is a four-stage left-to-right
+    statement and this cell is about 2.2 in, which is ~0.5 in a stage; the
+    pools alone are k columns of parts and stop being readable well before
+    that.
 
-    2FX2 rather than the PETase this project optimises: Figure 1 is about what
-    a combinatorial library IS, and using the target would imply the idea is
-    specific to it. Chosen by measuring secondary structure across a dozen
-    candidates (39.5% helix, 32.7% strand), and at 147 aa its k=4 fragments
-    are 37 residues -- inside the 20-50 band the method recommends.
-
-    A magnified catalytic triad was built here and then removed. It needed a
-    different protein -- flavodoxin has no triad, its functional site is a
-    cofactor pocket -- and trypsin's k=4 fragments are 56 residues, outside
-    the band above. render.py's git history has the triad and zoom-box code,
-    including the trick that made the zoom box land in the right place:
-    render the site as spheres through the FOLD's camera and read its ink
-    centroid, rather than placing the box by eye.
+    render.py still emits `whole`, `dim`, `iso1`..`isoK`, so the fold and the
+    exploded views are one line away if this slot ends up wanting them.
     """
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-
-    # The fold alone. Sits right of centre and a little smaller than the
-    # panel would allow: the cost plot beside it carries four labelled
-    # crossings and reads as the denser of the two, so matching their
-    # visual weight means not filling this one edge to edge.
-    place(ax, "whole", (0.60, 0.50), 128)
+    ax.add_patch(FancyBboxPatch(
+        (0.06, 0.12), 0.88, 0.76, boxstyle="square,pad=0", fill=False,
+        ec=INK["ghost"], lw=0.9, ls=(0, (4, 3)), zorder=2))
+    ax.text(0.5, 0.5, "panel (c) reserved", ha="center", va="center",
+            fontsize=fs(7.5), color=PALETTE["red"])
 
 
 # ---------------------------------------------------------------- panel (d)
+def panel_combine(ax, rng, n_pool=3):
+    """fold -> cut at k boundaries -> a pool per slot -> P^k assemblies.
+
+    The panel the figure was missing. Panel (b) prices a combinatorial library
+    and its whole argument rests on P^k -- buy k sets of parts, build P^k
+    sequences -- but nothing in the figure showed WHY that exponent exists.
+    Without it, panel (c) is a protein coloured in quarters and the word
+    "combinatorial" is doing all the work in the caption.
+
+    Full width because the statement is a left-to-right one: a single chain
+    becomes k independent choices, and the choices multiply. Squeezed into a
+    half-row beside the cost plot the four stages had nowhere to go.
+
+    Numbers are illustrative. P is drawn as three parts per slot to keep the
+    columns legible; the paper's libraries are far larger, which is the point
+    of the exponent rather than an exception to it.
+    """
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 3.0)
+    ax.axis("off")
+    MID = 1.95
+
+    # --- the fold, as the thing being cut ---------------------------------
+    place(ax, "whole", (0.55, MID), 44)
+    ax.text(0.55, 0.95, "one fold", ha="center", fontsize=fs(7))
+    arrow(ax, (1.15, MID), (1.62, MID))
+
+    # --- the chain, cut at k-1 boundaries ---------------------------------
+    bx, bw, bh = 1.75, 2.15, 0.42
+    bar(ax, bx, MID - bh / 2, bw, bh, FRAGMENT)
+    for i in range(1, K):
+        x = bx + bw * i / K
+        for dy in (bh / 2 + 0.06, -bh / 2 - 0.06):
+            ax.plot([x, x], [MID + dy, MID + dy * 1.45], "-",
+                    color=PALETTE["gray"], lw=0.8, zorder=4)
+    ax.text(bx + bw / 2, 0.95, f"cut into $k={K}$", ha="center",
+            fontsize=fs(7))
+    arrow(ax, (bx + bw + 0.14, MID), (bx + bw + 0.60, MID))
+
+    # --- one pool of parts per slot ---------------------------------------
+    px, pw, gap = 4.60, 0.46, 0.20
+    ch = 0.34
+    for i in range(K):
+        cx = px + i * (pw + gap)
+        for j in range(n_pool):
+            y = MID + (n_pool - 1) / 2 * (ch + 0.12) - j * (ch + 0.12)
+            ax.add_patch(FancyBboxPatch(
+                (cx, y - ch / 2), pw, ch, boxstyle="square,pad=0",
+                fc=_shade(FRAGMENT[i], rng.uniform(0.40, 1.0)),
+                ec=FRAGMENT[i], lw=0.5, zorder=3))
+    pool_w = K * pw + (K - 1) * gap
+    ax.text(px + pool_w / 2, 0.95, "$P$ parts per slot", ha="center",
+            fontsize=fs(7))
+    arrow(ax, (px + pool_w + 0.16, MID), (px + pool_w + 0.62, MID))
+
+    # --- any one part per slot is a full-length design --------------------
+    ax0 = px + pool_w + 0.76
+    aw = 9.92 - ax0
+    # n_pool bars, centred on MID like the pools beside them. Drawing
+    # n_pool+1 pushed the lowest bar down onto its own caption.
+    for j in range(n_pool):
+        y = MID + (n_pool - 1) / 2 * (bh + 0.10) - j * (bh + 0.10)
+        bar(ax, ax0, y - bh / 2, aw, bh, FRAGMENT,
+            shades=rng.uniform(0.40, 1.0, K))
+    ax.text(ax0 + aw / 2, 0.95, "every combination", ha="center",
+            fontsize=fs(7))
+
+    # The arithmetic, stated once, under the stage it belongs to.
+    ax.text(px + pool_w / 2, 0.30, r"$k \times P$ ordered", ha="center",
+            fontsize=fs(7), color=PALETTE["gray"])
+    ax.text(ax0 + aw / 2, 0.30, r"$P^{k}$ built", ha="center",
+            fontsize=fs(7), color=PALETTE["gray"])
+
+# ---------------------------------------------------------------- panel (e)
 # Colours for the three measured variants. One hue, three steps -- the
 # variants are not categories, they are three draws from one library, and the
 # same three steps key the structures, the progress curves and the points.
@@ -571,7 +633,7 @@ def main():
     plt.rcParams["text.usetex"] = False
     # Authored at page width, so a point here is a point on the page and the
     # MIN_FONT floor is real. See palette.PAGE_WIDTH_IN.
-    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 7.3))
+    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.6))
     # Row 0 is given enough height for the landscapes to reach their CELL
     # WIDTH. They are square (aspect equal), so matplotlib shrinks them to a
     # square inside each cell and centres it: while the row was short they
@@ -584,7 +646,7 @@ def main():
     # the whole figure and the panels stop lining up. Fixed margins make the
     # width a constant -- PAGE_WIDTH_IN exactly -- and give every row the same
     # left and right edge to align to.
-    outer = fig.add_gridspec(3, 1, height_ratios=[1.90, 1.40, 0.76],
+    outer = fig.add_gridspec(4, 1, height_ratios=[1.90, 1.40, 0.86, 0.76],
                              hspace=0.34, left=0.085, right=0.985,
                              top=0.965, bottom=0.045)
     # The legend belongs to the landscapes, so it lives INSIDE their row --
@@ -623,9 +685,11 @@ def main():
     mid = outer[1].subgridspec(1, 2, width_ratios=[1.28, 0.89], wspace=0.14)
     ax_cost = fig.add_subplot(mid[0, 0])
     ax_obj = fig.add_subplot(mid[0, 1])
-    ax_lab = fig.add_subplot(outer[2])
+    ax_comb = fig.add_subplot(outer[2])
+    ax_lab = fig.add_subplot(outer[3])
     panel_object(ax_obj)
     panel_cost(ax_cost)
+    panel_combine(ax_comb, rng)
     panel_lab(ax_lab, rng)
 
     # Panel letters are placed in FIGURE x, not axes x.
@@ -666,7 +730,7 @@ def main():
     def left_edge(axes):
         return min(inv.transform((extent(a).x0, 0))[0] for a in axes)
 
-    x_left = left_edge([ax_e, ax_cost, ax_lab])
+    x_left = left_edge([ax_e, ax_cost, ax_comb, ax_lab])
     x_right = left_edge([ax_obj])
 
     # Y comes from each panel's MEASURED top, not from a fraction of its own
@@ -686,7 +750,8 @@ def main():
     for ax, lab, x, y in ((ax_e, "a", x_left, top_of(ax_e)),
                           (ax_cost, "b", x_left, y_mid),
                           (ax_obj, "c", x_right, y_mid),
-                          (ax_lab, "d", x_left, top_of(ax_lab))):
+                          (ax_comb, "d", x_left, top_of(ax_comb)),
+                          (ax_lab, "e", x_left, top_of(ax_lab))):
         fig.text(x, y, lab, fontsize=PANEL_LABEL_PT,
                  fontweight="bold", va="bottom", ha="left")
 
