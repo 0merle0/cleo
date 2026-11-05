@@ -4,7 +4,54 @@ Both are combinatorial fragment libraries with multiple rounds of
 design-build-test, on two different enzymes. Written 2026-11-05 while
 scoping Figure 3; nothing here is derived, it is an inventory.
 
-## 1. MoMI --- PETase, k = 5
+## 0. Snapshot: `momi_libraries.csv`
+
+**Both** PETase libraries, all four rounds each, 6,714 rows. Written by
+`momi_libraries_snapshot.py`. This is the file figures should read.
+
+The copy in `data/momi/` is the FIRST library only, 3,424 rows and no
+`library_name` column, which is why the second library looked missing. The
+only table that distinguishes them is jq01's combined training set for the
+second library's round 3, under
+`jq_p07_active_learning/jq_e0325_260123_..._rd3_analysis/2_model_training/input/`.
+
+Two columns are derived at snapshot time so no figure re-parses a name:
+`selection` (the tag after the colon) and `parent_slots` (how many of the
+k=5 slots still hold a `g20` parent part).
+
+### What the two libraries did
+
+| | round 0 | 1 | 2 | 3 |
+|---|---|---|---|---|
+| **first**, n | 1,665 | 708 | 674 | 352 |
+| median x G20 | 0.17 | 0.27 | 0.03 | 0.90 |
+| max | 2.19 | 2.41 | **3.35** | 2.49 |
+| frac > G20 | 3.8% | 9.2% | 12.2% | 41.5% |
+| **second**, n | 1,791 | 736 | 367 | 369 |
+| median x G20 | 0.83 | 0.36 | 5.54 | **8.06** |
+| max | 5.00 | 7.36 | 17.97 | **18.98** |
+| frac > G20 | 38.7% | 32.1% | 92.9% | **99.7%** |
+
+The second library is a different campaign, not a continuation: it starts
+from a round 0 already ten times better by hit rate (38.7% above G20 against
+3.8%) and ends with 368 of 369 designs beating G20 at a median of 8x.
+
+Selection tags differ between them, so they are not comparable arm for arm:
+
+| | round 1 | round 2 | round 3 |
+|---|---|---|---|
+| first | `bin1`..`bin6`, `top2combos` | `MLPgamma1/5/8`, `af3Only`, `boltzOnly`, `modelhubOnly`, `allOracles` | `sampledtopkMLP`, `topkMLP` |
+| second | `bin1`..`bin6`, `top2combos` | `mostdiverseMuGt3`, `top30mu` | `mostdiverseMuGt4`, `top10mu` |
+
+Their parts come from different pools too: library 1 from `refw5`/`refw8` RL
+checkpoints, library 2 from `dist3`..`dist9`.
+
+**Unresolved.** jq01's round-3 README says *"Best variant from this round is
+30x better than G20"*, but the best `g20_norm_rate` in this table is 18.98.
+The 30x is presumably a different measurement -- kinetics rather than the
+plate screen. Do not quote either number as the other until that is settled.
+
+## 1. MoMI --- PETase, k = 5 (first library)
 
 209-aa design parent. Names encode the assembly directly:
 
