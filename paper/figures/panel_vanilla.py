@@ -66,7 +66,9 @@ MARK = {"M0097": "o", "M0255": "s", "M0315": "^"}
 #
 # Radial-gradient markers were built here and removed: standard filled
 # markers say the same thing and match the rest of the document.
-ARMC = {"vanilla": PALETTE["gray"], "post": SEQUENTIAL[3]}
+# INK["muted"], not PALETTE["gray"]: the control arm should sit back from
+# the trained one rather than compete with it for weight.
+ARMC = {"vanilla": INK["muted"], "post": SEQUENTIAL[3]}
 
 
 def _recomb(site, arm):

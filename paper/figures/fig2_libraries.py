@@ -44,7 +44,7 @@ from matplotlib.lines import Line2D
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from ame_fragk import (C, MARK, add_diversity, collect_posthoc,  # noqa: E402
+from ame_fragk import (C, add_diversity, collect_posthoc,  # noqa: E402
                        collect_trained)
 from concept_loop import panel_loop  # noqa: E402
 from figio import save  # noqa: E402
@@ -87,7 +87,7 @@ def panel_move(ax, v, p, site, show_x):
                 arrowprops=dict(arrowstyle="-|>", color=INK["ghost"], lw=1.3,
                                 shrinkA=7, shrinkB=9))
     for arm, r in (("vanilla", v), ("post", p)):
-        ax.plot(r.subs, r.success, MARK[site], ms=8, zorder=4,
+        ax.plot(r.subs, r.success, "o", ms=8, zorder=4,
                 mfc=ARMC[arm], mec=ARMC[arm], mew=1.5)
     ax.set_ylim(0, 108)
     for sp in ("top", "right"):
@@ -117,9 +117,8 @@ def panel_k(ax, d, site, show_x):
         ax.plot(g.k, 100 * g.retention, "-", color=C[cond], lw=1.8, zorder=2)
         for r in g.itertuples():
             hollow = cond == "trained" and not r.matched
-            ax.plot(r.k, 100 * r.retention, MARK[site], ms=6, zorder=3,
+            ax.plot(r.k, 100 * r.retention, "o", ms=6, zorder=3,
                     mfc="white" if hollow else C[cond], mec=C[cond], mew=1.6)
-    ax.axhline(50, color=PALETTE["red"], lw=1, ls=":", zorder=1)
     ax.set_xscale("log", base=2)
     ax.set_xticks([2, 4, 8, 16, 36, 64])
     ax.set_xticklabels(["2", "4", "8", "16", "36", "64"])
@@ -160,8 +159,6 @@ def main():
     for i, site in enumerate(SITES):
         ax_s = fig.add_subplot(grid[i, 0])
         panel_target(ax_s, site)
-        ax_s.text(0.02, 0.60, site, transform=ax_s.transAxes, rotation=90,
-                  ha="center", va="center", fontsize=fs(8))
 
         ax_v = fig.add_subplot(grid[i, 1], sharex=ax_v0, sharey=ax_v0)
         ax_v0 = ax_v0 or ax_v
@@ -201,12 +198,14 @@ def main():
                 boxes.append(t.get_window_extent(rend))
         return Bbox.union(boxes)
 
+    # Two letters, not four. The three columns are one argument read across
+    # a row -- this target, what post-training did to it, how far that held --
+    # so lettering them separately would promise three findings per row
+    # instead of one. The caption names the columns in words.
     y_row = max(inv.transform((0, extent(a).y1))[1]
                 for a in (first["s"], first["v"], first["k"]))
     for ax, lab, y in ((ax_a, "a", inv.transform((0, extent(ax_a).y1))[1]),
-                       (first["s"], "b", y_row),
-                       (first["v"], "c", y_row),
-                       (first["k"], "d", y_row)):
+                       (first["s"], "b", y_row)):
         x = inv.transform((extent(ax).x0, 0))[0]
         fig.text(x, y + 0.006, lab, fontsize=PANEL_LABEL_PT,
                  fontweight="bold", va="bottom", ha="left")
