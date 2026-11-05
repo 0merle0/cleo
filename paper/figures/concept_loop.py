@@ -98,8 +98,14 @@ def panel_loop(ax, rng):
 def main():
     rng = np.random.default_rng(3)
     plt.rcParams["text.usetex"] = False
+    # Same fixed margins as Figure 1, and the save below does not crop to
+    # content, so both figures are exactly PAGE_WIDTH_IN wide and their panels
+    # line up with each other on the page rather than each being cropped to
+    # whatever its own widest element happened to be.
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 1.95))
-    ax_a = fig.add_subplot(111)
+    gs = fig.add_gridspec(1, 1, left=0.085, right=0.985,
+                          top=0.90, bottom=0.03)
+    ax_a = fig.add_subplot(gs[0])
     panel_loop(ax_a, rng)
     fig.canvas.draw()
     rend = fig.canvas.get_renderer()
@@ -108,7 +114,7 @@ def main():
     ax_a.text(x, 1.02, "a", transform=blended_transform_factory(
         fig.transFigure, ax_a.transAxes), fontsize=PANEL_LABEL_PT, fontweight="bold",
         va="top", ha="left")
-    save(fig, "concept_loop", dpi=900)
+    save(fig, "concept_loop", dpi=900, tight=False)
 
 
 if __name__ == "__main__":

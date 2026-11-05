@@ -254,8 +254,16 @@ def panel_ours(ax, rng):
 
 
 def fitness_key(ax):
-    """A direction, not a scale -- the landscape is illustrative."""
-    cb = ax.inset_axes([1.105, 0.16, 0.032, 0.78])
+    """A direction, not a scale -- the landscape is illustrative.
+
+    Drawn in a gridspec cell of its OWN, not as an inset hanging off the
+    third landscape. Hung outside that axes it was the rightmost ink in the
+    figure, so with a crop-to-content save it set the whole figure's right
+    edge and panel (a) came out wider than the rows beneath it. Inside the
+    grid it shares the row's right margin with everything else.
+    """
+    ax.axis("off")
+    cb = ax.inset_axes([0.0, 0.16, 0.26, 0.78])
     g = np.linspace(0, 1, 256).reshape(-1, 1)
     cb.imshow(g, aspect="auto", origin="lower", cmap=TERRAIN,
               extent=(0, 1, 0, 1))
@@ -263,11 +271,11 @@ def fitness_key(ax):
     cb.set_yticks([])
     for sp in cb.spines.values():
         sp.set_color(INK["grid"])
-    cb.text(1.5, 1.0, "high", ha="left", va="center", fontsize=fs(6.6),
+    cb.text(1.4, 1.0, "high", ha="left", va="center", fontsize=fs(6.6),
             transform=cb.transAxes)
-    cb.text(1.5, 0.0, "low", ha="left", va="center", fontsize=fs(6.6),
+    cb.text(1.4, 0.0, "low", ha="left", va="center", fontsize=fs(6.6),
             transform=cb.transAxes)
-    cb.text(-0.9, 0.5, "Fitness", rotation=90, ha="center", va="center",
+    cb.text(-0.8, 0.5, "Fitness", rotation=90, ha="center", va="center",
             fontsize=fs(7.5), transform=cb.transAxes)
 
 
@@ -435,9 +443,11 @@ def panel_object(ax):
     ax.set_ylim(0, 1)
     ax.axis("off")
 
-    # The fold alone, centred. The zoom, its two frames and the measured
-    # box placement are gone -- see the docstring.
-    place(ax, "whole", (0.5, 0.5), 150)
+    # The fold alone. Sits right of centre and a little smaller than the
+    # panel would allow: the cost plot beside it carries four labelled
+    # crossings and reads as the denser of the two, so matching their
+    # visual weight means not filling this one edge to edge.
+    place(ax, "whole", (0.60, 0.50), 128)
 
 
 # ---------------------------------------------------------------- panel (d)
@@ -567,8 +577,16 @@ def main():
     # square inside each cell and centres it: while the row was short they
     # were height-limited at 1.12 in inside cells 1.55 in wide, and every
     # spare inch of the row went to margin instead of to the plots.
+    # EXPLICIT margins, and the save below does not crop to content.
+    #
+    # With bbox_inches="tight" the figure's width is whatever its widest ink
+    # happens to be, so a stray element in one row silently moves the edge for
+    # the whole figure and the panels stop lining up. Fixed margins make the
+    # width a constant -- PAGE_WIDTH_IN exactly -- and give every row the same
+    # left and right edge to align to.
     outer = fig.add_gridspec(3, 1, height_ratios=[1.90, 1.40, 0.76],
-                             hspace=0.34)
+                             hspace=0.34, left=0.085, right=0.985,
+                             top=0.965, bottom=0.045)
     # The legend belongs to the landscapes, so it lives INSIDE their row --
     # tight under the three panels, with the full row gap below it.
     #
@@ -581,21 +599,28 @@ def main():
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
-    land = top[0].subgridspec(1, 3, wspace=0.11)
+    # FOUR columns, not three: the fitness key gets one of its own.
+    #
+    # It used to hang off the third landscape as an inset at x=1.105, i.e.
+    # outside that axes. With a crop-to-content save it was then the rightmost
+    # ink in the whole figure, so it -- not the gridspec -- set the right edge,
+    # and panel (a) finished further right than the rows below it. Inside the
+    # grid it shares the same right margin as everything else.
+    land = top[0].subgridspec(1, 4, width_ratios=[1, 1, 1, 0.17], wspace=0.11)
     ax_e = fig.add_subplot(land[0, 0])
     ax_n = fig.add_subplot(land[0, 1])
     ax_o = fig.add_subplot(land[0, 2])
     panel_epcr(ax_e, rng)
     panel_naive(ax_n, rng)
     panel_ours(ax_o, rng)
-    fitness_key(ax_o)
+    fitness_key(fig.add_subplot(land[0, 3]))
     landscape_legend(fig.add_subplot(top[1]))
 
     # Cost on the LEFT and wider than the fold beside it. The prices are drawn
     # at their crossings again rather than carried in the legend, and that
     # only works if the arms are far enough apart in x to take a label
     # between them -- which is bought with axes width, not with font size.
-    mid = outer[1].subgridspec(1, 2, width_ratios=[1.02, 1.15], wspace=0.17)
+    mid = outer[1].subgridspec(1, 2, width_ratios=[1.28, 0.89], wspace=0.14)
     ax_cost = fig.add_subplot(mid[0, 0])
     ax_obj = fig.add_subplot(mid[0, 1])
     ax_lab = fig.add_subplot(outer[2])
@@ -678,7 +703,7 @@ def main():
     # The ink in whole.png is 4615 px across, so the source supports 1457 dpi
     # at this width. 900 asks for 2850 px, comfortably inside that; going past
     # ~1450 would just upsample.
-    save(fig, "concept_library", dpi=900)
+    save(fig, "concept_library", dpi=900, tight=False)
 
 
 if __name__ == "__main__":
