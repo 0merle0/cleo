@@ -633,12 +633,19 @@ def main():
     plt.rcParams["text.usetex"] = False
     # Authored at page width, so a point here is a point on the page and the
     # MIN_FONT floor is real. See palette.PAGE_WIDTH_IN.
-    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.6))
-    # Row 0 is given enough height for the landscapes to reach their CELL
-    # WIDTH. They are square (aspect equal), so matplotlib shrinks them to a
-    # square inside each cell and centres it: while the row was short they
-    # were height-limited at 1.12 in inside cells 1.55 in wide, and every
-    # spare inch of the row went to margin instead of to the plots.
+    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.70))
+    # Row 0's height is tuned so its CELL equals the square axes inside it.
+    #
+    # The landscapes are aspect-equal, so matplotlib fits a square in each
+    # cell and CENTRES it. Any height the row has beyond the square's side
+    # therefore becomes dead band, half above and half below -- at ratio 1.90
+    # the cell was 2.19 in around a 1.70 in square, i.e. 0.24 in of empty
+    # above the plots and 0.24 in between them and their legend.
+    #
+    # The square's side is set by cell WIDTH, so the row only needs that much
+    # height. Solved numerically: 1.44 leaves ~0 dead band at 1.69 in square;
+    # below about 1.42 the cell becomes the binding constraint and the
+    # landscapes start shrinking instead (1.36 -> 1.62 in, 1.32 -> 1.58 in).
     # EXPLICIT margins, and the save below does not crop to content.
     #
     # With bbox_inches="tight" the figure's width is whatever its widest ink
@@ -646,9 +653,9 @@ def main():
     # the whole figure and the panels stop lining up. Fixed margins make the
     # width a constant -- PAGE_WIDTH_IN exactly -- and give every row the same
     # left and right edge to align to.
-    outer = fig.add_gridspec(4, 1, height_ratios=[1.90, 1.40, 0.86, 0.76],
-                             hspace=0.34, left=0.085, right=0.985,
-                             top=0.965, bottom=0.045)
+    outer = fig.add_gridspec(4, 1, height_ratios=[1.68, 1.40, 0.86, 0.76],
+                             hspace=0.60, left=0.085, right=0.985,
+                             top=0.945, bottom=0.045)
     # The legend belongs to the landscapes, so it lives INSIDE their row --
     # tight under the three panels, with the full row gap below it.
     #
@@ -657,7 +664,7 @@ def main():
     # explains and panels b/c, which it has nothing to do with, and the gap is
     # also where panel b's letter sits. Pulling it up into row 0 settles the
     # question of which panels it belongs to and clears the gap in one move.
-    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.06)
+    top = outer[0].subgridspec(2, 1, height_ratios=[1.0, 0.11], hspace=0.05)
     # The three landscapes share a row and a letter: they are one argument
     # seen three ways, not three findings, and lettering them a/b/c would
     # promise the reader three separate results.
