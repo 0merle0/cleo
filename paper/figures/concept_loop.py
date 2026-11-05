@@ -118,7 +118,7 @@ def panel_loop(ax, rng):
             (cx - 0.035, ys[j] - 0.035), sw + 0.07, rh + 0.07,
             boxstyle="square,pad=0", fill=False, ec="black", lw=1.1,
             zorder=6))
-    ax.text(cx + sw / 2, 0.86, "same fragment, 3 chimeras", ha="center",
+    ax.text(cx + sw / 2, 0.92, "same fragment, 3 chimeras", ha="center",
             va="center", fontsize=fs(6.5), color=PALETTE["gray"])
 
     arrow(ax, (cx + cw + 0.52, 1.89), (cx + cw + 0.98, 1.89))
@@ -135,11 +135,14 @@ def panel_loop(ax, rng):
     arrow(ax, (bx + (9.86 - bx) / 2, 0.46), (0.98, 0.46),
           color=PALETTE["blue"], lw=1.5)
     arrow(ax, (0.98, 0.46), (0.98, 1.48), color=PALETTE["blue"], lw=1.5)
-    ax.text(5.1, 0.54, "GRPO update, per-fragment advantage", ha="center",
-            fontsize=fs(7), va="bottom")
+    # BELOW the arrow, not above it. Above, it shared a band with the
+    # "same fragment" note, and the two closed up whenever the panel got
+    # shorter.
+    ax.text(5.1, 0.28, "GRPO update, per-fragment advantage", ha="center",
+            fontsize=fs(7), va="center")
 
     # The two facts a reader needs before reading any number that follows.
-    ax.text(5.1, 0.08, "folded best-of-5 against a pool of RF3 / Boltz / "
+    ax.text(5.1, 0.04, "folded best-of-5 against a pool of RF3 / Boltz / "
                        "Protenix; AF3 is held out and scores every "
                        "reported number", ha="center", fontsize=fs(6.4),
             color=PALETTE["blue"])

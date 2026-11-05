@@ -17,6 +17,12 @@
 \DeclareSIUnit{\points}{points}
 \usepackage{booktabs}
 \usepackage{caption}
+% The single-line check measures a caption as one box to decide whether to
+% centre it. Figure legends in this document are long enough that the box
+% exceeds TeX's maximum dimension and the build dies with "Dimension too
+% large" -- in \captionof, where there is no float to bound it. The check is
+% only a centring heuristic, and these captions are never one line.
+\captionsetup{singlelinecheck=false}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{hyperref}
 \hypersetup{colorlinks=true, linkcolor=black, citecolor=black, urlcolor=blue}
