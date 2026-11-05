@@ -54,13 +54,60 @@ AME = CLEO / "experiments" / "ame"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(AME))
 from analyze_selection2 import as_matrix  # noqa: E402
-from palette import INK, PALETTE, fs  # noqa: E402
+from palette import INK, PALETTE, SEQUENTIAL, fs  # noqa: E402
 
 BB = {"M0097": "run_M0097_1ctt_cond9_14",
       "M0255": "run_M0255_1mg5_cond17_66",
       "M0315": "run_M0315_1ey3_cond18_25"}
 MARK = {"M0097": "o", "M0255": "s", "M0315": "^"}
-ARMC = {"vanilla": PALETTE["gray"], "post": PALETTE["blue"]}
+# Grey for stock ProteinMPNN; for the post-trained arm a step DARKER than
+# the palette blue (SEQUENTIAL[3], not PALETTE["blue"]), so a filled marker
+# holds its weight against the pale centre of the gradient.
+ARMC = {"vanilla": PALETTE["gray"], "post": SEQUENTIAL[3]}
+
+
+def _disc(hex_c, px=160, light=0.62):
+    """-> an RGBA radial-gradient disc: pale at the centre, `hex_c` at the rim.
+
+    matplotlib has no gradient marker, so the marker is a small image. A disc
+    is built once per colour and reused, which keeps the SVG to one embedded
+    bitmap per arm rather than one per point.
+    """
+    r, g, b = (int(hex_c.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    y, x = np.mgrid[-1:1:px * 1j, -1:1:px * 1j]
+    d = np.clip(np.hypot(x, y), 0, 1)
+    inside = d <= 1.0
+    # t=0 at the centre -> lightened; t=1 at the rim -> the colour itself
+    t = d ** 1.35
+    out = np.zeros((px, px, 4))
+    for i, c in enumerate((r, g, b)):
+        pale = c + (1 - c) * light
+        out[..., i] = pale + (c - pale) * t
+    # feather the last pixel ring so the disc does not alias against the axes
+    out[..., 3] = np.clip((1.0 - d) * px / 6, 0, 1) * inside
+    return out
+
+
+_DISC = {}
+
+
+def gradient_marker(ax, x, y, hex_c, size_pts=13.0, lw=1.1, zorder=5):
+    """Draw one gradient-filled marker with an outline at a data point."""
+    from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+    if hex_c not in _DISC:
+        _DISC[hex_c] = _disc(hex_c)
+    im = _DISC[hex_c]
+    ax.add_artist(AnnotationBbox(
+        OffsetImage(im, zoom=size_pts / im.shape[1]), (x, y),
+        frameon=False, box_alignment=(0.5, 0.5), pad=0, zorder=zorder,
+        annotation_clip=False))
+    # The outline is a hollow marker, not a patch. `ms` is in points, the
+    # same unit the disc is placed at, so the ring registers on the disc
+    # exactly -- a Circle patch would need its radius converted out of data
+    # coordinates and would go elliptical whenever the axes aspect changed.
+    ax.plot([x], [y], "o", ms=size_pts, mfc="none", mec=hex_c, mew=lw,
+            zorder=zorder + 1)
+    return size_pts
 
 
 def _recomb(site, arm):

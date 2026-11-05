@@ -104,33 +104,35 @@ finds a variant with 250x increase in catalytic activity.
   score, drives the GRPO update. Folding during training is best-of-5 against
   a \emph{pool} of RF3, Boltz and Protenix under a round robin; AlphaFold3 is
   held out of training entirely and scores every number in (b)--(d).
-  \textbf{(b)}~Stock ProteinMPNN against the post-trained policy, for the
-  three backbones trained against the pool. The vanilla arm is not a single
-  temperature: its fragments come from parents sampled at
+  One row per backbone throughout.
+  \textbf{(b)}~The three targets, coloured by their four fragments, with the
+  motif RFdiffusion2 holds fixed drawn as sticks and the ligand in grey. The
+  cut lines run \emph{through} the active site: under the same equal-count
+  split, M0097's motif falls on three different fragments (A26, A59/A61,
+  A93) and M0255's and M0315's each fall on two. Every recombination below is
+  therefore reassembling an active site from parts contributed by different
+  designs.
+  \textbf{(c)}~What post-training buys, measured on recombinants --- decoded
+  from MPNN, cut at $k=4$, shuffled across parents, reassembled, folded,
+  never on parents. Arrows run from vanilla to post-trained. Success rises on
+  all three, by $+26.2$, $+60.2$ and $+48.8$ points. The vanilla arm is not a
+  single temperature: its fragments come from parents sampled at
   $T=0.1$--$1.0$ and then filtered to those that pass, which skews the pool
-  toward low $T$ (for example 29\%, 23\%, 22\%, 16\%, 9\%, 1\% of fragment
-  slots on M0097). It is therefore the filtered union of the whole
-  temperature sweep rather than any one setting. Both arms are measured on the
-  same thing: sequences decoded from MPNN, cut at $k=4$, shuffled across
-  parents, reassembled, and folded --- never on parents. Arrows run from
-  vanilla to post-trained. Success rises on all three, by $+26.2$, $+60.2$
-  and $+48.8$ points. Distinct mutations are counted over \emph{passing}
+  toward low $T$, so it is the filtered union of the whole sweep rather than
+  any one setting. Distinct mutations are counted over \emph{passing}
   recombinants only and rarefied to a matched survivor count, so a wider
-  spread is genuinely wider coverage and not just a larger sample; on that
-  measure two backbones move right as well as up and M0315 trades 193
-  mutations for its 48.8 points.
-  \textbf{(c)}~How much of the retention in (d) is owed to training at that
-  $k$ rather than to cutting a $k=4$ policy finer: $+8.3$ points at $k=2$,
-  rising monotonically to $+32.2$ at $k=36$.
-  \textbf{(d)}~Retention against the number of fragments per design. Blue: a
-  policy trained at that $k$. Grey: one $k=4$ policy re-cut at $k$ post hoc.
-  Every trained cell ran a matched 200 steps so budget cannot covary with
-  $k$.
+  spread is genuinely wider coverage and not just a larger sample; two
+  backbones move right as well as up, and M0315 trades 193 mutations for its
+  48.8 points.
+  \textbf{(d)}~How far that holds as the library is cut finer. Blue: a policy
+  trained at that $k$. Grey: one $k=4$ policy re-cut at $k$ post hoc. Every
+  trained cell ran a matched 200 steps so budget cannot covary with $k$. The
+  advantage of training at $k$ widens monotonically, from $+8.3$ points at
+  $k=2$ to $+32.2$ at $k=36$.
   \textcolor{cleoRed}{Caveats that must survive into the text: every cell is
   single-seeded against a documented 21-point run-to-run swing; M0255 at
   $k=36$ and $k=64$ was still climbing at step 200, so those are lower
-  bounds; and the vanilla arm in (b) is one pooled recombinant set per
-  backbone, not a per-temperature curve.}}
+  bounds.}}
 \label{fig:libraries}
 \clearpage
 
