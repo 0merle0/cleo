@@ -12,6 +12,27 @@ at figure-build time. Regenerate with `paper/figures/petase_snapshot.py`.
 | `activity` | `momi_unified`: per-sequence mean MoMI normalized rate |
 | `n_mut_from_parent` | Hamming distance to the 209-aa design parent |
 | `momi_round` | design round (0-3), blank for the revalidated block |
+
+**This snapshot was stale and the round labels were wrong.** Regenerated
+2026-11-05. The copy in the repo had been written at 08:19 on 2026-10-17 and
+`metrics_wide.csv`, which is where `momi_round` comes from, was rewritten at
+08:58 the same morning -- 39 minutes later. The stale copy carried 539 blank
+rounds where the source has only 20, so 519 assayed designs (16% of the table)
+silently lost their round. Anything computed per round against the old file is
+wrong. Regenerate with `petase_snapshot.py` before trusting it.
+
+### Which library a design belongs to
+
+There is no `library` column, but `in_momi` and `in_adaptyv` in the source
+partition the table exactly, with no overlap:
+
+| flag | n | rounds | activity measure |
+|---|---|---|---|
+| `in_momi` | 3,371 | 0-3 | `momi_norm_rate` (3,135 non-null), `g20_norm_rate` (3,371) |
+| `in_adaptyv` | 20 | none | `adaptyv_norm_net_area` |
+
+So "no round" and "Adaptyv" are the same 20 designs: the revalidation block.
+`momi_val` additionally marks 682 of the MoMI designs.
 | `revalidated` | 1 for the 20 designs re-assayed by Adaptyv after selection |
 | `acyl_*`, `substrate_*` | AF3 zero-shot metrics on the acyl-enzyme intermediate and the Michaelis complex |
 
