@@ -74,10 +74,12 @@ def panel_target(ax, site):
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    place(ax, f"target_{site}", (0.56, 0.60), 88)
+    # 74 pt, not 88, and pushed up. Giving every row its own x-axis shortened
+    # these cells, and at the old size the fold sat on its own caption.
+    place(ax, f"target_{site}", (0.56, 0.68), 74)
     name, cofactor = ENZYME[site]
-    ax.text(0.56, 0.20, name, ha="center", va="center", fontsize=fs(7))
-    ax.text(0.56, 0.08, f"{cofactor} \u00b7 {PDBID[site]}", ha="center",
+    ax.text(0.56, 0.17, name, ha="center", va="center", fontsize=fs(7))
+    ax.text(0.56, 0.04, f"{cofactor} \u00b7 {PDBID[site]}", ha="center",
             va="center", fontsize=fs(6.2), color=PALETTE["gray"])
 
 
@@ -145,7 +147,7 @@ def main():
 
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.9))
     outer = fig.add_gridspec(2, 1, height_ratios=[0.72, 2.55], hspace=0.26,
-                             left=0.095, right=0.985, top=0.945, bottom=0.055)
+                             left=0.095, right=0.985, top=0.922, bottom=0.055)
     ax_a = fig.add_subplot(outer[0])
     panel_loop(ax_a, np.random.default_rng(3))
 
@@ -153,7 +155,7 @@ def main():
     # plots: it carries no axes, and at equal width the folds would dominate
     # a row whose argument is the two plots beside them.
     grid = outer[1].subgridspec(3, 3, width_ratios=[0.78, 1.0, 1.0],
-                                hspace=0.20, wspace=0.46)
+                                hspace=0.52, wspace=0.46)
     ax_v0 = ax_k0 = None
     first = {}
     for i, site in enumerate(SITES):
@@ -162,12 +164,16 @@ def main():
 
         ax_v = fig.add_subplot(grid[i, 1], sharex=ax_v0, sharey=ax_v0)
         ax_v0 = ax_v0 or ax_v
+        # Every row gets its own x-axis, not just the bottom one: the rows
+        # are three separate backbones rather than facets of one series, so
+        # each should be readable without tracking a shared axis two rows
+        # down.
         panel_move(ax_v, van.loc[(site, "vanilla")], van.loc[(site, "post")],
-                   site, show_x=(i == len(SITES) - 1))
+                   site, show_x=True)
 
         ax_k = fig.add_subplot(grid[i, 2], sharex=ax_k0, sharey=ax_k0)
         ax_k0 = ax_k0 or ax_k
-        panel_k(ax_k, d, site, show_x=(i == len(SITES) - 1))
+        panel_k(ax_k, d, site, show_x=True)
         if i == 0:
             first = dict(s=ax_s, v=ax_v, k=ax_k)
 

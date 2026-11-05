@@ -80,7 +80,7 @@ def main():
 
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 5.4))
     outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.05], hspace=0.52,
-                             left=0.095, right=0.985, top=0.94, bottom=0.085)
+                             left=0.095, right=0.985, top=0.915, bottom=0.085)
     top = outer[0].subgridspec(1, 3, wspace=0.12)
     axes = []
     for i, site in enumerate(SITES):
