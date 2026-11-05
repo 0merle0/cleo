@@ -187,17 +187,28 @@ being a comparison.
   slots, Ser66 on slot 2 and His107/Asp122 on slot 3, with the PET substrate
   in grey and the two catalytic hydrogen bonds dashed. Every recombination in
   this library therefore reassembles the triad across a cut.
-  \textbf{(b)}~How far each slot's parts sit from the G20 part they replace,
-  one distribution per slot over the $\sim$700 distinct parts it carries.
-  Slot~1 roams furthest (median 9, up to 17 mutations); slot~4 least (median
-  6, never more than 9).
+  \textbf{(b)}~The menu each slot offered: one histogram per slot of how far
+  its parts sit, in Hamming distance, from the G20 part they replace. Every
+  distinct part in the library, not only those that reached a measured
+  design. Slots differ markedly --- slot~1's parts are bimodal and reach 17
+  mutations, slot~4's never exceed~9 --- so the five slots were not sampled
+  to a common budget. Black line, median.
   \textbf{(c)}~Activity by round, as a multiple of the G20 parent measured on
-  the same plates. The median goes $0.83 \rightarrow 0.36 \rightarrow 5.54
-  \rightarrow 8.06$, and the share of designs beating G20 goes
+  the same plates, on a linear axis. The median goes $0.83 \rightarrow 0.36
+  \rightarrow 5.54 \rightarrow 8.06$ and the share beating G20 goes
   \SI{38.7}{\percent} $\rightarrow$ \SI{32.1}{\percent} $\rightarrow$
-  \SI{92.9}{\percent} $\rightarrow$ \SI{99.7}{\percent} --- 368 of 369
-  designs in the final round. The best single design is
-  $18.98\times$ G20.
+  \SI{92.9}{\percent} $\rightarrow$ \SI{99.7}{\percent}, which is 368 of
+  369 designs in the final round. The best single design is $18.98\times$ G20.
+  \textbf{(d)}~Activity against how far the whole design sits from G20.
+  \textcolor{cleoRed}{Read this one carefully before writing against it: the
+  two clouds are ROUNDS, not a property of distance. Round~0 sits at a median
+  of 7 mutations (max 17) and rounds~1--3 at 26--29, so the apparent gap is
+  where the campaign jumped, not a forbidden region. Across all designs the
+  rank correlation between distance and activity is only $+0.217$; designs at
+  15 or more mutations do have a higher median ($2.71$ against $0.85$) and
+  hit rate (\SI{62.7}{\percent} against \SI{39.5}{\percent}), but that
+  comparison is confounded with round and should not be presented as a
+  distance effect.}
   \textcolor{cleoRed}{Caveats: round~1 is a dip, not noise, and the text
   should say why; and activity here is the plate screen, which is not the
   same measurement as kinetics.}}

@@ -78,14 +78,17 @@ def main():
 
     # --- the whole fold -------------------------------------------------
     lines = base()
-    lines += ["set stick_radius, 0.16",
-              f"show sticks, p and resi {sel} and not (name C+N+O)"]
+    lines += ["remove hydrogens", "set stick_radius, 0.22",
+              f"show sticks, p and resi {sel}"]
     for n, s in TRIAD.items():
         lines.append(f"color s{s}, p and resi {n}")
     lines += ["show sticks, p and not polymer",
               "color grey45, p and not polymer",
-              "set stick_radius, 0.12, p and not polymer",
-              "orient p and polymer", "turn x, -10", "zoom p, 3",
+              "set stick_radius, 0.16, p and not polymer",
+              # turn y 180 after orienting: `orient` has no idea which
+              # face the substrate is on, and it came up behind the fold.
+              "orient p and polymer", "turn y, 180", "turn x, -10",
+              "zoom p, 1.5",
               f"png {OUT / 'momi_fold.png'}, width={PX}, height={PX}, "
               "dpi=300, ray=1"]
     run(lines, "momi_fold")
@@ -95,10 +98,16 @@ def main():
     # anything more here competes with the three colours that carry the
     # point, which is that the triad is split across two slots.
     lines = [f"load {PDB}, p", "hide everything", f"@{STYLE}",
-             "set ray_opaque_background, 0", "set stick_radius, 0.20",
-             "set dash_color, black", "set dash_width, 2.2",
-             "set dash_gap, 0.24", "set label_size, 0",
-             f"show sticks, p and resi {sel} and not (name C+N+O)"]
+             "set ray_opaque_background, 0", "set stick_radius, 0.30",
+             "set dash_color, black", "set dash_width, 2.6",
+             "set dash_gap, 0.26", "set label_size, 0",
+             # Hydrogens off everywhere -- they clutter at this stick
+             # radius and carry nothing here.
+             "remove hydrogens",
+             # The WHOLE residue, backbone included (N, CA, C, O), not
+             # just the side chain: the triad reads as three residues of a
+             # chain rather than three floating groups.
+             f"show sticks, p and resi {sel}"]
     for i, c in enumerate(COLORS):
         r, g, b = hexrgb(c)
         lines.append(f"set_color s{i}, [{r:.4f}, {g:.4f}, {b:.4f}]")
@@ -106,7 +115,7 @@ def main():
         lines.append(f"color s{s}, p and resi {n}")
     lines += ["show sticks, p and not polymer",
               "color grey45, p and not polymer",
-              "set stick_radius, 0.13, p and not polymer",
+              "set stick_radius, 0.22, p and not polymer",
               # the two catalytic hydrogen bonds
               "distance hb1, p and resi 66 and name OG, "
               "p and resi 107 and name NE2",
