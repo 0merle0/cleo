@@ -62,8 +62,8 @@ def main():
     # Page width and fixed margins, like Figure 1: a point here is a point on
     # the page, so palette.MIN_FONT means something, and the rows share one
     # left and right edge instead of each being cropped to its own widest ink.
-    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.4))
-    outer = fig.add_gridspec(3, 1, height_ratios=[0.62, 1.00, 1.00],
+    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.7))
+    outer = fig.add_gridspec(3, 1, height_ratios=[0.80, 1.00, 1.00],
                              hspace=0.55, left=0.095, right=0.985,
                              top=0.930, bottom=0.05)
 

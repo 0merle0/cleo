@@ -30,6 +30,7 @@ sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
 from palette import (INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
                      PANEL_LABEL_PT, fs)
+from matplotlib.patches import FancyBboxPatch  # noqa: E402
 from schematic import FRAGMENT, arrow, bar, box, place  # noqa: E402
 
 PNG = HERE / "structures" / "png"
@@ -38,75 +39,110 @@ GREY = INK["muted"]
 
 
 def panel_loop(ax, rng):
-    """backbone -> policy -> sequences -> fragments -> chimeras -> reward."""
+    """How post-training works here: one fragment, many chimeras, one reward.
+
+    This panel used to be a pipeline -- backbone, decoder, sequences, cut,
+    recombine, fold, update -- which is the ORDER of operations and not the
+    idea. Every box in it is standard; a reader who knows RLHF learns nothing
+    from the arrows.
+
+    The idea worth a panel is the credit assignment. ProteinMPNN is pretrained
+    and emits whole sequences, so there is no gradient that says "this
+    fragment recombines well". The method manufactures one: cut the batch into
+    k slots, build chimeras by swapping slots between parents, fold each
+    chimera, and then give every FRAGMENT the average outcome of the chimeras
+    it appeared in. A fragment that carries its partners scores high however
+    good its own parent was; a fragment that only works beside its original
+    neighbours does not.
+
+    That is why the picture is a grid and not a chain: the highlighted
+    fragment occurs in three chimeras, two of which fold, so its reward is
+    2/3 -- and that number, not the parent's score, is what the GRPO update
+    sees.
+
+    Pass/fail marks rather than invented numbers. The reward really is an
+    average over chimera outcomes, so the panel can show the actual quantity
+    instead of a plausible-looking decimal.
+    """
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 3.1)
     ax.axis("off")
 
-    place(ax, "grey", (0.72, 2.05), 64)
-    ax.text(0.72, 1.14, "backbone", ha="center", fontsize=fs(8))
-    arrow(ax, (1.32, 2.05), (1.92, 2.05))
+    # --- the decoder, pretrained and then post-trained ---------------------
+    box(ax, (0.12, 1.52), 1.72, 0.74, "ProteinMPNN",
+        "pretrained decoder", title_size=8)
+    arrow(ax, (1.90, 1.89), (2.36, 1.89))
 
-    box(ax, (1.95, 1.62), 1.30, 0.86, "ProteinMPNN", "decoder as policy")
-    arrow(ax, (3.28, 2.05), (3.85, 2.05))
+    # --- a batch of designs, cut into k slots ------------------------------
+    for j in range(3):
+        bar(ax, 2.45, 2.28 - 0.42 * j, 1.30, 0.30, FRAGMENT)
+    ax.text(3.10, 1.12, f"cut into $k={K}$", ha="center", fontsize=fs(7))
+    ax.text(3.10, 2.82, "$B$ designs", ha="center", fontsize=fs(7))
+    arrow(ax, (3.83, 1.89), (4.29, 1.89))
 
-    # B sequences, undifferentiated.
-    for j in range(4):
-        bar(ax, 3.90, 2.46 - 0.21 * j, 1.25, 0.14, [GREY] * K,
-            edge=INK['ghost'])
-    ax.text(4.52, 1.44, "$B$ sequences", ha="center", fontsize=fs(8))
-    arrow(ax, (5.22, 2.05), (5.78, 2.05))
+    # --- chimeras: slots swapped between parents, each one folded ----------
+    #
+    # The highlighted slot-0 part is deliberately the SAME tint in rows 0, 2
+    # and 3 and a different one in row 1, so the ringed cells are visibly one
+    # fragment recurring rather than four unrelated blue blocks.
+    cx, cw, rh = 4.38, 1.90, 0.30
+    HILITE, OTHER = 1.0, 0.45
+    rows = [
+        ([HILITE, 0.55, 1.0, 0.45], True),
+        ([OTHER, 1.0, 0.50, 1.0], True),
+        ([HILITE, 1.0, 0.45, 0.95], False),
+        ([HILITE, 0.45, 0.95, 0.55], True),
+    ]
+    ys = []
+    for j, (shades, ok) in enumerate(rows):
+        y = 2.34 - 0.42 * j
+        ys.append(y)
+        bar(ax, cx, y, cw, rh, FRAGMENT, shades=shades)
+        # pass / fail, as the oracle pool returned it
+        ax.plot(cx + cw + 0.22, y + rh / 2, "o", ms=5.5,
+                mfc=PALETTE["blue"] if ok else "white",
+                mec=PALETTE["blue"] if ok else INK["muted"], mew=1.2,
+                zorder=5)
+    ax.text(cx + cw / 2, 2.78, "chimeras", ha="center", fontsize=fs(7))
+    # Above the dots, not below them: below, it sat in the band the credit
+    # note and the GRPO label already share.
+    ax.text(cx + cw + 0.22, 2.78, "folds", ha="center", fontsize=fs(6.5),
+            color=PALETTE["gray"])
 
-    # Cut into k fragments: the same bars, now coloured by slot.
-    for j in range(4):
-        bar(ax, 5.83, 2.46 - 0.21 * j, 1.25, 0.14, FRAGMENT)
-    ax.text(6.45, 1.44, f"cut into $k={K}$", ha="center", fontsize=fs(8))
-    arrow(ax, (7.15, 2.05), (7.70, 2.05))
+    # Ring the one fragment whose reward is being computed.
+    sw = cw / K
+    for j, (shades, _) in enumerate(rows):
+        if shades[0] != HILITE:
+            continue
+        ax.add_patch(FancyBboxPatch(
+            (cx - 0.035, ys[j] - 0.035), sw + 0.07, rh + 0.07,
+            boxstyle="square,pad=0", fill=False, ec="black", lw=1.1,
+            zorder=6))
+    ax.text(cx + sw / 2, 0.86, "same fragment, 3 chimeras", ha="center",
+            va="center", fontsize=fs(6.5), color=PALETTE["gray"])
 
-    # Recombinants: one fragment per slot, drawn from different parents.
-    for j in range(4):
-        bar(ax, 7.75, 2.46 - 0.21 * j, 1.25, 0.14, FRAGMENT,
-            shades=rng.uniform(0.45, 1.0, K))
-    ax.text(8.37, 1.44, "recombinants", ha="center", fontsize=fs(8))
+    arrow(ax, (cx + cw + 0.52, 1.89), (cx + cw + 0.98, 1.89))
 
-    # The oracle POOL, named. This is the method's central guard and the
-    # figure used to leave it as "fold & score": training runs a round robin
-    # over RF3, Boltz and Protenix, and AF3 is held out of it entirely --
-    # af3_probe_every is a diagnostic, not a reward. Every number reported
-    # downstream is scored by that held-out AF3, so training against the
-    # predictor you then report under cannot explain the result.
-    box(ax, (7.60, 0.42), 1.56, 0.68, "fold & score",
-        "RF3 / Boltz / Protenix", title_size=8)
-    arrow(ax, (8.38, 1.30), (8.38, 1.12))
+    # --- the credit assignment --------------------------------------------
+    bx = cx + cw + 1.08
+    box(ax, (bx, 1.46), 9.86 - bx, 0.86,
+        r"fragment reward $=\,2/3$", "mean outcome of its chimeras",
+        title_size=8)
 
-    # The feedback edge: this is the whole method.
-    arrow(ax, (7.70, 0.76), (2.60, 0.76), color=PALETTE["blue"], rad=0.0,
-          lw=1.6)
-    arrow(ax, (2.60, 0.76), (2.60, 1.60), color=PALETTE["blue"], lw=1.6)
-    # Black, like every other label. The arrow it names stays blue, so the
-    # association is carried by adjacency rather than by matching ink.
-    # Centred at 4.6, not 5.15. At page-size type this string is ~4.1 x-units
-    # wide, and centred on the arrow's midpoint it ran under the fold & score
-    # box at x=7.72.
-    ax.text(4.6, 0.88, "GRPO update: each fragment scored by its "
-                       "recombinants", ha="center", fontsize=fs(7))
-    # The two facts a reader needs before reading any number that follows:
-    # what the reward saw, and what the results are scored by. Both are
-    # right-aligned to the panel edge -- centred under the box they overflowed
-    # the axes entirely.
-    # Both notes sit LEFT of the fold & score box, not under it. Right-
-    # aligned to the panel edge they ran straight through the box's own
-    # subtitle, which is at x > 7.6.
-    ax.text(4.6, 0.46, r"$\rho=0$ returns the parent, so this rate is not a "
-                       "retention", ha="center", fontsize=fs(6.4),
-            style="italic")
-    ax.text(4.6, 0.12, "AF3 is held out of training; every reported number "
-                       "is scored by it", ha="center", fontsize=fs(6.6),
+    # --- back to the decoder ----------------------------------------------
+    arrow(ax, (bx + (9.86 - bx) / 2, 1.42), (bx + (9.86 - bx) / 2, 0.46),
+          color=PALETTE["blue"], lw=1.5)
+    arrow(ax, (bx + (9.86 - bx) / 2, 0.46), (0.98, 0.46),
+          color=PALETTE["blue"], lw=1.5)
+    arrow(ax, (0.98, 0.46), (0.98, 1.48), color=PALETTE["blue"], lw=1.5)
+    ax.text(5.1, 0.54, "GRPO update, per-fragment advantage", ha="center",
+            fontsize=fs(7), va="bottom")
+
+    # The two facts a reader needs before reading any number that follows.
+    ax.text(5.1, 0.08, "folded best-of-5 against a pool of RF3 / Boltz / "
+                       "Protenix; AF3 is held out and scores every "
+                       "reported number", ha="center", fontsize=fs(6.4),
             color=PALETTE["blue"])
-
-
-
-
 
 
 def main():
