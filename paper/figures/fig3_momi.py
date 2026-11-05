@@ -32,6 +32,24 @@ from palette import (FRAGMENT, INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
 from schematic import place  # noqa: E402
 
 LIB = "second_big_library"
+
+
+def only(df, what):
+    """-> `df` gated to LIB, loudly.
+
+    Figure 3 is about the SECOND library. The two share 5 parts out of 3,629
+    and their design sets are disjoint, so anything pooled is wrong rather
+    than merely noisy -- when panel (b) was drawn over both, slots 2 and 3
+    came out at 8.1 and 7.0 mean mutations against the true 4.4 and 4.4.
+    Every table this figure reads goes through here.
+    """
+    col = "library_name" if "library_name" in df.columns else "library"
+    if col not in df.columns:
+        raise SystemExit(f"{what}: no library column to gate on")
+    g = df[df[col] == LIB]
+    if not len(g):
+        raise SystemExit(f"{what}: nothing left after gating to {LIB}")
+    return g
 SLOTS = [(1, 40), (45, 84), (89, 126), (131, 163), (168, 209)]
 COLORS = list(FRAGMENT) + [PALETTE["purple"]]
 K = 5
@@ -62,7 +80,8 @@ def panel_distance(axes, parts):
     Counts, not density, so a slot offering fewer options reads as offering
     fewer options.
     """
-    sub = parts[parts.is_parent == 0]
+    sub = only(parts, "fragment parts")
+    sub = sub[sub.is_parent == 0]
     hi = int(sub.n_mut_from_g20.max())
     for i, ax in enumerate(axes):
         v = sub[sub.slot == i + 1].n_mut_from_g20.to_numpy()
@@ -85,7 +104,8 @@ def panel_distance(axes, parts):
 
 def panel_activity(ax, d):
     """Activity by round, LINEAR, against G20 itself."""
-    s = d[(d.library_name == LIB) & (d.sample_type == "sample")]
+    s = only(d, "activity")
+    s = s[s.sample_type == "sample"]
     rounds = sorted(s.round_number.unique())
     shades = [SEQUENTIAL[1], SEQUENTIAL[2], SEQUENTIAL[3], SEQUENTIAL[5]]
     rng = np.random.default_rng(0)
@@ -110,7 +130,8 @@ def panel_activity(ax, d):
 
 def panel_dist_activity(ax, d, parent):
     """Activity against how far the whole design sits from G20."""
-    s = d[(d.library_name == LIB) & (d.sample_type == "sample")].copy()
+    s = only(d, "distance/activity")
+    s = s[s.sample_type == "sample"].copy()
     s["nmut"] = [sum(1 for a, b in zip(q, parent) if a != b)
                  for q in s.sequence]
     shades = {0: SEQUENTIAL[1], 1: SEQUENTIAL[2],

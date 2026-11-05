@@ -39,14 +39,27 @@ SRC = HERE / "data" / "momi_libraries.csv"
 OUT = HERE / "data" / "momi_fragment_parts.csv"
 K = 5
 
+# GATED TO THE SECOND LIBRARY. Figure 3 is about that library, and the two
+# share only 5 parts out of 3,629, so pooling them would put ~1,800 parts
+# that this library never offered into its own histograms.
+#
+# The slot windows themselves are identical in the first library -- checked,
+# both give 1-40, 45-84, 89-126, 131-163, 168-209 -- so the two campaigns
+# cut the same parent the same way and only the menus differ.
+LIBRARY = "second_big_library"
+
 
 def load():
     d = pd.read_csv(SRC)
     ctrl = d[d.sample_type == "positive_control"]
     if ctrl.sequence.nunique() != 1:
         sys.exit("positive controls are not a single sequence")
-    s = d[d.sample_type == "sample"].copy()
+    s = d[(d.sample_type == "sample")
+          & (d.library_name == LIBRARY)].copy()
+    if not len(s):
+        sys.exit(f"no samples for {LIBRARY}")
     s["parts"] = s.name.astype(str).str.split(":").str[0].str.split("___")
+    print(f"gated to {LIBRARY}: {len(s)} designs")
     return ctrl.sequence.iloc[0], s
 
 
@@ -76,20 +89,19 @@ def main():
           + ", ".join(f"{lo+1}-{hi+1}" for lo, hi in sp))
 
     rows, seen = [], {}
-    for lib, parts, seq in zip(s.library_name, s.parts, s.sequence):
+    for parts, seq in zip(s.parts, s.sequence):
         for i, pid in enumerate(parts):
             key = (i, pid)
             if key in seen:
-                seen[key][2].add(lib)
                 continue
             lo, hi = sp[i]
-            n = sum(1 for a, b in zip(seq[lo:hi + 1], parent[lo:hi + 1])
-                    if a != b)
-            seen[key] = [pid, n, {lib}]
-    for (i, pid), (_, n, libs) in seen.items():
-        rows.append(dict(slot=i + 1, part=pid, n_mut_from_g20=n,
-                         is_parent=int("g20" in pid),
-                         libraries="+".join(sorted(libs))))
+            seen[key] = sum(
+                1 for a, b in zip(seq[lo:hi + 1], parent[lo:hi + 1])
+                if a != b)
+    for (i, pid), n in seen.items():
+        rows.append(dict(library=LIBRARY, slot=i + 1, part=pid,
+                         n_mut_from_g20=n,
+                         is_parent=int("g20" in pid)))
     f = pd.DataFrame(rows).sort_values(["slot", "n_mut_from_g20"])
     f.to_csv(OUT, index=False)
     print(f"wrote {OUT}: {len(f)} distinct parts")
@@ -97,8 +109,8 @@ def main():
     print("\nmutations from G20 per part, by slot (parent part excluded):")
     print(nz.groupby("slot").n_mut_from_g20
           .agg(["count", "mean", "min", "max"]).round(1).to_string())
-    print("\nparts shared between the two libraries:")
-    print(f.libraries.value_counts().to_string())
+    print(f"\nall rows are {LIBRARY}: "
+          f"{(f.library == LIBRARY).all()}")
 
 
 if __name__ == "__main__":
