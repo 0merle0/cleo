@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-CLEO = HERE.parents[1]
+CLEO = HERE.parents[2]
 sys.path.insert(0, str(CLEO / "src"))
 from cleo.design.sample_from_policy import split_into_fragments  # noqa: E402
 

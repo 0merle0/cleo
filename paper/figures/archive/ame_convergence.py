@@ -45,7 +45,7 @@ sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
 from palette import PALETTE  # noqa: E402
 
-AME = HERE.parents[1] / "experiments" / "ame"
+AME = HERE.parents[2] / "experiments" / "ame"
 LO, HI = 0.5, 20.0          # the reward bounds the pilot runs used
 BIN = 15                    # steps per bin; 16 designs/step, so ~240 per point
 

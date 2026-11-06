@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-CLEO = HERE.parents[1]
+CLEO = HERE.parents[2]
 AME = CLEO / "experiments" / "ame"
 PANEL, FRAGRL = AME / "r1panel", AME / "fragrl"
 sys.path.insert(0, str(AME))

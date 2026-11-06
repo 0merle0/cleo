@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-AME = HERE.parents[1] / "experiments" / "ame"
+AME = HERE.parents[2] / "experiments" / "ame"
 sys.path.insert(0, str(AME))
 from analyze_selection2 import as_matrix, coverage, mean_pairwise  # noqa: E402,F401
 

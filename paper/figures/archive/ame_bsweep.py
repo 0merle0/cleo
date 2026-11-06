@@ -44,7 +44,7 @@ from matplotlib.ticker import FuncFormatter
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-AME = HERE.parents[1] / "experiments" / "ame"
+AME = HERE.parents[2] / "experiments" / "ame"
 sys.path.insert(0, str(HERE))
 from figio import save                                        # noqa: E402
 from palette import PALETTE                                    # noqa: E402

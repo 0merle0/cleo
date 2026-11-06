@@ -45,8 +45,17 @@ the batch and scores each fragment by the company it keeps.
 **But a fragment reward alone is not enough.** With chimera quality as the only
 objective, the policy optimised fragments that travel while the sequences it
 emitted degraded — **28 passing parents against 182** for the arm trained on
-parent RMSD alone, and retention fell with them. Keep `parent_metric`. The
-fragment term says "your parts travel"; the parent term says "and you fold".
+parent RMSD alone (M0255), and retention fell with them, 30.5% against 79.3%.
+The fragment term says "your parts travel"; the parent term says "and you
+fold".
+
+> **The fix is inferred, not yet measured.** Every shuffling run on record
+> (`experiments/ame/fragrl` and the `fragb32`/`bs16`/`bs64` sweeps) has
+> `parent_metric` unset — the recommended configuration has never actually
+> been run. What is measured is the *failure* of omitting it. Treat
+> `parent_metric: ame_motif_rmsd` in `fragment_shuffle.yaml` as the leading
+> hypothesis, and the first thing to test if shuffling underperforms.
+> See `docs/COMPARISONS.md` for the arm-by-arm numbers.
 
 ## 3. Compare only within a batch
 

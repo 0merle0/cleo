@@ -29,12 +29,12 @@ from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[1] / "src"))
+sys.path.insert(0, str(HERE.parents[2] / "src"))
 from cleo.design.utils.selection import (  # noqa: E402
     RULES, Distances, consensus, encode,
 )
 
-AME = HERE.parents[1] / "experiments" / "ame"
+AME = HERE.parents[2] / "experiments" / "ame"
 
 
 def load_pool(backbone, run_root):

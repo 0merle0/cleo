@@ -49,7 +49,7 @@ sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402
 from palette import PALETTE  # noqa: E402
 
-AME = HERE.parents[1] / "experiments" / "ame"
+AME = HERE.parents[2] / "experiments" / "ame"
 CUT = 1.5                      # motif all-atom RMSD cutoff, angstrom
 ACCENT = PALETTE["red"]
 

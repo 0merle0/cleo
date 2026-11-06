@@ -47,7 +47,7 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-CLEO = HERE.parents[1]
+CLEO = HERE.parents[2]
 AME = CLEO / "experiments" / "ame"
 sys.path.insert(0, str(HERE))
 from figio import save  # noqa: E402

@@ -44,7 +44,7 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-CLEO = HERE.parents[1]
+CLEO = HERE.parents[2]
 PANEL = CLEO / "experiments" / "ame" / "r1panel"
 sys.path.insert(0, str(CLEO / "experiments" / "ame"))
 from analyze_selection2 import as_matrix  # noqa: E402
