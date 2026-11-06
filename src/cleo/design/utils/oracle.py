@@ -333,10 +333,13 @@ def _boltz_input_from_af3_template(af3_template: dict, seq: str) -> dict:
     multi-oracle run there would have failed on whichever step drew Boltz.
 
     AF3 nests entities under ``sequences`` as ``{"protein": {...}}`` /
-    ``{"ligand": {"ccdCodes": [...]}}``. Boltz uses the same ``sequences`` key
-    with ``{"protein": {"id", "sequence", "msa"}}`` and
+    ``{"ligand": {"ccdCodes": [...]}}`` or ``{"ligand": {"smiles": "..."}}``.
+    Boltz uses the same ``sequences`` key with
+    ``{"protein": {"id", "sequence", "msa"}}`` and either
     ``{"ligand": {"id", "ccd"}}`` -- one CCD code per entity, so a multi-code
-    AF3 ligand becomes several entities with suffixed chain ids.
+    AF3 ligand becomes several entities with suffixed chain ids -- or
+    ``{"ligand": {"id", "smiles"}}`` for a SMILES ligand, which is the spelling
+    the hand-written PETase template in templates/oracle/ already used.
 
     ``msa: empty`` is set explicitly: that is Boltz's spelling for a
     single-sequence prediction, matching --use_msa False (Protenix),
@@ -349,16 +352,27 @@ def _boltz_input_from_af3_template(af3_template: dict, seq: str) -> dict:
                                           "sequence": seq, "msa": "empty"}})
         elif "ligand" in entity:
             ccd_codes = entity["ligand"].get("ccdCodes")
-            if not ccd_codes:
+            smiles = entity["ligand"].get("smiles")
+            if ccd_codes and smiles:
+                raise ValueError(
+                    f"boltz: ligand entity {entity['ligand'].get('id')!r} has BOTH ccdCodes and "
+                    "smiles. Pick one -- translating both would put the ligand in the complex twice."
+                )
+            if not ccd_codes and not smiles:
                 raise ValueError(
                     f"boltz: ligand entity {entity['ligand'].get('id')!r} in the AF3 template "
-                    "has no ccdCodes. SMILES and file-based ligands are not translated yet; add "
-                    "them here rather than letting the ligand silently vanish from the complex."
+                    "has neither ccdCodes nor smiles. File-based ligands are not translated yet; "
+                    "add them here rather than letting the ligand silently vanish from the complex."
                 )
             base_id = entity["ligand"]["id"]
-            for j, ccd in enumerate(ccd_codes):
-                sequences.append({"ligand": {"id": base_id if j == 0 else f"{base_id}{j}",
-                                             "ccd": ccd}})
+            if smiles:
+                # Boltz's own spelling, and the one the hand-written PETase
+                # template in templates/oracle/ already used.
+                sequences.append({"ligand": {"id": base_id, "smiles": smiles}})
+            else:
+                for j, ccd in enumerate(ccd_codes):
+                    sequences.append({"ligand": {"id": base_id if j == 0 else f"{base_id}{j}",
+                                                 "ccd": ccd}})
         else:
             raise ValueError(
                 f"boltz: unrecognised AF3 entity {sorted(entity)!r}; expected "
@@ -748,10 +762,17 @@ def _rf3_input_from_af3_template(af3_template: dict, name: str, seq: str) -> dic
     comparison is only meaningful if both are folding the same complex, and two
     hand-maintained templates drift. AF3 template stays authoritative.
 
-    Ligands are passed as CCD codes, which RF3's docs rank above SMILES and
-    CIF/SDF for accuracy. An AF3 ligand entity may name several CCD codes under
-    one chain id; each becomes its own component, since RF3 keys components to a
-    single code.
+    PREFER CCD CODES: RF3's docs rank them above SMILES and CIF/SDF for
+    accuracy, so a ligand that has a CCD code should be given as one. An AF3
+    ligand entity may name several CCD codes under one chain id; each becomes
+    its own component, since RF3 keys components to a single code.
+
+    SMILES ligands are translated for the case where no CCD code exists -- the
+    PETase PET dimer, for instance. RF3 parses inputs through atomworks, whose
+    ``ChemicalComponent.from_dict`` dispatches on the KEY present: ``smiles``
+    builds a ``SmilesComponent``, ``ccd_code`` a ``CCDComponent``. So a SMILES
+    component carries ``smiles`` INSTEAD OF ``ccd_code``, and one entity cannot
+    carry both.
 
     MSA fields are dropped. The AME templates carry empty ``unpairedMsa`` /
     ``pairedMsa``, so these are single-sequence predictions on both sides.
@@ -762,14 +783,30 @@ def _rf3_input_from_af3_template(af3_template: dict, name: str, seq: str) -> dic
             components.append({"seq": seq, "chain_id": entity["protein"]["id"]})
         elif "ligand" in entity:
             ccd_codes = entity["ligand"].get("ccdCodes")
-            if not ccd_codes:
+            smiles = entity["ligand"].get("smiles")
+            if ccd_codes and smiles:
+                raise ValueError(
+                    f"rf3: ligand entity {entity['ligand'].get('id')!r} has BOTH ccdCodes and "
+                    "smiles. Pick one -- translating both would put the ligand in the complex twice."
+                )
+            if not ccd_codes and not smiles:
                 raise ValueError(
                     f"rf3: ligand entity {entity['ligand'].get('id')!r} in the AF3 template has "
-                    "no ccdCodes. SMILES and file-based ligands are not translated yet; add them "
-                    "here rather than letting the ligand silently vanish from the complex."
+                    "neither ccdCodes nor smiles. File-based ligands are not translated yet; add "
+                    "them here rather than letting the ligand silently vanish from the complex."
                 )
-            for ccd in ccd_codes:
-                components.append({"ccd_code": ccd, "chain_id": entity["ligand"]["id"]})
+            if smiles:
+                # RF3 parses inputs through atomworks, whose
+                # ChemicalComponent.from_dict dispatches on the KEY: "smiles"
+                # builds a SmilesComponent, "ccd_code" a CCDComponent. So the
+                # component carries `smiles` instead of `ccd_code`, not as well
+                # as it. Verified against
+                # atomworks/io/tools/inference.py in rf3_5.sif.
+                components.append({"smiles": smiles,
+                                   "chain_id": entity["ligand"]["id"]})
+            else:
+                for ccd in ccd_codes:
+                    components.append({"ccd_code": ccd, "chain_id": entity["ligand"]["id"]})
         else:
             raise ValueError(
                 f"rf3: unrecognised AF3 entity {sorted(entity)!r}; expected 'protein' or 'ligand'."
@@ -986,8 +1023,15 @@ def _protenix_input_from_af3_template(af3_template: dict, name: str, seq: str) -
     ``{"ligand": {"ccdCodes": [...]}}``. Protenix takes the same ``sequences``
     key but spells a protein ``{"proteinChain": {"sequence", "count"}}`` and a
     ligand ``{"ligand": {"ligand": "CCD_<code>", "count"}}`` -- the ``CCD_``
-    prefix is required, and Protenix's own parser rejects a bare code
-    ("Please change the 'ligand' input format to 'CCD_' or 'FILE_'").
+    prefix is required for a CCD code, since a bare three-letter code is read
+    as a SMILES string and fails to parse.
+
+    A SMILES ligand is passed BARE, with no prefix: ``build_ligand()`` treats
+    anything not starting with ``CCD_`` or ``FILE_`` as SMILES and embeds it
+    with RDKit. (The "Please change the 'ligand' input format to 'CCD_' or
+    'FILE_'" string in that parser is a conformer-generation TIMEOUT message,
+    not a format rejection -- it fires after 90 s on a molecule RDKit cannot
+    embed, which is the real reason to prefer CCD codes where they exist.)
 
     An AF3 ligand entity may name several CCD codes under one chain id; each
     becomes its own Protenix entity, since the format carries one code per
@@ -1003,14 +1047,31 @@ def _protenix_input_from_af3_template(af3_template: dict, name: str, seq: str) -
             sequences.append({"proteinChain": {"sequence": seq, "count": 1}})
         elif "ligand" in entity:
             ccd_codes = entity["ligand"].get("ccdCodes")
-            if not ccd_codes:
+            smiles = entity["ligand"].get("smiles")
+            if ccd_codes and smiles:
+                raise ValueError(
+                    f"protenix: ligand entity {entity['ligand'].get('id')!r} has BOTH ccdCodes "
+                    "and smiles. Pick one -- translating both would put the ligand in the "
+                    "complex twice."
+                )
+            if not ccd_codes and not smiles:
                 raise ValueError(
                     f"protenix: ligand entity {entity['ligand'].get('id')!r} in the AF3 template "
-                    "has no ccdCodes. SMILES and file-based ligands are not translated yet; add "
-                    "them here rather than letting the ligand silently vanish from the complex."
+                    "has neither ccdCodes nor smiles. File-based ligands are not translated yet; "
+                    "add them here rather than letting the ligand silently vanish from the complex."
                 )
-            for ccd in ccd_codes:
-                sequences.append({"ligand": {"ligand": f"CCD_{ccd}", "count": 1}})
+            if smiles:
+                # A BARE SMILES, with no prefix. The "CCD_"/"FILE_" message in
+                # Protenix's parser is a conformer-generation TIMEOUT, not a
+                # format rejection -- build_ligand() documents
+                # {"ligand": {"ligand": "CCC=O"}} as a supported input and
+                # falls through to RDKit embedding for anything not starting
+                # with CCD_ or FILE_. Verified against
+                # protenix/data/inference/json_parser.py in protenix.sif.
+                sequences.append({"ligand": {"ligand": smiles, "count": 1}})
+            else:
+                for ccd in ccd_codes:
+                    sequences.append({"ligand": {"ligand": f"CCD_{ccd}", "count": 1}})
         else:
             raise ValueError(
                 f"protenix: unrecognised AF3 entity {sorted(entity)!r}; expected "

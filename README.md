@@ -2,6 +2,8 @@
 
 **Combinatorial Libraries for Exploration and Optimization (CLEO)** is a framework for designing protein libraries and using experimental data to guide discovery. A well-designed combinatorial library creates a rich search space that enables iterative rounds of data collection and model-guided sequence selection. See the [tutorial](#-tutorial) below for a full walkthrough.
 
+**Training a policy?** Start with [TRAINING_PROTOCOL.md](TRAINING_PROTOCOL.md) — the current pipeline (pooled oracles, held-out AF3 eval, fragment shuffling), with two runnable example configs.
+
 ## 🛠️ Installation
 
 CLEO uses [uv](https://docs.astral.sh/uv/), follow the steps below to install.

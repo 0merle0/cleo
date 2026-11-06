@@ -71,12 +71,19 @@ Also set `seed:`. Two unseeded runs of one config gave control pass rates of
 68.8% and 89.6% -- a 21-point swing, larger than most effects these runs are
 built to detect.
 
-## Known limitation: SMILES ligands
+## Ligands: CCD codes and SMILES
 
-The AF3-JSON path handles ligands as **CCD codes only**; there is no SMILES
-support in `oracle.py`. The PETase work uses a PET dimer given as SMILES,
-which exists only in the Boltz YAML template, so **the pool cannot currently
-run on that target** -- RF3 and Protenix have no way to receive the ligand.
-The pool works on ligand-free targets and on any target whose ligands have CCD
-codes, which includes the whole AME benchmark. Adding SMILES to the AF3-JSON
-translators would lift this.
+All the oracles translate the same AF3 JSON, so pass the `.json` and no oracle
+can fold a different complex than the others.
+
+    "ligand": {"id": "B", "ccdCodes": ["ZN"]}        # preferred
+    "ligand": {"id": "B", "smiles": "O=C(OCCO)..."}  # when no CCD code exists
+
+One entity carries one or the other; giving both raises rather than quietly
+adding the ligand twice. Prefer CCD codes -- RF3's docs rank them above SMILES
+for accuracy, and Protenix embeds a SMILES with RDKit and gives up after 90 s
+on molecules it cannot handle.
+
+`templates/oracle/petase_af3_template.json` is a worked SMILES example: the
+PET dimer has no CCD code, which is why the pool could not run on that target
+before SMILES translation existed.

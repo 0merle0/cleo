@@ -1,0 +1,172 @@
+# Fragment-shuffling RL with a pooled oracle and a held-out AF3 probe.
+#
+#   uv run cleo-design-train --config-name fragment_shuffle
+#
+# This is the CURRENT pipeline. `pooled_oracle.yaml` is the simpler one: it
+# rewards each sequence for folding. This one rewards each FRAGMENT for folding
+# in company it has never met, which is what a combinatorial library actually
+# asks of it. See TRAINING_PROTOCOL.md for why, and for how to read the output.
+#
+# Three differences from pooled_oracle.yaml:
+#   1. reward is FragmentReward, not UniversalReward -- per-token, not scalar
+#   2. a `frag` step shuffles the batch into chimeras and folds those
+#   3. AF3 probes the same chimeras on a stride, read-only
+#
+# Change the paths marked CHANGE ME to point at your own target.
+
+run_name: fragment_shuffle_M0097
+output_dir: ${hydra:runtime.cwd}/runs/${run_name}
+pdb: ${hydra:runtime.cwd}/templates/ame_example/M0097_target.pdb      # CHANGE ME
+checkpoint_path: null
+checkpoint_every_n_steps: 25
+
+algorithm: grpo
+batch_size: 16          # B; chimeras per step = B * rotations (see below)
+N_steps: 200
+lr: 1e-4
+seed: 0                 # SET THIS for anything you intend to compare
+
+kl_weight: 0.0
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+use_avg_reward: false   # must stay off with a pooled oracle; see the protocol
+
+model_type: ligand_mpnn
+ligand_mpnn_use_side_chain_context: 1
+temperature: 1.0
+omit_AA: CX
+fixed_residues: A26 A59 A61 A93                                       # CHANGE ME
+
+reward:
+  _target_: cleo.design.utils.fragment_reward.FragmentReward
+  output_dir: ${output_dir}
+  run_name: ${run_name}
+
+  # Per-token reward: every position inside slot j carries that fragment's
+  # standardised score. Scores are standardised WITHIN slot, so a slot that is
+  # intrinsically harder does not just become a lower reward.
+  k: 4                  # fragments per sequence; must match frag.cfg.k
+  frag_step: frag       # reads frag_slot0..frag_slot{k-1}
+  mode: min             # lower motif RMSD is better
+
+  # PARENT GEOMETRY, folded alongside the chimeras. Do not drop this. With
+  # chimera quality as the only objective the policy optimises fragments that
+  # travel while the sequences it actually emits degrade: 28 passing parents
+  # against 182 for the arm trained on parent RMSD alone, and retention fell
+  # with them. The fragment term says "your parts travel"; this says "and you
+  # fold". Costs ~25% more trunk passes.
+  parent_metric: ame_motif_rmsd
+  w_geom: 1.0
+  w_frag: 1.0
+
+  steps:
+
+    # --- the parents: fold, score, reduce ------------------------------------
+    - name: fold
+      target_fn: cleo.design.utils.oracle.multi_oracle_from_df
+      cfg:
+        rundir: null
+        template_path: ${hydra:runtime.cwd}/templates/ame_example/M0097_af3_template.json  # CHANGE ME
+        oracles: [rf3, boltz, protenix]
+        schedule: round_robin
+        num_diffusion_samples: 5
+        per_sample_rows: true
+        early_stopping_plddt_threshold: 0.0
+
+    - name: ame
+      target_fn: cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df
+      cfg:
+        design_pdb: ${hydra:runtime.cwd}/templates/ame_example/M0097_target.pdb
+        structure_col: fold_path
+        motif_atoms:                                                  # CHANGE ME
+          A26: [ND1, CG, CE1]
+          A59: [OE1, CD]
+          A61: [SG, CB, CA]
+          A93: [SG, CB]
+
+    - name: bo5
+      target_fn: cleo.design.utils.rfd2_benchmark.best_of_n_from_df
+      cfg:
+        group_col: name
+        metric_prefix: ame
+
+    # --- the shuffle ---------------------------------------------------------
+    # Unlike every other step, the set this folds is NOT the set it is given.
+    # It receives B sampled sequences and folds B*rotations chimeras built from
+    # their fragments, then hands each parent one column per slot holding that
+    # fragment's mean outcome across the chimeras it appeared in.
+    #
+    # Chimera (rho, i) takes slot j from parent (i + rho*j) % B, so every
+    # fragment is tried in `rotations` different backgrounds.
+    #
+    # COST: rotations * batch chimeras per step, each folded best-of-5.
+    # Here 4 * 16 * 5 = 320 folds/step; a 200-step run is 64,000 folds.
+    - name: frag
+      target_fn: cleo.design.utils.fragment_reward.chimera_metrics_from_df
+      cfg:
+        rundir: null
+        k: 4                  # must match reward.k
+        rotations: 4
+        metric_col: ame_motif_rmsd
+
+        # The chimeras get the SAME pooled oracle as the parents. train_step is
+        # forwarded into this nested config explicitly -- without that the
+        # dispatcher sees train_step=0 every rollout and draws one predictor for
+        # the whole run, which logs and plots exactly like a working
+        # multi-oracle run and is not one.
+        oracle_fn: cleo.design.utils.oracle.multi_oracle_from_df
+        oracle_cfg:
+          rundir: null
+          template_path: ${hydra:runtime.cwd}/templates/ame_example/M0097_af3_template.json
+          oracles: [rf3, boltz, protenix]
+          schedule: round_robin
+          num_diffusion_samples: 5
+          per_sample_rows: true
+          early_stopping_plddt_threshold: 0.0
+
+        metric_fn: cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df
+        metric_cfg:
+          rundir: null
+          design_pdb: ${hydra:runtime.cwd}/templates/ame_example/M0097_target.pdb
+          structure_col: fold_path
+          motif_atoms:
+            A26: [ND1, CG, CE1]
+            A59: [OE1, CD]
+            A61: [SG, CB, CA]
+            A93: [SG, CB]
+
+        bo_fn: cleo.design.utils.rfd2_benchmark.best_of_n_from_df
+        bo_cfg:
+          rundir: null
+          group_col: name
+          metric_prefix: ame
+
+        # --- the held-out evaluator ------------------------------------------
+        # Fold the SAME chimeras under AF3 every N steps. READ-ONLY: it writes
+        # one column and touches neither the score nor the advantage. AF3 must
+        # never enter the objective -- it is the held-out evaluator and keeping
+        # it out is the whole point.
+        #
+        # This exists because the training-oracle number stopped tracking
+        # transfer: M0315 climbed 96.4 -> 99.6 on RF3 between generations while
+        # its AF3 chimera pass went 66.8 -> 65.6. Without the probe that is only
+        # visible after a full train-then-evaluate cycle.
+        #
+        # Cost is one extra fold per stride: ~1% of a run at every=100.
+        af3_probe_every: 25
+        af3_probe_cfg:
+          af3_container: /net/software/containers/af3.sif
+          af3_script: /opt/alphafold3/run_alphafold.py
+          model_dir: /net/databases/alphafold
+
+  # FragmentReward overrides __call__ and never runs this aggregation; it is
+  # here because the base class requires the key. The per-token advantage comes
+  # from the slot columns above, not from this list.
+  reward_aggregation:
+    - metric: ame_motif_rmsd
+      lower_bound: 0.5
+      upper_bound: 6.0
+      weight: 1.0
+      mode: min

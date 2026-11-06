@@ -1,0 +1,25 @@
+{
+  "name": "petase_pet_dimer",
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "MGEEEELELERPSGERTPVRRHRFPARKANNFEEAVANVERLIEEIRAAGVDFSARKERAVVVGYSLGVVTGMIMFATGTDFIEALRKALEIGKKVVEEDPEFMERHRKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGEAGEAVVEVLTAAGVDVLLMGGLGSGYPVTIYQA",
+        "unpairedMsa": "",
+        "pairedMsa": "",
+        "templates": []
+      }
+    },
+    {
+      "ligand": {
+        "id": "B",
+        "smiles": "O=C(OCCO)c2ccc(C(=O)OCCOC(=O)c1ccc(C(=O)OCCO)cc1)cc2"
+      }
+    }
+  ],
+  "modelSeeds": [
+    1
+  ],
+  "dialect": "alphafold3",
+  "version": 2
+}
