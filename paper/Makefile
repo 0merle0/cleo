@@ -1,4 +1,4 @@
-.PHONY: pdf clean-pdf notebook library campaigns all svg2pdf clean watch
+.PHONY: pdf clean-pdf notebook library campaigns all svg2pdf clean watch figures
 
 LATEX = latexmk -pdf -interaction=nonstopmode -halt-on-error
 SVG_DIR = figures/svg
@@ -22,6 +22,23 @@ PDFS := $(patsubst $(SVG_DIR)/%.svg,$(PDF_DIR)/%.pdf,$(SVGS))
 # `make pdf` builds the paper only. The experimental record is a separate
 # document with a separate reader -- see the header of notebook.tex for why the
 # two are not one file. `make all` builds both.
+# `make figures` rebuilds every figure the paper uses, from its script, into
+# figures/svg/. That is the editable deliverable: each figure is one
+# self-contained SVG that opens in Inkscape with its text as real text.
+#
+# Order matters only for fig3: momi_fragments regenerates the per-part table
+# it reads, and that table is gated to the second PETase library.
+FIG_SCRIPTS = momi_fragments concept_library concept_loop fig2_libraries \
+              fig3_momi figS_posthoc
+
+figures:
+	@for f in $(FIG_SCRIPTS); do \
+	  printf '  %-20s ' $$f; \
+	  (cd .. && uv run python paper/figures/$$f.py >/dev/null 2>&1) \
+	    && echo OK || echo FAILED; \
+	done
+	@echo "figures/svg/ is the editable set; open any of them in Inkscape."
+
 all: pdf notebook library campaigns
 
 pdf: svg2pdf

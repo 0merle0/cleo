@@ -112,8 +112,12 @@ def panel_activity(ax, d):
     for i, r in enumerate(rounds):
         v = s[s.round_number == r].g20_norm_rate.to_numpy()
         x = i + 1 + rng.uniform(-0.27, 0.27, len(v))
+        # rasterized: ~3,300 points per panel would otherwise be ~3,300
+        # separate objects in Inkscape, which makes the file slow to open
+        # and miserable to select around. One image object instead; the
+        # axes, ticks and labels stay vector and editable.
         ax.plot(x, v, "o", ms=1.7, mfc=shades[i], mec="none", alpha=0.45,
-                zorder=2)
+                zorder=2, rasterized=True)
         ax.plot([i + 0.64, i + 1.36], [np.median(v)] * 2, "-", color="black",
                 lw=1.8, zorder=5)
     ax.axhline(1, color=PALETTE["gray"], lw=1, ls=":", zorder=1)
@@ -139,7 +143,8 @@ def panel_dist_activity(ax, d, parent):
     for r in sorted(s.round_number.unique()):
         g = s[s.round_number == r]
         ax.plot(g.nmut, g.g20_norm_rate, "o", ms=1.8, mfc=shades[int(r)],
-                mec="none", alpha=0.5, zorder=2, label=f"round {int(r)}")
+                mec="none", alpha=0.5, zorder=2, rasterized=True,
+                label=f"round {int(r)}")
     ax.axhline(1, color=PALETTE["gray"], lw=1, ls=":", zorder=1)
     ax.set_xlabel("mutations from G20 (whole sequence)", fontsize=fs(7.5))
     ax.set_ylabel("activity ($\\times$ G20)", fontsize=fs(7.5))

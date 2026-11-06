@@ -142,6 +142,27 @@ def _apply():
         # default, which is the one rounded corner a figure gets without
         # anyone drawing it.
         "legend.fancybox": False,
+        # KEEP TEXT AS TEXT IN THE EXPORT.
+        #
+        # matplotlib defaults to svg.fonttype "path", which converts every
+        # label to outlines. The figure looks identical and is completely
+        # uneditable: opening it in Illustrator or Inkscape gives you a pile
+        # of filled shapes, so fixing one typo means redrawing the glyph.
+        # "none" emits real <text> elements that can be selected, retyped and
+        # restyled in any vector editor.
+        #
+        # The trade: the editor has to resolve the font by name. Everything
+        # here is Arial with Liberation/Nimbus/DejaVu fallbacks, all of which
+        # are metrically compatible, so a machine without Arial substitutes
+        # one of those and the layout holds. That is the right trade for a
+        # figure meant to be hand-edited -- outlines would be the right one
+        # only for a camera-ready file nobody touches again.
+        "svg.fonttype": "none",
+        # Same idea for the PDFs: 42 embeds TrueType so text stays selectable
+        # and searchable rather than being drawn as Type 3 bitmap-ish glyphs,
+        # which is also what most journals ask for.
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
     })
 
 

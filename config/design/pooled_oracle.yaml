@@ -1,0 +1,133 @@
+# Pooled-oracle RL fine-tuning -- a complete, runnable example.
+#
+#   uv run cleo-design-train --config-name pooled_oracle
+#
+# WHAT THIS IS FOR
+#
+# Training against one structure predictor buys performance that does not
+# transfer: the policy learns that predictor's quirks. Measured on M0097, 256
+# designs, best-of-5 -- sequences no policy optimised score 36.3% under RF3 and
+# 40.2% under AF3, so the two agree within -3.9 points. RF3-TRAINED policies
+# score +18.0 (sequence reward) and +36.3 (fragment reward) higher under RF3
+# than under AF3. That ~22-40 points is excess that exists only under the
+# training oracle.
+#
+# `multi_oracle_from_df` removes the fixed target by drawing ONE predictor per
+# rollout. AF3 is then kept out of training entirely and used only to report,
+# so the reported number is a held-out measurement rather than a training score.
+#
+# Everything below runs on files tracked in this repo. It is a real config, not
+# a sketch -- point it at your own target by changing the four paths marked
+# CHANGE ME.
+
+# -- General training params --
+run_name: pooled_oracle_M0097
+output_dir: ${hydra:runtime.cwd}/runs/${run_name}
+pdb: ${hydra:runtime.cwd}/templates/ame_example/M0097_target.pdb   # CHANGE ME
+checkpoint_path: null
+checkpoint_every_n_steps: 25
+
+algorithm: grpo
+batch_size: 32
+N_steps: 200
+lr: 1e-4
+
+# SET THE SEED for anything you intend to compare. Two unseeded runs of one
+# config on this benchmark gave control pass rates of 68.8% and 89.6% -- a
+# 21-point swing, larger than most effects these runs are built to detect. A
+# single-run A/B at n~96 cannot resolve anything smaller than that.
+seed: 0
+
+# -- GRPO params --
+kl_weight: 0.0
+N_updates: 16
+update_batch_size: 8
+clip_eps_low: 0.2
+clip_eps_high: 0.28
+
+# Leave use_avg_reward OFF with a pooled oracle. GRPO's advantage is
+# (r - mean) / (std + 1e-3) computed WITHIN the batch, which cancels a
+# whole-batch oracle offset. A running-history baseline would compare this
+# step's oracle against previous steps' oracles and inject the ~26-point
+# disagreement between predictors straight into the advantage.
+use_avg_reward: false
+
+# -- MPNN params --
+model_type: ligand_mpnn
+ligand_mpnn_use_side_chain_context: 1
+temperature: 1.0              # keep at 1.0; lower collapses modes
+omit_AA: CX
+fixed_residues: A26 A59 A61 A93                                    # CHANGE ME
+
+reward:
+  _target_: cleo.design.utils.reward.UniversalReward
+  output_dir: ${output_dir}
+  run_name: ${run_name}
+
+  steps:
+
+    # 1. FOLD WITH A DIFFERENT ORACLE EACH STEP.
+    #
+    # One template feeds all three. Boltz, RF3 and Protenix each translate the
+    # SAME AF3 JSON, so no oracle can end up folding a different complex than
+    # the others -- pass the .json, not Boltz's own .yaml.
+    #
+    # Container paths are defaulted in oracle.py and only need setting if your
+    # site differs:
+    #   rf3_container      /net/software/containers/versions/modelhub_inference/rf3_5.sif
+    #   protenix_container /net/software/containers/pipelines/protenix.sif
+    # Unused keys are ignored by whichever oracle is drawn, so all three
+    # oracles' settings can sit side by side in this one block.
+    - name: fold
+      target_fn: cleo.design.utils.oracle.multi_oracle_from_df
+      cfg:
+        rundir: null                  # set dynamically by UniversalReward
+        template_path: ${hydra:runtime.cwd}/templates/ame_example/M0097_af3_template.json   # CHANGE ME
+        oracles: [rf3, boltz, protenix]
+        # round_robin is oracles[train_step % 3]: exactly uniform by
+        # construction. Do NOT use "random" to get an even split -- measured
+        # over a real 115-step run the seed-arithmetic draw gave 43/32/25
+        # against the intended thirds, and the lean was reproducible across
+        # seeds, so it is a property of the sequence, not noise.
+        schedule: round_robin
+        # Best-of-5 is the benchmark's own unit. Keep per_sample_rows on and
+        # reduce in step 3; a single-sample run measures something else.
+        num_diffusion_samples: 5
+        per_sample_rows: true
+        # RF3 defaults this to 0.5 and abandons predictions it judges
+        # unpromising, writing confidences with no structure. Those are exactly
+        # the FAILING designs the reward has to see -- left on, they drop out of
+        # the batch and bias reward toward what RF3 already liked.
+        early_stopping_plddt_threshold: 0.0
+
+    # 2. Score the geometry. `structure_col: fold_path` is stable whichever
+    # oracle ran -- that renaming is the whole point of the dispatcher.
+    - name: ame
+      target_fn: cleo.design.utils.rfd2_benchmark.rfd2_metrics_from_df
+      cfg:
+        design_pdb: ${hydra:runtime.cwd}/templates/ame_example/M0097_target.pdb
+        structure_col: fold_path
+        # Given explicitly so the 21 MB .trb is not needed. Omit this and the
+        # step reads motif atoms from <design_pdb>.trb instead.
+        motif_atoms:                                               # CHANGE ME
+          A26: [ND1, CG, CE1]
+          A59: [OE1, CD]
+          A61: [SG, CB, CA]
+          A93: [SG, CB]
+
+    # 3. REDUCE 5 ROWS PER SEQUENCE BACK TO 1. This is mandatory, not optional:
+    # every oracle here defaults to best-of-5, and a reward step must return one
+    # row per sampled sequence or the reward tensor will not match the batch.
+    # UniversalReward refuses to build a pipeline that folds N times without it.
+    - name: bo5
+      target_fn: cleo.design.utils.rfd2_benchmark.best_of_n_from_df
+      cfg:
+        group_col: name
+        metric_prefix: ame
+
+  reward_aggregation:
+    - metric: ame_motif_rmsd
+      lower_bound: 0.5
+      upper_bound: 6.0
+      weight: 1.0
+      mode: min
