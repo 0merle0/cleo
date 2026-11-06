@@ -46,7 +46,11 @@ SUBMIT = """#!/bin/bash
 #SBATCH --mem=64g
 #SBATCH -t 7-00:00:00
 #SBATCH -J {name}
-#SBATCH -o {logs}/{name}.log
+# NOTE: sbatch parses #SBATCH lines before any shell runs, so a
+# $VAR here is NOT expanded -- it would create a directory called
+# "$BUNDLE". This path is relative to the SUBMITTING directory;
+# submit_all.sh overrides it with an absolute one via --output.
+#SBATCH -o logs/%x-%j.log
 
 # Resolve the bundle from this script's own location, so the bundle can be
 # moved or renamed without editing anything.
@@ -59,7 +63,15 @@ mkdir -p "$CLEO_RUNS" || {{ echo "cannot create $CLEO_RUNS"; exit 1; }}
 [ -w "$CLEO_RUNS" ] || {{ echo "$CLEO_RUNS is not writable"; exit 1; }}
 
 cd "$CLEO_REPO" || {{ echo "set CLEO_REPO to your cleo checkout"; exit 1; }}
-uv run cleo-design-train --config-path "$BUNDLE/configs" --config-name {name}
+
+# hydra.run.dir is RELATIVE TO THE CWD by default, which is the repo -- so
+# without this every job writes outputs/<date>/<time>/ into the checkout,
+# 18 of them concurrently, and it fails outright on a read-only or shared
+# clone. Point it at the run directory with everything else.
+uv run cleo-design-train \
+    --config-path "$BUNDLE/configs" \
+    --config-name {name} \
+    hydra.run.dir="$CLEO_RUNS/{name}/hydra"
 """
 
 README = """# Clean comparison: does fragment shuffling help?
@@ -134,6 +146,27 @@ The oracle container paths are the IPD defaults baked into
 `cleo/design/utils/oracle.py`. On another cluster, set `rf3_container`,
 `protenix_container` and the `af3_probe_cfg` paths in the configs.
 
+## Where it writes
+
+Everything the jobs produce goes under two directories, and `submit_all.sh`
+proves both are writable (by creating a file, not by trusting `[ -w ]`)
+before it queues anything:
+
+    $CLEO_RUNS/<name>/        run output, checkpoints, per-step metrics
+    $CLEO_RUNS/<name>/hydra/  hydra's own run dir
+    <bundle>/logs/            sbatch stdout
+
+Nothing is written into the cleo checkout. That needed pinning:
+`hydra.run.dir` is relative to the working directory by default, which is
+the repo, so without the override in each submit script all 18 jobs would
+write `outputs/<date>/<time>/` into your clone concurrently — and fail
+outright on a read-only or shared one.
+
+`CLEO_RUNS` defaults to `runs/` inside this bundle, which is group-writable.
+If you are not in the owning group, point it anywhere you own:
+
+    export CLEO_RUNS=/net/scratch/$USER/cleanab
+
 ## What comes back
 
 Per run, under `$CLEO_RUNS/<name>/`:
@@ -177,15 +210,30 @@ BUNDLE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export CLEO_RUNS="${CLEO_RUNS:-$BUNDLE/runs}"
 
 # Fail before queueing rather than an hour into 18 jobs.
+#
+# Every path the jobs write to is under one of these two: run output and
+# checkpoints under $CLEO_RUNS/<name>/, hydra's own run dir under
+# $CLEO_RUNS/<name>/hydra (pinned explicitly, since it otherwise lands in
+# the repo), and sbatch logs under $BUNDLE/logs.
+#
+# Tested by actually creating a file, not with `[ -w ]`: on NFS with ACLs or
+# a full quota, -w reports writable and the write still fails.
 mkdir -p "$CLEO_RUNS" "$BUNDLE/logs" || exit 1
 for d in "$CLEO_RUNS" "$BUNDLE/logs"; do
-  [ -w "$d" ] || { echo "NOT WRITABLE: $d"; exit 1; }
+  probe="$d/.write_probe.$$"
+  if ! ( : > "$probe" ) 2>/dev/null; then
+    echo "NOT WRITABLE: $d"
+    echo "  set CLEO_RUNS to somewhere you own, e.g. /net/scratch/\$USER/cleanab"
+    exit 1
+  fi
+  rm -f "$probe"
 done
 [ -d "$CLEO_REPO/src/cleo" ] || { echo "CLEO_REPO does not look like a cleo checkout: $CLEO_REPO"; exit 1; }
 
 n=0
 for s in "$BUNDLE"/submit/*.submit; do
-  CLEO_REPO="$CLEO_REPO" CLEO_RUNS="$CLEO_RUNS" sbatch "$s" && n=$((n+1))
+  CLEO_REPO="$CLEO_REPO" CLEO_RUNS="$CLEO_RUNS" \
+    sbatch --output="$BUNDLE/logs/%x-%j.log" "$s" && n=$((n+1))
 done
 echo "submitted $n job(s); outputs under $CLEO_RUNS"
 """
@@ -234,7 +282,7 @@ def main():
         cfg.output_dir = "${oc.env:CLEO_RUNS}/" + name
         (out / "configs" / f.name).write_text(OmegaConf.to_yaml(cfg, resolve=False))
         (out / "submit" / f"{name}.submit").write_text(
-            SUBMIT.format(name=name, logs="$BUNDLE/logs"))
+            SUBMIT.format(name=name))
 
     (out / "README.md").write_text(README)
 
