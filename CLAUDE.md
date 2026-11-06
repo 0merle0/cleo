@@ -1,5 +1,15 @@
 # CLEO - Combinatorial Libraries for Exploration and Optimization
 
+> **Start here if you are an agent:** [AGENTS.md](AGENTS.md) — hard invariants,
+> working style, and which doc matches your task.
+>
+> | | |
+> |---|---|
+> | how to run training | [TRAINING_PROTOCOL.md](TRAINING_PROTOCOL.md) |
+> | *why* the method is this way | [docs/PRINCIPLES.md](docs/PRINCIPLES.md) |
+> | jobs, SLURM, run output | [docs/RUNNING.md](docs/RUNNING.md) |
+> | any figure (all SVG) | [docs/FIGURES.md](docs/FIGURES.md) |
+
 ## What This Is
 
 A framework for protein library design and iterative experimental optimization. It has two main modules:

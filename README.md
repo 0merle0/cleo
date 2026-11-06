@@ -2,7 +2,7 @@
 
 **Combinatorial Libraries for Exploration and Optimization (CLEO)** is a framework for designing protein libraries and using experimental data to guide discovery. A well-designed combinatorial library creates a rich search space that enables iterative rounds of data collection and model-guided sequence selection. See the [tutorial](#-tutorial) below for a full walkthrough.
 
-**Training a policy?** Start with [TRAINING_PROTOCOL.md](TRAINING_PROTOCOL.md) — the current pipeline (pooled oracles, held-out AF3 eval, fragment shuffling), with two runnable example configs.
+**Training a policy?** Start with [TRAINING_PROTOCOL.md](TRAINING_PROTOCOL.md) — the current pipeline (pooled oracles, held-out AF3 eval, fragment shuffling), with runnable example configs. The reasoning behind it is in [docs/PRINCIPLES.md](docs/PRINCIPLES.md); operational detail in [docs/RUNNING.md](docs/RUNNING.md); figures in [docs/FIGURES.md](docs/FIGURES.md). Agents: [AGENTS.md](AGENTS.md).
 
 ## 🛠️ Installation
 
