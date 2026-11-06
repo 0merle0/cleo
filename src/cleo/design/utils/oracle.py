@@ -1365,10 +1365,28 @@ def multi_oracle_from_df(df_input, cfg, step_name="fold"):
     # RF3 -- and a `skip_run` reread finds the right tree.
     sub = _ORACLE_FNS[choice](df_input, cfg, step_name=choice)
 
-    out = sub.rename(columns={f"{choice}_path": f"{step_name}_path"})
+    # Rename EVERY column the oracle produced, not just the path.
+    #
+    # Each oracle prefixes its outputs with the step name it was called under,
+    # which here is the oracle's own name -- so a reward aggregating on
+    # `boltz_iptm` got that column on Boltz steps and nothing at all on RF3 or
+    # Protenix ones. That is a reward term that silently vanishes for two
+    # thirds of a pooled run, which is worse than a crash because the run
+    # completes and the numbers look plausible.
+    #
+    # Renaming the whole prefix gives the stable `{step_name}_*` the docstring
+    # promises, so `fold_iptm` means "whichever oracle folded this step".
+    #
+    # NOT every field is common to all three. Shared: path, sample, iptm, ptm.
+    # Boltz alone has ligand_iptm, protein_iptm, complex_*, confidence_score;
+    # RF3 and Protenix alone have plddt, has_clash, ranking_score, chain_ptm_*;
+    # RF3 alone has interaction_pae_min. A reward that needs more than
+    # iptm/ptm from the oracle itself cannot be pooled as-is -- compute it
+    # downstream from `{step_name}_path` instead, which every oracle provides.
+    out = sub.rename(columns={c: f"{step_name}_{c[len(choice) + 1:]}"
+                              for c in sub.columns
+                              if c.startswith(f"{choice}_")})
     out[f"{step_name}_oracle"] = choice
-    if f"{choice}_sample" in out.columns:
-        out = out.rename(columns={f"{choice}_sample": f"{step_name}_sample"})
     if f"{step_name}_path" not in out.columns:
         raise RuntimeError(
             f"multi_oracle: {choice} returned no {choice}_path column; cannot "

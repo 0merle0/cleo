@@ -59,8 +59,13 @@ All commands use Hydra for configuration. External configs are passed with `--co
 ### Design Pipeline
 
 ```bash
-# 1. RL training - fine-tune ProteinMPNN with reward functions
-cleo-design-train --config-name denovo_petase
+# 1. RL training - fine-tune ProteinMPNN with reward functions.
+#    With no --config-name this runs `fragment_shuffle`: the CURRENT pipeline,
+#    i.e. pooled training oracles with AF3 held out, plus fragment shuffling.
+#    See TRAINING_PROTOCOL.md.
+cleo-design-train
+cleo-design-train --config-name denovo_petase      # PETase, pooled oracle
+cleo-design-train --config-name pooled_oracle      # pooled, no shuffling
 
 # 2. Sample sequences from trained checkpoints, split into fragments
 cleo-design-sample --config-name sample
@@ -282,6 +287,17 @@ uv run cleo-design-train \
 ```
 
 ## Available Structure Prediction Oracles
+
+**The default is a POOL of these, not one.** `multi_oracle_from_df` draws one
+predictor per rollout and AF3 is held out to report under; see
+TRAINING_PROTOCOL.md. All of them translate the same AF3 JSON template, with
+ligands as CCD codes or, where no code exists, SMILES.
+
+After the draw, every column is renamed to the step's name, so a reward reads
+`fold_iptm` rather than `boltz_iptm` and does not know which oracle ran. Only
+`path`, `sample`, `iptm` and `ptm` are common to all three -- a reward needing
+more than that from the oracle itself cannot be pooled, and should compute it
+downstream from `{step}_path`.
 
 - **Boltz** (`cleo.design.utils.oracle.boltz_from_df`) - uses a YAML template, runs CPU or GPU
 - **AlphaFold3** (`cleo.design.utils.oracle.af3_from_df`) - uses a JSON template, requires container + model weights

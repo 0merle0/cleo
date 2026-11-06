@@ -1,18 +1,22 @@
-# Config for RL fine-tuning of ProteinMPNN to generate sequences aligned to custom rewards
+# PETase library design with a POOLED training oracle.
 #
-# Usage:
-#   python -m cleo.design.train_policy --config-name denovo_petase
+#   uv run cleo-design-train --config-name denovo_petase
 #
-# This example fine-tunes LigandMPNN on PETase using GRPO with a reward
-# pipeline that includes Boltz structure prediction, catalytic-site geometry
-# metrics, and Hamming distance to reference sequences.
+# This is the pooled-oracle version of the PETase example. The single-oracle
+# original is kept as `denovo_petase_single_oracle.yaml` -- it records what was
+# actually run, and it no longer runs as-is (see the note on best-of-N below).
+#
+# See TRAINING_PROTOCOL.md for the protocol and config/design/POOLED_ORACLE.md
+# for the oracle details.
+#
+# WHY POOLED: training against one predictor buys performance that does not
+# transfer -- the policy learns that predictor's quirks. On M0097 the gap
+# between the training oracle and held-out AF3 was +18 to +36 points for
+# single-oracle policies, against -3.9 for designs no policy optimised.
 #
 # Two algorithms are supported:
-#   - vanillapg : Vanilla REINFORCE with a running-mean baseline. Uses only
-#                 the "General training params" and "MPNN params" below.
-#   - grpo      : Group Relative Policy Optimization (clipped surrogate
-#                 objective, multiple updates per rollout). Also uses the
-#                 "GRPO params" section below.
+#   - vanillapg : Vanilla REINFORCE with a running-mean baseline.
+#   - grpo      : Group Relative Policy Optimization (recommended).
 
 # -- General training params --
 run_name: test_run_1_w10 # name of the directory where run information will be saved
@@ -26,6 +30,7 @@ algorithm: grpo # algorithm to use for finetuning (vanillapg or grpo)
 batch_size: 32 # number of sequences proteinMPNN will sample during rollout
 N_steps: 500 # number of finetuning steps
 lr: 1e-4 # learning rate for finetuning
+seed: 0 # SET THIS for anything you intend to compare
 
 # -- GRPO params (only used when algorithm=grpo) --
 kl_weight: 1e-2 # weight for KL penalty to frozen reference model
@@ -33,6 +38,8 @@ N_updates: 16 # number of gradient updates per rollout batch
 update_batch_size: 8 # sub-batch size for each gradient update
 clip_eps_low: 0.2 # lower clipping bound for importance ratio (from DAPO https://arxiv.org/pdf/2503.14476)
 clip_eps_high: 0.28 # upper clipping bound for importance ratio (from DAPO https://arxiv.org/pdf/2503.14476)
+
+use_avg_reward: false # must stay off with a pooled oracle
 
 # -- MPNN params --
 model_type: ligand_mpnn # version of proteinMPNN to use (protein_mpnn or ligand_mpnn)
@@ -58,18 +65,34 @@ reward:
     #   cfg: config dictionary to pass to the target function
 
 
-    # predict the structure of the sequences sampled
-    - name: boltz
-      target_fn: cleo.design.utils.oracle.boltz_from_df
-      cfg: 
-        run_dir: null # this will be set dynamically
-        template_path: ${hydra:runtime.cwd}/templates/oracle/boltz_template_for_petase_with_pet_dimer.yaml # path to template config for running boltz on petase
+    # predict the structure -- ONE oracle per rollout, drawn from the pool.
+    #
+    # The template is the AF3 JSON, not Boltz's YAML: all four oracles
+    # translate from it, so no predictor can fold a different complex than the
+    # others. The PET dimer has no CCD code and is carried as SMILES, which
+    # every translator now handles.
+    #
+    # BEST-OF-N IS OFF HERE (num_diffusion_samples: 1). best_of_n_from_df
+    # reduces the rfd2/AME motif columns specifically, and PETase has no motif
+    # metrics for it to reduce, so there is nothing to collapse 5 samples with.
+    # Raising this above 1 without a PETase-aware reducer will fail the
+    # UniversalReward guard. The AME configs do run best-of-5.
+    - name: fold
+      target_fn: cleo.design.utils.oracle.multi_oracle_from_df
+      cfg:
+        rundir: null # set dynamically
+        template_path: ${hydra:runtime.cwd}/templates/oracle/petase_af3_template.json
+        oracles: [rf3, boltz, protenix]
+        schedule: round_robin   # uniform by construction; "random" measurably is not
+        num_diffusion_samples: 1
+        per_sample_rows: false
+        early_stopping_plddt_threshold: 0.0   # RF3: keep failing designs in the batch
 
     # measure and collect metrics from the structure prediction
     - name: petase_metrics
       target_fn: cleo.design.utils.petase.add_petase_metrics_to_df
       cfg:
-        ref_step: boltz
+        ref_step: fold
         cat_res_ser: 66 # catalytic serine residue
         cat_res_his: 107 # catalytic histidine residue
         cat_res_asp: 122 # catalytic aspartate residue
@@ -127,13 +150,13 @@ reward:
     #   weight: weight for the metric in the final reward aggregation
     #   mode: max (optimise toward upper bound) or min (optimise toward lower bound)
 
-    - metric: boltz_iptm
+    - metric: fold_iptm
       lower_bound: 0.0
       upper_bound: 0.8
       weight: 1.0
       mode: max
 
-    - metric: boltz_ptm
+    - metric: fold_ptm
       lower_bound: 0.0
       upper_bound: 0.8
       weight: 1.0

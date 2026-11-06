@@ -3,12 +3,21 @@
 This is the pipeline as it actually runs today. Earlier configs in `config/`
 still work and record what was run at the time, but start here.
 
-Two worked examples, both runnable on files tracked in this repo:
+**These are the defaults.** `cleo-design-train` with no `--config-name` runs
+`fragment_shuffle`: pooled training oracles with AF3 held out, and fragment
+shuffling. Older single-oracle configs are an explicit opt-in.
+
+Three worked examples, all runnable on files tracked in this repo:
 
 | config | what it rewards | use it when |
 |---|---|---|
 | `config/design/pooled_oracle.yaml` | each **sequence** for folding | you want a better single design |
-| `config/design/fragment_shuffle.yaml` | each **fragment** for folding in company it has never met | you are building a combinatorial library |
+| `config/design/fragment_shuffle.yaml` | each **fragment** for folding in company it has never met | you are building a combinatorial library — **the default** |
+| `config/design/denovo_petase.yaml` | PETase catalytic geometry, pooled oracle | the PETase target |
+
+`denovo_petase_single_oracle.yaml` is the pre-pool original. It is kept as a
+record of what was run and **no longer runs as-is**: it folds best-of-5 with no
+reducing step, which the `UniversalReward` guard now rejects.
 
 ```bash
 uv run cleo-design-train --config-name fragment_shuffle
@@ -95,7 +104,7 @@ train-then-evaluate cycle finishes. At `every: 25` it costs ~1% of a run.
 were missing the probe raised on every stride and the column stayed NaN — a
 broken diagnostic that looks like a quiet one.
 
-## 4. Reduce best-of-N — this is mandatory
+## 4. Reduce best-of-N — mandatory, and only implemented for motif metrics
 
 Every oracle defaults to `num_diffusion_samples: 5` with
 `per_sample_rows: true`, because best-of-5 is the benchmark's own unit. A
@@ -107,6 +116,12 @@ The reduction is over the benchmark's criterion, not AF3's confidence: min
 RMSD over samples, and an OR over the per-sample `pass AND no-clash`
 conjunction. Reducing the two columns separately would let a design pass on
 the strength of two different predictions.
+
+**`best_of_n_from_df` only knows the rfd2/AME motif columns**
+(`{prefix}_motif_rmsd`, `{prefix}_motif_pass_and_no_clash`). A target scored on
+anything else — PETase catalytic geometry, for instance — has nothing for it to
+reduce, so those configs set `num_diffusion_samples: 1` and run single-sample.
+Writing a reducer for other metric families is the obvious next step.
 
 ## 5. Ligands
 
@@ -122,7 +137,19 @@ and no oracle can fold a different complex than the others.
 One entity carries one or the other, never both. Prefer CCD: Protenix embeds a
 SMILES with RDKit and gives up after 90 s on molecules it cannot handle.
 
-## 6. Seed anything you intend to compare
+## 6. Reading oracle columns under a pool
+
+Every column the drawn oracle produced is renamed to the step's name, so a
+reward reads `fold_iptm`, not `boltz_iptm`, and does not know which predictor
+ran. `fold_oracle` records the draw.
+
+Only **`path`, `sample`, `iptm`, `ptm`** are common to all three. Boltz alone
+has `ligand_iptm`, `protein_iptm`, `complex_*`; RF3 and Protenix alone have
+`plddt`, `has_clash`, `ranking_score`, `chain_ptm_*`. A reward term on a field
+only one oracle emits would silently vanish for two thirds of a pooled run —
+compute it downstream from `{step}_path` instead.
+
+## 7. Seed anything you intend to compare
 
 `seed:` is unset by default, which leaves runs nondeterministic. Two unseeded
 runs of one config gave control pass rates of **68.8% and 89.6%** — a 21-point
@@ -130,7 +157,7 @@ swing, larger than most effects these experiments are built to detect. A
 single-run A/B at n≈96 cannot resolve anything smaller than that, so budget
 replicates rather than trusting one draw.
 
-## 7. Reading the output
+## 8. Reading the output
 
 - **A per-step score is not comparable across steps.** One step is one oracle
   and the three disagree by up to 26 points on identical designs. Compare

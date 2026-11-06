@@ -61,15 +61,28 @@ class UniversalReward():
         """
         if not steps:
             return
-        names = [getattr(s, "name", "?") for s in steps]
+
+        # Read fields off either a DictConfig or a plain dict.
+        #
+        # `getattr` alone silently returns the default on a dict, so a reward
+        # instantiated with `_convert_="all"` -- which turns every step into a
+        # plain dict -- saw no target_fn on any step, found no oracle, and
+        # waved the whole pipeline through. The guard did not fail, it
+        # evaporated, which is the failure mode it exists to prevent.
+        def _get(obj, key, default=None):
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
+
+        names = [_get(s, "name", "?") for s in steps]
         has_reduction = any(
-            str(getattr(s, "target_fn", "")).endswith("best_of_n_from_df")
+            str(_get(s, "target_fn", "")).endswith("best_of_n_from_df")
             for s in steps
         )
         if has_reduction:
             return
         for s in steps:
-            cfg = getattr(s, "cfg", None)
+            cfg = _get(s, "cfg", None)
             if cfg is None:
                 continue
             # Every oracle now implements per-sample rows and defaults to
@@ -79,7 +92,7 @@ class UniversalReward():
             # rf3/boltz/protenix step folding 5 samples passed this guard and
             # returned 5 rows per sequence, which is exactly the reward/batch
             # mismatch the check exists to prevent.
-            is_oracle = str(getattr(s, "target_fn", "")).endswith((
+            is_oracle = str(_get(s, "target_fn", "")).endswith((
                 "af3_from_df", "rf3_from_df", "protenix_from_df",
                 "boltz_from_df", "multi_oracle_from_df",
             ))
@@ -88,7 +101,7 @@ class UniversalReward():
             n = int(cfg.get("num_diffusion_samples", 5 if is_oracle else 1))
             if n > 1 and bool(cfg.get("per_sample_rows", n > 1)):
                 raise ValueError(
-                    f"reward step '{getattr(s, 'name', '?')}' folds {n} samples "
+                    f"reward step '{_get(s, 'name', '?')}' folds {n} samples "
                     f"per sequence, but no best_of_n_from_df step follows it, so "
                     f"the {n} rows per sequence are never collapsed.\n"
                     f"Pipeline is: {names}\n"

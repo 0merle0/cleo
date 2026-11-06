@@ -20,7 +20,13 @@ import torch
 _CONFIG_DIR = str(Path(__file__).resolve().parent / "../../../config/design")
 
 
-@hydra.main(version_base=None, config_path=_CONFIG_DIR)
+# DEFAULT CONFIG: the current pipeline -- pooled training oracles with AF3 held
+# out, and fragment shuffling. Running `cleo-design-train` with no arguments
+# gets that rather than erroring for want of a --config-name, and anything
+# older is now an explicit opt-in (`--config-name denovo_petase_single_oracle`).
+# See TRAINING_PROTOCOL.md.
+@hydra.main(version_base=None, config_path=_CONFIG_DIR,
+            config_name="fragment_shuffle")
 def train_policy(cfg):
     """Launch a training run using the algorithm specified in *cfg*."""
 
