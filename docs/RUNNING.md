@@ -41,6 +41,18 @@ run). Batch in one call — RF3 distributes over GPUs itself.
 
 ### SLURM
 
+**Check you can actually submit before planning a sweep.** `sinfo` and
+`squeue` working does not mean `sbatch` will: the association
+`jgershon/ipd` on cluster `digs` currently has `MaxSubmitJobs=0` and
+`MaxJobs=0` on every partition, so submission fails with
+`AssocMaxSubmitJobLimit` while every read-only command looks healthy. Verify
+with:
+
+    sacctmgr -n show assoc user=$USER format=Account,Partition,MaxSubmitJobs,MaxJobs
+
+A zero there needs an admin to lift it.
+
+
 `--gres=gpu:large:1` works here. `gpu:l40:8` is **not** satisfiable and sbatch
 rejects it with "Requested node configuration is not available". Set
 `HYDRA_FULL_ERROR=1` in the submit script; Hydra's default traceback hides the

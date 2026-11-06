@@ -24,6 +24,20 @@ per backbone, which is exactly where a silent error would hide.
 
     uv run python scripts/make_clean_comparison.py --out experiments/ame/cleanab
     uv run python scripts/make_clean_comparison.py --out ... --submit
+
+SUBMISSION IS CURRENTLY BLOCKED, and not by anything in this script. On
+cluster `digs` the association jgershon/ipd has MaxSubmitJobs=0 and
+MaxJobs=0 on all six partitions (cpu, cpu-bf, gpu, gpu-bf, gpu-em,
+gpu-train), so every sbatch returns:
+
+    sbatch: error: AssocMaxSubmitJobLimit
+    Job violates accounting/QOS policy (job submit limit, ...)
+
+That is an administrative cap, not a fault here -- 2,426 of 5,470
+association rows on this cluster are capped the same way. sinfo and squeue
+work fine, which is why the block only shows up at submit time. An admin has
+to raise the limit for this account; afterwards this script is unchanged and
+`--submit` queues all 18.
 """
 
 import argparse
