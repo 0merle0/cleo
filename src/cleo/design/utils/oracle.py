@@ -15,6 +15,7 @@ import re
 import json
 import copy
 import subprocess
+import warnings
 import time
 import numpy as np
 import torch
@@ -1320,6 +1321,23 @@ def multi_oracle_from_df(df_input, cfg, step_name="fold"):
     ...            Every other key is passed to the chosen oracle unchanged.
     """
     names = list(cfg.get("oracles", ["rf3", "boltz", "protenix"]))
+
+    # AF3 IS THE HELD-OUT EVALUATOR. Putting it in the training pool does not
+    # fail -- it trains perfectly well -- it just silently destroys the thing
+    # every reported number depends on, because an AF3 score is then a score
+    # under an oracle the policy optimised against. That gap was +18 to +36
+    # points on M0097. Warn rather than raise: a deliberate four-oracle
+    # ablation is a legitimate experiment, it simply cannot be reported as
+    # held-out.
+    if "af3" in names and not cfg.get("allow_af3_in_pool", False):
+        warnings.warn(
+            "multi_oracle: 'af3' is in the TRAINING pool. AF3 is the held-out "
+            "evaluator -- anything scored by it after this is no longer a "
+            "held-out measurement. Set allow_af3_in_pool: true to silence "
+            "this if that is intended.",
+            stacklevel=2,
+        )
+
     unknown = [n for n in names if n not in _ORACLE_FNS]
     if unknown:
         raise ValueError(

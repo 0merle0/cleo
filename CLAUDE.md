@@ -298,6 +298,10 @@ uv run cleo-design-train \
 
 ## Available Structure Prediction Oracles
 
+**AF3 is held out.** It is the evaluator (`config/design/evaluate.yaml`) and
+the read-only training probe, never a training oracle; `multi_oracle_from_df`
+warns if it finds `af3` in a pool. Train on the other three, report on AF3.
+
 **The default is a POOL of these, not one.** `multi_oracle_from_df` draws one
 predictor per rollout and AF3 is held out to report under; see
 TRAINING_PROTOCOL.md. All of them translate the same AF3 JSON template, with

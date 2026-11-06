@@ -45,7 +45,21 @@ by 22–40 points on RF3-trained policies. That excess exists only under the
 training oracle.
 
 So: **train on a pool of `[rf3, boltz, protenix]`, report on AF3.** One oracle
-is drawn per rollout by `multi_oracle_from_df`. AF3 never enters the objective.
+is drawn per rollout by `multi_oracle_from_df`. AF3 never enters the objective,
+and `multi_oracle_from_df` warns if you put it in the pool, because doing so
+costs nothing at train time and silently invalidates every number afterwards.
+
+AF3 appears in exactly two places, both outside the objective:
+
+- **`config/design/evaluate.yaml`** — the evaluation pipeline, which folds with
+  AF3 and nothing else. Evaluation is the opposite problem from training: it
+  wants ONE fixed yardstick, where a pool would mix three predictors that
+  disagree by up to 26 points on identical designs.
+- **`af3_probe_every`** — the read-only stride probe during training.
+
+Evaluations produced before this switch folded with Boltz, a *training* oracle,
+so they are not held-out measurements and are not comparable with ones produced
+after it.
 
 Three things that are easy to get wrong:
 

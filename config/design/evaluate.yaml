@@ -4,8 +4,18 @@
 #   python -m cleo.design.evaluate_sequences --config-name evaluate
 #
 # Takes a FASTA file of sequences and runs them through the same step-based
-# pipeline used during training (e.g. Boltz folding, petase metrics, distance
-# to reference sequences, etc.). Outputs a CSV with all computed metrics.
+# pipeline used during training (folding, petase metrics, distance to
+# reference sequences, etc.). Outputs a CSV with all computed metrics.
+#
+# FOLDS WITH AF3, WHICH IS HELD OUT OF TRAINING. Training draws from a pool of
+# [rf3, boltz, protenix] and AF3 never enters the objective, so this is the
+# only oracle here whose number measures the policy rather than how well the
+# policy learned its training oracle's quirks. On M0097 that difference was
+# +18 to +36 points. See TRAINING_PROTOCOL.md.
+#
+# This used to fold with Boltz -- one of the three training oracles -- so
+# evaluations produced before this change are NOT held-out measurements and
+# are not comparable with ones produced after it.
 
 input_fasta: ${hydra:runtime.cwd}/example_data/library_design/resampled_sequences/example_resampled.fasta
 
@@ -17,16 +27,27 @@ output_name: evaluation_results
 # Steps run in order, each augmenting the DataFrame with new columns.
 steps:
 
-  - name: boltz
-    target_fn: cleo.design.utils.oracle.boltz_from_df
+  - name: af3
+    target_fn: cleo.design.utils.oracle.af3_from_df
     cfg:
-      run_dir: null  # set automatically by the script
-      template_path: ${hydra:runtime.cwd}/templates/oracle/boltz_template_for_petase_with_pet_dimer.yaml
+      # rundir is set automatically by the script.
+      #
+      # The AF3 JSON template, not Boltz's YAML. Every oracle translates from
+      # this one file, so an evaluation folds the identical complex the
+      # training oracles did -- the PET dimer travels as SMILES, which all of
+      # them now handle.
+      template_path: ${hydra:runtime.cwd}/templates/oracle/petase_af3_template.json
+      # Site paths. Change these for your cluster.
+      af3_container: /net/software/containers/af3.sif
+      af3_script: /opt/alphafold3/run_alphafold.py
+      model_dir: /net/databases/alphafold
+      num_diffusion_samples: 5
+      per_sample_rows: true
 
   - name: petase_metrics
     target_fn: cleo.design.utils.petase.add_petase_metrics_to_df
     cfg:
-      ref_step: boltz
+      ref_step: af3
       cat_res_ser: 66
       cat_res_his: 107
       cat_res_asp: 122
@@ -61,16 +82,18 @@ steps:
   # sequences. Anything averaging that file silently weights a sequence by how
   # many of its predictions parsed.
   #
-  # "Best" is defined the same way the PETase reward defines it, so an
-  # evaluation number means the same thing as the training signal. Keep this
-  # list in step with denovo_petase.yaml's reward_aggregation.
+  # "Best" is defined the same way the PETase reward defines it, so the sample
+  # an evaluation reports is the one the objective would have picked. It is
+  # the same list as denovo_petase.yaml's reward_aggregation with the two
+  # oracle-confidence terms renamed: there they read `fold_*`, the pooled
+  # training oracle, and here `af3_*`. Keep the rest in step.
   - name: bo5
     target_fn: cleo.design.utils.best_of_n.best_of_n_from_df
     cfg:
       group_col: name
       aggregation:
-        - {metric: boltz_iptm, lower_bound: 0.0, upper_bound: 0.8, weight: 1.0, mode: max}
-        - {metric: boltz_ptm, lower_bound: 0.0, upper_bound: 0.8, weight: 1.0, mode: max}
+        - {metric: af3_iptm, lower_bound: 0.0, upper_bound: 0.8, weight: 1.0, mode: max}
+        - {metric: af3_ptm, lower_bound: 0.0, upper_bound: 0.8, weight: 1.0, mode: max}
         - {metric: petase_metrics_acylox_oxh1bbN, lower_bound: 6, upper_bound: 10.0, weight: 1.0, mode: min}
         - {metric: petase_metrics_acylox_oxh2bbN, lower_bound: 6, upper_bound: 10.0, weight: 1.0, mode: min}
         - {metric: petase_metrics_hisNE2_esterox, lower_bound: 5, upper_bound: 10.0, weight: 1.0, mode: min}
@@ -78,10 +101,9 @@ steps:
         - {metric: petase_metrics_his_ser_angle, lower_bound: 20, upper_bound: 90, weight: 1.0, mode: max}
         - {metric: dist_to_ref_seqs_min, lower_bound: 0, upper_bound: 100, weight: 10.0, mode: min}
 
-# NOTE ON THE EVALUATION ORACLE. This pipeline folds with Boltz, which is one
-# of the three TRAINING oracles. The protocol reports on held-out AF3 instead,
-# because a number produced by an oracle the policy trained against is not a
-# measurement of the policy -- see TRAINING_PROTOCOL.md. To report properly,
-# swap the `boltz` step for af3_from_df (same template, it reads the AF3 JSON)
-# and set metric ref_step to match. Left as Boltz here because changing which
-# oracle a saved evaluation used would silently redefine past numbers.
+# WHY NOT THE POOL HERE. Training pools oracles so the policy cannot overfit
+# any one of them. Evaluation is the opposite problem: it wants ONE fixed
+# yardstick, and a pooled evaluation would mix three predictors that disagree
+# by up to 26 points on identical designs, so a number would depend on which
+# oracle each sequence happened to draw. AF3 alone, held out of training, is
+# the yardstick.
