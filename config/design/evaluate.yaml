@@ -52,3 +52,36 @@ steps:
         - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDNARIFIATTVEEAVELARRAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
         - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIQKETGHKVDKSRIFIAETVEEAIELARQAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
         - MGWEEDLWLERPSGERTPVRRHHFPAKKAENGESAIANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHAVDRSRIFIAETVEEAVELAARAVELGHAIIHLPPYVIGEAGEAVVEVLAAAGVDVLLMGGLGSGVPVTIYQA
+
+  # COLLAPSE THE 5 SAMPLES TO ONE ROW PER SEQUENCE.
+  #
+  # Every oracle defaults to num_diffusion_samples: 5 with per_sample_rows
+  # following it, so without this step the output CSV carries five rows per
+  # sequence and the "Wrote metrics for N sequences" line counts rows, not
+  # sequences. Anything averaging that file silently weights a sequence by how
+  # many of its predictions parsed.
+  #
+  # "Best" is defined the same way the PETase reward defines it, so an
+  # evaluation number means the same thing as the training signal. Keep this
+  # list in step with denovo_petase.yaml's reward_aggregation.
+  - name: bo5
+    target_fn: cleo.design.utils.best_of_n.best_of_n_from_df
+    cfg:
+      group_col: name
+      aggregation:
+        - {metric: boltz_iptm, lower_bound: 0.0, upper_bound: 0.8, weight: 1.0, mode: max}
+        - {metric: boltz_ptm, lower_bound: 0.0, upper_bound: 0.8, weight: 1.0, mode: max}
+        - {metric: petase_metrics_acylox_oxh1bbN, lower_bound: 6, upper_bound: 10.0, weight: 1.0, mode: min}
+        - {metric: petase_metrics_acylox_oxh2bbN, lower_bound: 6, upper_bound: 10.0, weight: 1.0, mode: min}
+        - {metric: petase_metrics_hisNE2_esterox, lower_bound: 5, upper_bound: 10.0, weight: 1.0, mode: min}
+        - {metric: petase_metrics_hisNE2_serOG, lower_bound: 2.5, upper_bound: 10.0, weight: 1.0, mode: min}
+        - {metric: petase_metrics_his_ser_angle, lower_bound: 20, upper_bound: 90, weight: 1.0, mode: max}
+        - {metric: dist_to_ref_seqs_min, lower_bound: 0, upper_bound: 100, weight: 10.0, mode: min}
+
+# NOTE ON THE EVALUATION ORACLE. This pipeline folds with Boltz, which is one
+# of the three TRAINING oracles. The protocol reports on held-out AF3 instead,
+# because a number produced by an oracle the policy trained against is not a
+# measurement of the policy -- see TRAINING_PROTOCOL.md. To report properly,
+# swap the `boltz` step for af3_from_df (same template, it reads the AF3 JSON)
+# and set metric ref_step to match. Left as Boltz here because changing which
+# oracle a saved evaluation used would silently redefine past numbers.

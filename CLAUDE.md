@@ -198,11 +198,21 @@ When an oracle step emits N rows per sequence, the pipeline **must** reduce them
 back to one, or the reward tensor won't match the batch:
 
 ```yaml
+# AME / motif targets -- selects on the benchmark's own criterion
 - name: bo5
   target_fn: cleo.design.utils.rfd2_benchmark.best_of_n_from_df
   cfg:
     group_col: name
     metric_prefix: ame      # the metric step to reduce over
+
+# ANY OTHER metric family (PETase catalytic geometry, etc.) -- selects the
+# sample the run's own reward scores highest, so "best" and the objective
+# cannot drift apart. Agrees exactly with the above on motif data.
+- name: bo5
+  target_fn: cleo.design.utils.best_of_n.best_of_n_from_df
+  cfg:
+    group_col: name
+    aggregation: ${reward.reward_aggregation}
 ```
 
 `UniversalReward` refuses to construct a pipeline that folds N times without

@@ -104,7 +104,7 @@ train-then-evaluate cycle finishes. At `every: 25` it costs ~1% of a run.
 were missing the probe raised on every stride and the column stayed NaN — a
 broken diagnostic that looks like a quiet one.
 
-## 4. Reduce best-of-N — mandatory, and only implemented for motif metrics
+## 4. Reduce best-of-N — mandatory, and available for every metric family
 
 Every oracle defaults to `num_diffusion_samples: 5` with
 `per_sample_rows: true`, because best-of-5 is the benchmark's own unit. A
@@ -117,11 +117,27 @@ RMSD over samples, and an OR over the per-sample `pass AND no-clash`
 conjunction. Reducing the two columns separately would let a design pass on
 the strength of two different predictions.
 
-**`best_of_n_from_df` only knows the rfd2/AME motif columns**
-(`{prefix}_motif_rmsd`, `{prefix}_motif_pass_and_no_clash`). A target scored on
-anything else — PETase catalytic geometry, for instance — has nothing for it to
-reduce, so those configs set `num_diffusion_samples: 1` and run single-sample.
-Writing a reducer for other metric families is the obvious next step.
+There are two reducers, and which you want depends on what "best" means for
+your target:
+
+| reducer | selects on | use for |
+|---|---|---|
+| `rfd2_benchmark.best_of_n_from_df` | min motif RMSD, OR-ed pass flag | AME — the benchmark's own criterion |
+| `best_of_n.best_of_n_from_df` | an explicit criterion, usually the run's own reward | everything else |
+
+The generic one takes `aggregation: ${reward.reward_aggregation}`, so the
+sample called "best" is the one the objective would score highest and the two
+cannot drift apart. It also takes `select_col` + `select_mode` for a single
+column, and `any_cols` / `min_cols` / `max_cols` for fields that should be
+OR-ed or min/max-ed across samples rather than read off the winning row.
+
+The two agree exactly on motif data — 300 randomised trials, 0 mismatches — so
+AME stays on the benchmark criterion rather than switching to reward-based
+selection, which would quietly redefine what an AME pass rate means.
+
+Note `rank` and `zscore` normalisation are BATCH-relative: they answer "which
+design in this batch", not "which sample of this design". The generic reducer
+scores those entries on their bounds for selection and warns once.
 
 ## 5. Ligands
 

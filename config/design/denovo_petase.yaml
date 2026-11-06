@@ -72,11 +72,8 @@ reward:
     # others. The PET dimer has no CCD code and is carried as SMILES, which
     # every translator now handles.
     #
-    # BEST-OF-N IS OFF HERE (num_diffusion_samples: 1). best_of_n_from_df
-    # reduces the rfd2/AME motif columns specifically, and PETase has no motif
-    # metrics for it to reduce, so there is nothing to collapse 5 samples with.
-    # Raising this above 1 without a PETase-aware reducer will fail the
-    # UniversalReward guard. The AME configs do run best-of-5.
+    # BEST-OF-5, reduced by the run's own reward -- see the bo5 step at the
+    # end of this pipeline.
     - name: fold
       target_fn: cleo.design.utils.oracle.multi_oracle_from_df
       cfg:
@@ -84,8 +81,8 @@ reward:
         template_path: ${hydra:runtime.cwd}/templates/oracle/petase_af3_template.json
         oracles: [rf3, boltz, protenix]
         schedule: round_robin   # uniform by construction; "random" measurably is not
-        num_diffusion_samples: 1
-        per_sample_rows: false
+        num_diffusion_samples: 5
+        per_sample_rows: true
         early_stopping_plddt_threshold: 0.0   # RF3: keep failing designs in the batch
 
     # measure and collect metrics from the structure prediction
@@ -140,6 +137,24 @@ reward:
     #   cfg:
     #     ref_seq: MGEEEELELERPSGERTPVRRHRFPARKANNIEEAVANVERLIEEIEASGITFTATADRAVVVGWSLGVITGMIMHATGTDFITALRKALEIGKKVKEEDPEFMERHKKIVTDGNRAEIREDIDYWIEVIEKETGHPVDRSRIFIAETVEEAVELARRAVELGHAIIVLPPYLIGTAGEAVVQVLASAGVDVLLMGGLGSGVPVTIYRA
 
+
+    # COLLAPSE THE 5 SAMPLES BACK TO ONE ROW PER SEQUENCE.
+    #
+    # Mandatory: a reward step must return one row per sampled sequence or the
+    # reward tensor will not match the batch, and UniversalReward refuses to
+    # build a pipeline that folds N times without this.
+    #
+    # The winner is the sample scoring best under THIS RUN'S OWN reward, which
+    # is what `aggregation: ${reward.reward_aggregation}` interpolates. Picking
+    # on a single column instead would make "best" and "what we optimise"
+    # two different things that drift apart the next time the reward changes.
+    #
+    # Must come after every metric step the aggregation names.
+    - name: bo5
+      target_fn: cleo.design.utils.best_of_n.best_of_n_from_df
+      cfg:
+        group_col: name
+        aggregation: ${reward.reward_aggregation}
 
   # Normalizing metrics and aggregating to a single scalar reward
   reward_aggregation:

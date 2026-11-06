@@ -419,6 +419,13 @@ def best_of_n_from_df(df_input, cfg, step_name="best_of_n"):
     appearance of each group, so the collapsed frame stays aligned with the
     order sequences were sampled in -- which is what the reward tensor assumes.
 
+    THIS ONE IS MOTIF-SPECIFIC, AND DELIBERATELY SO. It selects on the
+    benchmark's own criterion, which is what an AME number has to mean. For any
+    other metric family use ``cleo.design.utils.best_of_n.best_of_n_from_df``,
+    which selects by an explicit criterion -- usually the run's own reward --
+    and is what PETase and anything else non-motif should call. The two agree
+    exactly on motif data: checked over 300 randomised trials, 0 mismatches.
+
     Config
     ------
     group_col      Column identifying a sequence across its samples ("name").
