@@ -33,10 +33,14 @@ HERE = Path(__file__).resolve().parent
 CLEO = HERE.parents[2]
 AME = CLEO / "experiments" / "ame"
 PANEL, FRAGRL = AME / "r1panel", AME / "fragrl"
+# fragrl2 is the SAME shuffling method WITH parent_metric set, which is
+# what fragment_shuffle.yaml recommends and what fragrl lacks entirely.
+FRAGRL2 = AME / "fragrl2"
+FRAG_ROOT = {"fragrl": (FRAGRL, "frag"), "fragrl2": (FRAGRL2, "frag2")}
 sys.path.insert(0, str(AME))
 from analyze_selection2 import as_matrix  # noqa: E402
 
-ARMS = ("baseline", "policy", "fragrl")
+ARMS = ("baseline", "policy", "fragrl", "fragrl2")
 
 
 def _frag_table(scored):
@@ -68,10 +72,11 @@ def _subs(seqs, ref):
 
 def locate(site_or_bb, arm):
     """-> (backbone stem, parents csv, recombinant scored csv) for one arm."""
-    if arm == "fragrl":
+    if arm in FRAG_ROOT:
+        root, sfx = FRAG_ROOT[arm]
         bb = site_or_bb
-        return bb, (FRAGRL / "eval" / f"{bb}_frag" / f"{bb}_frag_af3scored.csv",
-                    FRAGRL / "recomb" / f"{bb}_frag_scored.csv")
+        return bb, (root / "eval" / f"{bb}_{sfx}" / f"{bb}_{sfx}_af3scored.csv",
+                    root / "recomb" / f"{bb}_{sfx}_scored.csv")
     ev = sorted(PANEL.glob(f"eval/run_{site_or_bb}*/*_af3scored.csv"))
     if not ev:
         return None, (None, None)
@@ -95,7 +100,7 @@ def main():
     for site in sites:
         for arm in ARMS:
             key = site
-            if arm == "fragrl":
+            if arm in FRAG_ROOT:
                 bb0, _ = locate(site, "policy")
                 if bb0 is None:
                     continue
@@ -144,15 +149,21 @@ def main():
     print(d.to_string(index=False, header=[
         "site", "dead%", "arm", "parents", "retention%", "surv_frac", "U_rare"]))
 
-    for metric in ("retention", "surv_frac", "U_rare"):
+    # Both shuffling arms against the no-shuffling policy. fragrl has NO
+    # parent_metric; fragrl2 sets it, and is what fragment_shuffle.yaml
+    # recommends -- so the pair answers "does the parent term rescue
+    # retention", which is a different question from "does shuffling help".
+    for metric in ("parents", "retention", "surv_frac", "U_rare"):
         p = d.pivot(index="site", columns="arm", values=metric)
-        if "fragrl" not in p.columns:
-            continue
-        b = p.dropna(subset=["policy", "fragrl"])
-        if not len(b):
-            continue
-        print(f"\n{metric}: fragrl > policy on {(b.fragrl > b.policy).sum()}/{len(b)}"
-              f"   mean {b.fragrl.mean():.2f} vs {b.policy.mean():.2f}")
+        for shuf in ("fragrl", "fragrl2"):
+            if shuf not in p.columns or "policy" not in p.columns:
+                continue
+            b = p.dropna(subset=["policy", shuf])
+            if not len(b):
+                continue
+            print(f"\n{metric:10s} {shuf:8s} > policy on "
+                  f"{(b[shuf] > b.policy).sum()}/{len(b)}"
+                  f"   mean {b[shuf].mean():.2f} vs {b.policy.mean():.2f}")
     print("\n(collapse check: surv_frac up while U_rare down means the policy "
           "converged rather than became modular)")
 

@@ -42,20 +42,28 @@ first does not get you the second.
 That is what the chimera step is for: it folds `rotations × B` recombinants of
 the batch and scores each fragment by the company it keeps.
 
-**But a fragment reward alone is not enough.** With chimera quality as the only
-objective, the policy optimised fragments that travel while the sequences it
-emitted degraded — **28 passing parents against 182** for the arm trained on
-parent RMSD alone (M0255), and retention fell with them, 30.5% against 79.3%.
-The fragment term says "your parts travel"; the parent term says "and you
-fold".
+**But a fragment reward alone is not enough** — or so the parent-term
+hypothesis goes. Be careful here: the evidence is weaker than it reads.
 
-> **The fix is inferred, not yet measured.** Every shuffling run on record
-> (`experiments/ame/fragrl` and the `fragb32`/`bs16`/`bs64` sweeps) has
-> `parent_metric` unset — the recommended configuration has never actually
-> been run. What is measured is the *failure* of omitting it. Treat
-> `parent_metric: ame_motif_rmsd` in `fragment_shuffle.yaml` as the leading
-> hypothesis, and the first thing to test if shuffling underperforms.
-> See `docs/COMPARISONS.md` for the arm-by-arm numbers.
+With chimera quality as the only objective (`fragrl`), the policy produced far
+fewer passing parents than plain sequence RL — **28 against 182 on M0255** —
+and retention fell with them. The natural fix is a parent-fold term alongside
+the fragment term, which is what `parent_metric` is and what
+`fragment_shuffle.yaml` sets.
+
+> **That fix has been run and it did not work.** The `fragrl2` arm is `fragrl`
+> plus `parent_metric`, and across the three backbones it changed essentially
+> nothing: retention 53.8% → 53.7%, parents 102 → 101. On M0255 it scored 20
+> parents, against `fragrl`'s 28.
+
+What shuffling *does* buy, 3/3 and by a third, is **fragment diversity among
+survivors** (`U_rare` 1359 vs 1016) with `surv_frac` tied — the signature of
+real modularity rather than a policy collapsing to near-copies. What it costs
+is parent yield and retention (0/3, 53.8% vs 76.7%).
+
+Treat shuffling as a **trade, not an improvement**, and `parent_metric` as
+unproven rather than load-bearing. Full table and caveats in
+[COMPARISONS.md](COMPARISONS.md).
 
 ## 3. Compare only within a batch
 

@@ -51,12 +51,16 @@ reward:
   frag_step: frag       # reads frag_slot0..frag_slot{k-1}
   mode: min             # lower motif RMSD is better
 
-  # PARENT GEOMETRY, folded alongside the chimeras. Do not drop this. With
-  # chimera quality as the only objective the policy optimises fragments that
-  # travel while the sequences it actually emits degrade: 28 passing parents
-  # against 182 for the arm trained on parent RMSD alone, and retention fell
-  # with them. The fragment term says "your parts travel"; this says "and you
-  # fold". Costs ~25% more trunk passes.
+  # PARENT GEOMETRY, folded alongside the chimeras. The fragment term says
+  # "your parts travel"; this says "and you fold". Costs ~25% more trunk
+  # passes.
+  #
+  # UNPROVEN. It was introduced because fragment-only training produced far
+  # fewer passing parents (28 against 182 on M0255), but the arm that actually
+  # sets it (fragrl2) matched the arm that does not, on all three backbones:
+  # retention 53.7% vs 53.8%, parents 101 vs 102. Kept because the reasoning
+  # is sound and the cost is modest, not because it is demonstrated. See
+  # docs/COMPARISONS.md; set w_geom: 0.0 to turn it off.
   parent_metric: ame_motif_rmsd
   w_geom: 1.0
   w_frag: 1.0

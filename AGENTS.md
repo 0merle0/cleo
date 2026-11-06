@@ -8,6 +8,7 @@ results that looked right.
 |---|---|
 | training a policy, changing a reward or oracle | [TRAINING_PROTOCOL.md](TRAINING_PROTOCOL.md), then [docs/PRINCIPLES.md](docs/PRINCIPLES.md) |
 | why the method is shaped this way | [docs/PRINCIPLES.md](docs/PRINCIPLES.md) |
+| what the measured results actually say | [docs/COMPARISONS.md](docs/COMPARISONS.md) |
 | running jobs, SLURM, reading run output | [docs/RUNNING.md](docs/RUNNING.md) |
 | any figure or plot | [docs/FIGURES.md](docs/FIGURES.md) |
 | oracle details, pooling, ligands | [config/design/POOLED_ORACLE.md](config/design/POOLED_ORACLE.md) |
@@ -74,3 +75,9 @@ Do not present these as settled:
   the policy arm on 0/3 backbones, 53.8% vs 76.7%).
 - `best_of_n` selection for PETase uses the reward; whether that is the right
   criterion for a *reported* number rather than a training one is unsettled.
+- **Fragment shuffling loses to plain sequence RL on retention (0/3) and wins
+  on fragment diversity (3/3).** It is a trade, not an improvement, and
+  `parent_metric` did not change it. Do not describe the shuffled pipeline as
+  the better method without saying on which axis. See docs/COMPARISONS.md.
+- **No run exists with the current default** (pooled oracles AND shuffling);
+  every shuffling arm on record is RF3-only.
