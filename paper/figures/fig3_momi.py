@@ -5,11 +5,14 @@ Focused on the SECOND big library. The first is in the same table and is
 shown only where it is the honest comparison; the two share 5 parts out of
 3,629, so they are separate designs rather than a continuation.
 
-    (a) the G20 parent coloured by its five slots, and the active site --
+    (a) the wet-lab pipeline, design to readout. Hand-drawn, not plotted:
+        svg/wetlab_pipeline.svg is spliced in as vector after the save
+    (b) the G20 parent coloured by its five slots, and the active site --
         the catalytic triad is SPLIT, Ser66 on slot 2 and His107/Asp122 on
         slot 3, so recombination reassembles it across a cut
-    (b) how far each slot's parts sit from the G20 part they replace
-    (c) activity by round, against G20 itself
+    (c) how far each slot's parts sit from the G20 part they replace
+    (d) activity by round, against G20 itself
+    (e) activity against whole-sequence distance from G20
 
 Fragment boundaries are measured, not assumed; see momi_fragments.py.
 
@@ -26,7 +29,7 @@ from matplotlib.lines import Line2D
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from figio import save  # noqa: E402
+from figio import save, splice  # noqa: E402
 from palette import (FRAGMENT, INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
                      PANEL_LABEL_PT, SEQUENTIAL, fs)
 from schematic import place  # noqa: E402
@@ -64,8 +67,10 @@ def panel_design(ax_fold, ax_site):
     # Each column is ~220 pt wide, so these are close to filling it. The
     # row ratio is set to match rather than leaving the images floating in
     # an oversized cell.
-    place(ax_fold, "momi_fold", (0.5, 0.62), 186)
-    place(ax_site, "momi_site", (0.5, 0.62), 196)
+    # Narrower than the column since the pipeline strip went in above: the
+    # site image is nearly square, and at full width it ran up into it.
+    place(ax_fold, "momi_fold", (0.5, 0.60), 170)
+    place(ax_site, "momi_site", (0.5, 0.58), 165)
     ax_fold.text(0.5, 0.045, "G20 parent, cut into $k=5$", ha="center",
                  fontsize=fs(7))
     ax_site.text(0.5, 0.045, "catalytic triad, split across slots 2 and 3",
@@ -165,10 +170,14 @@ def main():
     ctrl = d[d.sample_type == "positive_control"]
     parent = ctrl.sequence.iloc[0]
 
-    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 8.2))
+    # 9.0 in is the text height of the page; the figure floats alone on it.
+    fig = plt.figure(figsize=(PAGE_WIDTH_IN, 9.0))
+    # (a) is not drawn here. This is the box wetlab_pipeline.svg is spliced
+    # into after the save; the gridspec starts below it.
+    PIPE = (0.02, 0.828, 0.985, 0.972)
     outer = fig.add_gridspec(3, 1, height_ratios=[1.20, 0.60, 0.84],
                              hspace=0.52, left=0.095, right=0.985,
-                             top=0.955, bottom=0.06)
+                             top=0.80, bottom=0.05)
 
     top = outer[0].subgridspec(1, 2, wspace=0.04)
     ax_f = fig.add_subplot(top[0, 0])
@@ -203,15 +212,19 @@ def main():
         return Bbox.union(boxes)
 
     y_bot = max(inv.transform((0, extent(a).y1))[1] for a in (ax_a, ax_m))
-    for ax, lab, y in ((ax_f, "a", inv.transform((0, extent(ax_f).y1))[1]),
-                       (axes_b[0], "b",
+    x_a = inv.transform((extent(ax_f).x0, 0))[0]
+    fig.text(x_a, PIPE[3] + 0.002, "a", fontsize=PANEL_LABEL_PT,
+             fontweight="bold", va="bottom", ha="left")
+    for ax, lab, y in ((ax_f, "b", inv.transform((0, extent(ax_f).y1))[1]),
+                       (axes_b[0], "c",
                         inv.transform((0, extent(axes_b[0]).y1))[1]),
-                       (ax_a, "c", y_bot), (ax_m, "d", y_bot)):
+                       (ax_a, "d", y_bot), (ax_m, "e", y_bot)):
         x = inv.transform((extent(ax).x0, 0))[0]
         fig.text(x, y + 0.006, lab, fontsize=PANEL_LABEL_PT,
                  fontweight="bold", va="bottom", ha="left")
 
     save(fig, "fig3_momi", dpi=900, tight=False)
+    splice("fig3_momi", "wetlab_pipeline", PIPE, fig)
 
 
 if __name__ == "__main__":
