@@ -63,47 +63,42 @@ Searched all 22,410 CSVs under `jq_p07_active_learning` for files containing
 both sequences; 16 matched, 8 with activity columns. After excluding
 archives and duplicates, these are the independent comparison points:
 
-| experiment | momi × G20 | **factor** | momi expression | CV |
-|---|---|---|---|---|
-| e0321 pool screen | 0.0450 | **22.2** | 0.787 µM | **0.004** |
-| e0328 overnight 37 °C | 0.0294 | **34.0** | 0.536 µM | 0.007 |
-| e0328 overnight 60 °C | 0.1473 | 6.8 | 0.469 µM | 0.110 |
-| library 1 December re-test, plate 3 | 0.0585 | **17.1** | 0.139 µM | 0.013 |
-| e0328 round 5, 37 °C short | **−0.017** | — | 0.826 µM | 0.010 |
-| e0328 round 5, 60 °C short | **−0.399** | — | 0.927 µM | 0.122 |
-| library 1, control row :1 | 0.046 | 21.6 | **0.097 µM** | — |
-| library 1, control row :2 | 0.125 | 8.0 | **0.115 µM** | — |
+| experiment | temp | momi × G20 | **factor** | momi expr | CV |
+|---|---|---|---|---|---|
+| e0321 pool screen | **22.4 °C** | 0.0450 | **22.2** | 0.787 µM | **0.004** |
+| library 1 Dec re-test, plate 3 | **23.7 °C** | 0.0585 | **17.1** | 0.139 µM | 0.013 |
+| e0328 overnight | 37 °C | 0.0294 | *34.0* | 0.536 µM | 0.007 |
+| e0328 overnight | 60 °C | 0.1473 | *6.8* | 0.469 µM | 0.110 |
+| e0328 round 5, short | 31.7 °C | **−0.017** | — | 0.826 µM | 0.010 |
+| e0328 round 5, short | 60 °C | **−0.399** | — | 0.927 µM | 0.122 |
+| library 1, control :1 | 30 °C | 0.046 | *21.6* | 0.097 µM | — |
+| library 1, control :2 | 30 °C | 0.125 | *8.0* | 0.115 µM | — |
 
-The two short reads are unusable: momi comes out **negative**, i.e. below
-background, which is the same reason it cannot be the reference in the first
-place. Only the longer reads resolve it at all.
+**Only the first two rows are condition-matched**, and they are the estimate:
+both ambient (22.4 and 23.7 °C), both short kinetic reads, both on plates
+where momi and G20 sit side by side. They give **22.2 and 17.1**.
 
-**Library 1's two rows should be discounted entirely, on expression.** Its
-momi controls sit at 0.097 and 0.115 µM against the pool screen's 0.787 µM —
-seven to eight times less protein, and right on the 0.1 µM filter line. By
-the house rule of at least 2 of 3 replicates above 0.1 µM:
+Everything in italics is excluded, for a stated reason:
 
-| row | replicates (µM) | passing | factor |
-|---|---|---|---|
-| :1 | 0.090, 0.105, 0.096 | **1 of 3 — fails** | 21.6 |
-| :2 | 0.131, 0.115, 0.097 | 2 of 3 — passes | 8.0 |
+- **37 °C and 60 °C overnight (34.0 and 6.8).** Different temperature AND
+  different duration. momi WT and G20 need not share a thermal profile —
+  indeed the ratio moves from 34.0 to 6.8 between 37 °C and 60 °C, which is
+  itself evidence that temperature changes it — so neither transfers to the
+  ambient reads the libraries were measured at. The 60 °C point also runs
+  the enzymes near their stability limit at CV 0.110.
+- **The two short reads.** momi comes out negative, below background.
+- **Library 1's September controls (21.6 and 8.0).** Saturated plate, and
+  momi barely expressing at 0.097–0.115 µM — row :1 fails the house
+  expression filter outright.
 
-So the row giving 21.6 does not clear the project's own expression filter,
-and the row that does gives 8.0. Neither is a usable estimate: at ~0.1 µM
-the enzyme is barely present, and library 1's plate is saturated besides.
-Library 1 is where G20 was found; it is not where this factor should be
-measured.
+So the defensible range is **17.1 to 22.2**. The value in use is 22.2: it is
+the better-conditioned of the two, with momi expressing at 0.787 µM against
+0.139 and CV 0.004 against 0.013. Using the mean of the two matched
+measurements instead would give ~19.7, a 12% difference and well inside what
+these data resolve.
 
-**The pattern is consistent and it does not support 13.** The three
-best-conditioned measurements — CV 0.004, 0.007 and 0.013 — give **22.2,
-34.0 and 17.1**, all above 13. Every value at or below 13 comes from a measurement that
-is otherwise compromised: the 60 °C overnight has CV 0.110 and runs the
-enzymes near their stability limit, and library 1's 8.0 is one of two control
-rows that disagree by 2.7× on a saturated plate.
-
-So 13 sits at the bottom of everything measured, and nothing clean supports
-it. 22.2 is the best single measurement; 34.0 is the only other clean one and
-points the same way.
+**13 still sits below both matched measurements**, and nothing at ambient
+temperature supports it.
 
 Two experiments contain both sequences but cannot contribute: `e0333`
 (validation set, 60 °C HPLC) and `e0340`/`e0344` are protein-purification
