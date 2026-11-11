@@ -79,11 +79,21 @@ SHARED = Path("/projects/ml/itopt/petase")
 LIB1_SEPT = KIERA / "testing_first_library_on_pet_probe" / "250927"
 LIB23 = KIERA / "exp_guided_library" / "260128_all_data_lib1_lib2.csv"
 
-EXPRESSION_MIN = 0.1      # uM mscarlett; the project's standard threshold
+# THE HOUSE FILTER, taken from jq01's processing rather than invented here
+# (jq_p07_active_learning/jq_e0321_.../2_process_kinetics.ipynb):
+#
+#     mscarlett_num_pass >= 2   AND   bg_sub_conc_norm_rate_cv <= cv_threshold
+#
+# `mscarlett_num_pass` is a COUNT of replicates expressing above 0.1 uM, not
+# a boolean -- at least 2 of 3 must clear it. Filtering on the MEAN instead
+# is slightly laxer: on library 1 it passes 68 designs against 65, letting
+# through wells where one strong replicate carries two weak ones.
+EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
+MIN_REPLICATES_PASSING = 2
 CV_MAX = 1.0              # as used by the kinetics pipeline
 
 SCHEMA = ["library", "round_number", "sample_type", "name", "sequence",
-          "well", "expression_um", "rate", "total_product", "rate_per_um",
+          "plate", "well", "expression_um", "n_expressing", "rate", "total_product", "rate_per_um",
           "g20_norm_rate", "cv", "r2", "passes_expression", "passes_cv",
           "passes_filter"]
 
@@ -108,13 +118,21 @@ def library1(timepoint=2):
     # are mostly background. G20 is 471 raw, 328 background-subtracted,
     # against 140 for the next design -- subtracting widens the gap from
     # 1.7x to 2.3x.
-    neg = d[d.sample_type == "negative_control"]
-    if not len(neg):
+    # PER PLATE, both the background and the G20 reference. With one plate
+    # in this screen the grouping is a no-op, but it is written this way so
+    # the guarantee is structural: a plate's gain, read height and lamp all
+    # differ slightly, so a background or a reference borrowed from another
+    # plate would import that difference as signal.
+    if not (d.sample_type == "negative_control").any():
         sys.exit("library 1: no negative controls to background-subtract")
-    bg_product = _num(neg["4MU_um_max_mean"]).mean()
-    bg_rate = _num(neg["rate_mean"]).mean()
 
+    bg_product = (d[d.sample_type == "negative_control"]
+                  .groupby("plate_number")["4MU_um_max_mean"].mean())
+    bg_rate = (d[d.sample_type == "negative_control"]
+               .groupby("plate_number")["rate_mean"].mean())
+    plate = d["plate_number"]
     conc = _num(d["mscarlett_mean"]) + 1e-4
+
     out = pd.DataFrame({
         "library": "1_original",
         # The original library screen is one round; G20 was picked from it.
@@ -122,30 +140,30 @@ def library1(timepoint=2):
         "sample_type": d["sample_type"],
         "name": d["name"],
         "sequence": d["sequence"],
+        "plate": plate,
         "well": d["source_dna_well"],
         "expression_um": _num(d["mscarlett_mean"]),
-        "rate": _num(d["rate_mean"]) - bg_rate,
-        "total_product": _num(d["4MU_um_max_mean"]) - bg_product,
+        # Count of replicates clearing the threshold, as jq01's pipeline does.
+        "n_expressing": sum((_num(d[f"mscarlett_um_{i}"]) >= EXPRESSION_MIN).astype(int)
+                            for i in (1, 2, 3)),
+        "rate": _num(d["rate_mean"]) - plate.map(bg_rate),
+        "total_product": _num(d["4MU_um_max_mean"]) - plate.map(bg_product),
         # Same formula as libraries 2 and 3: (rate - bg) / (conc + 1e-4).
-        # Reported for comparability, but see the saturation note -- this
-        # column is NOT what library 1 is ranked on.
-        "rate_per_um": (_num(d["rate_mean"]) - bg_rate) / conc,
-        # mscarlett_cv, NOT rate_norm_cv. The rate CV is computed on a
-        # near-zero mean and explodes: its 75th percentile is exactly
-        # 1.732, and G20 itself reads 1.732, which would filter out the
-        # single best design in the library.
+        # Reported for comparability; NOT what library 1 is ranked on.
+        "rate_per_um": (_num(d["rate_mean"]) - plate.map(bg_rate)) / conc,
+        # mscarlett_cv, NOT rate_norm_cv. The rate CV divides by a near-zero
+        # mean and explodes: its 75th percentile is exactly 1.732 and G20
+        # itself reads 1.732, which would filter out the best design here.
         "cv": _num(d["mscarlett_cv"]),
         "r2": pd.NA,
     })
 
-    # Normalise to the G20 well. Do it on total product, which is the metric
-    # G20 was selected on and the one that survives the filter sensibly --
-    # rate_per_um is the exploding quantity this filter exists to suppress.
-    g20 = out[out.well == "G20"]
-    if len(g20) != 1:
-        sys.exit(f"expected exactly one G20 well in library 1, got {len(g20)}")
-    ref = float(g20.total_product.iloc[0])   # background-subtracted
-    out["g20_norm_rate"] = out.total_product / ref
+    # Divide each plate through ITS OWN G20 well.
+    refs = (out[out.well == "G20"].groupby("plate")["total_product"].mean())
+    missing = set(out.plate.unique()) - set(refs.index)
+    if missing:
+        sys.exit(f"library 1: plates with no G20 well to normalise against: {missing}")
+    out["g20_norm_rate"] = out.total_product / out.plate.map(refs)
     return out
 
 
@@ -166,8 +184,10 @@ def libraries_23():
         "sample_type": d["sample_type"],
         "name": d["name"],
         "sequence": d["sequence"],
+        "plate": _num(d["plate_number"]),
         "well": d["source_dna_well"],
         "expression_um": _num(d["mscarlett_um_mean"]),
+        "n_expressing": _num(d["mscarlett_num_pass"]),
         # This pipeline reports a background-subtracted, concentration-
         # normalised rate; there is no raw-rate or total-product column, so
         # those stay empty rather than being invented from it.
@@ -183,7 +203,26 @@ def libraries_23():
 
 def add_filter(d):
     d = d.copy()
-    d["passes_expression"] = d.expression_um >= EXPRESSION_MIN
+    # `n_expressing` DOES NOT MEAN THE SAME THING IN EVERY SOURCE, so it
+    # cannot be thresholded uniformly:
+    #
+    #   library 1   a count this script computes, 0-3
+    #   library 2   a BOOLEAN (all rows read 1) -- the kiera pipeline stores
+    #               `all(replicates >= 0.1)`, so 1 means "passed", not "one
+    #               replicate passed"
+    #   library 3   a count, 3 or 6 (jq01's convention)
+    #
+    # Thresholding at >= 2 across all three silently dropped every row of
+    # library 2. Libraries 2 and 3 are in any case already filtered upstream
+    # -- their minimum expression is 0.109 and 0.112 uM -- so the rule is
+    # applied where it is this script's job to apply it, and the upstream
+    # verdict is honoured where it is not.
+    counted = d.library.isin(["1_original", "3_experiment_guided"])
+    d["passes_expression"] = (
+        (d.expression_um >= EXPRESSION_MIN)
+        & (~counted | (d.n_expressing >= MIN_REPLICATES_PASSING))
+        & (counted | (d.n_expressing >= 1))
+    )
     d["passes_cv"] = d.cv.isna() | (d.cv.abs() <= CV_MAX)
     d["passes_filter"] = d.passes_expression & d.passes_cv
     return d[SCHEMA]
