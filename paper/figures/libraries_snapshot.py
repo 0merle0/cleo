@@ -285,10 +285,12 @@ REPOOL = {("3_experiment_guided", 2)}
 # under 13x the pool screen's momi reads 0.585 instead of 1.0, which is the
 # point against.
 #
-# KEPT AT 13 so these numbers match the rest of the project. Set
-# MOMI_PER_G20 = 22.2 to follow the control experiment instead -- it is a
-# constant rescale and changes no x G20 value, ranking or percentage.
-MOMI_PER_G20 = 13.0
+# SET TO 22.2, following the control experiment rather than the legacy
+# constant. Note this makes these numbers differ from jq01's notebooks,
+# which still apply 13 -- any "x momi" figure quoted from there will be
+# 1.71x lower. x G20 values, rankings and percentages are unaffected; the
+# factor is a constant rescale.
+MOMI_PER_G20 = 22.2
 
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
 MIN_REPLICATES_PASSING = 2
