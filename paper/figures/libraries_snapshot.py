@@ -290,7 +290,7 @@ REPOOL = {("3_experiment_guided", 2)}
 # which still apply 13 -- any "x momi" figure quoted from there will be
 # 1.71x lower. x G20 values, rankings and percentages are unaffected; the
 # factor is a constant rescale.
-MOMI_PER_G20 = 22.2
+MOMI_PER_G20 = 22.2   # justified in docs/MOMI_NORMALISATION.md
 
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
 MIN_REPLICATES_PASSING = 2
