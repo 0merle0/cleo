@@ -192,6 +192,29 @@ LIB23 = KIERA / "exp_guided_library" / "260128_all_data_lib1_lib2.csv"
 # a boolean -- at least 2 of 3 must clear it. Filtering on the MEAN instead
 # is slightly laxer: on library 1 it passes 68 designs against 65, letting
 # through wells where one strong replicate carries two weak ones.
+# G20 -> momi WT conversion, for the `momi_norm_rate` column.
+#
+# momi WT is the enzyme the project actually started from, so it is the
+# natural axis. It cannot be the MEASURED reference, because in a short read
+# it sits at or below background (it reads NEGATIVE at 37C and 60C in
+# e0328). So every value is measured against G20 and converted once here.
+#
+# The factor comes from the two experiments that measured momi WT and G20 ON
+# THE SAME PLATE:
+#
+#     library 1, total product, 21 min    G20 = 24.0x momi
+#     pooled screen, rate, 3 min          G20 = 22.2x momi
+#     mean 23.1x, the two agreeing to 8%
+#
+# jq01's pipeline applies 13x for its own `momi_norm_rate`. That is 1.8x
+# lower than both measurements here, so numbers quoted as "x momi" will NOT
+# match between this file and those notebooks. Flagged rather than
+# reconciled: it is a choice about which number the paper stands behind.
+#
+# Everything downstream is a constant rescale, so x G20 comparisons,
+# rankings and percentages are untouched by the choice of factor.
+MOMI_PER_G20 = 23.1
+
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
 MIN_REPLICATES_PASSING = 2
 # CV <= 1.0 EVERYWHERE, which is a principled bound rather than a tuned one:
@@ -221,7 +244,7 @@ CV_MAX = 1.0
 
 SCHEMA = ["library", "round_number", "sample_type", "name", "sequence",
           "plate", "well", "expression_um", "n_expressing", "rate", "total_product", "rate_per_um",
-          "g20_norm_rate", "cv", "cv_metric", "cv_expression", "cv_rate", "r2",
+          "g20_norm_rate", "momi_norm_rate", "cv", "cv_metric", "cv_expression", "cv_rate", "r2",
           "passes_expression", "passes_cv", "passes_filter"]
 
 
@@ -364,6 +387,7 @@ def add_filter(d):
         & (counted | (d.n_expressing >= 1))
     )
     d["passes_cv"] = d.cv.isna() | (d.cv.abs() <= CV_MAX)
+    d["momi_norm_rate"] = d.g20_norm_rate * MOMI_PER_G20
     d["passes_filter"] = d.passes_expression & d.passes_cv
     return d[SCHEMA]
 
@@ -402,11 +426,12 @@ def main():
     not_g20 = samp[(samp.g20_norm_rate - 1).abs() > 1e-9]
     s = (samp.groupby("library")
          .agg(n=("g20_norm_rate", "size"),
-              median_x_g20=("g20_norm_rate", "median"),
-              max_x_g20=("g20_norm_rate", "max"),
+              median_x_momi=("momi_norm_rate", "median"),
+              max_x_momi=("momi_norm_rate", "max"),
               pct_above_g20=("g20_norm_rate", lambda v: 100 * (v > 1).mean()))
          .round(2))
-    s["max_excl_g20"] = not_g20.groupby("library").g20_norm_rate.max().round(2)
+    s["max_excl_g20_x_momi"] = (not_g20.groupby("library")
+                                .momi_norm_rate.max().round(1))
     print(s.to_string())
     print("\nmax includes G20 for library 1 (it is a sample there) and "
           "excludes it for 2 and 3 (a control); max_excl_g20 is comparable.")
