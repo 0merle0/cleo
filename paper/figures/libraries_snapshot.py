@@ -259,29 +259,35 @@ REPOOL = {("3_experiment_guided", 2)}
 # `g20_norm_rate * 13  # approximate to momi activity`, and is used so these
 # numbers match the rest of the project.
 #
-# NOT SETTLED, and library 1 cannot settle it.
+# THE DEDICATED CONTROL EXPERIMENT SAYS 22.2x, NOT 13x.
 #
-# momi WT appears in library 1 only. Searched by sequence: 2 exact matches
-# there (its two P23 control rows) and ZERO in libraries 2 and 3, which
-# cannot contain it -- they are built from G20 fragments, and G20 is 21
-# mutations from momi, so their closest designs sit 9 and 12 mutations away.
+# jq_e0321's pool screen was run for exactly this comparison. Its README:
+# "WT momi, G20 momi, top 5 from round 3 from first library, FastPETase,
+# LCC, thermoPETase comparison". All on one plate, one condition:
 #
-# The two measurements disagree and library 1 brackets both:
+#     momi_g20_top1   1.916 x G20      Fast_PETase     1.577
+#     G20 (control)   1.000            Thermo_PETase   1.504
+#     momi_wt         0.045            LCC             0.924
 #
-#   pooled screen, one plate, r2 0.99994, 0.787 uM, 3/3 reps, CV 0.4%
-#       momi = 0.045 x G20  ->  22.2x
-#       under 13x that row's own momi_norm_rate reads 0.585, not 1.0
+# momi_wt there is 3/3 replicates, CV 0.004, and EXPRESSES BEST of all the
+# reference enzymes at 0.787 uM against G20's 0.606 and FastPETase's 0.366 --
+# so its low activity is not an expression artefact. That gives 1/0.045 =
+# 22.2x.
 #
-#   library 1, its two momi control rows
-#       P23:1  0.046 x G20  ->  21.6x
-#       P23:2  0.125 x G20  ->   8.0x      2.7x apart
-#       mean 11.7x, and the range covers BOTH candidates
-#       under 13x their own momi_norm_rate averages 1.12, close to 1.0
+# The 13 appears to be a legacy constant: the SAME notebook that measures
+# momi at 0.045 also applies `g20_norm_rate * 13`, so the number was already
+# hardcoded and was not revised when this experiment produced the
+# measurement that supersedes it.
 #
-# So 13 is supported by library 1's controls averaging near 1.0 on their own
-# axis, and 22.2 by the pooled screen's much cleaner single measurement.
-# Set MOMI_PER_G20 = 22.2 to switch; it is a constant rescale and changes no
-# x G20 value, ranking or percentage.
+# Library 1 cannot arbitrate -- its two momi control rows give 21.6x and
+# 8.0x, 2.7x apart, bracketing both candidates. Under 13x its controls
+# average 1.12 on their own axis, which is the one point in 13's favour;
+# under 13x the pool screen's momi reads 0.585 instead of 1.0, which is the
+# point against.
+#
+# KEPT AT 13 so these numbers match the rest of the project. Set
+# MOMI_PER_G20 = 22.2 to follow the control experiment instead -- it is a
+# constant rescale and changes no x G20 value, ranking or percentage.
 MOMI_PER_G20 = 13.0
 
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
