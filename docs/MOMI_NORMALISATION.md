@@ -68,6 +68,7 @@ archives and duplicates, these are the independent comparison points:
 | e0321 pool screen | 0.0450 | **22.2** | 0.787 µM | **0.004** |
 | e0328 overnight 37 °C | 0.0294 | **34.0** | 0.536 µM | 0.007 |
 | e0328 overnight 60 °C | 0.1473 | 6.8 | 0.469 µM | 0.110 |
+| library 1 December re-test, plate 3 | 0.0585 | **17.1** | 0.139 µM | 0.013 |
 | e0328 round 5, 37 °C short | **−0.017** | — | 0.826 µM | 0.010 |
 | e0328 round 5, 60 °C short | **−0.399** | — | 0.927 µM | 0.122 |
 | library 1, control row :1 | 0.046 | 21.6 | **0.097 µM** | — |
@@ -93,9 +94,9 @@ the enzyme is barely present, and library 1's plate is saturated besides.
 Library 1 is where G20 was found; it is not where this factor should be
 measured.
 
-**The pattern is consistent and it does not support 13.** The two
-best-conditioned measurements — CV 0.004 and 0.007 — give **22.2 and 34.0**,
-both well above 13. Every value at or below 13 comes from a measurement that
+**The pattern is consistent and it does not support 13.** The three
+best-conditioned measurements — CV 0.004, 0.007 and 0.013 — give **22.2,
+34.0 and 17.1**, all above 13. Every value at or below 13 comes from a measurement that
 is otherwise compromised: the 60 °C overnight has CV 0.110 and runs the
 enzymes near their stability limit, and library 1's 8.0 is one of two control
 rows that disagree by 2.7× on a saturated plate.

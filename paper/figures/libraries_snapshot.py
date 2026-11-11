@@ -331,91 +331,59 @@ def _num(s):
 
 
 def library1(timepoint=2):
-    """-> the original library, normalised to its own G20 well."""
-    f = LIB1_SEPT / f"timepoint_{timepoint}" / "processed_data" / "5_complete_df.csv"
+    """-> the original library, processed like libraries 2 and 3.
+
+    Sourced from the DECEMBER 4MU re-test, not the September PET-probe
+    screen, so that it carries the same quantity as the other two: a
+    background-subtracted, concentration-normalised RATE. September was
+    scored on total product because its reaction had already saturated --
+    useful for finding G20, useless for plotting beside a rate.
+
+    Produced by paper/figures/library1_kinetics.py, which runs the
+    libraries-2-and-3 pipeline over the December t0/t1/t2 files.
+
+    NORMALISED TO momi WT PER PLATE, not to G20. G20 sits on plate 3 only,
+    while momi WT is the positive control on all three, so momi is the only
+    reference that reaches every design. That makes `momi_norm_rate`
+    MEASURED here and derived for libraries 2 and 3, and `g20_norm_rate`
+    derived here and measured there -- stated plainly because it is the
+    reverse of the other two.
+    """
+    f = HERE / "data" / "library1_december_kinetics.csv"
     if not f.exists():
-        sys.exit(f"library 1 not found: {f}")
+        sys.exit(f"run library1_kinetics.py first: {f}")
     d = pd.read_csv(f)
 
-    # BACKGROUND SUBTRACT, the same way libraries 2 and 3 do: subtract the
-    # mean negative-control value per plate, then divide by concentration.
-    #
-    # This is not cosmetic here. The negative controls read 128.8 and 158.0
-    # total product against a sample median of 154, so the median design in
-    # this library is INDISTINGUISHABLE FROM BACKGROUND and the raw numbers
-    # are mostly background. G20 is 471 raw, 328 background-subtracted,
-    # against 140 for the next design -- subtracting widens the gap from
-    # 1.7x to 2.3x.
-    # PER PLATE, both the background and the G20 reference. With one plate
-    # in this screen the grouping is a no-op, but it is written this way so
-    # the guarantee is structural: a plate's gain, read height and lamp all
-    # differ slightly, so a background or a reference borrowed from another
-    # plate would import that difference as signal.
-    if not (d.sample_type == "negative_control").any():
-        sys.exit("library 1: no negative controls to background-subtract")
+    momi = d[d.sample_type == "positive_control"]
+    refs = momi.groupby("plate_number").bg_sub_conc_norm_rate_mean.mean()
+    missing = set(d.plate_number.unique()) - set(refs.index)
+    if missing:
+        sys.exit(f"library 1: plates with no momi control: {missing}")
+    x_momi = d.bg_sub_conc_norm_rate_mean / d.plate_number.map(refs)
 
-    # MEDIAN over the individual replicate WELLS, not the mean of row means.
-    #
-    # Library 1 has 6 negative-control wells and five of them agree closely
-    # -- 125.0, 125.6, 126.4, 128.8, 131.9 -- while the sixth reads 222.7.
-    # Averaging lifts the background from 127.6 to 143.4, and because momi WT
-    # sits only ~30 above background that one well moves the derived
-    # G20/momi ratio from 11.7x to 24.0x. The median is unmoved by it.
-    _neg = d[d.sample_type == "negative_control"]
-
-    def _bg(cols):
-        long = _neg.melt(id_vars="plate_number", value_vars=cols)
-        return long.groupby("plate_number")["value"].median()
-
-    bg_product = _bg([f"4MU_um_max_{i}" for i in (1, 2, 3)])
-    bg_rate = _bg([f"rate_{i}" for i in (1, 2, 3)])
-    plate = d["plate_number"]
-    conc = _num(d["mscarlett_mean"]) + 1e-4
-
-    out = pd.DataFrame({
+    return pd.DataFrame({
         "library": "1_original",
-        # The original library screen is one round; G20 was picked from it.
         "round_number": 0,
         "sample_type": d["sample_type"],
         "name": d["name"],
         "sequence": d["sequence"],
-        "plate": plate,
+        "plate": _num(d["plate_number"]),
         "well": d["source_dna_well"],
-        "expression_um": _num(d["mscarlett_mean"]),
-        # Count of replicates clearing the threshold, as jq01's pipeline does.
-        "n_expressing": sum((_num(d[f"mscarlett_um_{i}"]) >= EXPRESSION_MIN).astype(int)
-                            for i in (1, 2, 3)),
-        "rate": _num(d["rate_mean"]) - plate.map(bg_rate),
-        "total_product": _num(d["4MU_um_max_mean"]) - plate.map(bg_product),
-        # Same formula as libraries 2 and 3: (rate - bg) / (conc + 1e-4).
-        # Reported for comparability; NOT what library 1 is ranked on.
-        "rate_per_um": (_num(d["rate_mean"]) - plate.map(bg_rate)) / conc,
-        # mscarlett_cv, NOT rate_norm_cv. The rate CV divides by a near-zero
-        # mean and explodes: its 75th percentile is exactly 1.732 and G20
-        # itself reads 1.732, which would filter out the best design here.
-        # Ranked on total product, so qualified on ITS reproducibility.
-        "cv": (d[[f"4MU_um_max_{i}" for i in (1, 2, 3)]].std(axis=1, ddof=1)
-               / d[[f"4MU_um_max_{i}" for i in (1, 2, 3)]].mean(axis=1)),
-        "cv_metric": "total_product_cv",
-        "cv_expression": _num(d["mscarlett_cv"]),
-        # The rate CV is kept but NOT filtered on. It divides by a near-zero
-        # mean here -- median 0.956, 75th percentile exactly 1.732 -- because
-        # the reaction had saturated, and a <= 1.0 gate on it removes 60 of
-        # 128 rows INCLUDING G20 itself. Carried so the number is visible
-        # rather than quietly dropped.
-        "cv_rate": _num(d["rate_norm_cv"]),
-        "r2": pd.NA,
-        "norm_scheme": "single_plate_own_g20",
-        "n_positive_controls": int((d.sample_type == "positive_control").sum()),
+        "expression_um": _num(d["mscarlett_um_mean"]),
+        "n_expressing": _num(d["n_expressing"]),
+        "rate": pd.NA,
+        "total_product": pd.NA,
+        "rate_per_um": _num(d["bg_sub_conc_norm_rate_mean"]),
+        # measured against momi; the G20 axis is derived from it
+        "g20_norm_rate": x_momi / MOMI_PER_G20,
+        "cv": _num(d["bg_sub_conc_norm_rate_cv"]),
+        "cv_metric": "bg_sub_conc_norm_rate_cv",
+        "cv_expression": pd.NA,
+        "cv_rate": _num(d["bg_sub_conc_norm_rate_cv"]),
+        "r2": _num(d["r2_score"]),
+        "norm_scheme": "per_plate_momi_control",
+        "n_positive_controls": len(momi),
     })
-
-    # Divide each plate through ITS OWN G20 well.
-    refs = (out[out.well == "G20"].groupby("plate")["total_product"].mean())
-    missing = set(out.plate.unique()) - set(refs.index)
-    if missing:
-        sys.exit(f"library 1: plates with no G20 well to normalise against: {missing}")
-    out["g20_norm_rate"] = out.total_product / out.plate.map(refs)
-    return out
 
 
 def _one_source(path, library):
