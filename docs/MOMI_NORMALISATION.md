@@ -70,12 +70,28 @@ archives and duplicates, these are the independent comparison points:
 | e0328 overnight 60 °C | 0.1473 | 6.8 | 0.469 µM | 0.110 |
 | e0328 round 5, 37 °C short | **−0.017** | — | 0.826 µM | 0.010 |
 | e0328 round 5, 60 °C short | **−0.399** | — | 0.927 µM | 0.122 |
-| library 1, control row :1 | 0.046 | 21.6 | 0.097 µM | — |
-| library 1, control row :2 | 0.125 | 8.0 | 0.115 µM | — |
+| library 1, control row :1 | 0.046 | 21.6 | **0.097 µM** | — |
+| library 1, control row :2 | 0.125 | 8.0 | **0.115 µM** | — |
 
 The two short reads are unusable: momi comes out **negative**, i.e. below
 background, which is the same reason it cannot be the reference in the first
 place. Only the longer reads resolve it at all.
+
+**Library 1's two rows should be discounted entirely, on expression.** Its
+momi controls sit at 0.097 and 0.115 µM against the pool screen's 0.787 µM —
+seven to eight times less protein, and right on the 0.1 µM filter line. By
+the house rule of at least 2 of 3 replicates above 0.1 µM:
+
+| row | replicates (µM) | passing | factor |
+|---|---|---|---|
+| :1 | 0.090, 0.105, 0.096 | **1 of 3 — fails** | 21.6 |
+| :2 | 0.131, 0.115, 0.097 | 2 of 3 — passes | 8.0 |
+
+So the row giving 21.6 does not clear the project's own expression filter,
+and the row that does gives 8.0. Neither is a usable estimate: at ~0.1 µM
+the enzyme is barely present, and library 1's plate is saturated besides.
+Library 1 is where G20 was found; it is not where this factor should be
+measured.
 
 **The pattern is consistent and it does not support 13.** The two
 best-conditioned measurements — CV 0.004 and 0.007 — give **22.2 and 34.0**,
@@ -92,6 +108,25 @@ Two experiments contain both sequences but cannot contribute: `e0333`
 (validation set, 60 °C HPLC) and `e0340`/`e0344` are protein-purification
 runs — momi and G20 have HPLC concentrations there but no activity merged in,
 so `g20_norm_rate` is null for both.
+
+## What else was on the pool-screen plate
+
+Context for the primary evidence — e0321 was not a momi-vs-G20 experiment
+alone, which is part of why it is well controlled:
+
+| category | n | × G20 range |
+|---|---|---|
+| pooled library fragments (5 fragments × 4 plates) | 20 | 0.058 – 1.639 |
+| top designs from library 2 round 3 | 5 | 1.066 – 1.916 |
+| natural PETase benchmarks (FastPETase, ThermoPETase, LCC) | 3 | 0.924 – 1.577 |
+| G20 positive control | 1 | 1.000 |
+| G20 ordered as a single gene | 1 | 0.927 |
+| momi WT | 1 | 0.045 |
+
+**G20 measured two independent ways on that plate agrees to 7%** — 1.000 as
+the library construct against 0.927 ordered as a single gene. That is a
+direct check that the reference itself is reproducible within the
+experiment the factor comes from.
 
 ## Where the 13 comes from
 
