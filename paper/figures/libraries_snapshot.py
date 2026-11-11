@@ -90,7 +90,29 @@ LIB23 = KIERA / "exp_guided_library" / "260128_all_data_lib1_lib2.csv"
 # through wells where one strong replicate carries two weak ones.
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
 MIN_REPLICATES_PASSING = 2
-CV_MAX = 1.0              # as used by the kinetics pipeline
+# CV thresholds are PER LIBRARY, because the quantity each library is ranked
+# on differs and so does the CV that qualifies it.
+#
+#   libraries 2, 3   rate CV <= 1.0, jq01's threshold. A no-op by
+#                    construction: they were CV-filtered upstream and their
+#                    maxima are 0.281 and 0.444.
+#   library 1        TOTAL-PRODUCT CV <= 0.15, chosen from the data here.
+#
+# Why total product: library 1 is ranked on total product, so that is the
+# quantity whose reproducibility matters. Its CV is well behaved -- median
+# 0.072, max 0.242 -- unlike the rate CV, which saturation drives to a
+# median of 0.956 and would delete G20.
+#
+# Why 0.15: it removes 7 of 64 designs, and all 7 sit at or below
+# background (-0.056 to 0.053 x G20, two of them negative) -- noise-
+# dominated wells and nothing else. The top 5 are unchanged at 0.15, 0.20
+# and 0.25; at 0.10 the cut reaches 20 of 64 and starts removing real
+# designs, dropping B21 and B18 out of the top 5. G20 itself is 0.059,
+# comfortably inside. CV correlates only weakly with expression (-0.07) or
+# activity (-0.15), so this is not a disguised activity filter.
+CV_MAX = {"1_original": 0.15,
+          "2_g20_optimisation": 1.0,
+          "3_experiment_guided": 1.0}
 #
 # THE CV GATE CURRENTLY REMOVES NOTHING from any library, and the `cv`
 # column is NOT the same quantity in all three:
@@ -107,7 +129,7 @@ CV_MAX = 1.0              # as used by the kinetics pipeline
 
 SCHEMA = ["library", "round_number", "sample_type", "name", "sequence",
           "plate", "well", "expression_um", "n_expressing", "rate", "total_product", "rate_per_um",
-          "g20_norm_rate", "cv", "cv_metric", "cv_rate", "r2",
+          "g20_norm_rate", "cv", "cv_metric", "cv_expression", "cv_rate", "r2",
           "passes_expression", "passes_cv", "passes_filter"]
 
 
@@ -167,8 +189,11 @@ def library1(timepoint=2):
         # mscarlett_cv, NOT rate_norm_cv. The rate CV divides by a near-zero
         # mean and explodes: its 75th percentile is exactly 1.732 and G20
         # itself reads 1.732, which would filter out the best design here.
-        "cv": _num(d["mscarlett_cv"]),
-        "cv_metric": "mscarlett_cv",
+        # Ranked on total product, so qualified on ITS reproducibility.
+        "cv": (d[[f"4MU_um_max_{i}" for i in (1, 2, 3)]].std(axis=1, ddof=1)
+               / d[[f"4MU_um_max_{i}" for i in (1, 2, 3)]].mean(axis=1)),
+        "cv_metric": "total_product_cv",
+        "cv_expression": _num(d["mscarlett_cv"]),
         # The rate CV is kept but NOT filtered on. It divides by a near-zero
         # mean here -- median 0.956, 75th percentile exactly 1.732 -- because
         # the reaction had saturated, and a <= 1.0 gate on it removes 60 of
@@ -217,6 +242,7 @@ def libraries_23():
         "g20_norm_rate": _num(d["g20_norm_rate"]),
         "cv": _num(d["bg_sub_conc_norm_rate_cv"]),
         "cv_metric": "bg_sub_conc_norm_rate_cv",
+        "cv_expression": pd.NA,
         "cv_rate": _num(d["bg_sub_conc_norm_rate_cv"]),
         "r2": _num(d["r2_score"]),
     })
@@ -245,7 +271,8 @@ def add_filter(d):
         & (~counted | (d.n_expressing >= MIN_REPLICATES_PASSING))
         & (counted | (d.n_expressing >= 1))
     )
-    d["passes_cv"] = d.cv.isna() | (d.cv.abs() <= CV_MAX)
+    lim = d.library.map(CV_MAX)
+    d["passes_cv"] = d.cv.isna() | (d.cv.abs() <= lim)
     d["passes_filter"] = d.passes_expression & d.passes_cv
     return d[SCHEMA]
 
