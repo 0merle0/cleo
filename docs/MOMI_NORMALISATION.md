@@ -57,6 +57,42 @@ Three things make this hard to dismiss:
 3. **Same plate, same read, same background subtraction** as the G20 it is
    divided by, so no cross-plate bridging is involved.
 
+## Every experiment that measured both, and what each gives
+
+Searched all 22,410 CSVs under `jq_p07_active_learning` for files containing
+both sequences; 16 matched, 8 with activity columns. After excluding
+archives and duplicates, these are the independent comparison points:
+
+| experiment | momi × G20 | **factor** | momi expression | CV |
+|---|---|---|---|---|
+| e0321 pool screen | 0.0450 | **22.2** | 0.787 µM | **0.004** |
+| e0328 overnight 37 °C | 0.0294 | **34.0** | 0.536 µM | 0.007 |
+| e0328 overnight 60 °C | 0.1473 | 6.8 | 0.469 µM | 0.110 |
+| e0328 round 5, 37 °C short | **−0.017** | — | 0.826 µM | 0.010 |
+| e0328 round 5, 60 °C short | **−0.399** | — | 0.927 µM | 0.122 |
+| library 1, control row :1 | 0.046 | 21.6 | 0.097 µM | — |
+| library 1, control row :2 | 0.125 | 8.0 | 0.115 µM | — |
+
+The two short reads are unusable: momi comes out **negative**, i.e. below
+background, which is the same reason it cannot be the reference in the first
+place. Only the longer reads resolve it at all.
+
+**The pattern is consistent and it does not support 13.** The two
+best-conditioned measurements — CV 0.004 and 0.007 — give **22.2 and 34.0**,
+both well above 13. Every value at or below 13 comes from a measurement that
+is otherwise compromised: the 60 °C overnight has CV 0.110 and runs the
+enzymes near their stability limit, and library 1's 8.0 is one of two control
+rows that disagree by 2.7× on a saturated plate.
+
+So 13 sits at the bottom of everything measured, and nothing clean supports
+it. 22.2 is the best single measurement; 34.0 is the only other clean one and
+points the same way.
+
+Two experiments contain both sequences but cannot contribute: `e0333`
+(validation set, 60 °C HPLC) and `e0340`/`e0344` are protein-purification
+runs — momi and G20 have HPLC concentrations there but no activity merged in,
+so `g20_norm_rate` is null for both.
+
 ## Where the 13 comes from
 
 jq01's notebooks apply `g20_norm_rate * 13  # approximate to momi activity`.
