@@ -12,6 +12,31 @@ this puts them on one schema and applies one filter.
 Libraries 2 and 3 are G20's descendants: G20 is their parent and their
 positive control, which is why both report `g20_norm_rate` directly.
 
+WHERE momi WT IS MEASURED, AND WHAT IT READS. It is NOT a routine control in
+libraries 2 and 3: across jq01's 32 plate maps the only controls are
+`negative_control` (279 wells) and `1.g20___..._5.g20` (189 wells), and the
+momi WT sequence appears in just 4 maps -- the pooled screen and three
+`top_design_vs_native` analyses. In library 1 it IS the positive control.
+
+Everywhere it was measured, as a multiple of G20:
+
+    library 1, total product, 21 min     0.042     (G20 ~24x)
+    pooled screen, rate, 3 min           0.045     (G20 ~22x)
+    e0328 round 5, 37C short            -0.017     below background
+    e0328 round 5, 60C short            -0.399     below background
+    e0328 overnight, 37C                 0.029     (G20 ~34x)
+    e0328 overnight, 60C                 0.147     (G20 ~6.8x)
+
+The two NEGATIVE values are the point: in a short read momi WT is at or
+below background, so it cannot anchor anything. It only becomes measurable
+when the assay runs long -- library 1's 21 minutes, or an overnight. That is
+why G20 and not momi WT is the positive control in every later library, and
+why `momi_norm_rate` is a conversion factor rather than a measurement.
+
+The two clean short-assay-independent estimates agree closely -- 0.042 from
+library 1's total product and 0.045 from the pooled screen's rate -- which
+is the cross-check that lets library 1 share an axis with the others.
+
 IS G20 CONSISTENT ACROSS LIBRARIES? Within a library, yes; between
 libraries, no -- which is why every value here is normalised to G20 on its
 own plate rather than compared in raw units.
