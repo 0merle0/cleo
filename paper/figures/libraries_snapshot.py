@@ -12,6 +12,39 @@ this puts them on one schema and applies one filter.
 Libraries 2 and 3 are G20's descendants: G20 is their parent and their
 positive control, which is why both report `g20_norm_rate` directly.
 
+!! LIBRARY 3's LATER ROUNDS ARE OVER-NORMALISED IN THE SOURCE FILE USED
+HERE, and its headline maximum is inflated by 1.74x. Do not publish the
+library 3 top numbers from this snapshot until it is re-sourced.
+
+The kiera combined file (260128_all_data_lib1_lib2.csv) normalises each
+plate against that plate's own G20 positive controls. The number of those
+controls collapses over rounds -- 5 per plate in round 0, 2 in round 1, and
+ONE from round 2 onwards -- so by round 3 each plate's entire scale rests on
+a single well. Round 3 plate 1's single control reads 0.000018 against
+0.000032 on plate 2, and everything on that plate inflates accordingly.
+
+The tell is that plate medians should agree within a round and do not:
+
+    kiera combined, round 3   plate medians 13.24 / 10.46 / 10.77  (24% spread)
+                              max 33.02 x G20 = 429 x momi
+
+    jq01's own round-3 analysis, which normalises plate1+plate3 together and
+    plate2 apart:
+                              plate medians  8.10 /  8.14 /  8.02  (0.5%)
+                              max 18.98 x G20 = 247 x momi
+
+jq01's version is right: agreeing medians are what correct per-plate
+normalisation looks like. Their round-4 file likewise tops out at 20.05 x
+G20 = 261 x momi. Both land at the ~250 x momi ceiling, against the 429
+this snapshot currently reports.
+
+Per-round plate spread, kiera combined: library 2 runs 11-18% across all
+rounds; library 3 runs 12%, 11%, 21%, 24% for rounds 0-3, degrading exactly
+as the controls thin out.
+
+TO FIX: source libraries 2 and 3 from jq01's per-round analysis outputs
+(jq_e0321/e0323/e0324/e0325/e0327) rather than the kiera combined file.
+
 WHERE momi WT IS MEASURED, AND WHAT IT READS. It is NOT a routine control in
 libraries 2 and 3: across jq01's 32 plate maps the only controls are
 `negative_control` (279 wells) and `1.g20___..._5.g20` (189 wells), and the
