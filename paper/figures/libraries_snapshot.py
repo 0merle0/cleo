@@ -30,14 +30,21 @@ G20 is unaffected -- it is the normaliser, so it reads 1.00 under every
 choice, and its rank is likewise untouched. Statements about the TOP of
 library 1 are robust; statements about its median or its shape are not.
 
-A second reason the lower range is uninformative: the POSITIVE control here
-is momi WT (1.wt_2.wt_3.wt_4.wt_5.wt), not G20, and momi WT reads 143.5 and
-170.6 against the vector control's 128.8 and 158.0 -- the two controls
-overlap. The assay cannot separate momi WT from empty vector, so everything
-between them is noise. Taken at face value that puts G20 at ~24x momi WT,
-which is the same order as the 13x factor jq01's pipeline uses for
-`momi_norm_rate`, but it rests on a denominator of 13.7 and should be
-treated as order-of-magnitude only.
+AND WHY G20, NOT momi WT, IS THE REFERENCE. Library 1's positive control is
+momi WT (1.wt_2.wt_3.wt_4.wt_5.wt), and it reads 143.5 and 170.6 against the
+vector control's 128.8 and 158.0 -- barely above background. That is not an
+assay failure; momi WT is a weak enzyme and being hard to see above vector
+is the premise of the whole campaign.
+
+It does mean momi WT cannot serve as a denominator here: subtracting
+background leaves it at 13.7, so anything divided by it inherits that
+near-zero's noise. Taken at face value G20 is ~24x momi WT, the same order
+as the 13x factor jq01's pipeline applies for `momi_norm_rate`, but on a
+denominator that thin it is order-of-magnitude at best -- which is also why
+that 13x is a stated approximation rather than a measurement.
+
+G20 is used as the reference instead, in every library, because it is the
+one design comfortably above background in all three.
 
 LIBRARY 1 IS NORMALISED HERE, not at source. It predates G20 being a
 control, and G20 sits in it as an ordinary sample (plate 3, well G20). So
