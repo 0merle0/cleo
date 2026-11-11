@@ -90,42 +90,30 @@ LIB23 = KIERA / "exp_guided_library" / "260128_all_data_lib1_lib2.csv"
 # through wells where one strong replicate carries two weak ones.
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
 MIN_REPLICATES_PASSING = 2
-# CV thresholds are PER LIBRARY, because the quantity each library is ranked
-# on differs and so does the CV that qualifies it.
+# CV <= 1.0 EVERYWHERE, which is a principled bound rather than a tuned one:
+# CV >= 1 means the standard deviation has reached the mean, so the threshold
+# asks "is this population hypervariate?" and not "where does the percentile
+# fall?". It is jq01's threshold and it is kept unchanged for all three.
 #
-#   libraries 2, 3   rate CV <= 1.0, jq01's threshold. A no-op by
-#                    construction: they were CV-filtered upstream and their
-#                    maxima are 0.281 and 0.444.
-#   library 1        TOTAL-PRODUCT CV <= 0.15, chosen from the data here.
+# An earlier version of this file set 0.15 for library 1, picked from its own
+# percentiles because 1.0 removed nothing there. That was a tuned cutoff
+# wearing QC's clothes: it had no meaning outside this dataset and would move
+# with the next plate. Removing nothing is the correct outcome when nothing is
+# hypervariate.
 #
-# Why total product: library 1 is ranked on total product, so that is the
-# quantity whose reproducibility matters. Its CV is well behaved -- median
-# 0.072, max 0.242 -- unlike the rate CV, which saturation drives to a
-# median of 0.956 and would delete G20.
+# WHAT THE CV IS COMPUTED ON still differs per library, and that part matters:
+# each is qualified on the quantity it is RANKED on.
 #
-# Why 0.15: it removes 7 of 64 designs, and all 7 sit at or below
-# background (-0.056 to 0.053 x G20, two of them negative) -- noise-
-# dominated wells and nothing else. The top 5 are unchanged at 0.15, 0.20
-# and 0.25; at 0.10 the cut reaches 20 of 64 and starts removing real
-# designs, dropping B21 and B18 out of the top 5. G20 itself is 0.059,
-# comfortably inside. CV correlates only weakly with expression (-0.07) or
-# activity (-0.15), so this is not a disguised activity filter.
-CV_MAX = {"1_original": 0.15,
-          "2_g20_optimisation": 1.0,
-          "3_experiment_guided": 1.0}
+#   libraries 2, 3   rate CV   (bg_sub_conc_norm_rate_cv), max 0.281 / 0.444
+#   library 1        TOTAL-PRODUCT CV, max 0.242
 #
-# THE CV GATE CURRENTLY REMOVES NOTHING from any library, and the `cv`
-# column is NOT the same quantity in all three:
-#
-#   libraries 2, 3   bg_sub_conc_norm_rate_cv (the RATE cv), jq01's filter.
-#                    Max 0.281 / 0.444 -- they were CV-filtered upstream, so
-#                    re-applying it here is a no-op by construction.
-#   library 1        mscarlett_cv (the EXPRESSION cv). Max 0.868.
-#
-# Library 1 cannot use the rate CV: saturation makes it divide by a
-# near-zero mean, and a <= 1.0 gate drops 60 of 128 rows including G20. The
-# rate CV is still reported as `cv_rate` so nothing is hidden. Treat a CV
-# comparison ACROSS libraries as meaningless; within one it is fine.
+# Library 1's rate CV would be the wrong quantity twice over: it is not what
+# library 1 is ranked on, and saturation drives it to a median of 0.956 with a
+# 75th percentile of exactly 1.732 -- hypervariate by this test, but because
+# the mean is near zero, not because the measurement is noisy. Its replicates
+# are in fact tight: G20 reads 467/500/446. Reported as `cv_rate`, not
+# filtered on.
+CV_MAX = 1.0
 
 SCHEMA = ["library", "round_number", "sample_type", "name", "sequence",
           "plate", "well", "expression_um", "n_expressing", "rate", "total_product", "rate_per_um",
@@ -271,8 +259,7 @@ def add_filter(d):
         & (~counted | (d.n_expressing >= MIN_REPLICATES_PASSING))
         & (counted | (d.n_expressing >= 1))
     )
-    lim = d.library.map(CV_MAX)
-    d["passes_cv"] = d.cv.isna() | (d.cv.abs() <= lim)
+    d["passes_cv"] = d.cv.isna() | (d.cv.abs() <= CV_MAX)
     d["passes_filter"] = d.passes_expression & d.passes_cv
     return d[SCHEMA]
 
