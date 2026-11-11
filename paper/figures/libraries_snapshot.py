@@ -91,11 +91,24 @@ LIB23 = KIERA / "exp_guided_library" / "260128_all_data_lib1_lib2.csv"
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
 MIN_REPLICATES_PASSING = 2
 CV_MAX = 1.0              # as used by the kinetics pipeline
+#
+# THE CV GATE CURRENTLY REMOVES NOTHING from any library, and the `cv`
+# column is NOT the same quantity in all three:
+#
+#   libraries 2, 3   bg_sub_conc_norm_rate_cv (the RATE cv), jq01's filter.
+#                    Max 0.281 / 0.444 -- they were CV-filtered upstream, so
+#                    re-applying it here is a no-op by construction.
+#   library 1        mscarlett_cv (the EXPRESSION cv). Max 0.868.
+#
+# Library 1 cannot use the rate CV: saturation makes it divide by a
+# near-zero mean, and a <= 1.0 gate drops 60 of 128 rows including G20. The
+# rate CV is still reported as `cv_rate` so nothing is hidden. Treat a CV
+# comparison ACROSS libraries as meaningless; within one it is fine.
 
 SCHEMA = ["library", "round_number", "sample_type", "name", "sequence",
           "plate", "well", "expression_um", "n_expressing", "rate", "total_product", "rate_per_um",
-          "g20_norm_rate", "cv", "r2", "passes_expression", "passes_cv",
-          "passes_filter"]
+          "g20_norm_rate", "cv", "cv_metric", "cv_rate", "r2",
+          "passes_expression", "passes_cv", "passes_filter"]
 
 
 def _num(s):
@@ -155,6 +168,13 @@ def library1(timepoint=2):
         # mean and explodes: its 75th percentile is exactly 1.732 and G20
         # itself reads 1.732, which would filter out the best design here.
         "cv": _num(d["mscarlett_cv"]),
+        "cv_metric": "mscarlett_cv",
+        # The rate CV is kept but NOT filtered on. It divides by a near-zero
+        # mean here -- median 0.956, 75th percentile exactly 1.732 -- because
+        # the reaction had saturated, and a <= 1.0 gate on it removes 60 of
+        # 128 rows INCLUDING G20 itself. Carried so the number is visible
+        # rather than quietly dropped.
+        "cv_rate": _num(d["rate_norm_cv"]),
         "r2": pd.NA,
     })
 
@@ -196,6 +216,8 @@ def libraries_23():
         "rate_per_um": _num(d["bg_sub_conc_norm_rate_mean"]),
         "g20_norm_rate": _num(d["g20_norm_rate"]),
         "cv": _num(d["bg_sub_conc_norm_rate_cv"]),
+        "cv_metric": "bg_sub_conc_norm_rate_cv",
+        "cv_rate": _num(d["bg_sub_conc_norm_rate_cv"]),
         "r2": _num(d["r2_score"]),
     })
     return out
