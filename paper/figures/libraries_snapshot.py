@@ -259,14 +259,29 @@ REPOOL = {("3_experiment_guided", 2)}
 # `g20_norm_rate * 13  # approximate to momi activity`, and is used so these
 # numbers match the rest of the project.
 #
-# NOT SETTLED. The pooled screen measured momi WT and G20 on one plate at
-# high quality (r2 0.99994, 0.787 uM, 3/3 replicates, CV 0.4%) and gives
-# momi WT = 0.045 x G20, i.e. 22.2x; under a factor of 13 that same row's
-# momi_norm_rate reads 0.585 rather than the 1.0 momi WT must have on its own
-# axis. Library 1 cannot arbitrate -- with a median background it gives
-# 11.7x, beside 13, but with the mean it gives 24.0x and with the high
-# control momi goes negative. Set MOMI_PER_G20 = 22.2 to switch; it is a
-# constant rescale and changes no x G20 value, ranking or percentage.
+# NOT SETTLED, and library 1 cannot settle it.
+#
+# momi WT appears in library 1 only. Searched by sequence: 2 exact matches
+# there (its two P23 control rows) and ZERO in libraries 2 and 3, which
+# cannot contain it -- they are built from G20 fragments, and G20 is 21
+# mutations from momi, so their closest designs sit 9 and 12 mutations away.
+#
+# The two measurements disagree and library 1 brackets both:
+#
+#   pooled screen, one plate, r2 0.99994, 0.787 uM, 3/3 reps, CV 0.4%
+#       momi = 0.045 x G20  ->  22.2x
+#       under 13x that row's own momi_norm_rate reads 0.585, not 1.0
+#
+#   library 1, its two momi control rows
+#       P23:1  0.046 x G20  ->  21.6x
+#       P23:2  0.125 x G20  ->   8.0x      2.7x apart
+#       mean 11.7x, and the range covers BOTH candidates
+#       under 13x their own momi_norm_rate averages 1.12, close to 1.0
+#
+# So 13 is supported by library 1's controls averaging near 1.0 on their own
+# axis, and 22.2 by the pooled screen's much cleaner single measurement.
+# Set MOMI_PER_G20 = 22.2 to switch; it is a constant rescale and changes no
+# x G20 value, ranking or percentage.
 MOMI_PER_G20 = 13.0
 
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
