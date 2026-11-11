@@ -12,6 +12,33 @@ this puts them on one schema and applies one filter.
 Libraries 2 and 3 are G20's descendants: G20 is their parent and their
 positive control, which is why both report `g20_norm_rate` directly.
 
+THE NEGATIVE CONTROL IS THE RIGHT KIND BUT A THIN ESTIMATE, so library 1's
+median is soft and should not be quoted as a precise number.
+
+P24 is vector-only, which is what a background should be. But it is n=2 and
+the two readings are 23% apart (128.8 and 158.0 total product), and it sits
+ABOVE 19% of the samples. Library 1's median moves with the choice:
+
+    background              median x G20
+    neg-ctrl mean (used)        0.032
+    neg-ctrl min                0.073
+    momi WT                    -0.010
+    sample 5th percentile       0.082
+    none                        0.327
+
+G20 is unaffected -- it is the normaliser, so it reads 1.00 under every
+choice, and its rank is likewise untouched. Statements about the TOP of
+library 1 are robust; statements about its median or its shape are not.
+
+A second reason the lower range is uninformative: the POSITIVE control here
+is momi WT (1.wt_2.wt_3.wt_4.wt_5.wt), not G20, and momi WT reads 143.5 and
+170.6 against the vector control's 128.8 and 158.0 -- the two controls
+overlap. The assay cannot separate momi WT from empty vector, so everything
+between them is noise. Taken at face value that puts G20 at ~24x momi WT,
+which is the same order as the 13x factor jq01's pipeline uses for
+`momi_norm_rate`, but it rests on a denominator of 13.7 and should be
+treated as order-of-magnitude only.
+
 LIBRARY 1 IS NORMALISED HERE, not at source. It predates G20 being a
 control, and G20 sits in it as an ordinary sample (plate 3, well G20). So
 `g20_norm_rate` for library 1 is computed by dividing through that well,
