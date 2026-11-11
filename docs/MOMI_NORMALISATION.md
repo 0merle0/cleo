@@ -6,7 +6,8 @@ from. This file is the justification for that conversion factor, because it
 is a single constant that scales every reported "× momi" figure and it
 disagrees with the value used elsewhere in the project.
 
-**Factor: 22.2.** Set in `paper/figures/libraries_snapshot.py` as
+**Factor: 19.7** — the midpoint of the two condition-matched measurements,
+22.207 and 17.113. Set in `paper/figures/libraries_snapshot.py` as
 `MOMI_PER_G20`.
 
 ## Why a conversion is needed at all
@@ -91,11 +92,17 @@ Everything in italics is excluded, for a stated reason:
   momi barely expressing at 0.097–0.115 µM — row :1 fails the house
   expression filter outright.
 
-So the defensible range is **17.1 to 22.2**. The value in use is 22.2: it is
-the better-conditioned of the two, with momi expressing at 0.787 µM against
-0.139 and CV 0.004 against 0.013. Using the mean of the two matched
-measurements instead would give ~19.7, a 12% difference and well inside what
-these data resolve.
+So the defensible range is **17.1 to 22.2**, and the value in use is their
+**midpoint, 19.7** (mean 19.660; geometric mean 19.494, which rounds the
+same way).
+
+The midpoint rather than the better-conditioned single value, because the
+two are **26% apart** and neither experiment is strong enough to override
+the other. The pool screen has the better measurement — momi at 0.787 µM
+against 0.139, CV 0.004 against 0.013 — but library 1's December re-test is
+a clean kinetic read on its own plate with its own controls, and nothing
+about it says to discard it. Quoting a midpoint says what the data supports;
+quoting 22.2 would imply the other measurement did not happen.
 
 **13 still sits below both matched measurements**, and nothing at ambient
 temperature supports it.
@@ -161,6 +168,31 @@ average 1.12 on their own axis, close to the 1.0 they should be. Under 22.2
 they average 1.9. That is a genuine argument, resting on a measurement whose
 two replicates differ by 2.7×.
 
+## What this means on a plot
+
+Because library 1 is normalised to momi directly while libraries 2 and 3 are
+converted, **G20 does not land at the same height in all three**:
+
+| | G20, × momi | |
+|---|---|---|
+| library 1, its own G20 well | **17.11** | measured against its own momi control |
+| library 2 | 19.70 | derived — 1.000 × G20 × 19.7 |
+| library 3 | 19.70 | derived |
+
+That 2.6-unit gap is the 26% disagreement between the two matched
+measurements, made visible. It is not an error: library 1 says G20 is 17.1 ×
+momi, and we quote 19.7 because the other experiment says 22.2.
+
+It is left visible deliberately. The alternative — normalising library 1 to
+its own G20 well instead — would force all three to 19.70 and look tidier,
+but it would hide the one piece of disagreement the factor rests on, and it
+would make library 1's momi axis derived rather than measured, which is the
+opposite of what its plate layout supports (momi is on all three plates,
+G20 only on plate 3).
+
+If a figure needs a single G20 reference line, draw it at 19.7 and expect
+library 1's own G20 marker to sit slightly below it.
+
 ## What it changes
 
 Nothing relative. The factor is a constant rescale, so every **× G20**
@@ -168,14 +200,14 @@ value, every ranking, every percentage and every library-to-library
 comparison is identical at 13 or 22.2. Only the absolute "× momi" headline
 moves:
 
-| | at 13 | at 22.2 |
+| | at 13 | at 19.7 |
 |---|---|---|
-| G20 | 13.0 | 22.2 |
-| Fast_PETase | 20.5 | 35.0 |
-| library 3 best design | 260.7 | 445.1 |
+| G20 | 13.0 | 19.7 |
+| Fast_PETase | 20.5 | 31.1 |
+| library 3 best design | 260.7 | 394.9 |
 
 **These numbers now differ from jq01's notebooks**, which still apply 13.
-Any "× momi" figure taken from there is 1.71× lower than one taken from
+Any "× momi" figure taken from there is 1.51× lower than one taken from
 here. That is deliberate, and it is the reason this file exists.
 
 ## What would settle it

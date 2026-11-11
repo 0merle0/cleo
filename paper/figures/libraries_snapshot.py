@@ -285,12 +285,25 @@ REPOOL = {("3_experiment_guided", 2)}
 # under 13x the pool screen's momi reads 0.585 instead of 1.0, which is the
 # point against.
 #
-# SET TO 22.2, following the control experiment rather than the legacy
-# constant. Note this makes these numbers differ from jq01's notebooks,
-# which still apply 13 -- any "x momi" figure quoted from there will be
-# 1.71x lower. x G20 values, rankings and percentages are unaffected; the
-# factor is a constant rescale.
-MOMI_PER_G20 = 22.2   # justified in docs/MOMI_NORMALISATION.md
+# SET TO 19.7, the midpoint of the two condition-matched measurements:
+#
+#     e0321 pool screen, 22.4 C            22.207x
+#     library 1 Dec re-test, plate 3, 23.7 C  17.113x
+#     mean 19.660, geometric mean 19.494, spread 26%
+#
+# Quoting the midpoint rather than the better-conditioned single value,
+# because the two are 26% apart and neither experiment is strong enough to
+# override the other.
+#
+# Everything measured at a DIFFERENT temperature is excluded -- 34.0x at
+# 37 C and 6.8x at 60 C -- since the ratio moving that far between those two
+# is itself evidence that temperature changes it, so neither transfers to
+# the ambient reads the libraries were measured at.
+#
+# These numbers differ from jq01's notebooks, which apply 13: any "x momi"
+# figure from there is 1.51x lower. x G20 values, rankings and percentages
+# are unaffected; the factor is a constant rescale.
+MOMI_PER_G20 = 19.7   # justified in docs/MOMI_NORMALISATION.md
 
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
 MIN_REPLICATES_PASSING = 2
@@ -391,7 +404,13 @@ def _one_source(path, library):
     d = pd.read_csv(path)
     out = []
     for rd, grp in d.groupby("round_number"):
-        samp = grp[grp.sample_type == "sample"].copy()
+        # Keep the CONTROLS as well as the samples. An earlier version kept
+        # only samples, which silently dropped every positive and negative
+        # control from libraries 2 and 3 -- so the G20 reference line could
+        # not be drawn on a plot of them, and the normalisation could not be
+        # checked from the snapshot alone.
+        samp = grp[grp.sample_type.isin(
+            ["sample", "positive_control", "negative_control"])].copy()
         if not len(samp):
             continue
         ctrl = grp[grp.sample_type == "positive_control"]
