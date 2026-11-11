@@ -194,26 +194,37 @@ LIB23 = KIERA / "exp_guided_library" / "260128_all_data_lib1_lib2.csv"
 # through wells where one strong replicate carries two weak ones.
 # G20 -> momi WT conversion, for the `momi_norm_rate` column.
 #
-# momi WT is the enzyme the project actually started from, so it is the
-# natural axis. It cannot be the MEASURED reference, because in a short read
-# it sits at or below background (it reads NEGATIVE at 37C and 60C in
-# e0328). So every value is measured against G20 and converted once here.
+# momi WT is the enzyme the project started from, so it is the natural axis.
+# It cannot be the MEASURED reference: in a short read it sits at or below
+# background and reads NEGATIVE at both 37C and 60C in e0328. So values are
+# measured against G20 per plate and converted once here.
 #
-# The factor comes from the two experiments that measured momi WT and G20 ON
-# THE SAME PLATE:
+# 13 IS jq01's HOUSE CONSTANT, hardcoded in every one of their processing
+# notebooks as `g20_norm_rate * 13  # approximate to momi activity`. It is
+# used here so numbers match the rest of the project rather than diverging
+# from it.
 #
-#     library 1, total product, 21 min    G20 = 24.0x momi
-#     pooled screen, rate, 3 min          G20 = 22.2x momi
-#     mean 23.1x, the two agreeing to 8%
+# IT IS NOT SETTLED, and the disagreement should be resolved before any
+# "x momi" figure is published:
 #
-# jq01's pipeline applies 13x for its own `momi_norm_rate`. That is 1.8x
-# lower than both measurements here, so numbers quoted as "x momi" will NOT
-# match between this file and those notebooks. Flagged rather than
-# reconciled: it is a choice about which number the paper stands behind.
+#   - The pooled screen measured momi WT and G20 on one plate, at high
+#     quality: r2 0.99994, 0.787 uM mscarlett, 3/3 replicates, CV 0.4%. It
+#     gives momi WT = 0.045 x G20, i.e. 22.2x. Under a factor of 13 that
+#     same row's `momi_norm_rate` reads 0.585 rather than the 1.0 momi WT
+#     must have on its own axis -- so 13 is internally inconsistent with
+#     jq01's own best measurement, by 1.71x.
 #
-# Everything downstream is a constant rescale, so x G20 comparisons,
-# rankings and percentages are untouched by the choice of factor.
-MOMI_PER_G20 = 23.1
+#   - Library 1 cannot arbitrate. Its ratio depends entirely on which of its
+#     two negative-control wells is used: 12.1x with the low one, 24.0x with
+#     their mean, and UNDEFINED with the high one, where momi goes negative.
+#     An earlier version of this file quoted 24.0x from it as independent
+#     corroboration of 22.2x. That was wrong -- it was an artefact of
+#     choosing the mean, and the low control lands at 12.1x, beside 13.
+#
+# Set MOMI_PER_G20 = 22.2 to use the pooled-screen measurement instead.
+# Nothing else changes: it is a constant rescale, so x G20 values, rankings
+# and percentages are identical either way.
+MOMI_PER_G20 = 13.0
 
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
 MIN_REPLICATES_PASSING = 2
