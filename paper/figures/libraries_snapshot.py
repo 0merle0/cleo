@@ -214,49 +214,59 @@ KIERA = Path("/home/jgershon/projects/itopt/kiera")
 SHARED = Path("/projects/ml/itopt/petase")
 
 LIB1_SEPT = KIERA / "testing_first_library_on_pet_probe" / "250927"
-LIB23 = KIERA / "exp_guided_library" / "260128_all_data_lib1_lib2.csv"
+# Libraries 2 and 3 come from jq01's PER-ROUND analyses, not from the kiera
+# combined file. The combined file normalises each plate against that plate's
+# own G20 controls, and those thin to ONE well from round 2 on, which
+# inflated library 3's round-3 maximum by 1.74x (33.02 against 18.98).
+JQ = Path("/home/jq01/projects/jq_p07_active_learning")
+LIB2_FILE = (JQ / "jq_e0319_251223_petase_g20_all_rounds_data"
+             / "251225_processed_filtered_data_round0_round1_round2_round3_with_val.csv")
+LIB3_FILES = {
+    0: JQ / "jq_e0322_260115_petase_g20_2nd_big_library_frag_swapping_analysis"
+          / "260115_processed_filtered_data_round0.csv",
+    1: JQ / "jq_e0323_260116_petase_g20_2nd_big_library_rd1_analysis"
+          / "260116_processed_filtered_data_round1.csv",
+    2: JQ / "jq_e0324_260119_petase_g20_2nd_big_library_rd2_analysis"
+          / "1_exp_data_analysis/output/260119_processed_filtered_data_round2.csv",
+    3: JQ / "jq_e0325_260123_petase_g20_2nd_big_library_rd3_analysis"
+          / "1_exp_data_analysis/output/260123_processed_filtered_data_round3_all_plates.csv",
+    4: JQ / "jq_e0327_260128_petase_g20_2nd_big_library_rd4_analysis"
+          / "1_exp_data_analysis/output/260128_processed_filtered_data_round4.csv",
+}
 
-# THE HOUSE FILTER, taken from jq01's processing rather than invented here
-# (jq_p07_active_learning/jq_e0321_.../2_process_kinetics.ipynb):
+# Rounds whose per-plate normalisation fails the plate-median test and are
+# renormalised here against the round's POOLED G20 controls.
 #
-#     mscarlett_num_pass >= 2   AND   bg_sub_conc_norm_rate_cv <= cv_threshold
+# The test: within one round, plate medians should agree. Where they do not
+# and the plates carry only one control each, the single well is setting the
+# scale rather than correcting for it.
 #
-# `mscarlett_num_pass` is a COUNT of replicates expressing above 0.1 uM, not
-# a boolean -- at least 2 of 3 must clear it. Filtering on the MEAN instead
-# is slightly laxer: on library 1 it passes 68 designs against 65, letting
-# through wells where one strong replicate carries two weak ones.
-# G20 -> momi WT conversion, for the `momi_norm_rate` column.
+#   library 3 round 2   per-plate spread 21% -> pooled 4%, max 17.97 -> 15.94
 #
-# momi WT is the enzyme the project started from, so it is the natural axis.
-# It cannot be the MEASURED reference: in a short read it sits at or below
-# background and reads NEGATIVE at both 37C and 60C in e0328. So values are
+# Not applied anywhere else, and deliberately not to library 3 round 3: jq01
+# already fixed that one by normalising plate1+plate3 together, which gets
+# the spread to 2%. Re-pooling it on top would undo their correction and
+# push the spread to 39%.
+REPOOL = {("3_experiment_guided", 2)}
+
+# G20 -> momi WT conversion for the `momi_norm_rate` column.
+#
+# momi WT cannot be the MEASURED reference: in a short read it sits at or
+# below background, reading negative at 37C and 60C in e0328. So values are
 # measured against G20 per plate and converted once here.
 #
-# 13 IS jq01's HOUSE CONSTANT, hardcoded in every one of their processing
-# notebooks as `g20_norm_rate * 13  # approximate to momi activity`. It is
-# used here so numbers match the rest of the project rather than diverging
-# from it.
+# 13 is jq01's house constant, hardcoded in all their processing notebooks as
+# `g20_norm_rate * 13  # approximate to momi activity`, and is used so these
+# numbers match the rest of the project.
 #
-# IT IS NOT SETTLED, and the disagreement should be resolved before any
-# "x momi" figure is published:
-#
-#   - The pooled screen measured momi WT and G20 on one plate, at high
-#     quality: r2 0.99994, 0.787 uM mscarlett, 3/3 replicates, CV 0.4%. It
-#     gives momi WT = 0.045 x G20, i.e. 22.2x. Under a factor of 13 that
-#     same row's `momi_norm_rate` reads 0.585 rather than the 1.0 momi WT
-#     must have on its own axis -- so 13 is internally inconsistent with
-#     jq01's own best measurement, by 1.71x.
-#
-#   - Library 1 cannot arbitrate. Its ratio depends entirely on which of its
-#     two negative-control wells is used: 12.1x with the low one, 24.0x with
-#     their mean, and UNDEFINED with the high one, where momi goes negative.
-#     An earlier version of this file quoted 24.0x from it as independent
-#     corroboration of 22.2x. That was wrong -- it was an artefact of
-#     choosing the mean, and the low control lands at 12.1x, beside 13.
-#
-# Set MOMI_PER_G20 = 22.2 to use the pooled-screen measurement instead.
-# Nothing else changes: it is a constant rescale, so x G20 values, rankings
-# and percentages are identical either way.
+# NOT SETTLED. The pooled screen measured momi WT and G20 on one plate at
+# high quality (r2 0.99994, 0.787 uM, 3/3 replicates, CV 0.4%) and gives
+# momi WT = 0.045 x G20, i.e. 22.2x; under a factor of 13 that same row's
+# momi_norm_rate reads 0.585 rather than the 1.0 momi WT must have on its own
+# axis. Library 1 cannot arbitrate -- with a median background it gives
+# 11.7x, beside 13, but with the mean it gives 24.0x and with the high
+# control momi goes negative. Set MOMI_PER_G20 = 22.2 to switch; it is a
+# constant rescale and changes no x G20 value, ranking or percentage.
 MOMI_PER_G20 = 13.0
 
 EXPRESSION_MIN = 0.1      # uM mscarlett, per replicate
@@ -289,6 +299,7 @@ CV_MAX = 1.0
 SCHEMA = ["library", "round_number", "sample_type", "name", "sequence",
           "plate", "well", "expression_um", "n_expressing", "rate", "total_product", "rate_per_um",
           "g20_norm_rate", "momi_norm_rate", "cv", "cv_metric", "cv_expression", "cv_rate", "r2",
+          "norm_scheme", "n_positive_controls",
           "passes_expression", "passes_cv", "passes_filter"]
 
 
@@ -371,6 +382,8 @@ def library1(timepoint=2):
         # rather than quietly dropped.
         "cv_rate": _num(d["rate_norm_cv"]),
         "r2": pd.NA,
+        "norm_scheme": "single_plate_own_g20",
+        "n_positive_controls": int((d.sample_type == "positive_control").sum()),
     })
 
     # Divide each plate through ITS OWN G20 well.
@@ -382,19 +395,43 @@ def library1(timepoint=2):
     return out
 
 
-def libraries_23():
-    """-> the two follow-up libraries, already G20-normalised at source."""
-    if not LIB23.exists():
-        sys.exit(f"libraries 2/3 not found: {LIB23}")
-    d = pd.read_csv(LIB23)
-    name_map = {"first_big_library": "2_g20_optimisation",
-                "second_big_library": "3_experiment_guided"}
-    unknown = set(d.library_name) - set(name_map)
-    if unknown:
-        sys.exit(f"unexpected library_name values: {unknown}")
+def _one_source(path, library):
+    """-> normalised rows from one of jq01's processed files."""
+    d = pd.read_csv(path)
+    out = []
+    for rd, grp in d.groupby("round_number"):
+        samp = grp[grp.sample_type == "sample"].copy()
+        if not len(samp):
+            continue
+        ctrl = grp[grp.sample_type == "positive_control"]
+        n_ctrl = len(ctrl)
+        if (library, int(rd)) in REPOOL and n_ctrl:
+            # Recover the raw rate (jq01 divided by the plate's own control)
+            # and renormalise against the round's pooled controls.
+            per_plate = ctrl.groupby("plate_number").bg_sub_conc_norm_rate_mean.mean()
+            raw = samp.g20_norm_rate * samp.plate_number.map(per_plate)
+            samp["g20_norm_rate"] = raw / ctrl.bg_sub_conc_norm_rate_mean.mean()
+            samp["norm_scheme"] = "pooled_round_controls"
+        else:
+            samp["norm_scheme"] = "per_plate" if n_ctrl else "no_controls_on_round"
+        samp["n_positive_controls"] = n_ctrl
+        out.append(samp)
+    return pd.concat(out, ignore_index=True)
 
-    out = pd.DataFrame({
-        "library": d.library_name.map(name_map),
+
+def libraries_23():
+    """-> the two follow-up libraries, from jq01's per-round analyses."""
+    parts = [_one_source(LIB2_FILE, "2_g20_optimisation")
+             .assign(library="2_g20_optimisation")]
+    for rd, f in sorted(LIB3_FILES.items()):
+        if not f.exists():
+            sys.exit(f"library 3 round {rd} missing: {f}")
+        parts.append(_one_source(f, "3_experiment_guided")
+                     .assign(library="3_experiment_guided"))
+    d = pd.concat(parts, ignore_index=True)
+
+    return pd.DataFrame({
+        "library": d["library"],
         "round_number": _num(d["round_number"]),
         "sample_type": d["sample_type"],
         "name": d["name"],
@@ -415,8 +452,9 @@ def libraries_23():
         "cv_expression": pd.NA,
         "cv_rate": _num(d["bg_sub_conc_norm_rate_cv"]),
         "r2": _num(d["r2_score"]),
+        "norm_scheme": d["norm_scheme"],
+        "n_positive_controls": d["n_positive_controls"],
     })
-    return out
 
 
 def add_filter(d):
