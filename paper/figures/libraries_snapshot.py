@@ -340,14 +340,24 @@ def main():
     print(f"wrote petase_libraries_filtered.csv: {len(kept)} rows")
 
     print("\nper library, filtered:")
-    s = (kept[kept.sample_type == "sample"]
-         .groupby("library")
+    # `max` is the best design as a multiple of G20 -- but G20 is a SAMPLE in
+    # library 1 (well G20) and a POSITIVE CONTROL in libraries 2 and 3. So
+    # library 1's max includes G20 itself while the others exclude it, and
+    # reading the column across libraries without that in mind compares "the
+    # best design, which is G20" against "the best design that is not G20".
+    # `max_excl_g20` is the like-for-like number.
+    samp = kept[kept.sample_type == "sample"]
+    not_g20 = samp[(samp.g20_norm_rate - 1).abs() > 1e-9]
+    s = (samp.groupby("library")
          .agg(n=("g20_norm_rate", "size"),
               median_x_g20=("g20_norm_rate", "median"),
               max_x_g20=("g20_norm_rate", "max"),
               pct_above_g20=("g20_norm_rate", lambda v: 100 * (v > 1).mean()))
          .round(2))
+    s["max_excl_g20"] = not_g20.groupby("library").g20_norm_rate.max().round(2)
     print(s.to_string())
+    print("\nmax includes G20 for library 1 (it is a sample there) and "
+          "excludes it for 2 and 3 (a control); max_excl_g20 is comparable.")
 
 
 if __name__ == "__main__":
