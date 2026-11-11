@@ -287,10 +287,21 @@ def library1(timepoint=2):
     if not (d.sample_type == "negative_control").any():
         sys.exit("library 1: no negative controls to background-subtract")
 
-    bg_product = (d[d.sample_type == "negative_control"]
-                  .groupby("plate_number")["4MU_um_max_mean"].mean())
-    bg_rate = (d[d.sample_type == "negative_control"]
-               .groupby("plate_number")["rate_mean"].mean())
+    # MEDIAN over the individual replicate WELLS, not the mean of row means.
+    #
+    # Library 1 has 6 negative-control wells and five of them agree closely
+    # -- 125.0, 125.6, 126.4, 128.8, 131.9 -- while the sixth reads 222.7.
+    # Averaging lifts the background from 127.6 to 143.4, and because momi WT
+    # sits only ~30 above background that one well moves the derived
+    # G20/momi ratio from 11.7x to 24.0x. The median is unmoved by it.
+    _neg = d[d.sample_type == "negative_control"]
+
+    def _bg(cols):
+        long = _neg.melt(id_vars="plate_number", value_vars=cols)
+        return long.groupby("plate_number")["value"].median()
+
+    bg_product = _bg([f"4MU_um_max_{i}" for i in (1, 2, 3)])
+    bg_rate = _bg([f"rate_{i}" for i in (1, 2, 3)])
     plate = d["plate_number"]
     conc = _num(d["mscarlett_mean"]) + 1e-4
 
