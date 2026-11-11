@@ -53,13 +53,31 @@ What DOES differ is the gain and the read length on the product channel:
     library 2   gain 50     3 min,  3 reads
     library 3   gain 50     3 min,  3 reads
 
-That is why library 1 saturates: 1.6x the gain over 7x the time. Its
-reaction had plateaued by the read, so its fitted RATE is ~0 with slightly
-negative replicate slopes while its TOTAL PRODUCT is the highest in the
-library. Library 1 is therefore ranked on total product; `rate_per_um` is
-computed the same way as libraries 2 and 3 for comparability but is not
-what library 1 is ranked on, and plotting it without reading this will
-mislead.
+That is why library 1 saturates: 1.6x the gain over 7x the time.
+
+`rate_per_um` IS computed for library 1, by exactly the libraries-2-and-3
+formula -- (rate - plate background) / (concentration + 1e-4) -- so the
+column exists and is built the same way. It carries NO SIGNAL, and that is
+a property of the raw data rather than a judgement call. From the reader
+files:
+
+  read1 is a kinetic read in which EVERY well declines at the same rate.
+  Over 384 wells: median -187.1/min, G20 -187.5/min (the median exactly),
+  negative control -220.6/min, sd 27.6. That is photobleaching, uniform
+  across the plate. Subtract the control slope and G20 reads +33.1/min
+  against a median of +33.5/min -- no separation whatsoever.
+
+  read2 is flat: G20 holds 1716/1717/1678/1695 across four reads while the
+  next design sits near 988.
+
+There is no accumulation phase anywhere to fit a rate to, because the
+reaction finished before either read. The ~0 and slightly negative rates in
+the processed file are the correct answer to the wrong question.
+
+What separates designs here is the LEVEL the signal had already reached --
+total product, G20 at 1716 against 988 for the next design. That is what
+library 1 is ranked on. `rate_per_um` stays in the schema for symmetry and
+tells you nothing; plotting it without reading this will mislead.
 
     uv run python paper/figures/libraries_snapshot.py
 """
