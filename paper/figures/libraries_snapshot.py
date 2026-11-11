@@ -12,6 +12,33 @@ this puts them on one schema and applies one filter.
 Libraries 2 and 3 are G20's descendants: G20 is their parent and their
 positive control, which is why both report `g20_norm_rate` directly.
 
+IS G20 CONSISTENT ACROSS LIBRARIES? Within a library, yes; between
+libraries, no -- which is why every value here is normalised to G20 on its
+own plate rather than compared in raw units.
+
+    G20 raw bg-subtracted conc-normalised rate
+    library 2   5.357e-05 +/- 5.1e-06   (CV  9%)   plates 5.43 5.26 5.38
+    library 3   3.457e-05 +/- 7.2e-06   (CV 21%)   plates 3.43 3.59 3.36
+    ratio       0.65x
+
+Plates within a library agree tightly; the two libraries differ by 35%, far
+more than that. Raw rates are therefore not comparable across libraries and
+the x G20 axis is doing real work.
+
+AND A CROSS-ASSAY CHECK THAT PASSES. momi WT is not in libraries 2 or 3 --
+their only positive control is G20 -- but the pooled screen
+(jq_e0321_.../260109_processed_filtered_data_round0_pooled_2nd_big_lib.csv)
+measures both: momi_wt reads 0.045 x G20, i.e. G20 ~22x momi WT.
+
+Library 1 gives ~24x by a completely different route: total product on a
+saturated plate, 327.7 / 13.7. Two assays, two quantities, same answer to
+within 10%. That is the strongest evidence that library 1 belongs on the
+same axis as the other two despite its saturation.
+
+(jq01's pipeline applies momi_norm_rate = g20_norm_rate * 13. Both routes
+here land nearer 22, so treat the 13 as the approximation it is labelled
+as.)
+
 THE NEGATIVE CONTROL IS THE RIGHT KIND BUT A THIN ESTIMATE, so library 1's
 median is soft and should not be quoted as a precise number.
 
