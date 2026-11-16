@@ -67,18 +67,18 @@ measurement or the run does not exist yet.
 
 | panel | draft text | shows | status | source |
 |---|---|---|---|---|
-| 1a | "figure 1a on the left / middle / right" | three landscapes: error-prone PCR, naive combinatorial, filtered combinatorial | **have** | `concept_library.py:draw_landscape` — toy, no data. **Redraw as 3D (see §3).** |
-| 1b | "sample Nsampled new sequences (figure 1?)" | the shuffling scheme: Nbatch=16 decoded, cut into k, Nsampled=64 chimeras, every fragment seen 4x | **have** | schematic; `concept_loop.py:panel_loop` is the credit-assignment half of it |
-| 1c | "INSERT GRPO OBJECTIVE HERE" | the per-fragment GRPO objective, typeset, variables labelled against 1b | **have** | equation, not a plot — belongs inside the figure so its symbols sit next to the scheme they describe |
-| 1d | "on the order of 10^4 oracle calls ... can easily reach 10^12" | oracle calls spent vs library size reached, and per-variant cost | **have** | `panel_cost.py`, `concept_library.py:gene_cost/library_cost` |
+| 1a | **built, 3-peak mesh.** "figure 1a on the left / middle / right" | three landscapes: error-prone PCR, naive combinatorial, filtered combinatorial | **have** | `concept_library.py:draw_landscape` — toy, no data. **Redraw as 3D (see §3).** |
+| 1b | **built.** "sample Nsampled new sequences (figure 1?)" | the shuffling scheme: Nbatch=16 decoded, cut into k, Nsampled=64 chimeras, every fragment seen 4x | **have** | schematic; `concept_loop.py:panel_loop` is the credit-assignment half of it |
+| 1c | **built.** "INSERT GRPO OBJECTIVE HERE" | the per-fragment GRPO objective, typeset, variables labelled against 1b | **have** | equation, not a plot — belongs inside the figure so its symbols sit next to the scheme they describe |
+| 1d | **built.** "on the order of 10^4 oracle calls ... can easily reach 10^12" | oracle calls spent vs library size reached, and per-variant cost | **have** | `panel_cost.py`, `concept_library.py:gene_cost/library_cost` |
 
 
 | panel | draft text | shows | status | source |
 |---|---|---|---|---|
-| 1e | "increase success from these backbones for sequences sampled from the library" | recombinant pass rate, sampled vs plain RL vs chimera-trained, **pooled over the three backbones** with the points shown | **have** | `key_results.md` §6 table; `arm_table.py` |
-| 1f | "increase diversity ... improving the novel of unique mutations" | distinct substitutions carried by *passing* members, rarefied to matched count, pooled | **have** | `ame_fragk_diversity.csv`, `key_results.md` §1 |
-| 1g | "low dimensional representation of random mutagenesis scoped libraries, naive proteinMPNN, and the post-trained model" | three arms in one embedding | **derive** | archived `ame_pca.py`. **Third arm needs building** — a random-mutagenesis library at matched size; see §2 |
-| 1h | "libraries out to k=16 ... still yield strong highfidelity libraries" | retention vs k, trained-at-k vs cut-at-k, **pooled over the three backbones** | **have** | `ame_fragk.csv` — supports a *stronger* claim than the draft makes; see §4 |
+| 1e | "increase success from these backbones for sequences sampled from the library" | recombinant pass rate, **pooled over the three backbones** with the points shown | **built** | `ame_arms.py`. stock MPNN **45.1**, plain RL **53.5**, chimera+pool **90.1** |
+| 1f | "increase diversity ... improving the novel of unique mutations" | rarefied distinct substitutions over *passing* members, pooled | **built — and it does not say what the draft says**, see §7 | `ame_arms.py`. 900.0 / 1342.4 / 990.6 |
+| 1g | **built, M0097.** "low dimensional representation of random mutagenesis scoped libraries, naive proteinMPNN, and the post-trained model" | three arms in one embedding | **derive** | archived `ame_pca.py`. **Third arm needs building** — a random-mutagenesis library at matched size; see §2 |
+| 1h | **built.** "libraries out to k=16 ... still yield strong highfidelity libraries" | retention vs k, trained-at-k vs cut-at-k, **pooled over the three backbones** | **have** | `ame_fragk.csv` — supports a *stronger* claim than the draft makes; see §4 |
 
 ### Figure 2 — the PETase, and what post-training did to it
 
@@ -229,3 +229,46 @@ for the best design is a coincidence of this dataset, not corroboration.
 | "a total of 25 = 32 variants" | 2^5 = 32; 31 of the 32 were assayed | round 1 `top2combos` |
 | "(put real savings here!)" | needs the greedy comparator defined | section 1, 4e |
 | "10^4 oracle calls" | 200 steps x 32 x best-of-5 = 3.2x10^4 | `panel_cost.py` |
+
+---
+
+## 7. Figure 1(f) contradicts the draft, and the draft should change
+
+The draft says post-training "increase[s] success from these backbones ...
+and increase[s] diversity as well". The first half holds. The second does
+not, and the panel now shows why.
+
+Rarefied distinct substitutions over passing recombinants, every arm
+subsampled to a common survivor count on each backbone:
+
+| backbone | stock MPNN | plain RL (s2 / s3) | chimera + pool |
+|---|---:|---:|---:|
+| M0097 | 855 | 1726 / 1723 | 1214 |
+| M0255 | 608 | 832 / 851 | 704 |
+| M0315 | **1237** | 1467 / 1456 | **1054** |
+| pooled | 900.0 | 1342.4 | 990.6 |
+
+Two things follow:
+
+1. **The chimera arm does not win diversity.** Plain RL carries more
+   distinct substitutions than it does on all three backbones. Training for
+   recombination buys pass rate — 45.1 to 90.1 pooled, which is the real
+   result — and it does not also buy coverage.
+2. **It loses diversity outright on M0315**, 1054 against stock MPNN's 1237,
+   while taking that backbone's pass rate to 98.4%. This is the same trade
+   `panel_vanilla.py` already recorded as "up and to the LEFT": +48.8 points
+   of success for 193 fewer distinct mutations.
+
+**Suggested claim:** post-training for recombination raises the fraction of
+the library that folds from 45% to 90% pooled, while holding diversity at or
+above stock ProteinMPNN on 2 of 3 backbones. That is defensible and the
+figure supports it. The stronger sentence is not.
+
+### Which chimera arm the numbers come from
+
+`key_results.md` §6 quotes 96.9 / 82.4 / 100.0 for the chimera objective.
+That is **`fragb32`**, evaluated as a 256-parent library (T2). Figure 1(e)
+uses **`fragk4`** — 85.9 / 85.9 / 98.4 — because it is scored through the
+same `recomb` pipeline as the two arms it is being compared against. The two
+are different arms and the figure should quote the ones computed identically
+to their own comparators. Do not mix them in one sentence.
