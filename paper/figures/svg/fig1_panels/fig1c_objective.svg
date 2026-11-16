@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="162pt" height="147.6pt" viewBox="0 0 162 147.6" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-11-16T09:54:37.000001</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.8, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 147.6 
+L 162 147.6 
+L 162 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 3.24 138.27168 
+L 158.76 138.27168 
+L 158.76 2.952 
+L 3.24 2.952 
+z
+" clip-path="url(#p302752ce93)" style="fill: #fafbfc; stroke: #e5e7eb; stroke-width: 0.8; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_1">
+    <!-- $J(\theta)=E\,[\,\frac{1}{kB}\sum_{i,j}\min(\rho_{ij}A_{ij},\;\mathrm{clip}(\rho_{ij})\,A_{ij})\,]$ -->
+    <g transform="translate(20.92 16.17312)">
+     <text>
+      <tspan x="0" y="-0.146875" style="font-style: italic; font-size: 8px; font-family: 'Arial'">J</tspan>
+      <tspan x="6.664062" y="-0.146875" style="font-style: italic; font-size: 8px; font-family: 'Arial'">θ</tspan>
+      <tspan x="21.005469" y="-0.146875" style="font-style: italic; font-size: 8px; font-family: 'Arial'">E</tspan>
+      <tspan x="58.852414" y="-0.146875" style="font-style: italic; font-size: 8px; font-family: 'Arial'">ρ</tspan>
+      <tspan x="66.320977" y="-0.146875" style="font-style: italic; font-size: 8px; font-family: 'Arial'">A</tspan>
+      <tspan x="94.618026" y="-0.146875" style="font-style: italic; font-size: 8px; font-family: 'Arial'">ρ</tspan>
+      <tspan x="105.861351" y="-0.146875" style="font-style: italic; font-size: 8px; font-family: 'Arial'">A</tspan>
+      <tspan x="4" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">(</tspan>
+      <tspan x="11.003906" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">)</tspan>
+      <tspan x="15.000781" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">=</tspan>
+      <tspan x="27.452106" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">[</tspan>
+      <tspan x="38.320617" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">∑</tspan>
+      <tspan x="43.297727" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">m</tspan>
+      <tspan x="49.961789" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">i</tspan>
+      <tspan x="51.739133" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">n</tspan>
+      <tspan x="56.188352" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">(</tspan>
+      <tspan x="74.543445" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">,</tspan>
+      <tspan x="79.950058" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">c</tspan>
+      <tspan x="83.950058" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">l</tspan>
+      <tspan x="85.727401" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">i</tspan>
+      <tspan x="87.504745" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">p</tspan>
+      <tspan x="91.953964" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">(</tspan>
+      <tspan x="102.086589" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">)</tspan>
+      <tspan x="114.083819" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">)</tspan>
+      <tspan x="117.858581" y="-0.146875" style="font-size: 8px; font-family: 'Arial'">]</tspan>
+      <tspan x="32.785461" y="-3.975" style="font-size: 5.6px; font-family: 'Arial'">1</tspan>
+      <tspan x="39.564758" y="7.054688" style="font-size: 5.6px; font-family: 'Arial'">,</tspan>
+      <tspan x="30.785461" y="2.539062" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">k</tspan>
+      <tspan x="33.585461" y="2.539062" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">B</tspan>
+      <tspan x="38.320617" y="7.054688" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">i</tspan>
+      <tspan x="42.053586" y="7.054688" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">j</tspan>
+      <tspan x="63.434445" y="2.242625" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">i</tspan>
+      <tspan x="64.678586" y="2.242625" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">j</tspan>
+      <tspan x="71.656914" y="2.242625" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">i</tspan>
+      <tspan x="72.901055" y="2.242625" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">j</tspan>
+      <tspan x="99.200058" y="2.242625" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">i</tspan>
+      <tspan x="100.444198" y="2.242625" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">j</tspan>
+      <tspan x="111.197288" y="2.242625" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">i</tspan>
+      <tspan x="112.441429" y="2.242625" style="font-style: italic; font-size: 5.6px; font-family: 'Arial'">j</tspan>
+     </text>
+     <rect x="30.785461" y="-2.975" width="6.535156" height="0.5"/>
+    </g>
+   </g>
+   <g id="text_2">
+    <!-- $\rho_{ij}=\frac{\pi_\theta(f_{ij}\,|\,\mathrm{str})}{\pi_{\theta_{\mathrm{old}}}(f_{ij}\,|\,\mathrm{str})}$ -->
+    <g transform="translate(61.125 45.54786)">
+     <text>
+      <tspan x="0" y="-0.775016" style="font-style: italic; font-size: 7.5px; font-family: 'Arial'">ρ</tspan>
+      <tspan x="4.295654" y="1.465141" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">i</tspan>
+      <tspan x="5.462036" y="1.465141" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">j</tspan>
+      <tspan x="13.880684" y="1.882797" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">π</tspan>
+      <tspan x="15.880684" y="-6.920313" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">π</tspan>
+      <tspan x="23.401032" y="-6.920313" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">f</tspan>
+      <tspan x="25.016909" y="1.882797" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">f</tspan>
+      <tspan x="8.251289" y="-0.775016" style="font-size: 7.5px; font-family: 'Arial'">=</tspan>
+      <tspan x="17.397773" y="3.450906" style="font-style: italic; font-size: 3.675px; font-family: 'Arial'">θ</tspan>
+      <tspan x="19.397773" y="-5.352203" style="font-style: italic; font-size: 3.675px; font-family: 'Arial'">θ</tspan>
+      <tspan x="24.85965" y="-5.352203" style="font-style: italic; font-size: 3.675px; font-family: 'Arial'">i</tspan>
+      <tspan x="25.676117" y="-5.352203" style="font-style: italic; font-size: 3.675px; font-family: 'Arial'">j</tspan>
+      <tspan x="26.475527" y="3.450906" style="font-style: italic; font-size: 3.675px; font-family: 'Arial'">i</tspan>
+      <tspan x="27.291994" y="3.450906" style="font-style: italic; font-size: 3.675px; font-family: 'Arial'">j</tspan>
+      <tspan x="21.652741" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">(</tspan>
+      <tspan x="23.268618" y="1.882797" style="font-size: 5.25px; font-family: 'Arial'">(</tspan>
+      <tspan x="27.482832" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">|</tspan>
+      <tspan x="29.098709" y="1.882797" style="font-size: 5.25px; font-family: 'Arial'">|</tspan>
+      <tspan x="29.575498" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">s</tspan>
+      <tspan x="31.191375" y="1.882797" style="font-size: 5.25px; font-family: 'Arial'">s</tspan>
+      <tspan x="32.200498" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">t</tspan>
+      <tspan x="33.659117" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">r</tspan>
+      <tspan x="33.816375" y="1.882797" style="font-size: 5.25px; font-family: 'Arial'">t</tspan>
+      <tspan x="35.274994" y="1.882797" style="font-size: 5.25px; font-family: 'Arial'">r</tspan>
+      <tspan x="35.407408" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">)</tspan>
+      <tspan x="37.023285" y="1.882797" style="font-size: 5.25px; font-family: 'Arial'">)</tspan>
+      <tspan x="19.391389" y="4.548583" style="font-size: 2.5725px; font-family: 'Arial'">o</tspan>
+      <tspan x="20.822091" y="4.548583" style="font-size: 2.5725px; font-family: 'Arial'">l</tspan>
+      <tspan x="21.393618" y="4.548583" style="font-size: 2.5725px; font-family: 'Arial'">d</tspan>
+     </text>
+     <rect x="13.880684" y="-3.665641" width="24.890892" height="0.46875"/>
+    </g>
+   </g>
+   <g id="text_3">
+    <!-- $A_{ij}=\frac{R(f_{ij})-\mu}{\sigma+\epsilon}$ -->
+    <g transform="translate(64.05 70.61118)">
+     <text>
+      <tspan x="0" y="-0.775016" style="font-style: italic; font-size: 7.5px; font-family: 'Arial'">A</tspan>
+      <tspan x="5.002441" y="1.465141" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">i</tspan>
+      <tspan x="6.168823" y="1.465141" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">j</tspan>
+      <tspan x="14.587471" y="-6.920313" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">R</tspan>
+      <tspan x="18.587471" y="1.106234" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">σ</tspan>
+      <tspan x="20.127144" y="-6.920313" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">f</tspan>
+      <tspan x="26.568599" y="1.106234" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">ε</tspan>
+      <tspan x="30.043573" y="-6.920313" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">μ</tspan>
+      <tspan x="8.958076" y="-0.775016" style="font-size: 7.5px; font-family: 'Arial'">=</tspan>
+      <tspan x="18.378853" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">(</tspan>
+      <tspan x="22.628022" y="1.106234" style="font-size: 5.25px; font-family: 'Arial'">+</tspan>
+      <tspan x="23.480048" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">)</tspan>
+      <tspan x="26.102997" y="-6.920313" style="font-size: 5.25px; font-family: 'Arial'">−</tspan>
+      <tspan x="21.585762" y="-5.352203" style="font-style: italic; font-size: 3.675px; font-family: 'Arial'">i</tspan>
+      <tspan x="22.402229" y="-5.352203" style="font-style: italic; font-size: 3.675px; font-family: 'Arial'">j</tspan>
+     </text>
+     <rect x="14.587471" y="-3.665641" width="18.332323" height="0.46875"/>
+    </g>
+   </g>
+   <g id="text_4">
+    <!-- $R(f_{ij})=\mathrm{mean}\ R(S)$ -->
+    <g transform="translate(51.825 85.4772)">
+     <text>
+      <tspan x="0" y="-0.171875" style="font-style: italic; font-size: 7.5px; font-family: 'Arial'">R</tspan>
+      <tspan x="7.913818" y="-0.171875" style="font-style: italic; font-size: 7.5px; font-family: 'Arial'">f</tspan>
+      <tspan x="42.923632" y="-0.171875" style="font-style: italic; font-size: 7.5px; font-family: 'Arial'">R</tspan>
+      <tspan x="50.83745" y="-0.171875" style="font-style: italic; font-size: 7.5px; font-family: 'Arial'">S</tspan>
+      <tspan x="5.41626" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">(</tspan>
+      <tspan x="12.703682" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">)</tspan>
+      <tspan x="16.450752" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">=</tspan>
+      <tspan x="22.080146" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">m</tspan>
+      <tspan x="28.327705" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">e</tspan>
+      <tspan x="32.498848" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">a</tspan>
+      <tspan x="36.66999" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">n</tspan>
+      <tspan x="48.339891" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">(</tspan>
+      <tspan x="55.839891" y="-0.171875" style="font-size: 7.5px; font-family: 'Arial'">)</tspan>
+      <tspan x="9.997559" y="2.068281" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">i</tspan>
+      <tspan x="11.16394" y="2.068281" style="font-style: italic; font-size: 5.25px; font-family: 'Arial'">j</tspan>
+     </text>
+    </g>
+   </g>
+   <g id="text_5">
+    <!-- over every chimera $S$ containing $f_{ij}$ -->
+    <g transform="translate(27.765 96.0344)">
+     <text>
+      <tspan x="0" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">o</tspan>
+      <tspan x="3.893066" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">v</tspan>
+      <tspan x="7.393066" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">e</tspan>
+      <tspan x="11.286133" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">r</tspan>
+      <tspan x="13.617188" y="-0.90625" style="font-size: 7px; font-family: 'Arial'"> </tspan>
+      <tspan x="15.562012" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">e</tspan>
+      <tspan x="19.455078" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">v</tspan>
+      <tspan x="22.955078" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">e</tspan>
+      <tspan x="26.848145" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">r</tspan>
+      <tspan x="29.179199" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">y</tspan>
+      <tspan x="32.679199" y="-0.90625" style="font-size: 7px; font-family: 'Arial'"> </tspan>
+      <tspan x="34.624023" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">c</tspan>
+      <tspan x="38.124023" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">h</tspan>
+      <tspan x="42.01709" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">i</tspan>
+      <tspan x="43.572266" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">m</tspan>
+      <tspan x="49.40332" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">e</tspan>
+      <tspan x="53.296387" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">r</tspan>
+      <tspan x="55.627441" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">a</tspan>
+      <tspan x="59.520508" y="-0.90625" style="font-size: 7px; font-family: 'Arial'"> </tspan>
+      <tspan x="66.134277" y="-0.90625" style="font-size: 7px; font-family: 'Arial'"> </tspan>
+      <tspan x="68.079102" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">c</tspan>
+      <tspan x="71.579102" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">o</tspan>
+      <tspan x="75.472168" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">n</tspan>
+      <tspan x="79.365234" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">t</tspan>
+      <tspan x="81.310059" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">a</tspan>
+      <tspan x="85.203125" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">i</tspan>
+      <tspan x="86.758301" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">n</tspan>
+      <tspan x="90.651367" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">i</tspan>
+      <tspan x="92.206543" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">n</tspan>
+      <tspan x="96.099609" y="-0.90625" style="font-size: 7px; font-family: 'Arial'">g</tspan>
+      <tspan x="99.992676" y="-0.90625" style="font-size: 7px; font-family: 'Arial'"> </tspan>
+      <tspan x="61.465332" y="-0.90625" style="font-style: italic; font-size: 7px; font-family: 'Arial'">S</tspan>
+      <tspan x="101.9375" y="-0.90625" style="font-style: italic; font-size: 7px; font-family: 'Arial'">f</tspan>
+      <tspan x="103.882324" y="1.184563" style="font-style: italic; font-size: 4.9px; font-family: 'Arial'">i</tspan>
+      <tspan x="104.970947" y="1.184563" style="font-style: italic; font-size: 4.9px; font-family: 'Arial'">j</tspan>
+     </text>
+    </g>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; fill: #9ca3af" transform="translate(10.2384 107.149669)">likelihood is over FRAGMENTS,</text>
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; fill: #9ca3af" transform="translate(10.2384 115.806098)">not whole sequences</text>
+   </g>
+   <g id="text_7">
+    <!-- $\mu,\sigma$ over the rollout, so a -->
+    <g style="fill: #9ca3af" transform="translate(10.2384 125.316288)">
+     <text>
+      <tspan x="0" y="-0.984375" style="font-style: italic; font-size: 7px; font-family: 'Arial'; fill: #9ca3af">μ</tspan>
+      <tspan x="6.945996" y="-0.984375" style="font-style: italic; font-size: 7px; font-family: 'Arial'; fill: #9ca3af">σ</tspan>
+      <tspan x="3.834961" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">,</tspan>
+      <tspan x="11.167188" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af"> </tspan>
+      <tspan x="13.112012" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">o</tspan>
+      <tspan x="17.005078" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">v</tspan>
+      <tspan x="20.505078" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">e</tspan>
+      <tspan x="24.398145" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">r</tspan>
+      <tspan x="26.729199" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af"> </tspan>
+      <tspan x="28.674023" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">t</tspan>
+      <tspan x="30.618848" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">h</tspan>
+      <tspan x="34.511914" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">e</tspan>
+      <tspan x="38.40498" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af"> </tspan>
+      <tspan x="40.349805" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">r</tspan>
+      <tspan x="42.680859" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">o</tspan>
+      <tspan x="46.573926" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">l</tspan>
+      <tspan x="48.129102" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">l</tspan>
+      <tspan x="49.684277" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">o</tspan>
+      <tspan x="53.577344" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">u</tspan>
+      <tspan x="57.47041" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">t</tspan>
+      <tspan x="59.415234" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">,</tspan>
+      <tspan x="61.360059" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af"> </tspan>
+      <tspan x="63.304883" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">s</tspan>
+      <tspan x="66.804883" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">o</tspan>
+      <tspan x="70.697949" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af"> </tspan>
+      <tspan x="72.642773" y="-0.984375" style="font-size: 7px; font-family: 'Arial'; fill: #9ca3af">a</tspan>
+     </text>
+    </g>
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; fill: #9ca3af" transform="translate(10.2384 133.981468)">whole-batch oracle offset cancels</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p302752ce93">
+   <rect x="3.24" y="2.952" width="155.52" height="141.696"/>
+  </clipPath>
+ </defs>
+</svg>

@@ -11,6 +11,7 @@ Output is split in two:
 | | |
 |---|---|
 | `paper/figures/svg/main/` | **the four numbered figures of the paper** |
+| `paper/figures/svg/fig1_panels/` | **Figure 1 as one SVG per panel**, for assembly by hand |
 | `paper/figures/svg/` | the panel sources they are assembled from |
 
 `main/` is the deliverable — open any of them in Inkscape, change what you
@@ -24,8 +25,25 @@ and disposable.
 
 A script chooses its tree with one argument:
 
-    save(fig, "fig1_method", subdir="main")   # -> svg/main/
-    save(fig, "concept_loop")                 # -> svg/
+    save(fig, "fig1_method", subdir="main")        # -> svg/main/
+    save(fig, "fig1d_cost", subdir="fig1_panels")  # -> svg/fig1_panels/
+    save(fig, "concept_loop")                      # -> svg/
+
+## One SVG per panel
+
+`fig1_panels.py` writes each of Figure 1's panels as its own file, from the
+same panel functions the assembled `fig1_method.py` uses -- so a fix lands in
+both and they cannot drift. The folder carries its own README listing what
+each file is and how big.
+
+**Each panel is authored at the size it is meant to be placed at**, in inches
+on a 6.5 in page. That is the whole point: a font size only means anything at
+final size, so a panel authored 4 in wide and dropped in at 2 in arrives with
+3.5 pt labels. Place at 100%, or change the authored size in `SIZES` and
+rebuild -- never scale the SVG on the way in.
+
+Panel letters are deliberately absent. They belong to the layout, which is
+decided at assembly; the filename carries the intended letter.
 
 ## Why SVG rather than a PDF out of LaTeX
 

@@ -123,6 +123,24 @@ def _apply():
         "mathtext.rm": "Arial",
         "mathtext.it": "Arial:italic",
         "mathtext.bf": "Arial:bold",
+        "mathtext.cal": "Arial:italic",
+        "mathtext.sf": "Arial",
+        "mathtext.tt": "Arial",
+        # ARIAL FOR MATHS TOO, AND NO QUIET SUBSTITUTION.
+        #
+        # Setting the fontset to "custom" above is not enough on its own:
+        # `mathtext.fallback` defaults to "cm", so any glyph Arial lacks is
+        # silently drawn from cmsy10/cmex10/STIXNonUnicode instead. With
+        # svg.fonttype "none" those font NAMES are written into the SVG, and
+        # an editor that cannot resolve them substitutes something arbitrary
+        # -- an equation that renders correctly here and in Comic Sans on a
+        # laptop, with no warning anywhere.
+        #
+        # None makes a missing glyph loud: matplotlib warns and draws a box.
+        # That is the right failure. If a symbol is unavailable, pick one
+        # Arial has (capital sigma for a sum, "in" spelled out for \in)
+        # rather than importing a second font to carry one character.
+        "mathtext.fallback": None,
         # Black for everything that is text. Spines and grid stay neutral --
         # they are rules, not labels.
         "text.color": "black",

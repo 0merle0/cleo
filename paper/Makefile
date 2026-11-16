@@ -21,7 +21,8 @@ PDF_DIR = figures/pdf
 # figures and $(SVG_DIR)/ holds the panel sources they are assembled from. A
 # single-level wildcard silently skipped main/, which is the half that goes
 # in the document -- so both are globbed and the PDF tree mirrors the SVG one.
-SVGS := $(wildcard $(SVG_DIR)/*.svg) $(wildcard $(SVG_DIR)/main/*.svg)
+SVGS := $(wildcard $(SVG_DIR)/*.svg) $(wildcard $(SVG_DIR)/main/*.svg) \
+        $(wildcard $(SVG_DIR)/fig1_panels/*.svg)
 PDFS := $(patsubst $(SVG_DIR)/%.svg,$(PDF_DIR)/%.pdf,$(SVGS))
 
 # `make pdf` builds the paper only. The experimental record is a separate
@@ -41,7 +42,8 @@ PDFS := $(patsubst $(SVG_DIR)/%.svg,$(PDF_DIR)/%.pdf,$(SVGS))
 # what gets dropped into those slots.
 FIG_SCRIPTS = momi_fragments concept_library concept_loop fig2_libraries \
               fig3_momi figS_posthoc \
-              fig1_method fig2_petase_design fig3_platform fig4_rounds
+              fig1_method fig2_petase_design fig3_platform fig4_rounds \
+              fig1_panels
 
 figures:
 	@for f in $(FIG_SCRIPTS); do \
@@ -51,6 +53,7 @@ figures:
 	done
 	@echo "figures/svg/main/ holds the paper's four figures -- open them in Inkscape."
 	@echo "figures/svg/ holds the panel sources they are assembled from."
+	@echo "figures/svg/fig1_panels/ holds Figure 1 as one SVG per panel."
 
 all: pdf notebook library campaigns
 

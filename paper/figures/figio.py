@@ -92,8 +92,48 @@ def save(fig, name, dpi=DPI, tight=True, subdir=None):
     pdf = pdf_dir / f"{stem.stem}.pdf"
     fig.savefig(pdf, format="pdf", dpi=dpi, **kw)
 
+    _check_fonts(out)
     print(f"wrote {out} and {pdf}")
     return out
+
+
+# Font families that are allowed to appear in an exported SVG. Everything
+# here is Arial or metrically compatible with it, so a machine without Arial
+# substitutes without the layout moving.
+_ALLOWED_FONTS = ("arial", "liberation sans", "nimbus sans", "dejavu sans",
+                  "sans-serif")
+
+
+def _check_fonts(path):
+    """Warn if an SVG references a font that is not the house stack.
+
+    This exists because of a specific, silent failure. `mathtext.fontset` is
+    set to "custom" with Arial, which looks like it settles the question --
+    but `mathtext.fallback` defaulted to "cm", so any glyph Arial lacks was
+    quietly drawn from cmsy10, cmex10 or STIXNonUnicode. With svg.fonttype
+    "none" those font NAMES go into the file. They resolve on the machine
+    that has matplotlib's fonts installed and on no other, so an equation
+    renders correctly here and in whatever the editor substitutes on a
+    laptop -- with nothing anywhere saying so.
+
+    palette.py now sets `mathtext.fallback: None`, which makes a missing
+    glyph loud at draw time. This is the second line: it checks what actually
+    landed in the file, so a future rcParam change or a stray `fontname=`
+    cannot reintroduce the problem quietly.
+    """
+    import re
+    fams = set()
+    for decl in re.findall(r"font-family:\s*([^;\"\']+)", path.read_text()):
+        for fam in decl.split(","):
+            fam = fam.strip().strip("'\"").lower()
+            if fam:
+                fams.add(fam)
+    bad = sorted(f for f in fams if f not in _ALLOWED_FONTS)
+    if bad:
+        print(f"  ! {path.name}: non-house fonts referenced: "
+              f"{', '.join(bad)}. These will substitute arbitrarily in an "
+              f"editor. Usually mathtext falling back for a glyph Arial "
+              f"lacks -- replace the symbol rather than the font.")
 
 
 def splice(name, asset, box, fig):

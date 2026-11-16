@@ -269,23 +269,27 @@ def panel_objective(ax):
                                linewidth=0.8, zorder=0))
 
     ax.text(0.5, 0.905,
-            r"$\mathcal{J}(\theta)=\mathbb{E}\left[\frac{1}{kB}"
-            r"\sum_{i,j}\min\left(\rho_{ij}A_{ij},\;"
-            r"\mathrm{clip}(\rho_{ij})\,A_{ij}\right)\right]$",
+            r"$J(\theta)=E\,[\,\frac{1}{kB}"
+            r"\sum_{i,j}\min(\rho_{ij}A_{ij},\;"
+            r"\mathrm{clip}(\rho_{ij})\,A_{ij})\,]$",
             fontsize=fs(8), color="black", ha="center", va="center")
 
     ax.text(0.5, 0.715,
-            r"$\rho_{ij}=\dfrac{\pi_\theta(f_{ij}\mid\mathrm{str})}"
-            r"{\pi_{\theta_{\mathrm{old}}}(f_{ij}\mid\mathrm{str})}$",
+            r"$\rho_{ij}=\frac{\pi_\theta(f_{ij}\,|\,\mathrm{str})}"
+            r"{\pi_{\theta_{\mathrm{old}}}(f_{ij}\,|\,\mathrm{str})}$",
             fontsize=fs(7.5), color="black", ha="center", va="center")
 
     ax.text(0.5, 0.545,
-            r"$A_{ij}=\dfrac{R(f_{ij})-\mu}{\sigma+\epsilon}$",
+            r"$A_{ij}=\frac{R(f_{ij})-\mu}{\sigma+\epsilon}$",
             fontsize=fs(7.5), color="black", ha="center", va="center")
 
-    ax.text(0.5, 0.385,
-            r"$R(f_{ij})=\mathrm{mean}\{R(S):f_{ij}\in S\}$",
+    # Two lines, because Arial has no U+2208 and the spelled-out version is
+    # wider than the panel. Splitting is better than shrinking: the font
+    # floor is 7 pt and this is already at it.
+    ax.text(0.5, 0.425, r"$R(f_{ij})=\mathrm{mean}\ R(S)$",
             fontsize=fs(7.5), color="black", ha="center", va="center")
+    ax.text(0.5, 0.350, r"over every chimera $S$ containing $f_{ij}$",
+            fontsize=fs(7), color="black", ha="center", va="center")
 
     ax.text(0.045, 0.300,
             "likelihood is over FRAGMENTS,\nnot whole sequences",
