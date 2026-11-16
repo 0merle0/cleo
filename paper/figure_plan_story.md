@@ -333,3 +333,58 @@ tarball survives, so every `af3_path` in that arm points at a missing file.
 Recovering it means re-folding 256 designs x best-of-5 x 3 backbones =
 **3,840 AF3 predictions**. Worth doing if a per-atom panel is wanted; the
 scalar spread above is what today's data supports.
+
+---
+
+## 9. The PETase anchors are in the config, and two slot boundaries are wrong
+
+**The anchors.** `config/design/denovo_petase.yaml` lists three sequences
+under `dist_to_ref_seqs`, and the reward minimises distance to the nearest
+of them at **weight 10** -- the heaviest term in the aggregation. Those
+three are the design target. They are all exact library-2 members, but they
+are **not** the top 3 by measured activity:
+
+| anchor | rank in library 2 | activity | round |
+|---|---:|---:|---:|
+| ref1 | 1 of 3,371 | 3.35 x G20 | 2 |
+| ref2 | 4 of 3,371 | 2.72 x G20 | 2 |
+| ref3 | 21 of 3,371 | 2.31 x G20 | 3 |
+
+They sit 4-7 mutations apart. `petase_design.anchors()` reads them from the
+config and `anchor_table()` prints this table, so a top-k-by-activity guess
+cannot quietly replace ref3 with rank 2.
+
+**The menu is uniform by design.** Library 3's part names carry a `distN`
+tag: N mutations from the corresponding anchor part. Counting DISTINCT
+parts per slot:
+
+| slot | parts | reach | shape |
+|---|---:|---:|---|
+| 1 | 360 | 1-14 | 26-27 at every distance |
+| 2 | 363 | 1-9 | 38-80, peaked at 4 |
+| 3 | 360 | 1-8 | 40-48, flat |
+| 4 | 354 | 1-8 | 39-50, flat |
+| 5 | 366 | 1-9 | 42-71, peaked at 2 |
+
+Figure 2(c) plots this. Parts and counts, not designs and density: a part
+built into 200 assembled designs is still one part in the menu, and
+counting designs reweights the menu by how often the sampler drew each
+part. The flat shape is the design; what differs between slots is the
+REACH, and slot 1 reaches nearly twice as far as slots 3 and 4.
+
+**Two slot boundaries in `SLOTS` are wrong.** Recomputing per-slot distance
+from the sequences and correlating against the `distN` tag over library 3:
+
+| slot | `SLOTS` says | r | best boundary found | r |
+|---|---|---:|---|---:|
+| 1 | 1-40 | **0.09** | 7-40 | 0.93 |
+| 2 | 45-84 | 0.96 | - | - |
+| 3 | 89-126 | 0.99 | - | - |
+| 4 | 131-163 | 0.89 | - | - |
+| 5 | 168-209 | **0.41** | 164-209 | 0.99 |
+
+Figure 2(c) sidesteps this by reading the tags, which are the design record.
+**`fig3_momi.py`'s per-slot panel does not** -- it computes `n_mut_from_g20`
+against the same `(1, 40)` and `(168, 209)`, so its slot 1 and slot 5
+histograms are measuring across a boundary that does not match where the
+parts were actually cut. Worth fixing before that panel is used.

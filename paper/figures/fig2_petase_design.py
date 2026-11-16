@@ -8,7 +8,7 @@ Data panels, built from the runs and libraries the paper shipped:
 
     (a) every reward term over training, naive (step 0) -> post-trained
     (b) the same, as the collapse in batch spread
-    (c) distance to the anchor set, split by fragment slot
+    (c) each slot's part menu, by distance from the anchor set
 
 The structure panels -- the theozyme-to-momi funnel and the superposed
 active-site clouds -- stay placeholders. They are renders, not data plots.
@@ -28,7 +28,12 @@ sys.path.insert(0, str(HERE))
 import petase_design as PD  # noqa: E402
 from blockout import slot  # noqa: E402
 from figio import save  # noqa: E402
-from palette import INK, PAGE_WIDTH_IN, PALETTE, SEQUENTIAL, fs  # noqa: E402
+from palette import (FRAGMENT, INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
+                     SEQUENTIAL, fs)
+
+# One colour per fragment slot, the same five fig3_momi uses, so a slot
+# keeps its identity between the two figures.
+SLOTC = list(FRAGMENT) + [PALETTE["purple"]]
 
 NAIVE = INK["muted"]
 # Same blue as Figure 1 uses for this method (fig1_method.METHOD).
@@ -147,48 +152,45 @@ def panel_spread(ax, runs=("refw5", "refw8"), final=20):
 
 # ================================================================ panel (c)
 
-def panel_slotdist(fig, gs, sd=None):
-    """Distance to the anchor set, SPLIT BY FRAGMENT SLOT.
+def panel_slotdist(fig, gs, menu=None):
+    """What each fragment slot's menu looks like, by distance from the anchors.
 
     One histogram per slot, in the style clean.pdf uses for its per-fragment
-    panel, because the slot is the unit the library is actually ordered in:
-    a slot is a well of DNA parts, and "how far did we let this slot roam"
-    was decided five times, once per slot, not once for the design.
+    panel: the slot is the unit the library is ordered in -- a well of DNA
+    parts -- and how far it was allowed to roam was decided five times, once
+    per slot, not once for the design.
 
-    x is the minimum Hamming distance from that design's part at that slot
-    to the corresponding part of the nearest ANCHOR. The anchors are the
-    three sequences written into `config/design/denovo_petase.yaml` under
-    `dist_to_ref_seqs`, which the reward minimises distance to at weight 10
-    -- the heaviest term in the aggregation. They are the design target, and
-    they are not what a top-3-by-activity guess would give: they sit at
-    ranks 1, 4 and 21 of 3,371 in library 2.
+    x is the `distN` tag the part was generated and named with: N mutations
+    from the corresponding part of the anchor set, the three sequences in
+    `config/design/denovo_petase.yaml` that the reward tethers to at weight
+    10. The tags are the design record and are taken as authoritative.
 
-    The minimum is taken PER SLOT, not per design. A design can take its
-    slot-1 part from near anchor 1 and its slot-4 part from near anchor 3 --
-    that is what recombining across a tethered set means -- and a per-design
-    minimum would misattribute both.
+    PARTS, not designs, and counts, not density. A part built into 200
+    assembled designs is still one part in the menu; counting designs would
+    reweight the menu by how often the sampler drew each part, which is a
+    fact about the sampler rather than about the library that was ordered.
 
-    Density, not counts, because the two libraries have different member
-    counts (3,371 and 3,261) and the question is shape, not size.
+    THE MENU IS UNIFORM BY DESIGN and the panel shows that: slot 1 carries
+    26-27 parts at every distance from 1 to 14, the other four carry 38-50
+    at every distance out to 8 or 9. The flat shape is the point. What
+    differs between slots is the REACH -- slot 1 runs to 14 mutations while
+    slots 3 and 4 stop at 8 -- and that is what to read off this panel.
     """
-    if sd is None:
-        sd = PD.slot_distance_to_anchors()
-    n = len(PD.SLOTS)
-    grid = gs.subgridspec(1, n, wspace=0.16)
-    hi = int(sd.dmin.max()) + 1
+    if menu is None:
+        menu = PD.part_menu()
+    slots = sorted(menu.slot.unique())
+    grid = gs.subgridspec(1, len(slots), wspace=0.16)
+    hi = int(menu.dist.max())
     axes = []
-    for i, (lo_r, hi_r) in enumerate(PD.SLOTS, start=1):
-        ax = fig.add_subplot(grid[0, i - 1], sharey=axes[0] if axes else None)
+    for j, i in enumerate(slots):
+        ax = fig.add_subplot(grid[0, j], sharey=axes[0] if axes else None)
         axes.append(ax)
-        for lib in (PD.LIB2, PD.LIB3):
-            v = sd[(sd.library == lib) & (sd.slot == i)].dmin.to_numpy()
-            ax.hist(v, bins=np.arange(-0.5, hi + 1.5), density=True,
-                    color=LIBC[lib], alpha=0.55, lw=0, zorder=3,
-                    label=LIBL[lib] if i == 1 else None)
-        ax.set_title(f"slot {i}\n{lo_r}\u2013{hi_r}", fontsize=fs(6.6), pad=3)
-        # Shared x across slots, so a wider slot reads as a wider slot.
-        ax.set_xlim(-0.5, hi)
-        ax.set_xticks([t for t in (0, 5, 10, 15, 20) if t <= hi])
+        v = menu[menu.slot == i].dist.to_numpy()
+        ax.hist(v, bins=np.arange(-0.5, hi + 1.5), color=SLOTC[i - 1],
+                lw=0, zorder=3)
+        ax.set_title(f"slot {i}", fontsize=fs(6.8), pad=3)
+        ax.set_xlim(-0.6, hi + 0.6)
+        ax.set_xticks([t for t in (0, 5, 10, 15) if t <= hi])
         ax.set_xlabel("mutations", fontsize=fs(6.8))
         ax.tick_params(labelsize=fs(6.4))
         for sp in ("top", "right"):
@@ -196,11 +198,8 @@ def panel_slotdist(fig, gs, sd=None):
         for k in ("left", "bottom"):
             ax.spines[k].set_color(INK["muted"])
             ax.spines[k].set_linewidth(0.8)
-        if i == 1:
-            ax.set_ylabel("Fraction of library", fontsize=fs(7))
-            ax.legend(fontsize=fs(6.2), loc="upper center", frameon=False,
-                      handlelength=0.9, borderpad=0.0, labelspacing=0.2,
-                      handletextpad=0.4, bbox_to_anchor=(0.62, 1.02))
+        if j == 0:
+            ax.set_ylabel("Parts in the slot", fontsize=fs(7.5))
         else:
             ax.tick_params(labelleft=False)
     return axes
@@ -209,7 +208,7 @@ def panel_slotdist(fig, gs, sd=None):
 # ================================================================== assembly
 
 def main():
-    sd = PD.slot_distance_to_anchors()
+    menu = PD.part_menu()
 
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 7.6))
     outer = fig.add_gridspec(3, 1, height_ratios=[1.30, 1.00, 1.00],
@@ -220,7 +219,7 @@ def main():
 
     mid = outer[1].subgridspec(1, 2, width_ratios=[0.78, 1.0], wspace=0.34)
     panel_spread(fig.add_subplot(mid[0, 0]))
-    panel_slotdist(fig, mid[0, 1], sd)
+    panel_slotdist(fig, mid[0, 1], menu)
 
     bot = outer[2].subgridspec(1, 2, wspace=0.10)
     slot(fig.add_subplot(bot[0, 0]), "d",

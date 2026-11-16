@@ -39,13 +39,13 @@ MARGIN = {
     # "His NE2 - ester O" needs the room. Guessing this margin is how the
     # assembled draft clipped them to "2 - ester O".
     "fig2b_spread": dict(left=0.300, right=0.980, top=0.975, bottom=0.165),
-    "fig2c_slotdist": dict(left=0.118, right=0.988, top=0.855, bottom=0.185),
+    "fig2c_slotdist": dict(left=0.112, right=0.988, top=0.905, bottom=0.185),
 }
 
 WHAT = {
     "fig2a_training": "every reward term over training, naive at step 0",
     "fig2b_spread": "collapse in batch spread, naive vs post-trained",
-    "fig2c_slotdist": "distance to the anchor set, per fragment slot",
+    "fig2c_slotdist": "part menu per slot, by distance from the anchors",
 }
 
 
@@ -77,11 +77,11 @@ def panel_b():
     _write(fig, stem)
 
 
-def panel_c(sd):
+def panel_c(menu):
     stem = "fig2c_slotdist"
     fig = plt.figure(figsize=SIZES[stem])
     gs = fig.add_gridspec(1, 1, **MARGIN[stem])
-    F2.panel_slotdist(fig, gs[0, 0], sd)
+    F2.panel_slotdist(fig, gs[0, 0], menu)
     _write(fig, stem)
 
 
@@ -117,10 +117,10 @@ def _manifest():
 
 
 def main():
-    sd = PD.slot_distance_to_anchors()
+    menu = PD.part_menu()
     panel_a()
     panel_b()
-    panel_c(sd)
+    panel_c(menu)
     _manifest()
     print(f"\n{len(SIZES)} panels in paper/figures/svg/{SUB}/")
     for stem, (w, h) in SIZES.items():

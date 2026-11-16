@@ -42,6 +42,8 @@ each, fold best-of-5, score. That is a real job, not a read.
 import sys
 from pathlib import Path
 
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -252,3 +254,50 @@ def slot_distance_to_anchors():
             rows.append(pd.DataFrame(dict(library=lib, slot=i,
                                           dmin=dist.min(axis=1))))
     return pd.concat(rows, ignore_index=True)
+
+
+def part_menu(library=None):
+    """-> the distinct PARTS each slot offers, by their distN tag.
+
+    This is what library 3's slots were designed to be, read from the part
+    names, which carry the distance each part was generated at from the
+    corresponding part of the anchor set. The tags are the design record and
+    are taken as authoritative here.
+
+    PARTS, not designs. A part appearing in 200 assembled designs is still
+    one part in the slot's menu, and the question this answers is what the
+    menu looked like -- the same framing clean.pdf uses for its per-fragment
+    panel. Counting designs instead would reweight the menu by how often the
+    sampler happened to draw each part.
+
+    The one untagged part per slot is `N.g20`, the parent's own fragment. It
+    is excluded: it is the thing the distances are measured from the
+    anchors' versions of, not a member of the generated menu.
+
+    WHY THE TAGS AND NOT THE SEQUENCES. Recomputing distance from the
+    sequences needs the slot boundaries, and two of the five in `SLOTS` are
+    wrong. Correlating computed distance against the tag over library 3
+    gives r = 0.96 and 0.99 for slots 2 and 3 but 0.09 for slot 1 and 0.41
+    for slot 5. Scanning boundaries recovers r = 0.93 at residues 7-40 for
+    slot 1 and r = 0.99 at 164-209 for slot 5, against the (1, 40) and
+    (168, 209) that `SLOTS` and `fig3_momi` both use. The tags avoid the
+    question entirely; the boundary discrepancy is recorded here because
+    fig3_momi's per-slot panel still relies on the old numbers.
+    """
+    library = library or LIB3
+    d = pd.read_csv(LIB).dropna(subset=["name"])
+    g = d[(d.library_name == library) & (d.sample_type == "sample")]
+
+    seen = {i: {} for i in range(1, 6)}
+    for n in g.name.astype(str):
+        for i, part in enumerate(re.sub(r":.*$", "", n).split("___"), start=1):
+            if i in seen:
+                seen[i][part] = True
+
+    rows = []
+    for i, parts in seen.items():
+        for part in parts:
+            m = re.search(r"dist(\d+)", part)
+            if m:
+                rows.append(dict(slot=i, part=part, dist=int(m.group(1))))
+    return pd.DataFrame(rows)
