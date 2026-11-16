@@ -274,15 +274,13 @@ def part_menu(library=None):
     is excluded: it is the thing the distances are measured from the
     anchors' versions of, not a member of the generated menu.
 
-    WHY THE TAGS AND NOT THE SEQUENCES. Recomputing distance from the
-    sequences needs the slot boundaries, and two of the five in `SLOTS` are
-    wrong. Correlating computed distance against the tag over library 3
-    gives r = 0.96 and 0.99 for slots 2 and 3 but 0.09 for slot 1 and 0.41
-    for slot 5. Scanning boundaries recovers r = 0.93 at residues 7-40 for
-    slot 1 and r = 0.99 at 164-209 for slot 5, against the (1, 40) and
-    (168, 209) that `SLOTS` and `fig3_momi` both use. The tags avoid the
-    question entirely; the boundary discrepancy is recorded here because
-    fig3_momi's per-slot panel still relies on the old numbers.
+    WHY THE TAGS AND NOT THE SEQUENCES. The tags are measured from the FIVE
+    references the parts were generated around (see `design_anchors`), while
+    `anchors()` -- the config's `dist_to_ref_seqs` list -- holds only three
+    of them. Recomputing distance against the three mislabels every part
+    generated around topk4 or topk5, which sit 14-22 mutations away. Reading
+    the tags sidesteps the question. The slot boundaries in `SLOTS` are
+    correct for all five slots and are not the issue.
     """
     library = library or LIB3
     d = pd.read_csv(LIB).dropna(subset=["name"])
@@ -301,3 +299,59 @@ def part_menu(library=None):
             if m:
                 rows.append(dict(slot=i, part=part, dist=int(m.group(1))))
     return pd.DataFrame(rows)
+
+
+def design_anchors():
+    """-> the FIVE references library 3's parts were generated around.
+
+    Reconstructed from the library itself: a part named `i.dist0.topkN` is
+    reference N's own fragment at slot i, so assembling those across the
+    five slots rebuilds each reference. Where a slot has no `dist0.topkN`
+    part, that reference shares slot i with topk1 -- which is why slot 3
+    carries one topk part and slot 4 carries five.
+
+    THIS IS NOT THE SAME SET AS `anchors()`, and the difference matters:
+
+        anchors()        3 sequences, from denovo_petase.yaml. What the
+                         TRAINING REWARD tethered to, via dist_to_ref_seqs
+                         at weight 10.
+        design_anchors() 5 sequences. What the LIBRARY PARTS were generated
+                         around, and what every `distN` tag is measured
+                         from.
+
+    The config's three are exactly topk1, topk2 and topk3. topk4 and topk5
+    are 14-22 mutations away from all three, so they are separate corners
+    rather than near-duplicates, and a distance computed against the config
+    three mislabels every part generated around them. That is the whole
+    reason Figure 2(c) reads the tags instead of recomputing:
+
+        rank in library 2:  1, 4, 21, 27, 32  of 3,371
+        activity:           3.35, 2.72, 2.31, 2.24, 2.21 x G20
+
+    It is NOT a slot-boundary problem. Positions whose residue is fixed by a
+    slot's part name fall exactly inside `SLOTS` for all five slots -- the
+    boundaries are right, and an earlier note here claiming slots 1 and 5
+    were mis-cut was wrong. The poor agreement that prompted it came from
+    measuring against three references when the parts were made from five.
+    """
+    d = pd.read_csv(LIB).dropna(subset=["sequence", "name"])
+    g = d[(d.library_name == LIB3) & (d.sample_type == "sample")]
+    g = g.drop_duplicates("sequence")
+    S = np.array([list(s) for s in g.sequence])
+    names = [re.sub(r":.*$", "", str(n)).split("___") for n in g.name]
+
+    segs = {}
+    for slot, (lo, hi) in enumerate(SLOTS, start=1):
+        for i, nm in enumerate(names):
+            m = re.search(r"dist0\.topk(\d+)", nm[slot - 1])
+            if m:
+                segs.setdefault((slot, int(m.group(1))), S[i, lo - 1:hi])
+
+    ks = sorted({k for _, k in segs})
+    out = []
+    for k in ks:
+        seq = S[0].copy()
+        for slot, (lo, hi) in enumerate(SLOTS, start=1):
+            seq[lo - 1:hi] = segs.get((slot, k), segs[(slot, 1)])
+        out.append("".join(seq))
+    return out

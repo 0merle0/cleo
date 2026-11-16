@@ -336,7 +336,7 @@ scalar spread above is what today's data supports.
 
 ---
 
-## 9. The PETase anchors are in the config, and two slot boundaries are wrong
+## 9. The PETase anchors: two sets, and which is which
 
 **The anchors.** `config/design/denovo_petase.yaml` lists three sequences
 under `dist_to_ref_seqs`, and the reward minimises distance to the nearest
@@ -372,19 +372,51 @@ counting designs reweights the menu by how often the sampler drew each
 part. The flat shape is the design; what differs between slots is the
 REACH, and slot 1 reaches nearly twice as far as slots 3 and 4.
 
-**Two slot boundaries in `SLOTS` are wrong.** Recomputing per-slot distance
-from the sequences and correlating against the `distN` tag over library 3:
+**RETRACTED: the slot boundaries are fine.** This section previously said
+slots 1 and 5 in `SLOTS` were mis-cut, on the evidence that recomputed
+per-slot distance correlated with the `distN` tag at r = 0.96 and 0.99 for
+slots 2 and 3 but only 0.09 and 0.41 for slots 1 and 5. That inference was
+wrong and `fig3_momi.py` needs no fix.
 
-| slot | `SLOTS` says | r | best boundary found | r |
-|---|---|---:|---|---:|
-| 1 | 1-40 | **0.09** | 7-40 | 0.93 |
-| 2 | 45-84 | 0.96 | - | - |
-| 3 | 89-126 | 0.99 | - | - |
-| 4 | 131-163 | 0.89 | - | - |
-| 5 | 168-209 | **0.41** | 164-209 | 0.99 |
+Checked directly: for each slot, the positions whose residue is *determined*
+by that slot's part name (constant within every part group, varying between
+groups) land exactly inside the stated range, for all five slots.
 
-Figure 2(c) sidesteps this by reading the tags, which are the design record.
-**`fig3_momi.py`'s per-slot panel does not** -- it computes `n_mut_from_g20`
-against the same `(1, 40)` and `(168, 209)`, so its slot 1 and slot 5
-histograms are measuring across a boundary that does not match where the
-parts were actually cut. Worth fixing before that panel is used.
+| slot | `SLOTS` | positions determined by the part name |
+|---|---|---|
+| 1 | 1-40 | 1-40 |
+| 2 | 45-84 | 45-84 |
+| 3 | 89-126 | 89-126 |
+| 4 | 131-163 | 131-163 |
+| 5 | 168-209 | 168-209 |
+
+**What was actually wrong is the reference set.** Library 3's parts were
+generated around **five** references, not three. A part named
+`i.dist0.topkN` is reference N's own fragment at slot i, and reassembling
+those gives all five:
+
+| | rank in library 2 | activity | distance to the config's three |
+|---|---:|---:|---|
+| topk1 | 1 of 3,371 | 3.35 x G20 | 0, 7, 4 |
+| topk2 | 4 | 2.72 | 7, 0, 6 |
+| topk3 | 21 | 2.31 | 4, 6, 0 |
+| **topk4** | 27 | 2.24 | **22, 22, 18** |
+| **topk5** | 32 | 2.21 | **16, 15, 14** |
+
+The config's three are exactly topk1-3. topk4 and topk5 are 14-22 mutations
+from all three, so they are separate corners, and any distance computed
+against the config three mislabels every part generated around them --
+which is exactly what produced the bad correlation at slots 1 and 5, the
+two slots that carry a second `dist0.topk` part.
+
+**So there are two anchor sets, and they are not interchangeable:**
+
+    anchors()         3 sequences, from denovo_petase.yaml. What the
+                      TRAINING REWARD tethered to, via dist_to_ref_seqs at
+                      weight 10.
+    design_anchors()  5 sequences, reconstructed from the library. What the
+                      LIBRARY PARTS were generated around, and what every
+                      distN tag is measured from.
+
+Figure 2(c) reads the tags and is unaffected by the distinction. Any text
+about what library 3 was aimed at should say which of the two it means.
