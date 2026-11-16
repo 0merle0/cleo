@@ -6,8 +6,9 @@ design, Figure 3 the platform, Figure 4 the search. See figure_plan_story.md.
 
 Data panels, built from the runs and libraries the paper shipped:
 
-    (a) every reward term over training, naive (step 0) -> post-trained
+    (a) every reward term, step 0 vs end, side by side
     (b) the same, as the collapse in batch spread
+    (d) the full training trajectories, kept as a separate panel
     (c) each slot's part menu, by distance from the anchor set
 
 The structure panels -- the theozyme-to-momi funnel and the superposed
@@ -101,6 +102,98 @@ def panel_training(fig, gs, run="refw5", ncol=4):
         ax.set_xticks([0, 100, 200])
         if i // ncol == nrow - 1:
             ax.set_xlabel("Training step", fontsize=fs(7))
+
+
+def panel_paired(ax, run="refw5", final=20):
+    """Every reward term at step 0 and at the end, side by side.
+
+    One column per term, naive on the left of the pair and post-trained on
+    the right, so each term is read as a pair and the whole reward is read
+    as a row.
+
+    y is the term's REWARD-NORMALISED value: each metric mapped onto [0, 1]
+    through the lower and upper bounds in the run config, flipped where the
+    mode is min, so that up is always better. That is the only way these
+    eight share an axis -- they are angstroms, degrees, a dimensionless
+    confidence and a mutation count -- and it is not a plotting convenience:
+    it is literally the quantity the reward sums.
+
+    The bar through each point is the batch MIN-MAX, the same range (a)
+    draws as a band. So the panel carries both halves of the claim at once:
+    the point rising is better positioning, the bar shortening is lower
+    variance.
+
+    THIS IS NOT A PER-DESIGN STRIP PLOT, and it cannot be made into one from
+    what is on disk. The training log stores batch mean/min/max per step and
+    nothing finer, and the folds those came from were cleaned -- 62 CIFs
+    survive across 212 steps. What DOES survive is the sequences: the AF3
+    input JSONs are intact, 32 at step 0 and 32 at step 200. So a real strip
+    plot is a fold-and-score job over 64 sequences (320 predictions at
+    best-of-5), not a re-run of training.
+    """
+    d = PD.load_training(run)
+    terms = [t for t in PD.TERMS if f"{t[0]}_batch_mean" in d.columns]
+
+    def norm(v, lo, hi, mode):
+        z = (np.asarray(v, float) - lo) / (hi - lo)
+        z = np.clip(z, 0.0, 1.0)
+        # mode "avg" targets the middle of the window rather than an end, so
+        # its score is distance from the centre, not height up the ramp.
+        if mode == "min":
+            return 1.0 - z
+        if mode == "avg":
+            return 1.0 - 2.0 * np.abs(z - 0.5)
+        return z
+
+    xs = np.arange(len(terms))
+    off = 0.17
+    for i, (key, label, lo, hi, mode) in enumerate(terms):
+        m = d[f"{key}_batch_mean"]
+        locol, hicol = f"{key}_batch_min", f"{key}_batch_max"
+        has_band = locol in d.columns and hicol in d.columns
+
+        for j, (when, colour) in enumerate(((0, NAIVE), (1, POST))):
+            x = xs[i] + (-off if j == 0 else off)
+            if when == 0:
+                mu = float(m.iloc[0])
+                band = ((float(d[locol].iloc[0]), float(d[hicol].iloc[0]))
+                        if has_band else None)
+            else:
+                mu = float(m.tail(final).mean())
+                band = ((float(d[locol].tail(final).mean()),
+                         float(d[hicol].tail(final).mean()))
+                        if has_band else None)
+            if band is not None:
+                b0, b1 = sorted(norm(band, lo, hi, mode))
+                ax.plot([x, x], [b0, b1], color=colour, lw=1.0, zorder=3,
+                        solid_capstyle="round", alpha=0.65)
+            ax.plot(x, norm(mu, lo, hi, mode), "o", ms=4.6, mfc=colour,
+                    mec="white", mew=0.8, zorder=5)
+
+        a = norm(float(m.iloc[0]), lo, hi, mode)
+        b = norm(float(m.tail(final).mean()), lo, hi, mode)
+        ax.annotate("", xy=(xs[i] + off - 0.045, b),
+                    xytext=(xs[i] - off + 0.045, a),
+                    arrowprops=dict(arrowstyle="-|>", color=INK["ghost"],
+                                    lw=0.9, shrinkA=3, shrinkB=4), zorder=2)
+
+    ax.set_xticks(xs)
+    ax.set_xticklabels([t[1] for t in terms], fontsize=fs(6.4), rotation=30,
+                       ha="right")
+    ax.tick_params(axis="x", length=0)
+    ax.set_xlim(-0.6, len(terms) - 0.4)
+    ax.set_ylim(-0.04, 1.08)
+    _tidy(ax, ylab="Reward-normalised score")
+
+    from matplotlib.lines import Line2D
+    ax.legend(handles=[
+        Line2D([], [], marker="o", ms=4.6, mfc=NAIVE, mec="white", mew=0.8,
+               ls="none", label="naive (step 0)"),
+        Line2D([], [], marker="o", ms=4.6, mfc=POST, mec="white", mew=0.8,
+               ls="none", label="post-trained")],
+        fontsize=fs(6.5), loc="lower left", frameon=False,
+        handlelength=0.8, borderpad=0.0, labelspacing=0.22,
+        handletextpad=0.4)
 
 
 # ================================================================ panel (b)
@@ -211,15 +304,15 @@ def main():
     menu = PD.part_menu()
 
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 7.6))
-    outer = fig.add_gridspec(3, 1, height_ratios=[1.30, 1.00, 1.00],
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.15, 0.86, 1.00],
                              left=0.085, right=0.985, top=0.955,
-                             bottom=0.055, hspace=0.52)
+                             bottom=0.055, hspace=0.72)
 
-    panel_training(fig, outer[0])
+    top = outer[0].subgridspec(1, 2, width_ratios=[1.12, 1.0], wspace=0.30)
+    panel_paired(fig.add_subplot(top[0, 0]))
+    panel_spread(fig.add_subplot(top[0, 1]))
 
-    mid = outer[1].subgridspec(1, 2, width_ratios=[0.78, 1.0], wspace=0.34)
-    panel_spread(fig.add_subplot(mid[0, 0]))
-    panel_slotdist(fig, mid[0, 1], menu)
+    panel_slotdist(fig, outer[1], menu)
 
     bot = outer[2].subgridspec(1, 2, wspace=0.10)
     slot(fig.add_subplot(bot[0, 0]), "d",
@@ -245,8 +338,8 @@ def main():
              "*_step_0200.pt, folded best-of-5 and scored.",
          ])
 
-    for letter, (x, y) in zip("abc", [(0.008, 0.975), (0.008, 0.545),
-                                      (0.505, 0.545)]):
+    for letter, (x, y) in zip("abc", [(0.008, 0.975), (0.520, 0.975),
+                                      (0.008, 0.545)]):
         fig.text(x, y, f"({letter})", fontsize=fs(9), fontweight="bold",
                  ha="left", va="top")
 

@@ -28,13 +28,17 @@ from figio import save  # noqa: E402
 SUB = "fig2_panels"
 
 SIZES = {
-    "fig2a_training": (6.50, 2.70),
+    "fig2a_paired": (3.40, 2.30),
+    "fig2d_training": (6.50, 2.70),
     "fig2b_spread": (3.15, 2.10),
     "fig2c_slotdist": (4.10, 2.10),
 }
 
 MARGIN = {
-    "fig2a_training": dict(left=0.055, right=0.988, top=0.945, bottom=0.095),
+    # Tall bottom margin: the term names are rotated 30 degrees and are the
+    # longest text in the panel.
+    "fig2a_paired": dict(left=0.155, right=0.985, top=0.975, bottom=0.300),
+    "fig2d_training": dict(left=0.055, right=0.988, top=0.945, bottom=0.095),
     # Wide left margin: the y axis is reward-term NAMES, not numbers, and
     # "His NE2 - ester O" needs the room. Guessing this margin is how the
     # assembled draft clipped them to "2 - ester O".
@@ -43,7 +47,8 @@ MARGIN = {
 }
 
 WHAT = {
-    "fig2a_training": "every reward term over training, naive at step 0",
+    "fig2a_paired": "every reward term, step 0 vs end, paired",
+    "fig2d_training": "full training trajectories, naive at step 0",
     "fig2b_spread": "collapse in batch spread, naive vs post-trained",
     "fig2c_slotdist": "part menu per slot, by distance from the anchors",
 }
@@ -61,9 +66,17 @@ def _write(fig, stem):
 
 
 def panel_a():
-    """The eight reward terms. One file: they share the step axis and the
-    claim is about all of them moving together, not about any one."""
-    stem = "fig2a_training"
+    """Step 0 against the end, paired, every reward term on one axis."""
+    stem = "fig2a_paired"
+    fig, ax = _fig(stem)
+    F2.panel_paired(ax)
+    _write(fig, stem)
+
+
+def panel_d():
+    """The full trajectories. Kept because the paired panel compresses 211
+    steps to two points and the shape of the approach is worth having."""
+    stem = "fig2d_training"
     fig = plt.figure(figsize=SIZES[stem])
     gs = fig.add_gridspec(1, 1, **MARGIN[stem])
     F2.panel_training(fig, gs[0, 0])
@@ -121,6 +134,7 @@ def main():
     panel_a()
     panel_b()
     panel_c(menu)
+    panel_d()
     _manifest()
     print(f"\n{len(SIZES)} panels in paper/figures/svg/{SUB}/")
     for stem, (w, h) in SIZES.items():

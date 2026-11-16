@@ -7,7 +7,8 @@ the layout, and the filename carries the intended one.
 
 | file | size (in) | what it shows |
 |---|---|---|
-| `fig2a_training.svg` | 6.50 x 2.70 | every reward term over training, naive at step 0 |
+| `fig2a_paired.svg` | 3.40 x 2.30 | every reward term, step 0 vs end, paired |
+| `fig2d_training.svg` | 6.50 x 2.70 | full training trajectories, naive at step 0 |
 | `fig2b_spread.svg` | 3.15 x 2.10 | collapse in batch spread, naive vs post-trained |
 | `fig2c_slotdist.svg` | 4.10 x 2.10 | part menu per slot, by distance from the anchors |
 
