@@ -114,29 +114,63 @@ def training_summary(run="refw5", final=20):
 
 # ------------------------------------------------------------------ top-k
 
-def _top_refs(d, k=TOP_K):
-    """-> the k best-measured library-2 sequences, as the aiming target.
+CONFIG = HERE.parents[1] / "config" / "design" / "denovo_petase.yaml"
 
-    Deduplicated by sequence first. The same variant appears more than once
-    across rounds, and a target set with a duplicate in it is a target set of
-    k-1 distinct references.
+
+def anchors():
+    """-> the reference sequences the PETase run actually anchored to.
+
+    READ FROM THE CONFIG, not reconstructed. `denovo_petase.yaml` carries
+    three sequences under the `dist_to_ref_seqs` step, and the reward
+    minimises distance to the nearest of them at weight 10 -- the heaviest
+    term in the whole aggregation. So these three ARE the design target, and
+    anything else is a guess at it.
+
+    This matters because the obvious guess is wrong. All three are exact
+    members of library 2, but they are ranks 1, 4 and 21 of 3,371 by
+    measured activity (3.35, 2.72 and 2.31 x G20), and the third comes from
+    round 3. Taking "the top 3 by activity" instead silently substitutes
+    ranks 1-3 and moves the target. The three sit 4-7 mutations apart, so
+    they are a tight cluster rather than three separate corners.
     """
+    import yaml
+    cfg = yaml.safe_load(CONFIG.read_text())
+    for st in cfg["reward"]["steps"]:
+        if st["name"] == "dist_to_ref_seqs":
+            return list(st["cfg"]["ref_seqs"])
+    raise KeyError(f"no dist_to_ref_seqs step in {CONFIG}")
+
+
+def anchor_table():
+    """-> where each anchor sits in library 2, by measured activity."""
+    import numpy as np
+    d = pd.read_csv(LIB)
     g = d[(d.library_name == LIB2) & (d.sample_type == "sample")]
-    g = g.dropna(subset=["g20_norm_rate", "sequence"])
-    g = g.sort_values("g20_norm_rate", ascending=False).drop_duplicates("sequence")
-    return g.head(k)
+    g = (g.dropna(subset=["g20_norm_rate", "sequence"])
+         .sort_values("g20_norm_rate", ascending=False)
+         .drop_duplicates("sequence").reset_index(drop=True))
+    g["rank"] = np.arange(1, len(g) + 1)
+    rows = []
+    for i, r in enumerate(anchors(), 1):
+        hit = g[g.sequence == r]
+        rows.append(dict(anchor=f"ref{i}",
+                         rank=int(hit["rank"].iloc[0]) if len(hit) else None,
+                         of=len(g),
+                         activity=float(hit.g20_norm_rate.iloc[0]) if len(hit) else None,
+                         round=int(hit.round_number.iloc[0]) if len(hit) else None))
+    return pd.DataFrame(rows)
 
 
-def distance_to_topk(k=TOP_K):
-    """-> per-design minimum Hamming distance to the top-k library-2 set.
+def distance_to_anchors():
+    """-> per-design minimum Hamming distance to the config's anchor set.
 
     Both libraries are on the same 209-aa scaffold with no indels, so Hamming
     is the honest distance and no alignment is needed. Verified rather than
     assumed: a ragged length raises.
     """
     d = pd.read_csv(LIB)
-    refs = _top_refs(d, k)
-    R = np.array([list(s) for s in refs.sequence])
+    refs = anchors()
+    R = np.array([list(s) for s in refs])
 
     out = []
     for lib in (LIB2, LIB3):
@@ -166,15 +200,55 @@ def main():
               .to_string(index=False, float_format=lambda v: f"{v:.2f}"))
         print()
 
-    d, refs = distance_to_topk()
-    print(f"=== minimum Hamming to the top-{TOP_K} library-2 variants ===")
+    d, refs = distance_to_anchors()
+    print("=== minimum Hamming to the config's three anchor sequences ===")
     print(d.groupby("library").dmin
           .describe()[["count", "min", "25%", "50%", "75%", "max"]]
           .to_string(float_format=lambda v: f"{v:.0f}"))
-    print("\nthe top-5 reference variants (library 2, by activity):")
-    for i, (_, r) in enumerate(refs.iterrows(), 1):
-        print(f"  topk{i}  {r.g20_norm_rate:6.2f} x G20   {r['name'][:72]}")
+    print("\nthe anchors, and where they sit in library 2:")
+    print(anchor_table().to_string(index=False))
 
 
 if __name__ == "__main__":
     main()
+
+
+# The five fragment slots, 1-indexed inclusive residue ranges. Same split as
+# fig3_momi uses, so the per-slot panels in Figures 2 and 3 are cut at the
+# same places and can be read against each other.
+SLOTS = [(1, 40), (45, 84), (89, 126), (131, 163), (168, 209)]
+
+
+def slot_distance_to_anchors():
+    """-> long-form per-slot distance from each design's part to the anchors.
+
+    Per slot rather than per design, because that is the unit the library is
+    ordered in: a slot is a well of DNA parts, and "how far did we let this
+    slot roam" is a decision that was made five times, once per slot, not
+    once for the design.
+
+    MINIMUM over the three anchors is taken PER SLOT, not per design. A
+    design can take its slot-1 part from near anchor 1 and its slot-4 part
+    from near anchor 3 -- that is what recombination across a tethered set
+    means -- so a per-design minimum would misattribute both.
+
+    Residues between the slots (the 4-residue junctions fixed for Golden
+    Gate overhangs) are not in any slot and are excluded, which is why the
+    slot lengths sum to 193 rather than 209.
+    """
+    d = pd.read_csv(LIB).dropna(subset=["sequence"])
+    R = np.array([list(s) for s in anchors()])
+
+    rows = []
+    for lib in (LIB2, LIB3):
+        g = d[(d.library_name == lib) & (d.sample_type == "sample")]
+        g = g.drop_duplicates("sequence")
+        S = np.array([list(s) for s in g.sequence])
+        if S.shape[1] != R.shape[1]:
+            raise ValueError(f"{lib}: {S.shape[1]} vs anchors {R.shape[1]}")
+        for i, (lo, hi) in enumerate(SLOTS, start=1):
+            a, b = lo - 1, hi                      # to 0-based, end-exclusive
+            dist = (S[:, None, a:b] != R[None, :, a:b]).sum(axis=2)
+            rows.append(pd.DataFrame(dict(library=lib, slot=i,
+                                          dmin=dist.min(axis=1))))
+    return pd.concat(rows, ignore_index=True)

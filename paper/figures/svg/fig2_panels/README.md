@@ -9,7 +9,7 @@ the layout, and the filename carries the intended one.
 |---|---|---|
 | `fig2a_training.svg` | 6.50 x 2.70 | every reward term over training, naive at step 0 |
 | `fig2b_spread.svg` | 3.15 x 2.10 | collapse in batch spread, naive vs post-trained |
-| `fig2c_topk.svg` | 3.30 x 2.10 | distance to the top-5 of library 2, both libraries |
+| `fig2c_slotdist.svg` | 4.10 x 2.10 | distance to the anchor set, per fragment slot |
 
 Two panels of Figure 2 are NOT here, because they are renders or
 need data that does not exist yet: the theozyme-to-momi design

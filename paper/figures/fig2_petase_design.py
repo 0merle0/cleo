@@ -8,7 +8,7 @@ Data panels, built from the runs and libraries the paper shipped:
 
     (a) every reward term over training, naive (step 0) -> post-trained
     (b) the same, as the collapse in batch spread
-    (c) distance to the top-5 of library 2, both libraries
+    (c) distance to the anchor set, split by fragment slot
 
 The structure panels -- the theozyme-to-momi funnel and the superposed
 active-site clouds -- stay placeholders. They are renders, not data plots.
@@ -147,48 +147,69 @@ def panel_spread(ax, runs=("refw5", "refw8"), final=20):
 
 # ================================================================ panel (c)
 
-def panel_topk(ax, dist=None, bins=36):
-    """Distance to the top-5 of library 2, for both libraries.
+def panel_slotdist(fig, gs, sd=None):
+    """Distance to the anchor set, SPLIT BY FRAGMENT SLOT.
 
-    x is the MINIMUM Hamming distance over the five best-measured library-2
-    variants -- the set library 3 was designed around. Minimum, not mean: a
-    design built around reference 3 is close to the library's target even if
-    it is far from the other four, and a mean would score it as distant.
+    One histogram per slot, in the style clean.pdf uses for its per-fragment
+    panel, because the slot is the unit the library is actually ordered in:
+    a slot is a well of DNA parts, and "how far did we let this slot roam"
+    was decided five times, once per slot, not once for the design.
 
-    READ THIS PANEL CAREFULLY, because it does not say what the draft says.
-    Library 3 is NOT centred closer on the top-5 than library 2 is -- the
-    medians are 17 and 19 mutations. What library 3 is, is narrower: its IQR
-    is 8 mutations against 13, and its most distant member is 42 against 64.
-    The aiming shows up as a tighter distribution, not a shifted one.
+    x is the minimum Hamming distance from that design's part at that slot
+    to the corresponding part of the nearest ANCHOR. The anchors are the
+    three sequences written into `config/design/denovo_petase.yaml` under
+    `dist_to_ref_seqs`, which the reward minimises distance to at weight 10
+    -- the heaviest term in the aggregation. They are the design target, and
+    they are not what a top-3-by-activity guess would give: they sit at
+    ranks 1, 4 and 21 of 3,371 in library 2.
 
-    Library 2's left edge at 0 is the references themselves: they ARE library
-    2 members, so that arm is guaranteed to touch zero and the comparison at
-    the extreme left is not meaningful.
+    The minimum is taken PER SLOT, not per design. A design can take its
+    slot-1 part from near anchor 1 and its slot-4 part from near anchor 3 --
+    that is what recombining across a tethered set means -- and a per-design
+    minimum would misattribute both.
+
+    Density, not counts, because the two libraries have different member
+    counts (3,371 and 3,261) and the question is shape, not size.
     """
-    if dist is None:
-        dist, _ = PD.distance_to_topk()
-    hi = int(dist.dmin.max()) + 1
-    edges = np.linspace(0, hi, bins + 1)
-    for lib in (PD.LIB2, PD.LIB3):
-        v = dist[dist.library == lib].dmin.to_numpy()
-        ax.hist(v, bins=edges, density=True, color=LIBC[lib], alpha=0.5,
-                edgecolor=LIBC[lib], linewidth=0.7, zorder=2,
-                label=f"{LIBL[lib]}  (n={len(v)})")
-        ax.axvline(np.median(v), color=LIBC[lib], lw=1.0, ls=(0, (3, 2)),
-                   zorder=3)
-
-    _tidy(ax, ylab="Fraction of library",
-          xlab="Minimum distance to the top-5 of library 2 (mutations)")
-    ax.set_xlim(0, hi)
-    ax.legend(fontsize=fs(6.5), loc="upper right", frameon=False,
-              handlelength=1.0, borderpad=0.0, labelspacing=0.25,
-              handletextpad=0.5)
+    if sd is None:
+        sd = PD.slot_distance_to_anchors()
+    n = len(PD.SLOTS)
+    grid = gs.subgridspec(1, n, wspace=0.16)
+    hi = int(sd.dmin.max()) + 1
+    axes = []
+    for i, (lo_r, hi_r) in enumerate(PD.SLOTS, start=1):
+        ax = fig.add_subplot(grid[0, i - 1], sharey=axes[0] if axes else None)
+        axes.append(ax)
+        for lib in (PD.LIB2, PD.LIB3):
+            v = sd[(sd.library == lib) & (sd.slot == i)].dmin.to_numpy()
+            ax.hist(v, bins=np.arange(-0.5, hi + 1.5), density=True,
+                    color=LIBC[lib], alpha=0.55, lw=0, zorder=3,
+                    label=LIBL[lib] if i == 1 else None)
+        ax.set_title(f"slot {i}\n{lo_r}\u2013{hi_r}", fontsize=fs(6.6), pad=3)
+        # Shared x across slots, so a wider slot reads as a wider slot.
+        ax.set_xlim(-0.5, hi)
+        ax.set_xticks([t for t in (0, 5, 10, 15, 20) if t <= hi])
+        ax.set_xlabel("mutations", fontsize=fs(6.8))
+        ax.tick_params(labelsize=fs(6.4))
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+        for k in ("left", "bottom"):
+            ax.spines[k].set_color(INK["muted"])
+            ax.spines[k].set_linewidth(0.8)
+        if i == 1:
+            ax.set_ylabel("Fraction of library", fontsize=fs(7))
+            ax.legend(fontsize=fs(6.2), loc="upper center", frameon=False,
+                      handlelength=0.9, borderpad=0.0, labelspacing=0.2,
+                      handletextpad=0.4, bbox_to_anchor=(0.62, 1.02))
+        else:
+            ax.tick_params(labelleft=False)
+    return axes
 
 
 # ================================================================== assembly
 
 def main():
-    dist, _ = PD.distance_to_topk()
+    sd = PD.slot_distance_to_anchors()
 
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 7.6))
     outer = fig.add_gridspec(3, 1, height_ratios=[1.30, 1.00, 1.00],
@@ -197,9 +218,9 @@ def main():
 
     panel_training(fig, outer[0])
 
-    mid = outer[1].subgridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.30)
+    mid = outer[1].subgridspec(1, 2, width_ratios=[0.78, 1.0], wspace=0.34)
     panel_spread(fig.add_subplot(mid[0, 0]))
-    panel_topk(fig.add_subplot(mid[0, 1]), dist)
+    panel_slotdist(fig, mid[0, 1], sd)
 
     bot = outer[2].subgridspec(1, 2, wspace=0.10)
     slot(fig.add_subplot(bot[0, 0]), "d",
