@@ -35,9 +35,37 @@ sys.path.insert(0, str(HERE))
 
 import landscape3d as L3  # noqa: E402
 from blockout import slot  # noqa: E402
-from concept_library import N_VARIANTS, START, _clip, fitness  # noqa: E402
+from concept_library import N_VARIANTS, _clip  # noqa: E402
 from figio import save  # noqa: E402
 from palette import INK, PAGE_WIDTH_IN, fs  # noqa: E402
+
+# --- the toy landscape ---------------------------------------------------
+#
+# THREE optima, not the four the 2D version carries. At the size this panel
+# prints, a fourth peak is a fourth thing to track in a drawing whose whole
+# argument is "the parent sits on one hill and there are others" -- three
+# says it and leaves the mesh legible. concept_library keeps the four-peak
+# 2D version; this landscape is defined here so changing one cannot silently
+# change the other.
+#
+#        cx,   cy,   width, height
+# Placed by their PROJECTED x (px = x + SHEAR*y), not their x. Two peaks a
+# long way apart in the plane can land on top of each other in an oblique
+# view: (0.73, 0.70) and (0.79, 0.25) project to 1.02 and 0.90 and read as
+# one ridge. These three project to 0.39 / 0.66 / 1.03 and stay separate.
+PEAKS = [
+    (0.25, 0.34, 0.094, 0.74),   # the parent's own optimum -- good, not best
+    (0.72, 0.74, 0.104, 1.00),   # the global optimum
+    (0.61, 0.11, 0.086, 0.86),
+]
+START = (0.25, 0.34)
+
+
+def fitness(x, y):
+    """-> the toy landscape: three gaussian optima plus gentle ruggedness."""
+    z = sum(a * np.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * s * s))
+            for cx, cy, s, a in PEAKS)
+    return z + 0.02 * np.sin(4 * np.pi * x) * np.sin(3.5 * np.pi * y)
 
 
 # One zmax for all three landscapes. Computed once from the shared fitness

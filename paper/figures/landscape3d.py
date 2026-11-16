@@ -30,6 +30,7 @@ The 2D version is still in `concept_library.py`. Swapping back is one import.
 """
 
 import numpy as np
+from matplotlib.collections import LineCollection
 
 from palette import INK, SEQUENTIAL, fs
 
@@ -43,11 +44,21 @@ SHEAR = 0.42      # how far right a unit of depth pushes
 SKEW = 0.30       # how far up a unit of depth pushes
 RISE = 0.46       # how tall a unit of fitness stands
 
-N_ROWS = 44       # profiles drawn; the object count of the whole surface
+# The mesh. Rows run across the panel, columns run into it, and both are
+# drawn -- that is what makes it read as a wireframe mesh rather than a
+# ridgeline. The counts are a legibility choice, not a resolution one: the
+# surface is sampled at N_COLS for the row polylines regardless, and
+# MESH_COLS only sets how many column lines are laid over it.
+N_ROWS = 26       # row profiles; also the number of occluding fills
 N_COLS = 150      # samples along each profile -- vertices, not objects
+MESH_COLS = 26    # column lines drawn over the rows
 
-FILL = "#FFFFFF"
-EDGE = SEQUENTIAL[2]
+
+# Soft blue, as light as it can be and still hold at 0.6 pt. The surface is
+# context for the points sitting on it, so it must not out-weigh them.
+FILL = "#F2F8FE"        # the soft wash that does the occluding
+EDGE = "#8FC4F2"        # row lines
+MESH = "#A9D2F6"        # column lines, a step lighter so rows lead
 EDGE_HI = SEQUENTIAL[4]
 DOT = "#1F2937"
 
@@ -78,21 +89,56 @@ def extent():
             (min(ys) - 0.17, max(ys) + pad * 1.5))
 
 
-def draw_surface(ax, fitness, zmax=None, rows=N_ROWS, lw=0.75):
-    """Paint `fitness` as an isometric ridgeline, back row first.
+def draw_surface(ax, fitness, zmax=None, rows=N_ROWS, lw=0.6):
+    """Paint `fitness` as a 3D wireframe mesh, back row first.
 
     `fitness(X, Y) -> Z` is whatever the panel's landscape is. `zmax`
     normalises height; pass the SAME value to every panel in a row or the
     three landscapes will not be comparable, which is the panel's whole job.
+
+    Hidden-line removal is the painter's algorithm and nothing cleverer: rows
+    are drawn from the back forward, each one laying down an opaque wash
+    before its own lines, so whatever is behind a near ridge disappears under
+    it. The column lines for the gap between two rows go down after the far
+    row and before the near one, which is the only ordering that occludes
+    them correctly.
     """
     gx = np.linspace(0.0, 1.0, N_COLS)
     ys = np.linspace(1.0, 0.0, rows)          # back to front: painter's order
     if zmax is None:
         zmax = float(np.max(fitness(*np.meshgrid(gx, ys))))
 
+    # Columns are sampled from the same grid the rows use, so a column line
+    # meets every row exactly on the row's own polyline instead of near it.
+    cidx = np.unique(np.linspace(0, N_COLS - 1, MESH_COLS).astype(int))
+
+    prev = None
     for y in ys:
         z = fitness(gx, np.full_like(gx, y)) / zmax
         px, py = iso(gx, np.full_like(gx, y), z)
+
+        # Column lines spanning from the previous (further) row to this one.
+        # Drawn before this row's wash, so this row hides the half of each
+        # segment that falls behind its ridge.
+        if prev is not None:
+            py0, y0 = prev
+            # x of the projection does not depend on z (px = x + SHEAR*y),
+            # so the two endpoints' x come straight from the transform and
+            # only the y values have to be carried over from the far row.
+            x0 = gx[cidx] + SHEAR * y0
+            x1 = gx[cidx] + SHEAR * y
+            # One LineCollection per gap rather than one Line2D per column.
+            # Same picture; in the SVG it becomes a single <g> instead of ~26
+            # sibling <path> elements, so the mesh can be selected, recoloured
+            # or deleted a band at a time in Inkscape instead of by rubber-band
+            # and hope. A mesh is unavoidably the object-heavy part of this
+            # panel -- grouping is what keeps it workable.
+            ax.add_collection(LineCollection(
+                np.stack([np.column_stack([x0, py0[cidx]]),
+                          np.column_stack([x1, py[cidx]])], axis=1),
+                colors=MESH, linewidths=lw * 0.8, capstyle="round",
+                zorder=2))
+
         # The polygon closes along the row's own baseline (z = 0), not the
         # bottom of the panel. Closing at the panel floor would make every
         # row a full-height silhouette and the far rows would be hidden
@@ -101,6 +147,13 @@ def draw_surface(ax, fitness, zmax=None, rows=N_ROWS, lw=0.75):
         ax.fill(np.concatenate([px, bx]), np.concatenate([py, by]),
                 facecolor=FILL, edgecolor="none", zorder=2)
         ax.plot(px, py, color=EDGE, lw=lw, solid_capstyle="round", zorder=3)
+        prev = (py, y)
+
+    # The front edge, a touch heavier: it is the silhouette and it is what
+    # gives the mesh a floor to sit on.
+    z = fitness(gx, np.zeros_like(gx)) / zmax
+    px, py = iso(gx, np.zeros_like(gx), z)
+    ax.plot(px, py, color=EDGE, lw=lw * 1.6, solid_capstyle="round", zorder=4)
     return zmax
 
 
@@ -131,7 +184,7 @@ def draw_points(ax, fitness, pts, zmax, ms=3.6, lift=0.012):
             ls="none", zorder=6)
 
 
-def draw_start(ax, fitness, start, zmax, ms=11, lift=0.02):
+def draw_start(ax, fitness, start, zmax, ms=8.5, lift=0.02):
     """The parent design: where every campaign actually begins."""
     x, y = start
     z = fitness(np.array([x]), np.array([y]))[0] / zmax + lift
