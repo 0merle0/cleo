@@ -52,7 +52,7 @@ SIZES = {
     # this panel briefly had, those labels had ~1.5 in of line to spread
     # along instead of ~3.2 and collided. Aspect is the fix, not font size.
     "fig1d_cost": (3.90, 2.05),
-    "fig1e_passrate": (2.20, 2.00),
+    "fig1e_passrate": (1.75, 2.00),
     "fig1f_diversity": (2.20, 2.00),
     "fig1g_motifvar": (2.35, 2.05),
     "fig1h_foldcost": (2.00, 2.00),
@@ -67,7 +67,7 @@ MARGIN = {
     "fig1b_shuffling": dict(left=0.01, right=0.99, top=0.98, bottom=0.02),
     "fig1c_objective": dict(left=0.02, right=0.98, top=0.98, bottom=0.02),
     "fig1d_cost": dict(left=0.135, right=0.968, top=0.965, bottom=0.215),
-    "fig1e_passrate": dict(left=0.235, right=0.975, top=0.97, bottom=0.115),
+    "fig1e_passrate": dict(left=0.300, right=0.975, top=0.97, bottom=0.125),
     "fig1f_diversity": dict(left=0.285, right=0.975, top=0.97, bottom=0.115),
     "fig1g_motifvar": dict(left=0.235, right=0.975, top=0.97, bottom=0.115),
     "fig1h_foldcost": dict(left=0.265, right=0.975, top=0.97, bottom=0.215),
@@ -81,7 +81,7 @@ WHAT = {
     "fig1b_shuffling": "the shuffling step and the rotation rule",
     "fig1c_objective": "the per-fragment GRPO objective",
     "fig1d_cost": "library size vs DNA spend, whole gene and k=2/4/8",
-    "fig1e_passrate": "recombinant pass rate, per backbone",
+    "fig1e_passrate": "recombinant pass rate, pooled over backbones",
     "fig1f_diversity": "rarefied distinct substitutions, per backbone",
     "fig1g_motifvar": "spread of motif RMSD, stock vs post-trained",
     "fig1h_foldcost": "oracle calls vs library size: filter vs train",

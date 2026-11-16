@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-11-16T10:47:43.392628</dc:date>
+    <dc:date>2026-11-16T11:15:58.098755</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -35,7 +35,7 @@ L 158.76 138.27168
 L 158.76 2.952 
 L 3.24 2.952 
 z
-" clip-path="url(#pbb77a03ef5)" style="fill: #fafbfc; stroke: #e5e7eb; stroke-width: 0.8; stroke-linejoin: miter"/>
+" clip-path="url(#pbb84b5af0c)" style="fill: #fafbfc; stroke: #e5e7eb; stroke-width: 0.8; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <!-- $J(\theta)=E\,[\,\frac{1}{kB}\sum_{i,j}\min(\rho_{ij}A_{ij},\;\mathrm{clip}(\rho_{ij})\,A_{ij})\,]$ -->
@@ -249,7 +249,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="pbb77a03ef5">
+  <clipPath id="pbb84b5af0c">
    <rect x="3.24" y="2.952" width="155.52" height="141.696"/>
   </clipPath>
  </defs>

@@ -10,10 +10,10 @@ concept, the method and the AME benchmark together, which is what every
     (c) the GRPO objective    (g) where in sequence space
     (d) DNA cost at several k (h) how fine it can be cut
 
-Panels (e) and (f) are per-backbone on purpose, not pooled: the move from
-stock to post-trained is not the same move on every backbone -- M0315
-reverses on diversity -- and an average of the three asserts something none
-of them does. (i) is pooled, with a min-max band over the three.
+(e) is pooled and (f) is not, for a stated reason: on pass rate the three
+backbones agree, so the bar is the headline and the points are corroboration;
+on diversity they disagree -- M0315 loses -- and a pooled bar would hide the
+one cell worth asking about. (j) is pooled, with a min-max band.
 
 Eight panels makes this a tall figure -- 9.4 in against a 6.5 in page. If it
 has to come down, (d) is the panel whose argument the text can carry alone.
@@ -335,13 +335,52 @@ def _grouped_bars(ax, d, col, ylab, arms, legend=False, fmt="{:.0f}"):
 
 
 def panel_pass(ax, d, arms=("sampled", "chimera")):
-    """Recombinant pass rate, per backbone. The headline, and unambiguous.
+    """Recombinant pass rate, POOLED over the three backbones.
 
-    Every backbone gains, and the smallest gain is M0097's +26.2 points.
+    One bar per arm, with the three backbones kept as points on it. Pooled
+    because this is the panel where the three agree: every backbone gains,
+    the smallest gain is +26 points, and the bar is the headline. The points
+    stay so the gain is visibly a property of all three and not an average
+    rescued by one of them.
+
+    (f) is deliberately NOT pooled, because there the three disagree -- M0315
+    loses diversity -- and a pooled bar would hide the one cell worth asking
+    about. Same data, different treatment, for a stated reason.
     """
-    _grouped_bars(ax, d, "pass_rate", "Recombinants passing (%)", arms,
-                  legend=True)
-    ax.set_ylim(0, 132)
+    xs = np.arange(len(arms))
+    for x, arm in zip(xs, arms):
+        g = d[d.arm == arm]
+        ax.bar(x, g.pass_rate.mean(), width=0.56, color=ARMC[arm], alpha=0.85,
+               edgecolor="white", linewidth=0.6, zorder=2)
+        # Inside the bar, not above it: above, the number lands in the
+        # cloud of per-backbone points and collides with whichever one sits
+        # nearest the mean.
+        ax.text(x, g.pass_rate.mean() * 0.5, f"{g.pass_rate.mean():.0f}",
+                fontsize=fs(8), ha="center", va="center", color="white",
+                fontweight="bold", zorder=5)
+        for i, site in enumerate(SITES):
+            h = g[g.site == site]
+            if not len(h):
+                continue
+            ax.plot(x + np.linspace(-0.16, 0.16, len(SITES))[i],
+                    h.pass_rate.mean(), MARK[site], ms=4.2, mfc="white",
+                    mec="#3F4A56", mew=1.0, zorder=4)
+
+    ax.set_xticks(xs)
+    ax.set_xticklabels([ARM_LABEL[a].replace(" ", "\n", 1) for a in arms],
+                       fontsize=fs(6.5))
+    ax.tick_params(axis="x", length=0)
+    ax.set_xlim(-0.6, len(arms) - 0.4)
+    ax.set_ylim(0, 118)
+    _tidy(ax, ylab="Recombinants passing (%)")
+
+    from matplotlib.lines import Line2D
+    ax.legend(handles=[Line2D([], [], marker=MARK[s_], ms=4.2, mfc="white",
+                              mec="#3F4A56", mew=1.0, ls="none", label=s_)
+                       for s_ in SITES],
+              fontsize=fs(6), loc="upper left", frameon=False,
+              handlelength=0.8, borderpad=0.0, labelspacing=0.2,
+              handletextpad=0.4)
 
 
 def panel_diversity(ax, d, arms=("sampled", "chimera")):
