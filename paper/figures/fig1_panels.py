@@ -46,7 +46,12 @@ SIZES = {
     "fig1a_landscapes": (6.50, 2.20),
     "fig1b_shuffling": (3.70, 2.05),
     "fig1c_objective": (2.25, 2.05),
-    "fig1d_cost": (2.35, 2.00),
+    # Sized back to what clean.pdf gave it. In concept_library's layout the
+    # cost axes is 3.23 x 1.61 in -- wide and short. The four prices are
+    # labelled where their arms cross the 10^12 line, and at the 2.35 x 2.00
+    # this panel briefly had, those labels had ~1.5 in of line to spread
+    # along instead of ~3.2 and collided. Aspect is the fix, not font size.
+    "fig1d_cost": (3.90, 2.05),
     "fig1e_tradeoff": (2.35, 2.00),
     "fig1f_foldcost": (2.00, 2.00),
     "fig1g_seqspace": (3.05, 2.05),
@@ -59,7 +64,7 @@ MARGIN = {
     "fig1a_landscapes": dict(left=0.015, right=0.985, top=0.895, bottom=0.035),
     "fig1b_shuffling": dict(left=0.01, right=0.99, top=0.98, bottom=0.02),
     "fig1c_objective": dict(left=0.02, right=0.98, top=0.98, bottom=0.02),
-    "fig1d_cost": dict(left=0.215, right=0.975, top=0.97, bottom=0.225),
+    "fig1d_cost": dict(left=0.135, right=0.968, top=0.965, bottom=0.215),
     "fig1e_tradeoff": dict(left=0.205, right=0.975, top=0.97, bottom=0.185),
     "fig1f_foldcost": dict(left=0.265, right=0.975, top=0.97, bottom=0.215),
     "fig1g_seqspace": dict(left=0.145, right=0.985, top=0.97, bottom=0.175),

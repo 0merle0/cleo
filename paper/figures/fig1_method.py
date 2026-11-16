@@ -484,17 +484,19 @@ def main():
     panel_shuffle(fig.add_subplot(mid[0, 0]))
     panel_objective(fig.add_subplot(mid[0, 1]))
 
-    # (d) cost, (e) pass rate, (f) diversity.
-    r3 = outer[2].subgridspec(1, 3, width_ratios=[1.25, 1.0, 1.0],
-                              wspace=0.52)
+    # (d) DNA cost, (e) the trade-off. (d) takes the wider cell: its four
+    # price labels are spread along the 10^12 reference line, so its aspect
+    # is load-bearing rather than cosmetic -- squeezed, they collide.
+    r3 = outer[2].subgridspec(1, 2, width_ratios=[1.55, 1.0], wspace=0.34)
     panel_cost(fig.add_subplot(r3[0, 0]))
     panel_tradeoff(fig.add_subplot(r3[0, 1]), arms)
-    panel_folds(fig.add_subplot(r3[0, 2]))
 
-    # (g) sequence space, (h) granularity.
-    r4 = outer[3].subgridspec(1, 2, wspace=0.28)
-    panel_space(fig.add_subplot(r4[0, 0]), space, var, pz)
-    panel_k(fig.add_subplot(r4[0, 1]))
+    # (f) fold cost, (g) sequence space, (h) granularity.
+    r4 = outer[3].subgridspec(1, 3, width_ratios=[1.0, 1.15, 1.15],
+                              wspace=0.46)
+    panel_folds(fig.add_subplot(r4[0, 0]))
+    panel_space(fig.add_subplot(r4[0, 1]), space, var, pz)
+    panel_k(fig.add_subplot(r4[0, 2]))
 
     # Panel letters in FIGURE coordinates. ax.get_tightbbox under-measures
     # rotated text, which is how panel letters end up sitting on y-labels --
@@ -502,8 +504,8 @@ def main():
     # measured off each axes.
     for letter, (x, y) in zip("abcdefgh", [
             (0.008, 0.980), (0.008, 0.805), (0.632, 0.805),
-            (0.008, 0.545), (0.345, 0.545), (0.668, 0.545),
-            (0.008, 0.272), (0.510, 0.272)]):
+            (0.008, 0.545), (0.620, 0.545), (0.008, 0.272),
+            (0.355, 0.272), (0.690, 0.272)]):
         fig.text(x, y, f"({letter})", fontsize=fs(9), fontweight="bold",
                  ha="left", va="top")
 

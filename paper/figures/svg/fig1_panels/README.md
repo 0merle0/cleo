@@ -18,7 +18,7 @@ intended letter.
 | `fig1a_landscapes.svg` | 6.50 x 2.20 | three search strategies, one toy landscape (2D, from clean.pdf) |
 | `fig1b_shuffling.svg` | 3.70 x 2.05 | the shuffling step and the rotation rule |
 | `fig1c_objective.svg` | 2.25 x 2.05 | the per-fragment GRPO objective |
-| `fig1d_cost.svg` | 2.35 x 2.00 | library size vs DNA spend, whole gene and k=2/4/8 |
+| `fig1d_cost.svg` | 3.90 x 2.05 | library size vs DNA spend, whole gene and k=2/4/8 |
 | `fig1e_tradeoff.svg` | 2.35 x 2.00 | diversity vs pass rate, stock -> post-trained |
 | `fig1f_foldcost.svg` | 2.00 x 2.00 | oracle calls vs library size: filter vs train |
 | `fig1g_seqspace.svg` | 3.05 x 2.05 | one PCA of one-hot sequences, M0097 |
