@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-11-16T06:32:21.252457</dc:date>
+    <dc:date>2026-11-16T06:38:11.065179</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -331,7 +331,7 @@ z
     <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="405.639197" transform="rotate(-0 262.911754 405.639197)">the denominator sits near background. This plate's</text>
    </g>
    <g id="text_52">
-    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="412.281873" transform="rotate(-0 262.911754 412.281873)">own G20/momi is 34.0x, not the 19.7x of Fig 4(f)</text>
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="412.281873" transform="rotate(-0 262.911754 412.281873)">own G20/momi is 34.0x, not the 19.7x of Fig 3(f)</text>
    </g>
    <g id="text_53">
     <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="418.781539" transform="rotate(-0 262.911754 418.781539)">-- never mix the two</text>

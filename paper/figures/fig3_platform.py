@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Figure 4 --- the experimental platform, and the three libraries.
+"""Figure 3 --- the experimental platform, and the three libraries.
 
-The story draft's Figure 3. Panel (a) is already built by someone else as
+Panel (a) is already built by someone else as
 svg/wetlab_pipeline.svg; this lays out the slot it goes in and everything
 around it. Panel (e) is new -- the draft labels c, d and f and skips e, and
 the worked kinetic trace is the thing missing between "we fit a rate" and
 "here are the rates".
 
-    uv run python paper/figures/fig4_platform.py
+    uv run python paper/figures/fig3_platform.py
 """
 
 import sys
@@ -121,7 +121,7 @@ def main():
              "(docs/MOMI_NORMALISATION.md)",
          ])
 
-    save(fig, "fig4_platform", dpi=900, tight=False)
+    save(fig, "fig3_platform", dpi=900, tight=False)
 
 
 if __name__ == "__main__":

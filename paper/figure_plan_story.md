@@ -10,28 +10,49 @@ numbering. Where the two disagree, this file wins.
 
 ---
 
-## 0. The one renumbering this needs
+## 0. Four figures, as the draft has them
 
-The draft puts the concept, the method, the GRPO objective, the shuffling
-scheme, the AME benchmark, the diversity result, the sequence-space
-embedding, the k sweep and the cost/scale argument all in **Figure 1**. That
-is nine panels of two different kinds of claim, and it is why every reference
-reads `figure 1?`.
+The draft's own numbering stands:
 
-Split it. Everything downstream shifts by one:
+| | carries |
+|---|---|
+| **Fig 1** | why combinatorial, the method, and the AME benchmark |
+| **Fig 2** | PETase: the design, and what post-training did to it |
+| **Fig 3** | the experimental platform and the three libraries |
+| **Fig 4** | searching a 10^12 library in four rounds |
 
-| draft | becomes | carries |
-|---|---|---|
-| Fig 1 (concept half) | **Fig 1** | why combinatorial, and what the method is |
-| Fig 1 (benchmark half) | **Fig 2** | AME: it works, and how far it scales |
-| Fig 2 | **Fig 3** | PETase: the design, and what post-training did to it |
-| Fig 3 | **Fig 4** | the experimental platform and the three libraries |
-| Fig 4 | **Fig 5** | searching a 10^12 library in four rounds |
+Figure 1 is doing the most work — eight panels, and at 6.5 in wide it is
+9.9 in tall. That is the cost of the four-figure format and the thing to
+watch when it is placed. If it has to come down, panel (d) (cost vs library
+size) is the one whose argument the text can carry on its own.
 
-Five main figures. Everything else supplementary. The rest of this file uses
-the new numbers.
+A note on panel letters: the draft writes `figure 1?` throughout because
+there was nothing to point at. Figure 1's letters are now fixed, so the
+prose can be pointed at them:
 
----
+    (a) three landscapes      (e) recombinants fold
+    (b) fragment shuffling    (f) diversity over passing members
+    (c) the GRPO objective    (g) where in sequence space
+    (d) cost vs library size  (h) how fine it can be cut
+
+**The AME panels — (e), (f) and (h) — are pooled across the three
+backbones**, not drawn as three facets. One bar or one curve per arm, with
+the three backbones overlaid as points or as a min-max band. The pooling
+makes the k result read more cleanly than the facets did:
+
+| k | 2 | 4 | 8 | 16 | 36 | 64 |
+|---|---:|---:|---:|---:|---:|---:|
+| trained at k | 0.91 | 0.90 | 0.94 | **0.92** | 0.60 | 0.29 |
+| k=4 policy, cut at k | 0.83 | — | 0.76 | **0.64** | 0.28 | — |
+
+Flat through k=16, a cliff at 36, and a +27.9 pt gap over a k=4-trained
+policy at k=16.
+
+**Keep the per-backbone points on the pooled panels.** M0255 is materially
+harder than the other two (82.4% against 96.9 and 100.0 on recombinant pass;
+0.406 against 0.559 and 0.832 at k=36) and it is what drives the tail. A
+bare mean hides that, and M0255 at k=36/64 was still climbing at step 200,
+so the pooled tail is a lower bound either way.
 
 ## 1. Every figure reference in the draft, resolved
 
@@ -39,7 +60,7 @@ Status key: **have** = data in hand, panel is a build job. **derive** = data
 exists but needs a new reduction or a new script. **collect** = the
 measurement or the run does not exist yet.
 
-### Figure 1 — why combinatorial, and what the method is
+### Figure 1 — the method, and the benchmark that says it works
 
 | panel | draft text | shows | status | source |
 |---|---|---|---|---|
@@ -48,47 +69,46 @@ measurement or the run does not exist yet.
 | 1c | "INSERT GRPO OBJECTIVE HERE" | the per-fragment GRPO objective, typeset, variables labelled against 1b | **have** | equation, not a plot — belongs inside the figure so its symbols sit next to the scheme they describe |
 | 1d | "on the order of 10^4 oracle calls ... can easily reach 10^12" | oracle calls spent vs library size reached, and per-variant cost | **have** | `panel_cost.py`, `concept_library.py:gene_cost/library_cost` |
 
-### Figure 2 — AME: it works, and how far it scales
 
 | panel | draft text | shows | status | source |
 |---|---|---|---|---|
-| 2a | "increase success from these backbones for sequences sampled from the library" | recombinant pass rate, sampled vs plain RL vs chimera-trained, per backbone | **have** | `key_results.md` §6 table; `arm_table.py` |
-| 2b | "increase diversity ... improving the novel of unique mutations" | distinct substitutions carried by *passing* members, rarefied to matched count | **have** | `ame_fragk_diversity.csv`, `key_results.md` §1 |
-| 2c | "low dimensional representation of random mutagenesis scoped libraries, naive proteinMPNN, and the post-trained model" | three arms in one embedding | **derive** | archived `ame_pca.py`. **Third arm needs building** — a random-mutagenesis library at matched size; see §2 |
-| 2d | "libraries out to k=16 ... still yield strong highfidelity libraries" | retention vs k, trained-at-k vs cut-at-k | **have** | `ame_fragk.csv` — supports a *stronger* claim than the draft makes; see §4 |
+| 1e | "increase success from these backbones for sequences sampled from the library" | recombinant pass rate, sampled vs plain RL vs chimera-trained, **pooled over the three backbones** with the points shown | **have** | `key_results.md` §6 table; `arm_table.py` |
+| 1f | "increase diversity ... improving the novel of unique mutations" | distinct substitutions carried by *passing* members, rarefied to matched count, pooled | **have** | `ame_fragk_diversity.csv`, `key_results.md` §1 |
+| 1g | "low dimensional representation of random mutagenesis scoped libraries, naive proteinMPNN, and the post-trained model" | three arms in one embedding | **derive** | archived `ame_pca.py`. **Third arm needs building** — a random-mutagenesis library at matched size; see §2 |
+| 1h | "libraries out to k=16 ... still yield strong highfidelity libraries" | retention vs k, trained-at-k vs cut-at-k, **pooled over the three backbones** | **have** | `ame_fragk.csv` — supports a *stronger* claim than the draft makes; see §4 |
 
-### Figure 3 — the PETase, and what post-training did to it
-
-| panel | draft text | shows | status | source |
-|---|---|---|---|---|
-| 3a | "designed from a theozyme alone of PET polymer docked into the active site (fig 2a)" | theozyme → RFD2 backbone → MPNN → filters → momi; the design funnel | **have** | `structures/png/momi_fold.png`, `momi_site.png`; filter thresholds are in the draft prose |
-| 3b | "optimizing for these rewards drastically reduces variance and improves positioning and confidence of active site residues (Fig 2?)" | per-reward distributions, naive vs post-trained library | **derive** | needs the PETase run's own metrics; AME equivalent is `panel_vanilla.py` |
-| 3c | "Visualizations of the active site atoms from naive and optimized libraries (fig2?)" | superposed catalytic atoms, two clouds | **derive** | `structures/render_momi.py` exists; needs folds for both arms |
-| 3d | "ability to center the sequence space of the library to be tethered to a top-k set (figure 2?)" | library 3's sequence space centred on the top-3 measured variants vs library 2's | **have** | part names carry design intent (`dist0.topk1`, `distN.*`); compute real Hamming — **the `distN` tag disagrees with computed distance on 992/1803 parts** |
-
-### Figure 4 — the platform and the three libraries
+### Figure 2 — the PETase, and what post-training did to it
 
 | panel | draft text | shows | status | source |
 |---|---|---|---|---|
-| 4a | "as seen depicted in figure 3a" | wet-lab pipeline strip: geneblocks → ECHO → GGA → PCR → PUREfrex → reader | **have, built** | `svg/wetlab_pipeline.svg` (Jason, `312211c`) |
-| 4b | "gate samples on each replicate having at least 0.1uM ... (figure 3b)" + "background subtracted and fit with least squares (figure 3b)" | the filter cascade with counts surviving each gate | **have** | `libraries_snapshot.py` `passes_*` columns |
-| 4c | "consistency amongst measured control rates seen in figure 3c" | positive-control rate per plate, per round, all three libraries | **have** | snapshot controls. Plates agree to 1–2% within a round (20.70/20.18/20.05) — **plot raw rate, not momi-normalised**, which is 19.7 by construction in most rounds |
-| 4d | "parity plots of individual replicates seen in figure 3d" | replicate i vs replicate j | **collect** | the snapshot is already reduced to means; `cv_rate` survives, the three replicate values do not. Re-extract from jq01's per-round raw files |
-| 4e | — (draft skips e) | one worked kinetic trace: raw fluorescence, background, least-squares fit | **have** | `library1_kinetics.py` reads the raw reader files already |
-| 4f | "aggregate measurements from each of three different libraries ... figure 3f?" + "nearly 400x ... figure 3x" | all three libraries on one momi axis, by round | **have, built** | `petase_libraries_filtered.csv`; medians 1.15 / 3.69 / 20.27, max 17.1 / 66.0 / 395.0 |
+| 2a | "designed from a theozyme alone of PET polymer docked into the active site (fig 2a)" | theozyme → RFD2 backbone → MPNN → filters → momi; the design funnel | **have** | `structures/png/momi_fold.png`, `momi_site.png`; filter thresholds are in the draft prose |
+| 2b | "optimizing for these rewards drastically reduces variance and improves positioning and confidence of active site residues (Fig 2?)" | per-reward distributions, naive vs post-trained library | **derive** | needs the PETase run's own metrics; AME equivalent is `panel_vanilla.py` |
+| 2c | "Visualizations of the active site atoms from naive and optimized libraries (fig2?)" | superposed catalytic atoms, two clouds | **derive** | `structures/render_momi.py` exists; needs folds for both arms |
+| 2d | "ability to center the sequence space of the library to be tethered to a top-k set (figure 2?)" | library 3's sequence space centred on the top-3 measured variants vs library 2's | **have** | part names carry design intent (`dist0.topk1`, `distN.*`); compute real Hamming — **the `distN` tag disagrees with computed distance on 992/1803 parts** |
 
-### Figure 5 — searching 10^12 in four rounds
+### Figure 3 — the platform and the three libraries
 
 | panel | draft text | shows | status | source |
 |---|---|---|---|---|
-| 5a | "combine each designed fragment with the other parent fragments ... figure 4a" | single-body effect of every part, by slot | **have** | round 0 is *exactly* this — 1665 (lib 2) and 1791 (lib 3) designs, every one with 4 of 5 slots = G20 |
-| 5b | "correlation between distance from top-k fragment and activity ... figure 4a" | activity vs Hamming distance of the one varied part | **have** | same rows; compute distance, do not trust `distN` |
-| 5c | "binning fragments ... ~128 variants per bin ... figure 4b" | round 1 activity by bin, with the top-2 exhaustive block called out | **have** | round 1 tags `bin1`..`bin6` (19–165 each) + `top2combos` (31 of the 32 possible) |
-| 5d | "using the predictors ... next 2 rounds ... figure 4x" | rounds 2–4, predicted vs measured, by selection strategy | **have** | tags `MLPgamma1/5/8`, `topkMLP`, `sampledtopkMLP`, `top30mu`, `top10mu`, `mostdiverseMuGt3/4` |
-| 5e | "in many fewer evaluations (put real savings here!) than greedy would require" | policy-over-fragment-space vs exhaustive/greedy screening cost | **derive** | counts are computable from library size and rounds; the greedy comparator needs defining |
-| 5f | "comparing our top designs to native PETases ... at XXx faster Kcat figure 4x" | designs vs FastPETase / ThermoPETase / LCC / Kubu / MiPa, one plate | **have** | **`jq_e0328`, and it is better than we thought — see §5** |
-| 5g | "we do not find that optimization of this probe substrate transfers well to bulk PET" | probe activity vs nanoPET / pellet activity | **collect** | `jq_e0334/3_sm_hplc_nanopet_titration` and `jq_e0331/0333` HPLC exist as notebooks only. Needs extraction, or ask Jason |
-| 5h | "many variants distant in sequence space that are significantly more accurate" | activity vs distance from momi, final libraries | **have** | snapshot. **Note the first library said the opposite** — activity fell with distance (`key_results.md` §7) |
+| 3a | "as seen depicted in figure 3a" | wet-lab pipeline strip: geneblocks → ECHO → GGA → PCR → PUREfrex → reader | **have, built** | `svg/wetlab_pipeline.svg` (Jason, `312211c`) |
+| 3b | "gate samples on each replicate having at least 0.1uM ... (figure 3b)" + "background subtracted and fit with least squares (figure 3b)" | the filter cascade with counts surviving each gate | **have** | `libraries_snapshot.py` `passes_*` columns |
+| 3c | "consistency amongst measured control rates seen in figure 3c" | positive-control rate per plate, per round, all three libraries | **have** | snapshot controls. Plates agree to 1–2% within a round (20.70/20.18/20.05) — **plot raw rate, not momi-normalised**, which is 19.7 by construction in most rounds |
+| 3d | "parity plots of individual replicates seen in figure 3d" | replicate i vs replicate j | **collect** | the snapshot is already reduced to means; `cv_rate` survives, the three replicate values do not. Re-extract from jq01's per-round raw files |
+| 3e | — (draft skips e) | one worked kinetic trace: raw fluorescence, background, least-squares fit | **have** | `library1_kinetics.py` reads the raw reader files already |
+| 3f | "aggregate measurements from each of three different libraries ... figure 3f?" + "nearly 400x ... figure 3x" | all three libraries on one momi axis, by round | **have, built** | `petase_libraries_filtered.csv`; medians 1.15 / 3.69 / 20.27, max 17.1 / 66.0 / 395.0 |
+
+### Figure 4 — searching 10^12 in four rounds
+
+| panel | draft text | shows | status | source |
+|---|---|---|---|---|
+| 4a | "combine each designed fragment with the other parent fragments ... figure 4a" | single-body effect of every part, by slot | **have** | round 0 is *exactly* this — 1665 (lib 2) and 1791 (lib 3) designs, every one with 4 of 5 slots = G20 |
+| 4b | "correlation between distance from top-k fragment and activity ... figure 4a" | activity vs Hamming distance of the one varied part | **have** | same rows; compute distance, do not trust `distN` |
+| 4c | "binning fragments ... ~128 variants per bin ... figure 4b" | round 1 activity by bin, with the top-2 exhaustive block called out | **have** | round 1 tags `bin1`..`bin6` (19–165 each) + `top2combos` (31 of the 32 possible) |
+| 4d | "using the predictors ... next 2 rounds ... figure 4x" | rounds 2–4, predicted vs measured, by selection strategy | **have** | tags `MLPgamma1/5/8`, `topkMLP`, `sampledtopkMLP`, `top30mu`, `top10mu`, `mostdiverseMuGt3/4` |
+| 4e | "in many fewer evaluations (put real savings here!) than greedy would require" | policy-over-fragment-space vs exhaustive/greedy screening cost | **derive** | counts are computable from library size and rounds; the greedy comparator needs defining |
+| 4f | "comparing our top designs to native PETases ... at XXx faster Kcat figure 4x" | designs vs FastPETase / ThermoPETase / LCC / Kubu / MiPa, one plate | **have** | **`jq_e0328`, and it is better than we thought — see §5** |
+| 4g | "we do not find that optimization of this probe substrate transfers well to bulk PET" | probe activity vs nanoPET / pellet activity | **collect** | `jq_e0334/3_sm_hplc_nanopet_titration` and `jq_e0331/0333` HPLC exist as notebooks only. Needs extraction, or ask Jason |
+| 4h | "many variants distant in sequence space that are significantly more accurate" | activity vs distance from momi, final libraries | **have** | snapshot. **Note the first library said the opposite** — activity fell with distance (`key_results.md` §7) |
 
 ### Supplementary referenced in the draft
 
@@ -104,13 +124,13 @@ measurement or the run does not exist yet.
 
 ## 2. What has to be collected, in priority order
 
-1. **Replicate-level values for the parity plot (4d).** Everything else about
+1. **Replicate-level values for the parity plot (3d).** Everything else about
    Figure 4 is in hand; this is the one panel with no path from the snapshot.
    The raw readers are reachable the way `library1_kinetics.py` reaches them.
-2. **Bulk PET / nanoPET (5g).** The draft states a negative result — that
+2. **Bulk PET / nanoPET (4g).** The draft states a negative result — that
    probe gains do not transfer. A stated negative needs its panel. The
    notebooks exist; the extracted numbers do not.
-3. **The random-mutagenesis arm for 2c.** `jq_e0307_250311_petase_library_random_mutation`
+3. **The random-mutagenesis arm for 1g.** `jq_e0307_250311_petase_library_random_mutation`
    has AF3 output for a random-mutagenesis PETase library, which may serve
    directly; otherwise it is a cheap generate-and-fold.
 4. **PLM vs one-hot (S3).** Runnable today against the snapshot. Half a day.
@@ -123,7 +143,7 @@ measurement or the run does not exist yet.
 
 ## 3. The landscapes go 3D
 
-The conceptual landscapes in 1a are currently **2D filled contours** seen from
+The conceptual landscapes in Fig 1(a) are currently **2D filled contours** seen from
 above (`contourf` + white contour lines). The draft wants 3D.
 
 **The trap:** matplotlib's `mplot3d` is the obvious route and the wrong one.
@@ -187,7 +207,7 @@ denominator is weak: momi WT at 0.383 sits close to background, which is the
 whole reason `MOMI_NORMALISATION.md` exists. (iii) This plate's *internal*
 G20/momi ratio is **34.0x**, not the 19.7x adopted from the two
 condition-matched measurements. The two numbers answer different questions and
-must not be mixed: use 19.7 for the cross-library axis in 4f, and this plate's
+must not be mixed: use 19.7 for the cross-library axis in Fig 3(f), and this plate's
 own ratio for anything quoted off this plate. That both routes land near 394x
 for the best design is a coincidence of this dataset, not corroboration.
 
@@ -204,5 +224,5 @@ for the best design is a coincidence of this dataset, not corroboration.
 | "~66x (check these)" library 2 | 66.0x — correct | snapshot |
 | "~400x" library 3 | 395.0x on the derived axis, 393x in-plate | snapshot, §5 |
 | "a total of 25 = 32 variants" | 2^5 = 32; 31 of the 32 were assayed | round 1 `top2combos` |
-| "(put real savings here!)" | needs the greedy comparator defined | §1, 5e |
+| "(put real savings here!)" | needs the greedy comparator defined | section 1, 4e |
 | "10^4 oracle calls" | 200 steps x 32 x best-of-5 = 3.2x10^4 | `panel_cost.py` |

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Figure 5 --- searching a 10^12 library in four rounds.
+"""Figure 4 --- searching a 10^12 library in four rounds.
 
-The story draft's Figure 4. Every round the draft describes exists in the
+Every round the draft describes exists in the
 snapshot and is identifiable from the design names:
 
     round 0   single-body      4 of 5 slots are the G20 parent (1665 / 1791)
@@ -10,7 +10,7 @@ snapshot and is identifiable from the design names:
 
 so (a) through (d) are build jobs rather than collection jobs.
 
-    uv run python paper/figures/fig5_rounds.py
+    uv run python paper/figures/fig4_rounds.py
 """
 
 import sys
@@ -93,7 +93,7 @@ def main():
              "  393x over momi WT,  3.4x FastPETase,  7.6x LCC",
              "CAVEATS: overnight 37 C, n=1 per construct, and",
              "the denominator sits near background. This plate's",
-             "own G20/momi is 34.0x, not the 19.7x of Fig 4(f)",
+             "own G20/momi is 34.0x, not the 19.7x of Fig 3(f)",
              "-- never mix the two",
          ])
 
@@ -118,7 +118,7 @@ def main():
              "that reversal is the result -- show both, do not show one",
          ])
 
-    save(fig, "fig5_rounds", dpi=900, tight=False)
+    save(fig, "fig4_rounds", dpi=900, tight=False)
 
 
 if __name__ == "__main__":

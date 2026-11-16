@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Figure 3 --- the PETase, and what post-training did to it.
+"""Figure 2 --- the PETase, and what post-training did to it.
 
-The story draft's Figure 2. Renumbered because the concept/benchmark split
-pushes everything down one; see paper/figure_plan_story.md section 0.
+Four-figure scheme, matching the story draft's own numbering: Figure 1 is the
+method and the benchmark, this is the design, Figure 3 is the platform,
+Figure 4 is the search. See paper/figure_plan_story.md.
 
-    uv run python paper/figures/fig3_petase_design.py
+    uv run python paper/figures/fig2_petase_design.py
 """
 
 import sys
@@ -81,7 +82,7 @@ def main():
              "compute it, do not read it",
          ])
 
-    save(fig, "fig3_petase_design", dpi=900, tight=False)
+    save(fig, "fig2_petase_design", dpi=900, tight=False)
 
 
 if __name__ == "__main__":
