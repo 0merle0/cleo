@@ -31,32 +31,35 @@ SUB = "fig3_panels"
 
 SIZES = {
     "fig3b_cascade": (2.10, 2.05),
-    "fig3c_controls": (2.10, 2.05),
+    "fig3c_controls": (2.40, 2.05),
+    "fig3h_controlnorm": (2.10, 2.05),
     "fig3d_parity": (2.20, 2.15),
     "fig3e_trace": (2.60, 2.05),
     "fig3f_scale": (3.00, 1.70),
-    "fig3g_libraries": (6.50, 2.40),
+    "fig3g_libraries": (2.30, 2.40),
 }
 
 MARGIN = {
     "fig3b_cascade": dict(left=0.260, right=0.985, top=0.975, bottom=0.165),
-    "fig3c_controls": dict(left=0.300, right=0.985, top=0.890, bottom=0.165),
+    "fig3c_controls": dict(left=0.265, right=0.985, top=0.975, bottom=0.165),
+    "fig3h_controlnorm": dict(left=0.320, right=0.985, top=0.890, bottom=0.165),
     # Aspect-equal axes: generous margins all round, because the box is
     # fitted inside whatever is left and a tight margin shrinks the plot
     # rather than the whitespace.
     "fig3d_parity": dict(left=0.235, right=0.985, top=0.975, bottom=0.165),
     "fig3e_trace": dict(left=0.195, right=0.985, top=0.975, bottom=0.175),
     "fig3f_scale": dict(left=0.230, right=0.985, top=0.965, bottom=0.215),
-    "fig3g_libraries": dict(left=0.085, right=0.990, top=0.970, bottom=0.135),
+    "fig3g_libraries": dict(left=0.270, right=0.985, top=0.975, bottom=0.165),
 }
 
 WHAT = {
     "fig3b_cascade": "what survives each gate, library 3, from raw reads",
-    "fig3c_controls": "positive-control raw rate per plate, per round",
+    "fig3c_controls": "background against signal: no-enzyme vs G20, raw rate",
+    "fig3h_controlnorm": "G20 control, concentration-normalised, per round",
     "fig3d_parity": "replicate 1 against replicate 2, per construct",
     "fig3e_trace": "one plate's worked traces, 4MU against time",
     "fig3f_scale": "assayed count against library size",
-    "fig3g_libraries": "all three libraries by round, on one momi axis",
+    "fig3g_libraries": "all three libraries on one momi axis",
 }
 
 
@@ -118,8 +121,12 @@ def main():
     _write(fig, "fig3b_cascade")
 
     fig, ax = _fig("fig3c_controls")
-    F3.panel_controls(ax, designs)
+    F3.panel_controls(ax, designs, reps)
     _write(fig, "fig3c_controls")
+
+    fig, ax = _fig("fig3h_controlnorm")
+    F3.panel_controls_norm(ax, designs)
+    _write(fig, "fig3h_controlnorm")
 
     fig, ax = _fig("fig3d_parity")
     F3.panel_parity(ax, reps, designs)

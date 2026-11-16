@@ -5,7 +5,7 @@ Data panels, built from the re-processed raw plate reads
 (`library_kinetics.py`) plus the three-library snapshot:
 
     (b) the filter cascade        (e) one worked kinetic trace
-    (c) controls agree per plate  (f) the three libraries, by round
+    (c) background against signal (f) the three libraries, by round
     (d) replicate parity          (g) what was assayed against what exists
 
 (a), the assembly-and-assay pipeline strip, is Jason's `wetlab_pipeline.svg`
@@ -22,6 +22,11 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
+
+# The slope is fitted against the Unix epoch in SECONDS, so every raw rate
+# is uM/s. Reported per hour, which is the timescale the assay is run on and
+# keeps the axis off a 1e-5 offset that no one can read.
+PER_HOUR = 3600.0
 sys.path.insert(0, str(HERE))
 
 from blockout import slot  # noqa: E402
@@ -101,39 +106,77 @@ def panel_cascade(ax, designs, reps):
 
 # ================================================================ panel (c)
 
-def panel_controls(ax, designs):
-    """Positive-control rate, per plate, per round.
+def panel_controls(ax, designs, reps):
+    """Background against signal: no-enzyme wells beside the G20 control.
 
-    RAW rate, not normalised. The normalised control is 1.0 by construction
-    -- it is the denominator -- so plotting it would show the definition
-    rather than the reproducibility. Raw rate is the quantity that could
-    disagree between plates and does not.
+    RAW SLOPE, not concentration-normalised, and that is forced rather than
+    chosen. A negative-control well has no enzyme in it -- mscarlett reads
+    0.0000 uM at the median -- so dividing its slope by its concentration
+    divides by nothing. Done anyway, those wells span -6.6e-3 to +2.2e-3,
+    about a thousand times the positive control's normalised rate, which is
+    noise amplified by a near-zero denominator and not activity. The
+    concentration-normalised view belongs to wells that contain protein and
+    is `panel_controls_norm`.
 
-    One marker per plate set; plates within a round should sit on top of
-    each other, and the round-to-round drift is the real axis of variation.
+    So this panel is in the units the plate actually produces, and the
+    quantity it shows is signal-to-background: the G20 control runs ~5x the
+    no-enzyme floor, and the floor is flat across rounds.
+    """
+    r = reps[reps.sample_type.isin(["negative_control", "positive_control"])]
+    rng = np.random.default_rng(0)
+    groups = (("negative_control", INK["muted"], "no enzyme", -0.18),
+              ("positive_control", SEQUENTIAL[4], "G20 control", 0.18))
+    for st, colour, label, dx in groups:
+        for rnd, g in r[r.sample_type == st].groupby("round_number"):
+            v = g.raw_rate.to_numpy() * PER_HOUR
+            x = rnd + dx + rng.uniform(-0.07, 0.07, len(v))
+            ax.plot(x, v, "o", ms=2.4, mfc=colour, mec="none", alpha=0.55,
+                    ls="none", zorder=3)
+            med = float(np.median(v))
+            ax.plot([rnd + dx - 0.13, rnd + dx + 0.13], [med, med],
+                    color=colour, lw=1.8, zorder=5)
+        ax.plot([], [], "o", ms=4, mfc=colour, mec="none", ls="none",
+                label=label)
+
+    ax.set_xticks(sorted(r.round_number.unique()))
+    _tidy(ax, ylab="Rate (4MU $\\mu$M h$^{-1}$)", xlab="Round")
+    ax.legend(fontsize=fs(6.3), loc="upper right", frameon=False,
+              handlelength=0.8, borderpad=0.0, labelspacing=0.22,
+              handletextpad=0.4)
+
+
+def panel_controls_norm(ax, designs):
+    """The G20 control, concentration-normalised, per plate per round.
+
+    The reproducibility panel. Every point is one plate set's control; plates
+    within a round should sit on top of each other, and they do -- the
+    per-round spread is the number printed above each group.
+
+    Normalised by concentration but NOT by G20: the G20-normalised control
+    is 1.0 by construction, since it is the denominator, so plotting it
+    would show the definition rather than the agreement.
+
+    Negative controls are absent here on purpose -- see `panel_controls`.
     """
     c = designs[designs.sample_type == "positive_control"]
     rng = np.random.default_rng(0)
     cvs = []
     for rnd, g in c.groupby("round_number"):
-        v = g.bg_sub_conc_norm_rate_mean.to_numpy()
+        v = g.bg_sub_conc_norm_rate_mean.to_numpy() * PER_HOUR
         x = rnd + rng.uniform(-0.17, 0.17, len(v))
-        ax.plot(x, v, "o", ms=3.4, mfc=SEQUENTIAL[3], mec="white", mew=0.7,
+        ax.plot(x, v, "o", ms=3.4, mfc=SEQUENTIAL[4], mec="white", mew=0.7,
                 ls="none", zorder=4)
         med = float(np.median(v))
         ax.plot([rnd - 0.3, rnd + 0.3], [med, med], color="black", lw=1.4,
                 zorder=5)
         cvs.append((rnd, float(np.std(v) / np.mean(v))
-                    if np.mean(v) else float("nan"), len(v)))
-    # Placed after the loop: inside it, ax.get_ylim() is read before the
-    # last round's points exist and the labels land at the wrong height.
+                    if np.mean(v) else float("nan")))
     top = ax.get_ylim()[1]
-    for rnd, cv, n in cvs:
+    for rnd, cv in cvs:
         ax.text(rnd, top, f"{100*cv:.0f}%", fontsize=fs(5.8), ha="center",
                 va="bottom", color=INK["muted"])
     ax.set_xticks(sorted(c.round_number.unique()))
-    _tidy(ax, ylab="Control rate\n(bg-subtracted, per $\\mu$M)",
-          xlab="Round")
+    _tidy(ax, ylab="G20 control rate (h$^{-1}$)", xlab="Round")
 
 
 # ================================================================ panel (d)
@@ -259,53 +302,51 @@ def panel_trace(ax, traces, reps, n_show=3):
 # ================================================================ panel (f)
 
 def panel_libraries(ax, snap):
-    """All three libraries on one momi axis, by round. The headline.
+    """All three libraries on one momi axis. The headline.
 
-    LOG y: the three libraries span 0.01 to 395 x momi and a linear axis
-    renders libraries 1 and 2 as a line on the floor.
+    One strip per library, not split by round. The round-by-round view is
+    the subject of Figure 4, which is about the search; here the claim is
+    simply where each library sits, and three columns say it without asking
+    the reader to track ten.
+
+    LOG y: the three span 0.01 to 395 x momi WT and a linear axis renders
+    libraries 1 and 2 as a line on the floor.
 
     G20 does not land at one height across the libraries -- 17.11 measured
     in library 1 against its own momi control, 19.70 derived in libraries 2
     and 3 -- and that 26% disagreement is the whole uncertainty in the
-    factor. It is left visible rather than normalised away; see
+    factor. Left visible rather than normalised away; see
     docs/MOMI_NORMALISATION.md.
     """
     s = snap[(snap.sample_type == "sample") & snap.passes_filter].copy()
     s = s[s.momi_norm_rate > 0]
     rng = np.random.default_rng(0)
-    pos, labels = [], []
-    x = 0
-    for lib in ("1_original", "2_g20_optimisation", "3_experiment_guided"):
-        g = s[s.library == lib]
-        for rnd in sorted(g.round_number.unique()):
-            v = g[g.round_number == rnd].momi_norm_rate.to_numpy()
-            if not len(v):
-                continue
-            ax.plot(x + rng.uniform(-0.3, 0.3, len(v)), v, "o", ms=1.5,
-                    mfc=LIBC[lib], mec="none", alpha=0.35, ls="none",
-                    rasterized=True, zorder=3)
-            med = float(np.median(v))
-            ax.plot([x - 0.38, x + 0.38], [med, med], color="black", lw=1.5,
-                    zorder=5)
-            pos.append(x)
-            labels.append(str(int(rnd)))
-            x += 1
-        x += 0.6
+    libs = ("1_original", "2_g20_optimisation", "3_experiment_guided")
+    for x, lib in enumerate(libs):
+        v = s[s.library == lib].momi_norm_rate.to_numpy()
+        if not len(v):
+            continue
+        ax.plot(x + rng.normal(0, 0.085, len(v)), v, "o", ms=1.8,
+                mfc=LIBC[lib], mec="none", alpha=0.35, ls="none",
+                rasterized=True, zorder=3)
+        med = float(np.median(v))
+        # White casing: in the library's own colour the median rule sits
+        # inside its own cloud and disappears.
+        ax.plot([x - 0.30, x + 0.30], [med, med], color="white", lw=3.4,
+                solid_capstyle="round", zorder=5)
+        ax.plot([x - 0.28, x + 0.28], [med, med], color=LIBC[lib], lw=1.9,
+                solid_capstyle="round", zorder=6)
 
     ax.axhline(1, color=PALETTE["gray"], lw=0.9, ls=":", zorder=1)
+    ax.text(-0.52, 1.9, "momi WT", fontsize=fs(6),
+            color=PALETTE["gray"], ha="left", va="bottom", zorder=7)
     ax.set_yscale("log")
-    ax.set_xticks(pos)
-    ax.set_xticklabels(labels, fontsize=fs(6.3))
+    ax.set_xticks(range(len(libs)))
+    ax.set_xticklabels(["1\noriginal", "2\nG20 opt.", "3\nexp-guided"],
+                       fontsize=fs(6.5))
     ax.tick_params(axis="x", length=0)
-    _tidy(ax, ylab="Activity ($\\times$ momi WT)", xlab="Round")
-
-    from matplotlib.lines import Line2D
-    ax.legend(handles=[Line2D([], [], marker="o", ms=4, mfc=LIBC[k],
-                              mec="none", ls="none", label=LIBL[k])
-                       for k in LIBC],
-              fontsize=fs(6.3), loc="upper left", frameon=False,
-              handlelength=0.8, borderpad=0.0, labelspacing=0.22,
-              handletextpad=0.4)
+    ax.set_xlim(-0.6, len(libs) - 0.4)
+    _tidy(ax, ylab="Activity ($\\times$ momi WT)")
 
 
 # ================================================================ panel (g)
@@ -369,10 +410,12 @@ def main():
              "add PET-trimer probe -> plate reader",
          ])
 
-    r1 = outer[1].subgridspec(1, 3, width_ratios=[1.0, 1.0, 0.95], wspace=0.46)
+    r1 = outer[1].subgridspec(1, 4, width_ratios=[1.0, 1.15, 1.0, 1.0],
+                              wspace=0.56)
     panel_cascade(fig.add_subplot(r1[0, 0]), designs, reps)
-    panel_controls(fig.add_subplot(r1[0, 1]), designs)
-    panel_parity(fig.add_subplot(r1[0, 2]), reps, designs)
+    panel_controls(fig.add_subplot(r1[0, 1]), designs, reps)
+    panel_controls_norm(fig.add_subplot(r1[0, 2]), designs)
+    panel_parity(fig.add_subplot(r1[0, 3]), reps, designs)
 
     r2 = outer[2].subgridspec(1, 2, width_ratios=[1.0, 1.1], wspace=0.34)
     panel_trace(fig.add_subplot(r2[0, 0]), traces, reps)
@@ -380,9 +423,9 @@ def main():
 
     panel_libraries(fig.add_subplot(outer[3]), snap)
 
-    for letter, (x, y) in zip("abcdefg", [
-            (0.008, 0.975), (0.008, 0.800), (0.345, 0.800), (0.675, 0.800),
-            (0.008, 0.535), (0.505, 0.535), (0.008, 0.275)]):
+    for letter, (x, y) in zip("abcdefgh", [
+            (0.008, 0.975), (0.008, 0.800), (0.268, 0.800), (0.530, 0.800),
+            (0.775, 0.800), (0.008, 0.535), (0.505, 0.535), (0.008, 0.275)]):
         fig.text(x, y, f"({letter})", fontsize=fs(9), fontweight="bold",
                  ha="left", va="top")
 

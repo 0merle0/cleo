@@ -8,11 +8,12 @@ the layout, and the filename carries the intended one.
 | file | size (in) | what it shows |
 |---|---|---|
 | `fig3b_cascade.svg` | 2.10 x 2.05 | what survives each gate, library 3, from raw reads |
-| `fig3c_controls.svg` | 2.10 x 2.05 | positive-control raw rate per plate, per round |
+| `fig3c_controls.svg` | 2.40 x 2.05 | background against signal: no-enzyme vs G20, raw rate |
+| `fig3h_controlnorm.svg` | 2.10 x 2.05 | G20 control, concentration-normalised, per round |
 | `fig3d_parity.svg` | 2.20 x 2.15 | replicate 1 against replicate 2, per construct |
 | `fig3e_trace.svg` | 2.60 x 2.05 | one plate's worked traces, 4MU against time |
 | `fig3f_scale.svg` | 3.00 x 1.70 | assayed count against library size |
-| `fig3g_libraries.svg` | 6.50 x 2.40 | all three libraries by round, on one momi axis |
+| `fig3g_libraries.svg` | 2.30 x 2.40 | all three libraries on one momi axis |
 
 Panel (a), the assembly-and-assay pipeline strip, is not here: it is
 `../wetlab_pipeline.svg` and is a schematic rather than a data plot.
