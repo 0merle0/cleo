@@ -317,8 +317,10 @@ def panel_libraries(ax, snap):
     and the top designs are visibly hundreds-fold, which a log axis
     flattens into "a bit higher".
 
-    Medians are drawn and printed because they are the part a linear axis
-    compresses: 1.21, 4.12 and 21.02 x momi WT.
+    No median rules across the strips -- the cloud is the panel. The median
+    is printed under each library name instead, because it is the part a
+    linear axis compresses: 1.2, 4.1 and 21.0 x momi WT sit within 20 units
+    of each other on an axis that runs to 395.
 
     G20 does not land at one height across the libraries -- 17.11 measured
     in library 1 against its own momi control, 19.70 derived in libraries 2
@@ -337,30 +339,21 @@ def panel_libraries(ax, snap):
         ax.plot(x + rng.normal(0, 0.085, len(v)), v, "o", ms=1.8,
                 mfc=LIBC[lib], mec="none", alpha=0.35, ls="none",
                 rasterized=True, zorder=3)
-        med = float(np.median(v))
-        # White casing: in the library's own colour the median rule sits
-        # inside its own cloud and disappears.
-        ax.plot([x - 0.30, x + 0.30], [med, med], color="white", lw=3.4,
-                solid_capstyle="round", zorder=5)
-        ax.plot([x - 0.28, x + 0.28], [med, med], color=LIBC[lib], lw=1.9,
-                solid_capstyle="round", zorder=6)
-
     ax.axhline(1, color=PALETTE["gray"], lw=0.9, ls=":", zorder=1)
-    # Medians printed beside their rules: on a linear axis spanning 395 the
-    # three sit within 20 units of each other and cannot be read off the
-    # axis, which is exactly what the log version made legible.
-    for x, lib in enumerate(libs):
-        v = s[s.library == lib].momi_norm_rate
-        if len(v):
-            ax.text(x + 0.34, float(np.median(v)), f"{np.median(v):.1f}",
-                    fontsize=fs(6.2), color=LIBC[lib], ha="left",
-                    va="center", fontweight="bold", zorder=7)
+    # Median under the library name rather than ruled across the strip.
+    # The rules are gone by request; the number stays because a linear axis
+    # spanning 395 puts all three medians within 20 units of each other,
+    # where none of them can be read off the axis.
     ax.text(-0.52, 22, "momi WT", fontsize=fs(6),
             color=PALETTE["gray"], ha="left", va="bottom", zorder=7)
     ax.set_ylim(0, None)
     ax.set_xticks(range(len(libs)))
-    ax.set_xticklabels(["1\noriginal", "2\nG20 opt.", "3\nexp-guided"],
-                       fontsize=fs(6.5))
+    meds = [float(np.median(s[s.library == k].momi_norm_rate))
+            if len(s[s.library == k]) else float("nan") for k in libs]
+    ax.set_xticklabels(
+        [f"{n}\nmed {m:.1f}" for n, m in
+         zip(("1\noriginal", "2\nG20 opt.", "3\nexp-guided"), meds)],
+        fontsize=fs(6.5))
     ax.tick_params(axis="x", length=0)
     # Extra room on the right: the median labels sit beside their rules and
     # library 3's runs off a tight limit.
