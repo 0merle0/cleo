@@ -30,7 +30,8 @@ The 2D version is still in `concept_library.py`. Swapping back is one import.
 """
 
 import numpy as np
-from matplotlib.collections import LineCollection
+from matplotlib.collections import PolyCollection
+from matplotlib.colors import LinearSegmentedColormap
 
 from palette import INK, SEQUENTIAL, fs
 
@@ -44,22 +45,29 @@ SHEAR = 0.42      # how far right a unit of depth pushes
 SKEW = 0.30       # how far up a unit of depth pushes
 RISE = 0.46       # how tall a unit of fitness stands
 
-# The mesh. Rows run across the panel, columns run into it, and both are
-# drawn -- that is what makes it read as a wireframe mesh rather than a
-# ridgeline. The counts are a legibility choice, not a resolution one: the
-# surface is sampled at N_COLS for the row polylines regardless, and
-# MESH_COLS only sets how many column lines are laid over it.
-N_ROWS = 26       # row profiles; also the number of occluding fills
-N_COLS = 150      # samples along each profile -- vertices, not objects
-MESH_COLS = 26    # column lines drawn over the rows
+# Surface resolution. These are QUADS, not objects: the whole surface is one
+# rasterised PolyCollection per panel, so raising them costs pixels and not
+# SVG elements. Axes, labels and the designs drawn on top stay vector.
+N_ROWS = 70       # rows of quads, back to front
+N_COLS = 110      # quads across each row
+N_PROFILE = 150   # samples along a profile -- used for the silhouette
 
+# Light grey through the house blue, as fitness rises. The low ground has to
+# stay light enough that the dark design points on top of it still read, so
+# the ramp starts near-white rather than at a mid grey.
+TERRAIN = LinearSegmentedColormap.from_list(
+    "cleo_terrain",
+    ["#F4F5F6", "#E7ECF1", "#D5E4F3", SEQUENTIAL[1], SEQUENTIAL[2],
+     SEQUENTIAL[3]])
 
-# Soft blue, as light as it can be and still hold at 0.6 pt. The surface is
-# context for the points sitting on it, so it must not out-weigh them.
-FILL = "#F2F8FE"        # the soft wash that does the occluding
-EDGE = "#8FC4F2"        # row lines
-MESH = "#A9D2F6"        # column lines, a step lighter so rows lead
-EDGE_HI = SEQUENTIAL[4]
+# Lambertian shading, from the upper left and slightly front. Colour alone
+# gives height but not form -- two peaks of equal height read as flat discs
+# without it. AMBIENT is the floor so a face turned away from the light is
+# still tinted by its own fitness rather than going black.
+LIGHT = np.array([-0.45, -0.35, 0.82])
+AMBIENT = 0.72
+
+EDGE = SEQUENTIAL[3]
 DOT = "#1F2937"
 
 
@@ -85,76 +93,116 @@ def extent():
     # Extra room under the floor so the corner cue in `axis_cue` sits BELOW
     # the front row instead of inside it. The front row's baseline is y = 0
     # exactly, so a cue placed at the old bottom pad landed on the surface.
-    return ((min(xs) - pad, max(xs) + pad),
-            (min(ys) - 0.17, max(ys) + pad * 1.5))
+    # Bottom room for the corner cue in `axis_cue`, top room for the arrow
+    # head and rotated label of `zaxis`. Both sit outside the unit cube, so
+    # neither is covered by the projected extent on its own.
+    return ((min(xs) - pad - 0.06, max(xs) + pad),
+            (min(ys) - 0.17, max(ys) + 0.13))
 
 
-def draw_surface(ax, fitness, zmax=None, rows=N_ROWS, lw=0.6):
-    """Paint `fitness` as a 3D wireframe mesh, back row first.
+def draw_surface(ax, fitness, zmax=None, rows=N_ROWS, cols=N_COLS):
+    """Paint `fitness` as a soft shaded surface, back row first.
 
     `fitness(X, Y) -> Z` is whatever the panel's landscape is. `zmax`
     normalises height; pass the SAME value to every panel in a row or the
     three landscapes will not be comparable, which is the panel's whole job.
 
-    Hidden-line removal is the painter's algorithm and nothing cleverer: rows
-    are drawn from the back forward, each one laying down an opaque wash
-    before its own lines, so whatever is behind a near ridge disappears under
-    it. The column lines for the gap between two rows go down after the far
-    row and before the near one, which is the only ordering that occludes
-    them correctly.
+    THE WHOLE SURFACE IS ONE RASTERISED COLLECTION. A shaded surface is
+    rows x cols quads -- 7,700 here -- and as vector paths that is an SVG
+    nothing can open comfortably and no one can edit. `rasterized=True`
+    collapses it to a single image while the axes, the z axis, every label
+    and the designs drawn on top stay vector and selectable. This is the same
+    rule the dense scatter panels follow, applied to a surface.
+
+    Hidden-surface removal is the painter's algorithm: rows are built from
+    the back forward and drawn in that order, so a near ridge covers whatever
+    sits behind it. That is exact for a height field under an oblique
+    projection -- there is no case where a farther quad should win.
+
+    Colour is fitness, light grey to blue. Shading is Lambertian from the
+    upper left, and it is not decoration: colour alone gives height but not
+    form, so without it two peaks of equal height read as flat discs.
     """
-    gx = np.linspace(0.0, 1.0, N_COLS)
-    ys = np.linspace(1.0, 0.0, rows)          # back to front: painter's order
+    gx = np.linspace(0.0, 1.0, cols + 1)
+    gy = np.linspace(1.0, 0.0, rows + 1)              # back to front
+    X, Y = np.meshgrid(gx, gy)
     if zmax is None:
-        zmax = float(np.max(fitness(*np.meshgrid(gx, ys))))
+        zmax = float(np.max(fitness(X, Y)))
+    Z = fitness(X, Y) / zmax
+    PX, PY = iso(X, Y, Z)
 
-    # Columns are sampled from the same grid the rows use, so a column line
-    # meets every row exactly on the row's own polyline instead of near it.
-    cidx = np.unique(np.linspace(0, N_COLS - 1, MESH_COLS).astype(int))
+    # Corner-to-quad: each cell takes its four projected corners.
+    quads = np.stack([
+        np.stack([PX[:-1, :-1], PY[:-1, :-1]], -1),
+        np.stack([PX[:-1, 1:], PY[:-1, 1:]], -1),
+        np.stack([PX[1:, 1:], PY[1:, 1:]], -1),
+        np.stack([PX[1:, :-1], PY[1:, :-1]], -1),
+    ], axis=2).reshape(-1, 4, 2)
 
-    prev = None
-    for y in ys:
-        z = fitness(gx, np.full_like(gx, y)) / zmax
-        px, py = iso(gx, np.full_like(gx, y), z)
+    # Height of each cell, for colour.
+    zc = 0.25 * (Z[:-1, :-1] + Z[:-1, 1:] + Z[1:, 1:] + Z[1:, :-1])
 
-        # Column lines spanning from the previous (further) row to this one.
-        # Drawn before this row's wash, so this row hides the half of each
-        # segment that falls behind its ridge.
-        if prev is not None:
-            py0, y0 = prev
-            # x of the projection does not depend on z (px = x + SHEAR*y),
-            # so the two endpoints' x come straight from the transform and
-            # only the y values have to be carried over from the far row.
-            x0 = gx[cidx] + SHEAR * y0
-            x1 = gx[cidx] + SHEAR * y
-            # One LineCollection per gap rather than one Line2D per column.
-            # Same picture; in the SVG it becomes a single <g> instead of ~26
-            # sibling <path> elements, so the mesh can be selected, recoloured
-            # or deleted a band at a time in Inkscape instead of by rubber-band
-            # and hope. A mesh is unavoidably the object-heavy part of this
-            # panel -- grouping is what keeps it workable.
-            ax.add_collection(LineCollection(
-                np.stack([np.column_stack([x0, py0[cidx]]),
-                          np.column_stack([x1, py[cidx]])], axis=1),
-                colors=MESH, linewidths=lw * 0.8, capstyle="round",
-                zorder=2))
+    # Surface normal from the height gradient, in the ORIGINAL (x, y, z)
+    # frame rather than the projected one -- shading describes the surface,
+    # not the drawing of it.
+    dzdx = (Z[:-1, 1:] + Z[1:, 1:] - Z[:-1, :-1] - Z[1:, :-1]) / (2 / cols)
+    dzdy = (Z[1:, :-1] + Z[1:, 1:] - Z[:-1, :-1] - Z[:-1, 1:]) / (2 / rows)
+    n = np.stack([-dzdx, -dzdy, np.ones_like(dzdx)], -1)
+    n /= np.linalg.norm(n, axis=-1, keepdims=True)
+    shade = np.clip(n @ LIGHT, 0.0, 1.0)
+    shade = AMBIENT + (1.0 - AMBIENT) * shade
 
-        # The polygon closes along the row's own baseline (z = 0), not the
-        # bottom of the panel. Closing at the panel floor would make every
-        # row a full-height silhouette and the far rows would be hidden
-        # entirely rather than occluded where the near surface is taller.
-        bx, by = iso(gx[::-1], np.full_like(gx, y), np.zeros_like(gx))
-        ax.fill(np.concatenate([px, bx]), np.concatenate([py, by]),
-                facecolor=FILL, edgecolor="none", zorder=2)
-        ax.plot(px, py, color=EDGE, lw=lw, solid_capstyle="round", zorder=3)
-        prev = (py, y)
+    rgba = TERRAIN(np.clip(zc, 0.0, 1.0))
+    rgba[..., :3] *= shade[..., None]
 
-    # The front edge, a touch heavier: it is the silhouette and it is what
-    # gives the mesh a floor to sit on.
-    z = fitness(gx, np.zeros_like(gx)) / zmax
-    px, py = iso(gx, np.zeros_like(gx), z)
-    ax.plot(px, py, color=EDGE, lw=lw * 1.6, solid_capstyle="round", zorder=4)
+    # edgecolors matched to facecolors, not "none": without them the renderer
+    # leaves hairline seams between adjacent quads, which on a pale surface
+    # reads as a grid and is exactly the mesh look being removed here.
+    pc = PolyCollection(quads, facecolors=rgba.reshape(-1, 4),
+                        edgecolors=rgba.reshape(-1, 4), linewidths=0.35,
+                        rasterized=True, zorder=2)
+    ax.add_collection(pc)
+
+    # The front silhouette, kept vector: it is the edge the eye reads the
+    # landscape's shape from, and a rasterised one looks soft at print size.
+    gp = np.linspace(0.0, 1.0, N_PROFILE)
+    z0 = fitness(gp, np.zeros_like(gp)) / zmax
+    px, py = iso(gp, np.zeros_like(gp), z0)
+    ax.plot(px, py, color=EDGE, lw=0.8, solid_capstyle="round", zorder=3,
+            alpha=0.55)
     return zmax
+
+
+def zaxis(ax, label="Function", pad=0.055, lw=0.9):
+    """A vertical axis for the function value, at the NEAR-left corner.
+
+    (x=0, y=0), not the back-left corner. The back corner is the usual place
+    for a z axis and it does not work here: the panel is wide and short, so
+    an axis rising from the back lands its label in the title. The near
+    corner is the lowest point on the canvas and the toy landscape has no
+    peak there, so the axis stands clear of the surface and of everything
+    above it.
+
+    Drawn in FRONT of the surface, since at the near corner it is in front.
+
+    No numeric ticks. The landscape is an argument about search strategy made
+    before any data -- there are no units, and numbers here would imply a
+    scale that does not exist. Two ticks and the direction of increase is the
+    honest amount of information.
+    """
+    x0, y0 = iso(0.0, 0.0, 0.0)
+    x1, y1 = iso(0.0, 0.0, 1.0)
+    ax.annotate("", xy=(x1, y1 + 0.03), xytext=(x0, y0),
+                arrowprops=dict(arrowstyle="-|>", color=INK["muted"], lw=lw,
+                                shrinkA=0, shrinkB=0), zorder=7,
+                annotation_clip=False)
+    for frac in (0.0, 1.0):
+        tx, ty = iso(0.0, 0.0, frac)
+        ax.plot([tx - 0.022, tx], [ty, ty], color=INK["muted"], lw=lw,
+                solid_capstyle="butt", zorder=7, clip_on=False)
+    ax.text(x0 - pad, (y0 + y1) / 2, label, fontsize=fs(7),
+            color=INK["muted"], ha="center", va="center", rotation=90,
+            zorder=7, clip_on=False)
 
 
 def frame(ax):

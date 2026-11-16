@@ -43,12 +43,12 @@ SUB = "fig1_panels"
 # (filename stem, width in, height in). Widths are the fractions of a 6.5 in
 # page these panels occupy in the assembled version, so the set tiles.
 SIZES = {
-    "fig1a_landscapes": (6.50, 1.70),
+    "fig1a_landscapes": (6.50, 2.20),
     "fig1b_shuffling": (3.70, 2.05),
     "fig1c_objective": (2.25, 2.05),
-    "fig1d_cost": (2.10, 1.95),
-    "fig1e_passrate": (1.70, 1.95),
-    "fig1f_diversity": (1.70, 1.95),
+    "fig1d_cost": (2.35, 2.00),
+    "fig1e_tradeoff": (2.35, 2.00),
+    "fig1f_foldcost": (2.00, 2.00),
     "fig1g_seqspace": (3.05, 2.05),
     "fig1h_granularity": (3.05, 2.05),
 }
@@ -56,26 +56,26 @@ SIZES = {
 # Per-panel axes margins. A schematic wants the whole canvas; a plot needs
 # room for its tick labels and axis titles.
 MARGIN = {
-    "fig1a_landscapes": dict(left=0.005, right=0.995, top=0.90, bottom=0.02),
+    "fig1a_landscapes": dict(left=0.015, right=0.985, top=0.895, bottom=0.035),
     "fig1b_shuffling": dict(left=0.01, right=0.99, top=0.98, bottom=0.02),
     "fig1c_objective": dict(left=0.02, right=0.98, top=0.98, bottom=0.02),
-    "fig1d_cost": dict(left=0.235, right=0.975, top=0.97, bottom=0.225),
-    "fig1e_passrate": dict(left=0.325, right=0.975, top=0.97, bottom=0.165),
-    "fig1f_diversity": dict(left=0.355, right=0.975, top=0.97, bottom=0.165),
+    "fig1d_cost": dict(left=0.215, right=0.975, top=0.97, bottom=0.225),
+    "fig1e_tradeoff": dict(left=0.205, right=0.975, top=0.97, bottom=0.185),
+    "fig1f_foldcost": dict(left=0.265, right=0.975, top=0.97, bottom=0.215),
     "fig1g_seqspace": dict(left=0.145, right=0.985, top=0.97, bottom=0.175),
     "fig1h_granularity": dict(left=0.145, right=0.985, top=0.97, bottom=0.175),
 }
 
 
 WHAT = {
-    "fig1a_landscapes": "three search strategies on one toy landscape",
+    "fig1a_landscapes": "three search strategies, one toy landscape (2D, from clean.pdf)",
     "fig1b_shuffling": "the shuffling step and the rotation rule",
     "fig1c_objective": "the per-fragment GRPO objective",
-    "fig1d_cost": "folds vs library size: brute force vs training",
-    "fig1e_passrate": "recombinant pass rate, 3 arms, pooled",
-    "fig1f_diversity": "rarefied distinct substitutions, pooled",
+    "fig1d_cost": "library size vs DNA spend, whole gene and k=2/4/8",
+    "fig1e_tradeoff": "diversity vs pass rate, stock -> post-trained",
+    "fig1f_foldcost": "oracle calls vs library size: filter vs train",
     "fig1g_seqspace": "one PCA of one-hot sequences, M0097",
-    "fig1h_granularity": "retention vs k, trained-at-k vs cut-at-k",
+    "fig1h_granularity": "retention vs k, trained at each k",
 }
 
 
@@ -139,19 +139,18 @@ def _write(fig, stem):
 # ------------------------------------------------------------------ panels
 
 def panel_a():
-    """The three landscapes, kept in ONE file on purpose.
+    """The three landscapes, the fitness key and the legend, in ONE file.
 
-    They share a single zmax so their heights are comparable, which is the
-    panel's entire argument. Split into three files they would be three
-    drawings that could be scaled independently, and a reader comparing peak
-    heights across them would be reading an artefact of placement.
+    Kept together because they are one panel: the key gives the contour
+    shading its referent and the legend tells the reader what the open
+    circles in the third landscape are. Split apart they would be three
+    drawings that could be scaled independently, and a reader comparing
+    peak shading across them would be reading an artefact of placement.
     """
     stem = "fig1a_landscapes"
     fig = plt.figure(figsize=SIZES[stem])
-    gs = fig.add_gridspec(1, 3, wspace=0.07, **MARGIN[stem])
-    rng = np.random.default_rng(7)
-    for i, fn in enumerate((F1.panel_epcr, F1.panel_naive, F1.panel_ours)):
-        fn(fig.add_subplot(gs[0, i]), rng)
+    gs = fig.add_gridspec(1, 1, **MARGIN[stem])
+    F1.panel_landscapes(fig, gs[0, 0])
     _write(fig, stem)
 
 
@@ -177,16 +176,16 @@ def panel_d():
 
 
 def panel_e(arms):
-    stem = "fig1e_passrate"
+    stem = "fig1e_tradeoff"
     fig, ax = _fig(stem)
-    F1.panel_pass(ax, arms)
+    F1.panel_tradeoff(ax, arms)
     _write(fig, stem)
 
 
-def panel_f(arms):
-    stem = "fig1f_diversity"
+def panel_f(_arms=None):
+    stem = "fig1f_foldcost"
     fig, ax = _fig(stem)
-    F1.panel_diversity(ax, arms)
+    F1.panel_folds(ax)
     _write(fig, stem)
 
 
@@ -216,7 +215,7 @@ def main():
     panel_c()
     panel_d()
     panel_e(arms)
-    panel_f(arms)
+    panel_f()
     panel_g(space, var, pz)
     panel_h()
 

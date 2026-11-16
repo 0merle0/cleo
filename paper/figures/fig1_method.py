@@ -5,15 +5,15 @@ Four-figure scheme, matching the story draft: this figure carries the
 concept, the method and the AME benchmark together, which is what every
 "figure 1?" in the draft points at.
 
-    (a) three landscapes      (e) recombinants fold
-    (b) fragment shuffling    (f) diversity over passing members
+    (a) three landscapes      (e) diversity vs pass rate
+    (b) fragment shuffling    (f) oracle calls vs library size
     (c) the GRPO objective    (g) where in sequence space
-    (d) what it costs         (h) how fine it can be cut
+    (d) DNA cost at several k (h) how fine it can be cut
 
-Panels (e), (f) and (h) are POOLED over the three backbones with the
-per-backbone points drawn on top. M0255 is materially harder than the other
-two and drives every tail in this benchmark; a bare mean hides the one cell
-a reader should ask about.
+Panel (e) is per-backbone on purpose, not pooled: the move from stock to
+post-trained is not the same move on every backbone, and an average of the
+three asserts something none of them does. (h) is pooled with a min-max band
+over the three.
 
 Eight panels makes this a tall figure -- 9.4 in against a 6.5 in page. If it
 has to come down, (d) is the panel whose argument the text can carry alone.
@@ -32,64 +32,19 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import ame_arms as AA  # noqa: E402
-import landscape3d as L3  # noqa: E402
+import concept_library as CL  # noqa: E402
 import panel_cost as COST  # noqa: E402
-from concept_library import N_VARIANTS, _clip  # noqa: E402
 from figio import save  # noqa: E402
 from palette import (FRAGMENT, INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
                      SEQUENTIAL, fs)
 
-# --- the toy landscape ---------------------------------------------------
-#
-# THREE optima, not the four the 2D version carries. At the size this panel
-# prints, a fourth peak is a fourth thing to track in a drawing whose whole
-# argument is "the parent sits on one hill and there are others" -- three
-# says it and leaves the mesh legible. concept_library keeps the four-peak
-# 2D version; this landscape is defined here so changing one cannot silently
-# change the other.
-#
-# Placed by their PROJECTED x (px = x + SHEAR*y), not their x. Two peaks a
-# long way apart in the plane can land on top of each other in an oblique
-# view: (0.73, 0.70) and (0.79, 0.25) project to 1.02 and 0.90 and read as
-# one ridge. These three project to 0.39 / 0.66 / 1.03 and stay separate.
-#
-#        cx,   cy,   width, height
-PEAKS = [
-    (0.25, 0.34, 0.094, 0.74),   # the parent's own optimum -- good, not best
-    (0.72, 0.74, 0.104, 1.00),   # the global optimum
-    (0.61, 0.11, 0.086, 0.86),
-]
-START = (0.25, 0.34)
-
-# Arm colours, used in (e), (f) and (g) so one arm is one colour throughout.
+# Arm colours, used in (e) and (g) so one arm is one colour throughout.
 # Stock MPNN is grey: it is the control and should sit back rather than
 # compete with the trained arms for weight.
 ARMC = {"sampled": INK["muted"],
         "plain RL": PALETTE["yellow"],
         "chimera": SEQUENTIAL[3]}
 MARK = {"M0097": "o", "M0255": "s", "M0315": "^"}
-
-
-def fitness(x, y):
-    """-> the toy landscape: three gaussian optima plus gentle ruggedness."""
-    z = sum(a * np.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * s * s))
-            for cx, cy, s, a in PEAKS)
-    return z + 0.02 * np.sin(4 * np.pi * x) * np.sin(3.5 * np.pi * y)
-
-
-def _zmax():
-    """One zmax for all three landscapes.
-
-    Normalising each panel to its own maximum would make three vertical
-    scales out of one landscape, and the panel's entire job is that the
-    landscape is the same in all three.
-    """
-    g = np.linspace(0, 1, 200)
-    X, Y = np.meshgrid(g, g)
-    return float(np.max(fitness(X, Y)))
-
-
-ZMAX = _zmax()
 
 
 def _tidy(ax, ylab=None, xlab=None):
@@ -107,67 +62,36 @@ def _tidy(ax, ylab=None, xlab=None):
 
 
 # ================================================================ panel (a)
+#
+# THE 2D LANDSCAPES FROM clean.pdf, not a new drawing. `concept_library` has
+# carried this panel since the first version of the figure -- filled contour
+# seen from above, four optima, a fitness key and a shared legend -- and it
+# is what the argument has always been made with.
+#
+# A 3D version was built (soft shaded surface, three peaks, a Function axis;
+# see landscape3d.py) and is NOT used here. It is kept in the tree rather
+# than deleted: swapping back is changing which three functions panel_a
+# calls. The 2D version reads better at this size, which is the whole reason
+# it was 2D to begin with -- an oblique view spends vertical space on depth
+# that a contour spends on the landscape itself.
 
-def _surface(ax):
-    L3.frame(ax)
-    L3.draw_surface(ax, fitness, zmax=ZMAX)
+def panel_landscapes(fig, gs, rng=None):
+    """The three-arm landscape row, exactly as clean.pdf composes it.
 
-
-def panel_epcr(ax, rng):
-    """Mutagenesis walks: dense, and it never leaves the parent's basin."""
-    _surface(ax)
-    L3.title(ax, "Error-prone PCR")
-    pts = _clip(rng.normal(START, 0.055, size=(N_VARIANTS, 2)))
-    L3.draw_points(ax, fitness, pts, ZMAX)
-    L3.draw_start(ax, fitness, START, ZMAX)
-    L3.axis_cue(ax)
-
-
-def panel_naive(ax, rng):
-    """Combinatorial assembly with parts chosen without regard to fitness.
-
-    Drawn as a PRODUCT SET rather than a cloud, because that is what assembly
-    builds: 6 variants for block 1 crossed with 6 for block 2 is their 36
-    combinations, not 36 free points.
+    Four columns -- three landscapes and the fitness key -- over one legend
+    strip. The key and the legend are not decoration: without the key the
+    contour shading has no referent, and without the legend the open circles
+    in the third panel (candidates filtered OUT) read as a third class of
+    design rather than as the filter doing its job.
     """
-    _surface(ax)
-    L3.title(ax, "Naive combinatorial")
-    r = np.random.default_rng(50)
-    xs = np.sort(r.uniform(0.05, 0.95, 6))
-    ys = np.sort(r.uniform(0.05, 0.95, 6))
-    pts = _clip(np.array([(x, y) for x in xs for y in ys], float)
-                + rng.normal(0, 0.012, (36, 2)))
-    L3.draw_points(ax, fitness, pts, ZMAX)
-    L3.draw_start(ax, fitness, START, ZMAX)
-
-
-def panel_ours(ax, rng):
-    """Generate the same reach, then filter hard before building anything.
-
-    The filter IS the search. The library spans the space as widely as the
-    naive one -- the faint open candidates -- but only what survives folding
-    and scoring is kept, and the survivors sit on the optima. The filled
-    points number N_VARIANTS, identical to the other two panels, so the three
-    differ in WHERE the budget goes and not in how much of it there is.
-    """
-    _surface(ax)
-    L3.title(ax, "Filtered combinatorial")
-    xs = rng.uniform(0.05, 0.95, 14)
-    ys = rng.uniform(0.05, 0.95, 14)
-    cand = _clip(np.array([(x, y) for x in xs for y in ys], float)
-                 + rng.normal(0, 0.010, (196, 2)))
-    keep = np.argsort(fitness(cand[:, 0], cand[:, 1]))[-N_VARIANTS:]
-    mask = np.zeros(len(cand), bool)
-    mask[keep] = True
-
-    rej = cand[~mask]
-    z = fitness(rej[:, 0], rej[:, 1]) / ZMAX + 0.012
-    px, py = L3.iso(rej[:, 0], rej[:, 1], z)
-    ax.plot(px, py, "o", ms=2.3, mfc="none", mec=INK["muted"], mew=0.5,
-            ls="none", zorder=5)
-
-    L3.draw_points(ax, fitness, cand[mask], ZMAX)
-    L3.draw_start(ax, fitness, START, ZMAX)
+    rng = rng or np.random.default_rng(7)
+    top = gs.subgridspec(2, 1, height_ratios=[1.0, 0.13], hspace=0.06)
+    land = top[0].subgridspec(1, 4, width_ratios=[1, 1, 1, 0.17], wspace=0.11)
+    CL.panel_epcr(fig.add_subplot(land[0, 0]), rng)
+    CL.panel_naive(fig.add_subplot(land[0, 1]), rng)
+    CL.panel_ours(fig.add_subplot(land[0, 2]), rng)
+    CL.fitness_key(fig.add_subplot(land[0, 3]))
+    CL.landscape_legend(fig.add_subplot(top[1]))
 
 
 # ================================================================ panel (b)
@@ -305,16 +229,37 @@ def panel_objective(ax):
 # ================================================================ panel (d)
 
 def panel_cost(ax):
-    """Folds to a library of size S: brute-force filtering against training.
+    """What a given spend buys, as a library size, at several k.
 
-    The y axis is FOLDS, not steps and not dollars. Training is flat in S
-    because the enrichment lives in the policy rather than in the members --
-    once trained, every design drawn from it inherits the pass rate without
-    being folded. Brute force is linear in S because every candidate has to
-    be folded to find out whether it passes.
+    This is `concept_library.panel_cost`, which has been the cost panel all
+    along -- whole gene, k=2, k=4, k=8 -- and is the one the argument needs.
+    It was briefly replaced here by a folds-vs-library-size panel; that is a
+    different and also-true argument about ORACLE cost, and it now lives in
+    `panel_folds` below rather than displacing this one.
 
-    Below the crossover brute force wins, and the panel says so by drawing
-    the crossing rather than starting the axis past it.
+    Axes are cost on x and library size on y: the question is what you GET
+    for what you PAY. One hue dark to light, because k is ordered and whole
+    genes are just k=1 on the same ramp.
+    """
+    CL.panel_cost(ax)
+    ax.tick_params(labelsize=fs(7))
+    ax.xaxis.label.set_size(fs(7.5))
+    ax.yaxis.label.set_size(fs(7.5))
+
+
+def panel_folds(ax):
+    """Structure predictions to reach a library of size S: filter vs train.
+
+    Kept as a separate panel rather than merged into (d). (d) is about DNA
+    dollars and (c) about oracle calls -- same shape of argument, different
+    currency, and one axis cannot carry both.
+
+    Training is flat in S because the enrichment lives in the policy rather
+    than in the members: once trained, every design drawn from it inherits
+    the pass rate without being folded. Brute force is linear because every
+    candidate has to be folded to find out whether it passes. Below the
+    crossover brute force wins, and the panel draws the crossing rather than
+    starting the axis past it.
     """
     S = np.logspace(2, 12, 200)
     for p in (0.258, 0.496, 0.598):
@@ -324,8 +269,6 @@ def panel_cost(ax):
     ax.axhline(COST.TRAIN_FOLDS, color=SEQUENTIAL[3], lw=1.6, zorder=3,
                label="post-train once")
 
-    # A band, not a point: the three backbones' vanilla pass rates put the
-    # crossover in three different places.
     lo, hi = (COST.crossover(p) for p in (0.258, 0.598))
     ax.axvspan(lo, hi, color=PALETTE["yellow"], alpha=0.22, lw=0, zorder=1)
     ax.text(np.sqrt(lo * hi), 4e3, "break-even", fontsize=fs(6),
@@ -344,63 +287,61 @@ def panel_cost(ax):
 
 # ================================================================ panels e/f
 
-def _arm_panel(ax, d, col, ylab):
-    """Pooled bar per arm, with every backbone drawn on top of it.
+def panel_tradeoff(ax, d, arms=("sampled", "chimera"),
+                   labels=("stock ProteinMPNN", "post-trained")):
+    """Diversity against pass rate, one point per backbone per arm.
 
-    The bar is the mean over backbones (and over seeds, where an arm has
-    them). The points are what the mean is made of, and they stay because
-    M0255 is materially harder than the other two and drives every tail in
-    this benchmark -- a bare mean hides the one cell a reader should ask
-    about.
+    This replaces the two bar panels it grew out of. Bars put the two
+    quantities side by side and left the reader to pair them up; the thing
+    worth seeing is that they MOVE TOGETHER, and the only way to show a joint
+    move is a joint axis. The arrow per backbone is the move.
+
+    WHAT THE ARROWS SAY, and it is not one thing. M0097 and M0255 go up and
+    to the RIGHT -- more of the library folds AND it carries wider coverage.
+    M0315 goes up and to the LEFT: +48.8 points of pass rate for 183 fewer
+    distinct substitutions. Two of three gain on both axes, the third trades.
+    Drawing arrows rather than two clouds of loose points is what keeps that
+    per-backbone difference visible instead of averaged into a claim the
+    data does not support.
+
+    Diversity is on x because it is the quantity being spent, pass rate on y
+    because it is the one being bought.
     """
-    arms = list(AA.ARMS)
-    for x, arm in enumerate(arms):
-        g = d[d.arm == arm]
-        ax.bar(x, g[col].mean(), width=0.64, color=ARMC[arm], alpha=0.28,
-               edgecolor=ARMC[arm], linewidth=1.1, zorder=2)
-        jitter = np.linspace(-0.18, 0.18, len(g))
-        for (_, r), dx in zip(g.sort_values("site").iterrows(), jitter):
-            ax.plot(x + dx, r[col], MARK[r.site], ms=3.4, mfc="white",
-                    mec=ARMC[arm], mew=1.0, zorder=4)
+    for site in sorted(set(d.site)):
+        g = d[d.site == site]
+        pts = {}
+        for arm in arms:
+            h = g[g.arm == arm]
+            if len(h):
+                pts[arm] = (h.subs.mean(), h.pass_rate.mean())
+        if len(pts) < len(arms):
+            continue
+        (x0, y0), (x1, y1) = pts[arms[0]], pts[arms[1]]
+        ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
+                    arrowprops=dict(arrowstyle="-|>", color=INK["ghost"],
+                                    lw=1.2, shrinkA=6, shrinkB=8), zorder=2)
+        for arm in arms:
+            x, y = pts[arm]
+            ax.plot(x, y, MARK[site], ms=6.5, mfc=ARMC[arm], mec=ARMC[arm],
+                    mew=1.3, ls="none", zorder=4)
 
-    ax.set_xticks(range(len(arms)))
-    ax.set_xticklabels(["stock\nMPNN", "plain\nRL", "chimera\n+pool"],
-                       fontsize=fs(6.5))
-    _tidy(ax, ylab=ylab)
-    ax.tick_params(axis="x", length=0)
-    ax.set_xlim(-0.62, len(arms) - 0.38)
+    _tidy(ax, ylab="Recombinants passing (%)",
+          xlab="Distinct substitutions (rarefied)")
+    ax.set_ylim(0, 108)
 
-
-def panel_pass(ax, d):
-    """Recombinant pass rate. The headline, and it is unambiguous."""
-    _arm_panel(ax, d, "pass_rate", "Recombinants passing (%)")
-    ax.set_ylim(0, 115)
-    for x, arm in enumerate(AA.ARMS):
-        m = d[d.arm == arm].pass_rate.mean()
-        ax.text(x, 106, f"{m:.0f}", fontsize=fs(7), ha="center", va="center",
-                color=ARMC[arm], fontweight="bold")
-
-
-def panel_diversity(ax, d):
-    """Rarefied distinct substitutions over PASSING members.
-
-    THIS PANEL DOES NOT SAY WHAT THE DRAFT ASSUMES, and that is the reason to
-    draw it. The chimera arm carries more diversity than stock MPNN on two
-    backbones and LESS on M0315 (1054 against 1237), and plain RL carries
-    more than either on all three. Post-training for recombination buys pass
-    rate; it does not also win diversity, and the text should claim the first
-    and not the second.
-
-    Rarefied because an arm that passes more often has more survivors to find
-    substitutions in. Every arm on a backbone is subsampled to a common
-    survivor count first, so a difference is coverage and not sample size.
-    """
-    _arm_panel(ax, d, "subs", "Distinct substitutions\n(rarefied)")
-    ax.set_ylim(0, 2100)
-    for x, arm in enumerate(AA.ARMS):
-        m = d[d.arm == arm].subs.mean()
-        ax.text(x, 1960, f"{m:.0f}", fontsize=fs(7), ha="center", va="center",
-                color=ARMC[arm], fontweight="bold")
+    from matplotlib.lines import Line2D
+    arm_h = [Line2D([], [], marker="o", ms=5.5, mfc=ARMC[a], mec=ARMC[a],
+                    ls="none", label=lab) for a, lab in zip(arms, labels)]
+    site_h = [Line2D([], [], marker=MARK[s], ms=5.0, mfc="none",
+                     mec=INK["muted"], mew=1.1, ls="none", label=s)
+              for s in sorted(set(d.site))]
+    leg = ax.legend(handles=arm_h, fontsize=fs(6.5), loc="upper left",
+                    frameon=False, handletextpad=0.4, labelspacing=0.25,
+                    borderpad=0.0)
+    ax.add_artist(leg)
+    ax.legend(handles=site_h, fontsize=fs(6.5), loc="lower right",
+              frameon=False, handletextpad=0.4, labelspacing=0.25,
+              borderpad=0.0, ncol=3, columnspacing=0.8)
 
 
 # ================================================================ panel (g)
@@ -497,10 +438,10 @@ def panel_space(ax, d, var, pz):
 def panel_k(ax):
     """Retention against k, pooled over the three backbones.
 
-    Two conditions: a policy TRAINED at each k, and the single k=4 policy
-    re-cut at each k post hoc. The gap between them is the result -- it is
-    not that fine cuts are impossible, it is that a policy has to be trained
-    at the granularity it will be cut at.
+    ONE condition: a policy trained at each k. The post-hoc arm -- the
+    single k=4 policy re-cut at every k -- is a control about train/test
+    mismatch, not part of the claim this panel makes, and it is kept in
+    `figS_posthoc` rather than drawn here.
 
     The band is MIN-MAX over the three backbones, not a confidence interval.
     Every cell is one seed, against a documented 21-point run-to-run swing on
@@ -508,15 +449,13 @@ def panel_k(ax):
     sampling error.
     """
     d = pd.read_csv(HERE / "data" / "ame_fragk.csv")
-    for cond, lab, c in (("trained", "trained at $k$", SEQUENTIAL[3]),
-                         ("posthoc", r"$k\!=\!4$ policy, cut at $k$",
-                          INK["muted"])):
-        g = (d[d.cond == cond].groupby("k").retention
-             .agg(["mean", "min", "max"]).reset_index())
-        ax.fill_between(g.k, 100 * g["min"], 100 * g["max"], color=c,
-                        alpha=0.16, lw=0, zorder=2)
-        ax.plot(g.k, 100 * g["mean"], "-o", color=c, lw=1.4, ms=3.2,
-                mfc="white", mew=1.1, zorder=3, label=lab)
+    c = SEQUENTIAL[3]
+    g = (d[d.cond == "trained"].groupby("k").retention
+         .agg(["mean", "min", "max"]).reset_index())
+    ax.fill_between(g.k, 100 * g["min"], 100 * g["max"], color=c,
+                    alpha=0.16, lw=0, zorder=2)
+    ax.plot(g.k, 100 * g["mean"], "-o", color=c, lw=1.6, ms=3.6,
+            mfc="white", mew=1.2, zorder=3)
 
     ax.set_xscale("log", base=2)
     ax.set_xticks([2, 4, 8, 16, 36, 64])
@@ -524,9 +463,6 @@ def panel_k(ax):
     ax.set_ylim(0, 112)
     _tidy(ax, ylab="Recombinants passing (%)",
           xlab="Fragments per design, $k$")
-    ax.legend(fontsize=fs(6.5), loc="lower left", frameon=False,
-              handlelength=1.3, borderpad=0.0, labelspacing=0.25,
-              handletextpad=0.4)
 
 
 # ================================================================== assembly
@@ -541,10 +477,7 @@ def main():
         left=0.085, right=0.985, top=0.968, bottom=0.048, hspace=0.52)
 
     # (a) three landscapes, one budget spent three ways.
-    row = outer[0].subgridspec(1, 3, wspace=0.07)
-    rng = np.random.default_rng(7)
-    for i, fn in enumerate((panel_epcr, panel_naive, panel_ours)):
-        fn(fig.add_subplot(row[0, i]), rng)
+    panel_landscapes(fig, outer[0])
 
     # (b) the shuffling scheme, (c) the objective it feeds.
     mid = outer[1].subgridspec(1, 2, width_ratios=[1.70, 1.0], wspace=0.10)
@@ -555,8 +488,8 @@ def main():
     r3 = outer[2].subgridspec(1, 3, width_ratios=[1.25, 1.0, 1.0],
                               wspace=0.52)
     panel_cost(fig.add_subplot(r3[0, 0]))
-    panel_pass(fig.add_subplot(r3[0, 1]), arms)
-    panel_diversity(fig.add_subplot(r3[0, 2]), arms)
+    panel_tradeoff(fig.add_subplot(r3[0, 1]), arms)
+    panel_folds(fig.add_subplot(r3[0, 2]))
 
     # (g) sequence space, (h) granularity.
     r4 = outer[3].subgridspec(1, 2, wspace=0.28)

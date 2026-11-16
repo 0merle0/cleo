@@ -33,23 +33,27 @@ A note on panel letters: the draft writes `figure 1?` throughout because
 there was nothing to point at. Figure 1's letters are now fixed, so the
 prose can be pointed at them:
 
-    (a) three landscapes      (e) recombinants fold
-    (b) fragment shuffling    (f) diversity over passing members
-    (c) the GRPO objective    (g) where in sequence space
-    (d) cost vs library size  (h) how fine it can be cut
+    (a) three landscapes        (e) diversity vs pass rate
+    (b) fragment shuffling      (f) oracle calls vs library size
+    (c) the GRPO objective      (g) where in sequence space
+    (d) DNA cost at several k   (h) how fine it can be cut
 
-**The AME panels — (e), (f) and (h) — are pooled across the three
-backbones**, not drawn as three facets. One bar or one curve per arm, with
-the three backbones overlaid as points or as a min-max band. The pooling
-makes the k result read more cleanly than the facets did:
+**Panel (e) is per-backbone on purpose; (h) is pooled.** (e) is a scatter —
+diversity on x, pass rate on y, one point per backbone per arm, with an
+arrow for the move from stock ProteinMPNN to post-trained. It is not
+averaged, because the move is not the same move on every backbone and a mean
+of the three asserts something none of them does (see §7).
+
+(h) shows ONE curve, the policy trained at each k, with a min-max band over
+the three backbones. The post-hoc control — a single k=4 policy re-cut at
+every k — is about train/test mismatch rather than about this claim, and
+stays in `figS_posthoc`:
 
 | k | 2 | 4 | 8 | 16 | 36 | 64 |
 |---|---:|---:|---:|---:|---:|---:|
 | trained at k | 0.91 | 0.90 | 0.94 | **0.92** | 0.60 | 0.29 |
-| k=4 policy, cut at k | 0.83 | — | 0.76 | **0.64** | 0.28 | — |
 
-Flat through k=16, a cliff at 36, and a +27.9 pt gap over a k=4-trained
-policy at k=16.
+Flat through k=16, a cliff at 36.
 
 **Keep the per-backbone points on the pooled panels.** M0255 is materially
 harder than the other two (82.4% against 96.9 and 100.0 on recombinant pass;

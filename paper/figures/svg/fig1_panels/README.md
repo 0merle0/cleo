@@ -15,14 +15,14 @@ intended letter.
 
 | file | size (in) | what it shows |
 |---|---|---|
-| `fig1a_landscapes.svg` | 6.50 x 1.70 | three search strategies on one toy landscape |
+| `fig1a_landscapes.svg` | 6.50 x 2.20 | three search strategies, one toy landscape (2D, from clean.pdf) |
 | `fig1b_shuffling.svg` | 3.70 x 2.05 | the shuffling step and the rotation rule |
 | `fig1c_objective.svg` | 2.25 x 2.05 | the per-fragment GRPO objective |
-| `fig1d_cost.svg` | 2.10 x 1.95 | folds vs library size: brute force vs training |
-| `fig1e_passrate.svg` | 1.70 x 1.95 | recombinant pass rate, 3 arms, pooled |
-| `fig1f_diversity.svg` | 1.70 x 1.95 | rarefied distinct substitutions, pooled |
+| `fig1d_cost.svg` | 2.35 x 2.00 | library size vs DNA spend, whole gene and k=2/4/8 |
+| `fig1e_tradeoff.svg` | 2.35 x 2.00 | diversity vs pass rate, stock -> post-trained |
+| `fig1f_foldcost.svg` | 2.00 x 2.00 | oracle calls vs library size: filter vs train |
 | `fig1g_seqspace.svg` | 3.05 x 2.05 | one PCA of one-hot sequences, M0097 |
-| `fig1h_granularity.svg` | 3.05 x 2.05 | retention vs k, trained-at-k vs cut-at-k |
+| `fig1h_granularity.svg` | 3.05 x 2.05 | retention vs k, trained at each k |
 
 `fig1a_landscapes` holds all three landscapes in ONE file on
 purpose. They share a single height normalisation, which is the
