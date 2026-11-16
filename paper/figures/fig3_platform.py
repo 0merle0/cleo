@@ -309,8 +309,16 @@ def panel_libraries(ax, snap):
     simply where each library sits, and three columns say it without asking
     the reader to track ten.
 
-    LOG y: the three span 0.01 to 395 x momi WT and a linear axis renders
-    libraries 1 and 2 as a line on the floor.
+    LINEAR y, which is a deliberate trade and worth knowing. The three
+    libraries span 0.01 to 395 x momi WT, so on a linear axis the whole of
+    library 1 and 89% of library 2 sit inside the bottom 5% of the range and
+    their internal structure is gone. What linear buys is that the SIZE of
+    the gain reads directly: library 3's median sits five times library 2's
+    and the top designs are visibly hundreds-fold, which a log axis
+    flattens into "a bit higher".
+
+    Medians are drawn and printed because they are the part a linear axis
+    compresses: 1.21, 4.12 and 21.02 x momi WT.
 
     G20 does not land at one height across the libraries -- 17.11 measured
     in library 1 against its own momi control, 19.70 derived in libraries 2
@@ -338,14 +346,25 @@ def panel_libraries(ax, snap):
                 solid_capstyle="round", zorder=6)
 
     ax.axhline(1, color=PALETTE["gray"], lw=0.9, ls=":", zorder=1)
-    ax.text(-0.52, 1.9, "momi WT", fontsize=fs(6),
+    # Medians printed beside their rules: on a linear axis spanning 395 the
+    # three sit within 20 units of each other and cannot be read off the
+    # axis, which is exactly what the log version made legible.
+    for x, lib in enumerate(libs):
+        v = s[s.library == lib].momi_norm_rate
+        if len(v):
+            ax.text(x + 0.34, float(np.median(v)), f"{np.median(v):.1f}",
+                    fontsize=fs(6.2), color=LIBC[lib], ha="left",
+                    va="center", fontweight="bold", zorder=7)
+    ax.text(-0.52, 22, "momi WT", fontsize=fs(6),
             color=PALETTE["gray"], ha="left", va="bottom", zorder=7)
-    ax.set_yscale("log")
+    ax.set_ylim(0, None)
     ax.set_xticks(range(len(libs)))
     ax.set_xticklabels(["1\noriginal", "2\nG20 opt.", "3\nexp-guided"],
                        fontsize=fs(6.5))
     ax.tick_params(axis="x", length=0)
-    ax.set_xlim(-0.6, len(libs) - 0.4)
+    # Extra room on the right: the median labels sit beside their rules and
+    # library 3's runs off a tight limit.
+    ax.set_xlim(-0.6, len(libs) - 0.10)
     _tidy(ax, ylab="Activity ($\\times$ momi WT)")
 
 
