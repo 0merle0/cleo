@@ -19,10 +19,12 @@ intended letter.
 | `fig1b_shuffling.svg` | 3.70 x 2.05 | the shuffling step and the rotation rule |
 | `fig1c_objective.svg` | 2.25 x 2.05 | the per-fragment GRPO objective |
 | `fig1d_cost.svg` | 3.90 x 2.05 | library size vs DNA spend, whole gene and k=2/4/8 |
-| `fig1e_tradeoff.svg` | 2.35 x 2.00 | diversity vs pass rate, stock -> post-trained |
-| `fig1f_foldcost.svg` | 2.00 x 2.00 | oracle calls vs library size: filter vs train |
-| `fig1g_seqspace.svg` | 3.05 x 2.05 | one PCA of one-hot sequences, M0097 |
-| `fig1h_granularity.svg` | 3.05 x 2.05 | retention vs k, trained at each k |
+| `fig1e_passrate.svg` | 2.20 x 2.00 | recombinant pass rate, per backbone |
+| `fig1f_diversity.svg` | 2.20 x 2.00 | rarefied distinct substitutions, per backbone |
+| `fig1g_motifvar.svg` | 2.35 x 2.05 | spread of motif RMSD, stock vs post-trained |
+| `fig1h_foldcost.svg` | 2.00 x 2.00 | oracle calls vs library size: filter vs train |
+| `fig1i_seqspace.svg` | 3.05 x 2.05 | one PCA of one-hot sequences, M0097 |
+| `fig1j_granularity.svg` | 3.05 x 2.05 | retention vs k, trained at each k |
 
 `fig1a_landscapes` holds all three landscapes in ONE file on
 purpose. They share a single height normalisation, which is the

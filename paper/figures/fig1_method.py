@@ -10,10 +10,10 @@ concept, the method and the AME benchmark together, which is what every
     (c) the GRPO objective    (g) where in sequence space
     (d) DNA cost at several k (h) how fine it can be cut
 
-Panel (e) is per-backbone on purpose, not pooled: the move from stock to
-post-trained is not the same move on every backbone, and an average of the
-three asserts something none of them does. (h) is pooled with a min-max band
-over the three.
+Panels (e) and (f) are per-backbone on purpose, not pooled: the move from
+stock to post-trained is not the same move on every backbone -- M0315
+reverses on diversity -- and an average of the three asserts something none
+of them does. (i) is pooled, with a min-max band over the three.
 
 Eight panels makes this a tall figure -- 9.4 in against a 6.5 in page. If it
 has to come down, (d) is the panel whose argument the text can carry alone.
@@ -33,6 +33,7 @@ sys.path.insert(0, str(HERE))
 
 import ame_arms as AA  # noqa: E402
 import concept_library as CL  # noqa: E402
+import motif_variance as MV  # noqa: E402
 import panel_cost as COST  # noqa: E402
 from figio import save  # noqa: E402
 from palette import (FRAGMENT, INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
@@ -287,61 +288,143 @@ def panel_folds(ax):
 
 # ================================================================ panels e/f
 
-def panel_tradeoff(ax, d, arms=("sampled", "chimera"),
-                   labels=("stock ProteinMPNN", "post-trained")):
-    """Diversity against pass rate, one point per backbone per arm.
+# "This work" rather than "post-trained", to match the third landscape in
+# panel (a). One name for one thing across the whole figure.
+ARM_LABEL = {"sampled": "stock ProteinMPNN", "plain RL": "plain RL",
+             "chimera": "This work"}
+SITES = ("M0097", "M0255", "M0315")
 
-    This replaces the two bar panels it grew out of. Bars put the two
-    quantities side by side and left the reader to pair them up; the thing
-    worth seeing is that they MOVE TOGETHER, and the only way to show a joint
-    move is a joint axis. The arrow per backbone is the move.
 
-    WHAT THE ARROWS SAY, and it is not one thing. M0097 and M0255 go up and
-    to the RIGHT -- more of the library folds AND it carries wider coverage.
-    M0315 goes up and to the LEFT: +48.8 points of pass rate for 183 fewer
-    distinct substitutions. Two of three gain on both axes, the third trades.
-    Drawing arrows rather than two clouds of loose points is what keeps that
-    per-backbone difference visible instead of averaged into a claim the
-    data does not support.
+def _grouped_bars(ax, d, col, ylab, arms, legend=False, fmt="{:.0f}"):
+    """Grouped bars: one group per backbone, one bar per arm.
 
-    Diversity is on x because it is the quantity being spent, pass rate on y
-    because it is the one being bought.
+    Per backbone rather than pooled. The move from stock to post-trained is
+    not the same move on all three -- M0315 reverses on diversity -- and a
+    pooled bar with the three points scattered on it leaves the reader to
+    pair them up by eye. Three groups of two says it directly.
+
+    Arms with replicate seeds (plain RL has two) are averaged within the
+    backbone, since the bar is that backbone's value for that arm.
     """
-    for site in sorted(set(d.site)):
-        g = d[d.site == site]
-        pts = {}
-        for arm in arms:
-            h = g[g.arm == arm]
-            if len(h):
-                pts[arm] = (h.subs.mean(), h.pass_rate.mean())
-        if len(pts) < len(arms):
-            continue
-        (x0, y0), (x1, y1) = pts[arms[0]], pts[arms[1]]
-        ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
-                    arrowprops=dict(arrowstyle="-|>", color=INK["ghost"],
-                                    lw=1.2, shrinkA=6, shrinkB=8), zorder=2)
-        for arm in arms:
-            x, y = pts[arm]
-            ax.plot(x, y, MARK[site], ms=6.5, mfc=ARMC[arm], mec=ARMC[arm],
-                    mew=1.3, ls="none", zorder=4)
+    n = len(arms)
+    width = 0.78 / n
+    for j, arm in enumerate(arms):
+        xs, ys = [], []
+        for i, site in enumerate(SITES):
+            g = d[(d.site == site) & (d.arm == arm)]
+            if not len(g):
+                continue
+            xs.append(i + (j - (n - 1) / 2) * width)
+            ys.append(g[col].mean())
+        ax.bar(xs, ys, width=width * 0.88, color=ARMC[arm], alpha=0.85,
+               edgecolor="white", linewidth=0.6, zorder=2,
+               label=ARM_LABEL[arm] if legend else None)
+        for x, y in zip(xs, ys):
+            ax.text(x, y, " " + fmt.format(y), rotation=90, ha="center",
+                    va="bottom", fontsize=fs(6), color=ARMC[arm], zorder=4)
 
-    _tidy(ax, ylab="Recombinants passing (%)",
-          xlab="Distinct substitutions (rarefied)")
-    ax.set_ylim(0, 108)
+    ax.set_xticks(range(len(SITES)))
+    ax.set_xticklabels(SITES, fontsize=fs(6.5))
+    ax.tick_params(axis="x", length=0)
+    ax.set_xlim(-0.6, len(SITES) - 0.4)
+    _tidy(ax, ylab=ylab)
+    if legend:
+        ax.legend(fontsize=fs(6.5), loc="upper left", frameon=False,
+                  handlelength=1.0, borderpad=0.0, labelspacing=0.25,
+                  handletextpad=0.4)
+
+
+def panel_pass(ax, d, arms=("sampled", "chimera")):
+    """Recombinant pass rate, per backbone. The headline, and unambiguous.
+
+    Every backbone gains, and the smallest gain is M0097's +26.2 points.
+    """
+    _grouped_bars(ax, d, "pass_rate", "Recombinants passing (%)", arms,
+                  legend=True)
+    ax.set_ylim(0, 132)
+
+
+def panel_diversity(ax, d, arms=("sampled", "chimera")):
+    """Rarefied distinct substitutions over PASSING members, per backbone.
+
+    THIS PANEL DOES NOT SAY WHAT THE DRAFT ASSUMES, which is the reason to
+    draw it per backbone rather than pooled. Post-training widens coverage on
+    M0097 (855 -> 1214) and M0255 (608 -> 704) and NARROWS it on M0315
+    (1237 -> 1054), while taking that backbone's pass rate to 98.4%. Two of
+    three gain on both axes; the third trades diversity for fold rate.
+
+    Rarefied because an arm that passes more often has more survivors to find
+    substitutions in. Every arm on a backbone is subsampled to a common
+    survivor count first, so a difference is coverage and not sample size.
+    """
+    _grouped_bars(ax, d, "subs", "Distinct substitutions\n(rarefied)", arms)
+    ax.set_ylim(0, 1750)
+
+
+def panel_motif_var(ax, md, arms=("sampled", "chimera")):
+    """How tightly each library holds its catalytic atoms.
+
+    y is `rfd2_motif_rmsd` -- the predicted motif's RMSD to the theozyme it
+    was scaffolded around -- one point per DESIGN, averaged over its five
+    diffusion samples. Its SPREAD is the quantity: a library whose members
+    all place the catalytic atoms in the same place has a tight box, whatever
+    its median.
+
+    LOG y, because the stock arm has a tail the post-trained arm does not.
+    M0315's worst stock design sits at 53 A against a 1.83 A median; on a
+    linear axis that single design sets the scale and flattens every box into
+    a line. The log axis is the honest way to show a distribution whose
+    spread IS the result.
+
+    Box is median and IQR, whiskers 5th-95th percentile. Reported over EVERY
+    design, not only passing ones -- conditioning on passing truncates at the
+    pass threshold and manufactures exactly the variance reduction being
+    claimed, since the post-trained arm passes more often and so keeps more
+    of its own tail.
+    """
+    width = 0.34
+    for j, arm in enumerate(arms):
+        for i, site in enumerate(SITES):
+            v = md[(md.site == site) & (md.arm == arm)].rmsd.to_numpy()
+            if not len(v):
+                continue
+            x = i + (j - (len(arms) - 1) / 2) * width
+            q1, med, q3 = np.percentile(v, [25, 50, 75])
+            lo, hi = np.percentile(v, [5, 95])
+            c = ARMC[arm]
+            ax.plot([x, x], [lo, hi], color=c, lw=0.9, zorder=3,
+                    solid_capstyle="butt")
+            ax.add_patch(plt.Rectangle(
+                (x - width * 0.36, q1), width * 0.72, q3 - q1,
+                facecolor=c, alpha=0.55, edgecolor=c, linewidth=0.8,
+                zorder=4))
+            ax.plot([x - width * 0.36, x + width * 0.36], [med, med],
+                    color="white", lw=1.2, zorder=5, solid_capstyle="butt")
+
+    # The benchmark's own criterion. Everything in this panel is a distance
+    # to a theozyme, and 1.5 A is where AME calls a motif recovered -- so the
+    # line is the reason the spread matters, not an annotation on top of it.
+    ax.axhline(1.5, color=PALETTE["red"], lw=0.9, ls=(0, (3, 2)), zorder=2)
+    ax.text(len(SITES) - 0.45, 1.56, "1.5 A", fontsize=fs(6),
+            color=PALETTE["red"], ha="right", va="bottom")
+
+    ax.set_yscale("log")
+    ax.set_ylim(0.3, 60)
+    ax.set_yticks([0.5, 1, 2, 5, 10, 50])
+    ax.set_yticklabels(["0.5", "1", "2", "5", "10", "50"])
+    ax.set_xticks(range(len(SITES)))
+    ax.set_xticklabels(SITES, fontsize=fs(6.5))
+    ax.tick_params(axis="x", length=0)
+    ax.set_xlim(-0.6, len(SITES) - 0.4)
+    _tidy(ax, ylab="Motif RMSD to theozyme (A)")
 
     from matplotlib.lines import Line2D
-    arm_h = [Line2D([], [], marker="o", ms=5.5, mfc=ARMC[a], mec=ARMC[a],
-                    ls="none", label=lab) for a, lab in zip(arms, labels)]
-    site_h = [Line2D([], [], marker=MARK[s], ms=5.0, mfc="none",
-                     mec=INK["muted"], mew=1.1, ls="none", label=s)
-              for s in sorted(set(d.site))]
-    leg = ax.legend(handles=arm_h, fontsize=fs(6.5), loc="upper left",
-                    frameon=False, handletextpad=0.4, labelspacing=0.25,
-                    borderpad=0.0)
-    ax.add_artist(leg)
-    ax.legend(handles=site_h, fontsize=fs(6.5), loc="lower right",
-              frameon=False, handletextpad=0.4, labelspacing=0.25,
-              borderpad=0.0, ncol=3, columnspacing=0.8)
+    ax.legend(handles=[Line2D([], [], marker="s", ms=5, mfc=ARMC[a],
+                              mec=ARMC[a], ls="none", label=ARM_LABEL[a])
+                       for a in arms],
+              fontsize=fs(6.5), loc="upper left", frameon=False,
+              handlelength=0.8, borderpad=0.0, labelspacing=0.22,
+              handletextpad=0.4)
 
 
 # ================================================================ panel (g)
@@ -386,8 +469,8 @@ def collect_space(site="M0097", seed=0):
               .sequence.iloc[0])
 
     groups = [("single + double", _mutant_library(parent, rng)),
-              ("stock MPNN", sp.sequence.tolist()),
-              ("chimera + pool", pp.sequence.tolist())]
+              ("stock ProteinMPNN", sp.sequence.tolist()),
+              ("This work", pp.sequence.tolist())]
 
     # ONE matrix, centred and decomposed ONCE. That is what puts the three
     # libraries in the same space -- three PCAs fitted separately would give
@@ -415,9 +498,9 @@ def panel_space(ax, d, var, pz):
     and the post-trained library is a tight cloud somewhere else entirely.
     """
     colour = {"single + double": PALETTE["red"],
-              "stock MPNN": INK["muted"],
-              "chimera + pool": SEQUENTIAL[3]}
-    for arm in ("single + double", "stock MPNN", "chimera + pool"):
+              "stock ProteinMPNN": INK["muted"],
+              "This work": SEQUENTIAL[3]}
+    for arm in ("single + double", "stock ProteinMPNN", "This work"):
         g = d[d.arm == arm]
         ax.plot(g.pc1, g.pc2, "o", ms=2.4, mfc=colour[arm], mec="none",
                 alpha=0.55, ls="none", rasterized=True, zorder=3, label=arm)
@@ -469,6 +552,7 @@ def panel_k(ax):
 
 def main():
     arms = AA.collect()
+    md = MV.design_means()
     space, var, pz = collect_space()
 
     fig = plt.figure(figsize=(PAGE_WIDTH_IN, 9.4))
@@ -487,25 +571,30 @@ def main():
     # (d) DNA cost, (e) the trade-off. (d) takes the wider cell: its four
     # price labels are spread along the 10^12 reference line, so its aspect
     # is load-bearing rather than cosmetic -- squeezed, they collide.
-    r3 = outer[2].subgridspec(1, 2, width_ratios=[1.55, 1.0], wspace=0.34)
-    panel_cost(fig.add_subplot(r3[0, 0]))
-    panel_tradeoff(fig.add_subplot(r3[0, 1]), arms)
-
-    # (f) fold cost, (g) sequence space, (h) granularity.
-    r4 = outer[3].subgridspec(1, 3, width_ratios=[1.0, 1.15, 1.15],
+    r3 = outer[2].subgridspec(1, 3, width_ratios=[1.75, 1.0, 1.0],
                               wspace=0.46)
-    panel_folds(fig.add_subplot(r4[0, 0]))
-    panel_space(fig.add_subplot(r4[0, 1]), space, var, pz)
-    panel_k(fig.add_subplot(r4[0, 2]))
+    panel_cost(fig.add_subplot(r3[0, 0]))
+    panel_pass(fig.add_subplot(r3[0, 1]), arms)
+    panel_diversity(fig.add_subplot(r3[0, 2]), arms)
+
+    # (g) catalytic-atom spread, (h) fold cost, (i) sequence space,
+    # (j) granularity.
+    r4 = outer[3].subgridspec(1, 4, width_ratios=[1.0, 0.9, 1.05, 1.05],
+                              wspace=0.58)
+    panel_motif_var(fig.add_subplot(r4[0, 0]), md)
+    panel_folds(fig.add_subplot(r4[0, 1]))
+    panel_space(fig.add_subplot(r4[0, 2]), space, var, pz)
+    panel_k(fig.add_subplot(r4[0, 3]))
 
     # Panel letters in FIGURE coordinates. ax.get_tightbbox under-measures
     # rotated text, which is how panel letters end up sitting on y-labels --
     # so these are placed explicitly against the gridspec rows rather than
     # measured off each axes.
-    for letter, (x, y) in zip("abcdefgh", [
+    for letter, (x, y) in zip("abcdefghij", [
             (0.008, 0.980), (0.008, 0.805), (0.632, 0.805),
-            (0.008, 0.545), (0.620, 0.545), (0.008, 0.272),
-            (0.355, 0.272), (0.690, 0.272)]):
+            (0.008, 0.545), (0.430, 0.545), (0.705, 0.545),
+            (0.008, 0.272), (0.265, 0.272), (0.505, 0.272),
+            (0.755, 0.272)]):
         fig.text(x, y, f"({letter})", fontsize=fs(9), fontweight="bold",
                  ha="left", va="top")
 

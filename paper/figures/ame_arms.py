@@ -48,8 +48,18 @@ BB = {"M0097": "run_M0097_1ctt_cond9_14",
       "M0255": "run_M0255_1mg5_cond17_66",
       "M0315": "run_M0315_1ey3_cond18_25"}
 
-# Arm -> list of (label, path template). A list because plain RL is two seeds.
-ARMS = ("sampled", "plain RL", "chimera")
+# THE COMPARISON IS TWO ARMS: stock ProteinMPNN against the fine-tuned
+# policy. `plain RL` -- GRPO on whole sequences, RF3 only -- is a real arm
+# with real data and it is deliberately NOT in the default set. It answers a
+# different question (does fragment-level credit beat sequence-level credit)
+# and putting a third bar in every panel invites the reader to compare three
+# things when the figure is making one comparison.
+#
+# It is still loadable: pass arms=ARMS_ALL to collect(). Dropping it does not
+# change the rarefaction floor, because the stock arm has the fewest passing
+# members on all three backbones and therefore sets n either way.
+ARMS = ("sampled", "chimera")
+ARMS_ALL = ("sampled", "plain RL", "chimera")
 
 AA = "ACDEFGHIKLMNPQRSTVWY"
 AA_IDX = {a: i for i, a in enumerate(AA)}
@@ -99,7 +109,7 @@ def _distinct_subs(seqs, ref):
                 for j in range(M.shape[1]) if M[i, j] != ref[j]})
 
 
-def collect(draws=200, seed=0):
+def collect(draws=200, seed=0, arms=ARMS):
     """-> one row per (site, arm, seed): pass rate and rarefied diversity.
 
     DIVERSITY IS RAREFIED, and that is the point of care here. Distinct
@@ -113,7 +123,7 @@ def collect(draws=200, seed=0):
     rng = np.random.default_rng(seed)
     rows = []
     for site in BB:
-        loaded = {a: load(site, a) for a in ARMS}
+        loaded = {a: load(site, a) for a in arms}
         if any(not v for v in loaded.values()):
             continue
 
@@ -142,7 +152,7 @@ def collect(draws=200, seed=0):
 
 
 if __name__ == "__main__":
-    d = collect()
+    d = collect(arms=ARMS_ALL)
     print(d.to_string(index=False))
     print()
     print("pooled over backbones (plain RL pools its two seeds too):")

@@ -52,10 +52,12 @@ SIZES = {
     # this panel briefly had, those labels had ~1.5 in of line to spread
     # along instead of ~3.2 and collided. Aspect is the fix, not font size.
     "fig1d_cost": (3.90, 2.05),
-    "fig1e_tradeoff": (2.35, 2.00),
-    "fig1f_foldcost": (2.00, 2.00),
-    "fig1g_seqspace": (3.05, 2.05),
-    "fig1h_granularity": (3.05, 2.05),
+    "fig1e_passrate": (2.20, 2.00),
+    "fig1f_diversity": (2.20, 2.00),
+    "fig1g_motifvar": (2.35, 2.05),
+    "fig1h_foldcost": (2.00, 2.00),
+    "fig1i_seqspace": (3.05, 2.05),
+    "fig1j_granularity": (3.05, 2.05),
 }
 
 # Per-panel axes margins. A schematic wants the whole canvas; a plot needs
@@ -65,10 +67,12 @@ MARGIN = {
     "fig1b_shuffling": dict(left=0.01, right=0.99, top=0.98, bottom=0.02),
     "fig1c_objective": dict(left=0.02, right=0.98, top=0.98, bottom=0.02),
     "fig1d_cost": dict(left=0.135, right=0.968, top=0.965, bottom=0.215),
-    "fig1e_tradeoff": dict(left=0.205, right=0.975, top=0.97, bottom=0.185),
-    "fig1f_foldcost": dict(left=0.265, right=0.975, top=0.97, bottom=0.215),
-    "fig1g_seqspace": dict(left=0.145, right=0.985, top=0.97, bottom=0.175),
-    "fig1h_granularity": dict(left=0.145, right=0.985, top=0.97, bottom=0.175),
+    "fig1e_passrate": dict(left=0.235, right=0.975, top=0.97, bottom=0.115),
+    "fig1f_diversity": dict(left=0.285, right=0.975, top=0.97, bottom=0.115),
+    "fig1g_motifvar": dict(left=0.235, right=0.975, top=0.97, bottom=0.115),
+    "fig1h_foldcost": dict(left=0.265, right=0.975, top=0.97, bottom=0.215),
+    "fig1i_seqspace": dict(left=0.145, right=0.985, top=0.97, bottom=0.175),
+    "fig1j_granularity": dict(left=0.145, right=0.985, top=0.97, bottom=0.175),
 }
 
 
@@ -77,10 +81,12 @@ WHAT = {
     "fig1b_shuffling": "the shuffling step and the rotation rule",
     "fig1c_objective": "the per-fragment GRPO objective",
     "fig1d_cost": "library size vs DNA spend, whole gene and k=2/4/8",
-    "fig1e_tradeoff": "diversity vs pass rate, stock -> post-trained",
-    "fig1f_foldcost": "oracle calls vs library size: filter vs train",
-    "fig1g_seqspace": "one PCA of one-hot sequences, M0097",
-    "fig1h_granularity": "retention vs k, trained at each k",
+    "fig1e_passrate": "recombinant pass rate, per backbone",
+    "fig1f_diversity": "rarefied distinct substitutions, per backbone",
+    "fig1g_motifvar": "spread of motif RMSD, stock vs post-trained",
+    "fig1h_foldcost": "oracle calls vs library size: filter vs train",
+    "fig1i_seqspace": "one PCA of one-hot sequences, M0097",
+    "fig1j_granularity": "retention vs k, trained at each k",
 }
 
 
@@ -181,28 +187,42 @@ def panel_d():
 
 
 def panel_e(arms):
-    stem = "fig1e_tradeoff"
+    stem = "fig1e_passrate"
     fig, ax = _fig(stem)
-    F1.panel_tradeoff(ax, arms)
+    F1.panel_pass(ax, arms)
     _write(fig, stem)
 
 
-def panel_f(_arms=None):
-    stem = "fig1f_foldcost"
+def panel_f(arms):
+    stem = "fig1f_diversity"
+    fig, ax = _fig(stem)
+    F1.panel_diversity(ax, arms)
+    _write(fig, stem)
+
+
+def panel_motifvar(md):
+    stem = "fig1g_motifvar"
+    fig, ax = _fig(stem)
+    F1.panel_motif_var(ax, md)
+    _write(fig, stem)
+
+
+def panel_foldcost():
+    stem = "fig1h_foldcost"
     fig, ax = _fig(stem)
     F1.panel_folds(ax)
     _write(fig, stem)
 
 
 def panel_g(space, var, pz):
-    stem = "fig1g_seqspace"
+    stem = "fig1i_seqspace"
     fig, ax = _fig(stem)
     F1.panel_space(ax, space, var, pz)
     _write(fig, stem)
 
 
 def panel_h():
-    stem = "fig1h_granularity"
+    stem = "fig1j_granularity"
     fig, ax = _fig(stem)
     F1.panel_k(ax)
     _write(fig, stem)
@@ -213,6 +233,7 @@ def main():
     # collect_space() runs an SVD over ~1,200 one-hot sequences. Neither
     # should run eight times.
     arms = AA.collect()
+    md = F1.MV.design_means()
     space, var, pz = F1.collect_space()
 
     panel_a()
@@ -220,7 +241,9 @@ def main():
     panel_c()
     panel_d()
     panel_e(arms)
-    panel_f()
+    panel_f(arms)
+    panel_motifvar(md)
+    panel_foldcost()
     panel_g(space, var, pz)
     panel_h()
 

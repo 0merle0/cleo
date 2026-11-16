@@ -33,10 +33,17 @@ A note on panel letters: the draft writes `figure 1?` throughout because
 there was nothing to point at. Figure 1's letters are now fixed, so the
 prose can be pointed at them:
 
-    (a) three landscapes        (e) diversity vs pass rate
-    (b) fragment shuffling      (f) oracle calls vs library size
-    (c) the GRPO objective      (g) where in sequence space
-    (d) DNA cost at several k   (h) how fine it can be cut
+    (a) three landscapes (2D)   (f) diversity, per backbone
+    (b) fragment shuffling      (g) catalytic-atom spread
+    (c) the GRPO objective      (h) oracle calls vs library size
+    (d) DNA cost at several k   (i) where in sequence space
+    (e) pass rate, per backbone (j) how fine it can be cut
+
+**Every arm comparison in Figure 1 is two arms: stock ProteinMPNN against
+"This work".** `plain RL` -- GRPO on whole sequences, RF3 only -- is real and
+is kept loadable (`ame_arms.ARMS_ALL`), but it answers a different question
+(does fragment-level credit beat sequence-level credit) and a third bar in
+every panel invites a three-way comparison the figure is not making.
 
 **Panel (e) is per-backbone on purpose; (h) is pooled.** (e) is a scatter —
 diversity on x, pass rate on y, one point per backbone per arm, with an
@@ -239,40 +246,75 @@ for the best design is a coincidence of this dataset, not corroboration.
 ## 7. Figure 1(f) contradicts the draft, and the draft should change
 
 The draft says post-training "increase[s] success from these backbones ...
-and increase[s] diversity as well". The first half holds. The second does
-not, and the panel now shows why.
+and increase[s] diversity as well". The first half holds everywhere. The
+second does not, and the panel now shows it per backbone rather than pooled.
 
-Rarefied distinct substitutions over passing recombinants, every arm
+Rarefied distinct substitutions over passing recombinants, each arm
 subsampled to a common survivor count on each backbone:
 
-| backbone | stock MPNN | plain RL (s2 / s3) | chimera + pool |
-|---|---:|---:|---:|
-| M0097 | 855 | 1726 / 1723 | 1214 |
-| M0255 | 608 | 832 / 851 | 704 |
-| M0315 | **1237** | 1467 / 1456 | **1054** |
-| pooled | 900.0 | 1342.4 | 990.6 |
+| backbone | stock ProteinMPNN | This work | pass rate |
+|---|---:|---:|---|
+| M0097 | 853 | **1199** | 60 -> 86 |
+| M0255 | 608 | **700** | 26 -> 86 |
+| M0315 | **1238** | 1045 | 50 -> 98 |
 
-Two things follow:
+**Pass rate gains on all three; diversity gains on two and falls on the
+third.** M0315 trades 193 distinct substitutions for +48 points of fold
+rate. The defensible sentence is: fine-tuning for recombination raises the
+fraction of the library that folds on every backbone, while holding
+diversity at or above stock ProteinMPNN on 2 of 3. The stronger one is not
+supported.
 
-1. **The chimera arm does not win diversity.** Plain RL carries more
-   distinct substitutions than it does on all three backbones. Training for
-   recombination buys pass rate — 45.1 to 90.1 pooled, which is the real
-   result — and it does not also buy coverage.
-2. **It loses diversity outright on M0315**, 1054 against stock MPNN's 1237,
-   while taking that backbone's pass rate to 98.4%. This is the same trade
-   `panel_vanilla.py` already recorded as "up and to the LEFT": +48.8 points
-   of success for 193 fewer distinct mutations.
-
-**Suggested claim:** post-training for recombination raises the fraction of
-the library that folds from 45% to 90% pooled, while holding diversity at or
-above stock ProteinMPNN on 2 of 3 backbones. That is defensible and the
-figure supports it. The stronger sentence is not.
-
-### Which chimera arm the numbers come from
+### Which fine-tuned arm the numbers come from
 
 `key_results.md` §6 quotes 96.9 / 82.4 / 100.0 for the chimera objective.
-That is **`fragb32`**, evaluated as a 256-parent library (T2). Figure 1(e)
-uses **`fragk4`** — 85.9 / 85.9 / 98.4 — because it is scored through the
-same `recomb` pipeline as the two arms it is being compared against. The two
-are different arms and the figure should quote the ones computed identically
-to their own comparators. Do not mix them in one sentence.
+That is **`fragb32`**, evaluated as a 256-parent library (T2). Figure 1 uses
+**`fragk4`** -- 86 / 86 / 98 -- because it is scored through the same
+`recomb` pipeline as the stock arm it is compared against. Different arms;
+do not mix them in one sentence.
+
+---
+
+## 8. Catalytic-atom spread: the measured version of the PETase claim
+
+The PETase section claims in prose that post-training "drastically reduces
+variance and improves positioning ... of active site residues". On AME that
+is measurable, and it is Figure 1(g).
+
+`rfd2_motif_rmsd` is the predicted motif's RMSD to the theozyme it was
+scaffolded around. Each design is folded best-of-5, so the spread decomposes
+(`motif_variance.py`), over EVERY design rather than only passing ones --
+conditioning on passing truncates at the threshold and would manufacture the
+very reduction being claimed:
+
+| backbone | arm | median | sd between designs | IQR | frac <= 1.5 A |
+|---|---|---:|---:|---:|---:|
+| M0097 | stock | 1.59 | 1.59 | 0.62 | 0.42 |
+| M0097 | **this work** | 1.32 | **0.77** | **0.19** | **0.82** |
+| M0255 | stock | 2.10 | 1.19 | 0.90 | 0.15 |
+| M0255 | **this work** | 1.39 | **0.50** | **0.24** | **0.73** |
+| M0315 | stock | 1.83 | 5.04 | 0.69 | 0.23 |
+| M0315 | **this work** | 0.92 | **0.38** | **0.10** | **0.97** |
+
+Between-design spread falls **2.1x / 2.4x / 13.4x**; the IQR, which is not
+moved by the tail, falls **3.3x / 3.8x / 7.0x**. The claim holds, and holds
+strongly.
+
+**Two things to state with it.**
+
+1. **The gain is between designs, not within one.** The within-design
+   spread -- across the five diffusion samples of a single sequence -- goes
+   0.33 to 0.42 on M0097, i.e. slightly UP. Fine-tuning tightens the
+   *library*, not the oracle's reproducibility on a given sequence. That is
+   the right claim and the stronger-sounding one would be wrong.
+2. **M0315's stock sd of 5.04 is a tail, not a typical design.** Its worst
+   stock design sits at 53 A against a 1.83 A median. Quote the IQR (0.69 ->
+   0.10) as the robust statement and let the log axis carry the tail.
+
+**This is not a per-atom RMSF**, and cannot be made into one from what is on
+disk. A per-atom figure needs the predicted structures, and
+`r1panel/recomb/folds/` is empty -- the stock arm's CIFs were deleted and no
+tarball survives, so every `af3_path` in that arm points at a missing file.
+Recovering it means re-folding 256 designs x best-of-5 x 3 backbones =
+**3,840 AF3 predictions**. Worth doing if a per-atom panel is wanted; the
+scalar spread above is what today's data supports.
