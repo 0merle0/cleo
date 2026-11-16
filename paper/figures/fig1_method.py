@@ -10,10 +10,11 @@ concept, the method and the AME benchmark together, which is what every
     (c) the GRPO objective    (g) where in sequence space
     (d) DNA cost at several k (h) how fine it can be cut
 
-(e) is pooled and (f) is not, for a stated reason: on pass rate the three
-backbones agree, so the bar is the headline and the points are corroboration;
-on diversity they disagree -- M0315 loses -- and a pooled bar would hide the
-one cell worth asking about. (j) is pooled, with a min-max band.
+(e) and (f) are both pooled, each with its three backbones drawn on the
+bars. On pass rate the three agree and the points corroborate; on diversity
+they do NOT -- M0315 falls while the mean rises -- so on (f) the points are
+the result and the panel must never be shown without them. (j) is pooled
+with a min-max band.
 
 Eight panels makes this a tall figure -- 9.4 in against a 6.5 in page. If it
 has to come down, (d) is the panel whose argument the text can carry alone.
@@ -42,9 +43,16 @@ from palette import (FRAGMENT, INK, PAGE_WIDTH_IN, PALETTE,  # noqa: E402
 # Arm colours, used in (e) and (g) so one arm is one colour throughout.
 # Stock MPNN is grey: it is the control and should sit back rather than
 # compete with the trained arms for weight.
+# ONE blue for this method, a step darker than the mid ramp, used in every
+# panel where the method appears -- the bars, the trained-at-k curve, the
+# sequence-space cloud, the motif boxes, the post-train line in the cost
+# panel. A method that is two different blues across one figure reads as two
+# different things.
+METHOD = SEQUENTIAL[4]
+
 ARMC = {"sampled": INK["muted"],
         "plain RL": PALETTE["yellow"],
-        "chimera": SEQUENTIAL[3]}
+        "chimera": METHOD}
 MARK = {"M0097": "o", "M0255": "s", "M0315": "^"}
 
 
@@ -267,7 +275,7 @@ def panel_folds(ax):
         ax.plot(S, COST.brute_force_folds(S, p), lw=1.0,
                 color=INK["muted"], alpha=0.8, zorder=2)
     ax.plot([], [], lw=1.0, color=INK["muted"], label="fold every candidate")
-    ax.axhline(COST.TRAIN_FOLDS, color=SEQUENTIAL[3], lw=1.6, zorder=3,
+    ax.axhline(COST.TRAIN_FOLDS, color=METHOD, lw=1.6, zorder=3,
                label="post-train once")
 
     lo, hi = (COST.crossover(p) for p in (0.258, 0.598))
@@ -292,6 +300,7 @@ def panel_folds(ax):
 # panel (a). One name for one thing across the whole figure.
 ARM_LABEL = {"sampled": "stock ProteinMPNN", "plain RL": "plain RL",
              "chimera": "This work"}
+
 SITES = ("M0097", "M0255", "M0315")
 
 
@@ -334,70 +343,84 @@ def _grouped_bars(ax, d, col, ylab, arms, legend=False, fmt="{:.0f}"):
                   handletextpad=0.4)
 
 
-def panel_pass(ax, d, arms=("sampled", "chimera")):
-    """Recombinant pass rate, POOLED over the three backbones.
+def _pooled_bars(ax, d, col, ylab, arms, legend=False):
+    """One bar per arm, pooled over backbones, with the backbones on it.
 
-    One bar per arm, with the three backbones kept as points on it. Pooled
-    because this is the panel where the three agree: every backbone gains,
-    the smallest gain is +26 points, and the bar is the headline. The points
-    stay so the gain is visibly a property of all three and not an average
-    rescued by one of them.
+    The bar is the mean over the three backbones; the points are the three
+    values it is made of. Both are needed: the bar is the claim and the
+    points are what stops it being an average rescued by one backbone.
 
-    (f) is deliberately NOT pooled, because there the three disagree -- M0315
-    loses diversity -- and a pooled bar would hide the one cell worth asking
-    about. Same data, different treatment, for a stated reason.
+    No value labels. They were tried inside the bars in white and above
+    them in colour; the first fails when a figure is printed or downsampled,
+    the second lands in the points. The axis carries the numbers.
     """
     xs = np.arange(len(arms))
     for x, arm in zip(xs, arms):
         g = d[d.arm == arm]
-        ax.bar(x, g.pass_rate.mean(), width=0.56, color=ARMC[arm], alpha=0.85,
-               edgecolor="white", linewidth=0.6, zorder=2)
-        # Inside the bar, not above it: above, the number lands in the
-        # cloud of per-backbone points and collides with whichever one sits
-        # nearest the mean.
-        ax.text(x, g.pass_rate.mean() * 0.5, f"{g.pass_rate.mean():.0f}",
-                fontsize=fs(8), ha="center", va="center", color="white",
-                fontweight="bold", zorder=5)
+        m = g[col].mean()
+        # Solid fill, no alpha: alpha over white makes a FOURTH blue that is
+        # not in the ramp, which is how a figure ends up with the cost plot's
+        # k=4 line and this bar looking like different colours.
+        ax.bar(x, m, width=0.56, color=ARMC[arm], edgecolor="white",
+               linewidth=0.6, zorder=2)
+
+        pts = []
         for i, site in enumerate(SITES):
             h = g[g.site == site]
             if not len(h):
                 continue
-            ax.plot(x + np.linspace(-0.16, 0.16, len(SITES))[i],
-                    h.pass_rate.mean(), MARK[site], ms=4.2, mfc="white",
-                    mec="#3F4A56", mew=1.0, zorder=4)
+            v = h[col].mean()
+            pts.append(v)
+            ax.plot(x + np.linspace(-0.16, 0.16, len(SITES))[i], v,
+                    MARK[site], ms=4.2, mfc="white", mec=INK["ink"],
+                    mew=1.0, zorder=4)
+
+        _ = pts
 
     ax.set_xticks(xs)
     ax.set_xticklabels([ARM_LABEL[a].replace(" ", "\n", 1) for a in arms],
                        fontsize=fs(6.5))
     ax.tick_params(axis="x", length=0)
     ax.set_xlim(-0.6, len(arms) - 0.4)
-    ax.set_ylim(0, 118)
-    _tidy(ax, ylab="Recombinants passing (%)")
+    _tidy(ax, ylab=ylab)
 
-    from matplotlib.lines import Line2D
-    ax.legend(handles=[Line2D([], [], marker=MARK[s_], ms=4.2, mfc="white",
-                              mec="#3F4A56", mew=1.0, ls="none", label=s_)
-                       for s_ in SITES],
-              fontsize=fs(6), loc="upper left", frameon=False,
-              handlelength=0.8, borderpad=0.0, labelspacing=0.2,
-              handletextpad=0.4)
+    if legend:
+        from matplotlib.lines import Line2D
+        ax.legend(handles=[Line2D([], [], marker=MARK[s_], ms=4.2,
+                                  mfc="white", mec=INK["ink"], mew=1.0,
+                                  ls="none", label=s_) for s_ in SITES],
+                  fontsize=fs(6), loc="upper left", frameon=False,
+                  handlelength=0.8, borderpad=0.0, labelspacing=0.2,
+                  handletextpad=0.4)
+
+
+def panel_pass(ax, d, arms=("sampled", "chimera")):
+    """Recombinant pass rate, pooled over the three backbones.
+
+    All three gain, and the smallest gain is +26 points, so the bar is the
+    headline and the points corroborate it.
+    """
+    ax.set_ylim(0, 108)
+    _pooled_bars(ax, d, "pass_rate", "Recombinants passing (%)", arms,
+                 legend=True)
 
 
 def panel_diversity(ax, d, arms=("sampled", "chimera")):
-    """Rarefied distinct substitutions over PASSING members, per backbone.
+    """Rarefied distinct substitutions over PASSING members, pooled.
 
-    THIS PANEL DOES NOT SAY WHAT THE DRAFT ASSUMES, which is the reason to
-    draw it per backbone rather than pooled. Post-training widens coverage on
-    M0097 (855 -> 1214) and M0255 (608 -> 704) and NARROWS it on M0315
-    (1237 -> 1054), while taking that backbone's pass rate to 98.4%. Two of
-    three gain on both axes; the third trades diversity for fold rate.
+    THE POINTS ARE LOAD-BEARING HERE IN A WAY THEY ARE NOT IN (e). The bars
+    say diversity rises, 900 -> 981. The points say that is two backbones
+    rising and ONE FALLING: M0315 goes 1238 -> 1045 while its pass rate goes
+    to 98%. The pooled bar alone would support a claim the data does not --
+    see figure_plan_story.md section 7 -- so this panel must never be shown
+    with the points stripped off.
 
     Rarefied because an arm that passes more often has more survivors to find
     substitutions in. Every arm on a backbone is subsampled to a common
     survivor count first, so a difference is coverage and not sample size.
     """
-    _grouped_bars(ax, d, "subs", "Distinct substitutions\n(rarefied)", arms)
-    ax.set_ylim(0, 1750)
+    ax.set_ylim(0, 1450)
+    _pooled_bars(ax, d, "subs", "Distinct substitutions\n(rarefied)", arms)
 
 
 def panel_motif_var(ax, md, arms=("sampled", "chimera")):
@@ -406,20 +429,17 @@ def panel_motif_var(ax, md, arms=("sampled", "chimera")):
     y is `rfd2_motif_rmsd` -- the predicted motif's RMSD to the theozyme it
     was scaffolded around -- one point per DESIGN, averaged over its five
     diffusion samples. Its SPREAD is the quantity: a library whose members
-    all place the catalytic atoms in the same place has a tight box, whatever
-    its median.
+    all place the catalytic atoms in the same place has a tight box,
+    whatever its median.
 
-    LOG y, because the stock arm has a tail the post-trained arm does not.
-    M0315's worst stock design sits at 53 A against a 1.83 A median; on a
-    linear axis that single design sets the scale and flattens every box into
-    a line. The log axis is the honest way to show a distribution whose
-    spread IS the result.
+    LOG y, because the stock arm has a tail the method does not. M0315's
+    worst stock design sits at 53 A against a 1.83 A median; on a linear
+    axis that one design sets the scale and flattens every box to a line.
 
-    Box is median and IQR, whiskers 5th-95th percentile. Reported over EVERY
-    design, not only passing ones -- conditioning on passing truncates at the
-    pass threshold and manufactures exactly the variance reduction being
-    claimed, since the post-trained arm passes more often and so keeps more
-    of its own tail.
+    Box is median and IQR, whiskers 5th-95th percentile. Over EVERY design,
+    not only passing ones -- conditioning on passing truncates at the pass
+    threshold and manufactures the very reduction being claimed, since the
+    method passes more often and so keeps more of its own tail.
     """
     width = 0.34
     for j, arm in enumerate(arms):
@@ -440,9 +460,8 @@ def panel_motif_var(ax, md, arms=("sampled", "chimera")):
             ax.plot([x - width * 0.36, x + width * 0.36], [med, med],
                     color="white", lw=1.2, zorder=5, solid_capstyle="butt")
 
-    # The benchmark's own criterion. Everything in this panel is a distance
-    # to a theozyme, and 1.5 A is where AME calls a motif recovered -- so the
-    # line is the reason the spread matters, not an annotation on top of it.
+    # The benchmark's own criterion: 1.5 A is where AME calls a motif
+    # recovered, so the line is the reason the spread matters.
     ax.axhline(1.5, color=PALETTE["red"], lw=0.9, ls=(0, (3, 2)), zorder=2)
     ax.text(len(SITES) - 0.45, 1.56, "1.5 A", fontsize=fs(6),
             color=PALETTE["red"], ha="right", va="bottom")
@@ -538,7 +557,7 @@ def panel_space(ax, d, var, pz):
     """
     colour = {"single + double": PALETTE["red"],
               "stock ProteinMPNN": INK["muted"],
-              "This work": SEQUENTIAL[3]}
+              "This work": METHOD}
     for arm in ("single + double", "stock ProteinMPNN", "This work"):
         g = d[d.arm == arm]
         ax.plot(g.pc1, g.pc2, "o", ms=2.4, mfc=colour[arm], mec="none",
@@ -571,7 +590,7 @@ def panel_k(ax):
     sampling error.
     """
     d = pd.read_csv(HERE / "data" / "ame_fragk.csv")
-    c = SEQUENTIAL[3]
+    c = METHOD
     g = (d[d.cond == "trained"].groupby("k").retention
          .agg(["mean", "min", "max"]).reset_index())
     ax.fill_between(g.k, 100 * g["min"], 100 * g["max"], color=c,

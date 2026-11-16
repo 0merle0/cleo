@@ -31,8 +31,9 @@ from figio import save  # noqa: E402
 from palette import INK, PAGE_WIDTH_IN, PALETTE, SEQUENTIAL, fs  # noqa: E402
 
 NAIVE = INK["muted"]
-POST = SEQUENTIAL[3]
-LIBC = {PD.LIB2: INK["muted"], PD.LIB3: SEQUENTIAL[3]}
+# Same blue as Figure 1 uses for this method (fig1_method.METHOD).
+POST = SEQUENTIAL[4]
+LIBC = {PD.LIB2: INK["muted"], PD.LIB3: SEQUENTIAL[4]}
 LIBL = {PD.LIB2: "library 2", PD.LIB3: "library 3"}
 
 

@@ -67,7 +67,10 @@ SEQUENTIAL = ["#BADBFD", "#7FBDFA", "#4499E7", "#216CAD", "#004A80", "#002D52"]
 assert SEQUENTIAL[2] == PALETTE["blue"], "ramp must pass through the palette blue"
 
 # Neutrals for context: un-highlighted structure, grid lines, rules.
-INK = {"muted": "#9CA3AF", "grid": "#E5E7EB", "ghost": "#D1D5DB"}
+INK = {"muted": "#9CA3AF", "grid": "#E5E7EB", "ghost": "#D1D5DB",
+       # Dark neutral for marks that sit ON a coloured fill and must
+       # read against both it and white.
+       "ink": "#374151"}
 
 
 # ---------------------------------------------------------------- typography
