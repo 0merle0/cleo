@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="468pt" height="403.2pt" viewBox="0 0 468 403.2" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-11-16T06:32:16.406889</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.8, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 403.2 
+L 468 403.2 
+L 468 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 21.06 164.416 
+L 460.98 164.416 
+L 460.98 12.096 
+L 21.06 12.096 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 35.13744 162.58816 
+L 446.90256 162.58816 
+Q 455.70096 162.58816 455.70096 159.54176 
+L 455.70096 16.97024 
+Q 455.70096 13.92384 446.90256 13.92384 
+L 35.13744 13.92384 
+Q 26.33904 13.92384 26.33904 16.97024 
+L 26.33904 159.54176 
+Q 26.33904 162.58816 35.13744 162.58816 
+z
+" style="fill: #aac32f; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #aac32f; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_1"/>
+   <g id="matplotlib.axis_2"/>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #aac32f" x="445.5828" y="25.484069" transform="rotate(-0 445.5828 25.484069)">data in hand</text>
+   </g>
+   <g id="text_2">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="43.056" y="27.025319" transform="rotate(-0 43.056 27.025319)">(a)</text>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="43.056" y="49.14535" transform="rotate(-0 43.056 49.14535)">Where momi came from: theozyme to an assayed enzyme</text>
+   </g>
+   <g id="text_4">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="43.056" y="64.08535" transform="rotate(-0 43.056 64.08535)">PET polymer docked to catalytic residues -&gt; RFD2 backbone -&gt;</text>
+   </g>
+   <g id="text_5">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="43.056" y="74.999881" transform="rotate(-0 43.056 74.999881)">ProteinMPNN sequence -&gt; geometric filters -&gt; screen -&gt; momi</text>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="43.056" y="85.854256" transform="rotate(-0 43.056 85.854256)">the filters, stated in the draft, belong ON this panel:</text>
+   </g>
+   <g id="text_7">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="43.056" y="96.704256" transform="rotate(-0 43.056 96.704256)">  Ser OG - His NE2 &lt; 3 A      oxyanion contacts &lt; 3.5 A</text>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="43.056" y="107.554256" transform="rotate(-0 43.056 107.554256)">  Asp O(-) - His N &lt; 3.5 A    active-site pLDDT &gt; 80</text>
+   </g>
+   <g id="text_9">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="43.056" y="118.404256" transform="rotate(-0 43.056 118.404256)">momi is LOW activity -- say so here, it is the premise</text>
+   </g>
+   <g id="text_10">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="43.056" y="129.249881" transform="rotate(-0 43.056 129.249881)">of everything downstream</text>
+   </g>
+   <g id="text_11">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #aac32f" x="43.056" y="154.5859" transform="rotate(-0 43.056 154.5859)">structures/png/momi_fold.png, momi_site.png</text>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="patch_4">
+    <path d="M 21.06 389.088 
+L 157.681118 389.088 
+L 157.681118 198.688 
+L 21.06 198.688 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 25.431876 386.8032 
+L 153.309242 386.8032 
+Q 156.041665 386.8032 156.041665 382.9952 
+L 156.041665 204.7808 
+Q 156.041665 200.9728 153.309242 200.9728 
+L 25.431876 200.9728 
+Q 22.699453 200.9728 22.699453 204.7808 
+L 22.699453 382.9952 
+Q 22.699453 386.8032 25.431876 386.8032 
+z
+" style="fill: #fac72c; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #fac72c; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_3"/>
+   <g id="matplotlib.axis_4"/>
+   <g id="text_12">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #fac72c" x="152.899379" y="214.170469" transform="rotate(-0 152.899379 214.170469)">needs deriving</text>
+   </g>
+   <g id="text_13">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="27.891056" y="215.711719" transform="rotate(-0 27.891056 215.711719)">(b)</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif" transform="translate(27.891056 243.44625)">Post-training</text>
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif" transform="translate(27.891056 252.0015)">tightens the reward</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="27.891056" y="274.195469" transform="rotate(-0 27.891056 274.195469)">per-reward distributions,</text>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="27.891056" y="285.045469" transform="rotate(-0 27.891056 285.045469)">naive vs post-trained</text>
+   </g>
+   <g id="text_17">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="27.891056" y="295.895469" transform="rotate(-0 27.891056 295.895469)">the claim is VARIANCE</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="27.891056" y="306.830781" transform="rotate(-0 27.891056 306.830781)">falling, not only the</text>
+   </g>
+   <g id="text_19">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="27.891056" y="317.595469" transform="rotate(-0 27.891056 317.595469)">mean rising -- plot both</text>
+   </g>
+   <g id="text_20">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="27.891056" y="328.445469" transform="rotate(-0 27.891056 328.445469)">or the sentence is</text>
+   </g>
+   <g id="text_21">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="27.891056" y="339.295469" transform="rotate(-0 27.891056 339.295469)">unsupported</text>
+   </g>
+   <g id="text_22">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #fac72c" x="27.891056" y="377.142719" transform="rotate(-0 27.891056 377.142719)">PETase run metrics; cf. panel_vanilla.py</text>
+   </g>
+  </g>
+  <g id="axes_3">
+   <g id="patch_6">
+    <path d="M 172.709441 389.088 
+L 309.330559 389.088 
+L 309.330559 198.688 
+L 172.709441 198.688 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 177.081317 386.8032 
+L 304.958683 386.8032 
+Q 307.691106 386.8032 307.691106 382.9952 
+L 307.691106 204.7808 
+Q 307.691106 200.9728 304.958683 200.9728 
+L 177.081317 200.9728 
+Q 174.348894 200.9728 174.348894 204.7808 
+L 174.348894 382.9952 
+Q 174.348894 386.8032 177.081317 386.8032 
+z
+" style="fill: #fac72c; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #fac72c; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_5"/>
+   <g id="matplotlib.axis_6"/>
+   <g id="text_23">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #fac72c" x="304.54882" y="214.170469" transform="rotate(-0 304.54882 214.170469)">needs deriving</text>
+   </g>
+   <g id="text_24">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="179.540497" y="215.711719" transform="rotate(-0 179.540497 215.711719)">(c)</text>
+   </g>
+   <g id="text_25">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif" transform="translate(179.540497 243.54375)">Catalytic geometry,</text>
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif" transform="translate(179.540497 252.099)">two libraries overlaid</text>
+   </g>
+   <g id="text_26">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="179.540497" y="274.195469" transform="rotate(-0 179.540497 274.195469)">superposed active-site</text>
+   </g>
+   <g id="text_27">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="179.540497" y="285.045469" transform="rotate(-0 179.540497 285.045469)">atoms, naive cloud vs</text>
+   </g>
+   <g id="text_28">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="179.540497" y="295.895469" transform="rotate(-0 179.540497 295.895469)">optimised cloud</text>
+   </g>
+   <g id="text_29">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="179.540497" y="306.745469" transform="rotate(-0 179.540497 306.745469)">same view, same</text>
+   </g>
+   <g id="text_30">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="179.540497" y="317.595469" transform="rotate(-0 179.540497 317.595469)">superposition target,</text>
+   </g>
+   <g id="text_31">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="179.540497" y="328.445469" transform="rotate(-0 179.540497 328.445469)">or the comparison is</text>
+   </g>
+   <g id="text_32">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="179.540497" y="339.380781" transform="rotate(-0 179.540497 339.380781)">an artefact of framing</text>
+   </g>
+   <g id="text_33">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #fac72c" x="179.540497" y="377.142719" transform="rotate(-0 179.540497 377.142719)">render_momi.py; needs both arms folded</text>
+   </g>
+  </g>
+  <g id="axes_4">
+   <g id="patch_8">
+    <path d="M 324.358882 389.088 
+L 460.98 389.088 
+L 460.98 198.688 
+L 324.358882 198.688 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 328.730758 386.8032 
+L 456.608124 386.8032 
+Q 459.340547 386.8032 459.340547 382.9952 
+L 459.340547 204.7808 
+Q 459.340547 200.9728 456.608124 200.9728 
+L 328.730758 200.9728 
+Q 325.998335 200.9728 325.998335 204.7808 
+L 325.998335 382.9952 
+Q 325.998335 386.8032 328.730758 386.8032 
+z
+" style="fill: #aac32f; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #aac32f; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_7"/>
+   <g id="matplotlib.axis_8"/>
+   <g id="text_34">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #aac32f" x="456.198261" y="214.170469" transform="rotate(-0 456.198261 214.170469)">data in hand</text>
+   </g>
+   <g id="text_35">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="331.189938" y="215.711719" transform="rotate(-0 331.189938 215.711719)">(d)</text>
+   </g>
+   <g id="text_36">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif" transform="translate(331.189938 243.54375)">Centring the library</text>
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif" transform="translate(331.189938 252.099)">on known hits</text>
+   </g>
+   <g id="text_37">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="331.189938" y="274.21625" transform="rotate(-0 331.189938 274.21625)">library 3 tethered to the</text>
+   </g>
+   <g id="text_38">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="331.189938" y="285.06625" transform="rotate(-0 331.189938 285.06625)">top-3 measured variants;</text>
+   </g>
+   <g id="text_39">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="331.189938" y="295.91625" transform="rotate(-0 331.189938 295.91625)">library 2 was not</text>
+   </g>
+   <g id="text_40">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="331.189938" y="306.745469" transform="rotate(-0 331.189938 306.745469)">TRAP: the distN tag in a</text>
+   </g>
+   <g id="text_41">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="331.189938" y="317.595469" transform="rotate(-0 331.189938 317.595469)">part name disagrees with</text>
+   </g>
+   <g id="text_42">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="331.189938" y="328.445469" transform="rotate(-0 331.189938 328.445469)">computed distance on</text>
+   </g>
+   <g id="text_43">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="331.189938" y="339.380781" transform="rotate(-0 331.189938 339.380781)">992 of 1803 parts --</text>
+   </g>
+   <g id="text_44">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="331.189938" y="350.145469" transform="rotate(-0 331.189938 350.145469)">compute it, do not read it</text>
+   </g>
+   <g id="text_45">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #aac32f" x="331.189938" y="377.1635" transform="rotate(-0 331.189938 377.1635)">part names; compute real Hamming</text>
+   </g>
+  </g>
+ </g>
+</svg>

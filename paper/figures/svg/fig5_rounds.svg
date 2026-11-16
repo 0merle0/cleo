@@ -1,0 +1,445 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="468pt" height="604.8pt" viewBox="0 0 468 604.8" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-11-16T06:32:21.252457</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.8, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 604.8 
+L 468 604.8 
+L 468 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 21.06 138.604383 
+L 229.552891 138.604383 
+L 229.552891 13.3056 
+L 21.06 13.3056 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 27.731773 137.100797 
+L 222.881118 137.100797 
+Q 227.050976 137.100797 227.050976 134.594822 
+L 227.050976 17.315161 
+Q 227.050976 14.809185 222.881118 14.809185 
+L 27.731773 14.809185 
+Q 23.561915 14.809185 23.561915 17.315161 
+L 23.561915 134.594822 
+Q 23.561915 137.100797 27.731773 137.100797 
+z
+" style="fill: #aac32f; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #aac32f; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_1"/>
+   <g id="matplotlib.axis_2"/>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #aac32f" x="222.25564" y="25.207502" transform="rotate(-0 222.25564 25.207502)">data in hand</text>
+   </g>
+   <g id="text_2">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="31.484645" y="26.748752" transform="rotate(-0 31.484645 26.748752)">(a)</text>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="31.484645" y="44.74185" transform="rotate(-0 31.484645 44.74185)">Round 1: every part on its own</text>
+   </g>
+   <g id="text_4">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="59.820132" transform="rotate(-0 31.484645 59.820132)">each part combined with the four G20 parent parts</text>
+   </g>
+   <g id="text_5">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="70.584819" transform="rotate(-0 31.484645 70.584819)">activity by slot, one distribution per slot</text>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="81.520132" transform="rotate(-0 31.484645 81.520132)">verified: every round-0 row has exactly one non-parent slot</text>
+   </g>
+   <g id="text_7">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #aac32f" x="31.484645" y="130.26045" transform="rotate(-0 31.484645 130.26045)">snapshot round 0 -- 1665 / 1791 designs</text>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="patch_4">
+    <path d="M 252.487109 138.604383 
+L 460.98 138.604383 
+L 460.98 13.3056 
+L 252.487109 13.3056 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 259.158882 137.100797 
+L 454.308227 137.100797 
+Q 458.478085 137.100797 458.478085 134.594822 
+L 458.478085 17.315161 
+Q 458.478085 14.809185 454.308227 14.809185 
+L 259.158882 14.809185 
+Q 254.989024 14.809185 254.989024 17.315161 
+L 254.989024 134.594822 
+Q 254.989024 137.100797 259.158882 137.100797 
+z
+" style="fill: #aac32f; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #aac32f; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_3"/>
+   <g id="matplotlib.axis_4"/>
+   <g id="text_8">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #aac32f" x="453.682749" y="25.207502" transform="rotate(-0 453.682749 25.207502)">data in hand</text>
+   </g>
+   <g id="text_9">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="262.911754" y="26.748752" transform="rotate(-0 262.911754 26.748752)">(b)</text>
+   </g>
+   <g id="text_10">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="262.911754" y="44.8156" transform="rotate(-0 262.911754 44.8156)">Single-body effect vs distance</text>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="59.820132" transform="rotate(-0 262.911754 59.820132)">the draft's claim: parts &gt;4 mutations out still improve</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="70.584819" transform="rotate(-0 262.911754 70.584819)">TRAP: do not use the distN tag -- it disagrees with</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="81.520132" transform="rotate(-0 262.911754 81.520132)">computed distance on 992 of 1803 parts</text>
+   </g>
+   <g id="text_14">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #aac32f" x="262.911754" y="130.26045" transform="rotate(-0 262.911754 130.26045)">same rows; compute Hamming on the varied part</text>
+   </g>
+  </g>
+  <g id="axes_3">
+   <g id="patch_6">
+    <path d="M 21.06 288.962922 
+L 229.552891 288.962922 
+L 229.552891 163.664139 
+L 21.06 163.664139 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 27.731773 287.459336 
+L 222.881118 287.459336 
+Q 227.050976 287.459336 227.050976 284.953361 
+L 227.050976 167.6737 
+Q 227.050976 165.167725 222.881118 165.167725 
+L 27.731773 165.167725 
+Q 23.561915 165.167725 23.561915 167.6737 
+L 23.561915 284.953361 
+Q 23.561915 287.459336 27.731773 287.459336 
+z
+" style="fill: #aac32f; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #aac32f; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_5"/>
+   <g id="matplotlib.axis_6"/>
+   <g id="text_15">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #aac32f" x="222.25564" y="175.566041" transform="rotate(-0 222.25564 175.566041)">data in hand</text>
+   </g>
+   <g id="text_16">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="31.484645" y="177.107291" transform="rotate(-0 31.484645 177.107291)">(c)</text>
+   </g>
+   <g id="text_17">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="31.484645" y="195.07664" transform="rotate(-0 31.484645 195.07664)">Round 2: bin, then draw</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="210.178671" transform="rotate(-0 31.484645 210.178671)">bin1 .. bin6 by single-body efficacy, ~120-165 each</text>
+   </g>
+   <g id="text_19">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="221.028671" transform="rotate(-0 31.484645 221.028671)">plus top2combos: 31 of the 2^5 = 32 exhaustive top-2 builds</text>
+   </g>
+   <g id="text_20">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="231.878671" transform="rotate(-0 31.484645 231.878671)">(the draft writes '25 = 32' -- it means 2^5)</text>
+   </g>
+   <g id="text_21">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="242.728671" transform="rotate(-0 31.484645 242.728671)">expect and show the drop-off; the last bin is ungated,</text>
+   </g>
+   <g id="text_22">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="253.578671" transform="rotate(-0 31.484645 253.578671)">i.e. a random draw from the library</text>
+   </g>
+   <g id="text_23">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #aac32f" x="31.484645" y="280.618989" transform="rotate(-0 31.484645 280.618989)">snapshot round 1 tags</text>
+   </g>
+  </g>
+  <g id="axes_4">
+   <g id="patch_8">
+    <path d="M 252.487109 288.962922 
+L 460.98 288.962922 
+L 460.98 163.664139 
+L 252.487109 163.664139 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 259.158882 287.459336 
+L 454.308227 287.459336 
+Q 458.478085 287.459336 458.478085 284.953361 
+L 458.478085 167.6737 
+Q 458.478085 165.167725 454.308227 165.167725 
+L 259.158882 165.167725 
+Q 254.989024 165.167725 254.989024 167.6737 
+L 254.989024 284.953361 
+Q 254.989024 287.459336 259.158882 287.459336 
+z
+" style="fill: #aac32f; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #aac32f; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_7"/>
+   <g id="matplotlib.axis_8"/>
+   <g id="text_24">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #aac32f" x="453.682749" y="175.566041" transform="rotate(-0 453.682749 175.566041)">data in hand</text>
+   </g>
+   <g id="text_25">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="262.911754" y="177.107291" transform="rotate(-0 262.911754 177.107291)">(d)</text>
+   </g>
+   <g id="text_26">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="262.911754" y="195.10039" transform="rotate(-0 262.911754 195.10039)">Rounds 3-4: the surrogate picks</text>
+   </g>
+   <g id="text_27">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="210.093358" transform="rotate(-0 262.911754 210.093358)">predicted vs measured, coloured by selection strategy</text>
+   </g>
+   <g id="text_28">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="221.028671" transform="rotate(-0 262.911754 221.028671)">lib 2: MLPgamma1/5/8, topkMLP, sampledtopkMLP</text>
+   </g>
+   <g id="text_29">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="231.878671" transform="rotate(-0 262.911754 231.878671)">lib 3: top30mu, top10mu, mostdiverseMuGt3/4</text>
+   </g>
+   <g id="text_30">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="242.643358" transform="rotate(-0 262.911754 242.643358)">gamma is the diversity weight -- a sweep, so plot it as one</text>
+   </g>
+   <g id="text_31">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="253.578671" transform="rotate(-0 262.911754 253.578671)">selection is from the top 1%, not top-k: say why (diversity)</text>
+   </g>
+   <g id="text_32">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #aac32f" x="262.911754" y="280.618989" transform="rotate(-0 262.911754 280.618989)">snapshot rounds 2-4 tags</text>
+   </g>
+  </g>
+  <g id="axes_5">
+   <g id="patch_10">
+    <path d="M 21.06 439.321461 
+L 229.552891 439.321461 
+L 229.552891 314.022678 
+L 21.06 314.022678 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_11">
+    <path d="M 27.731773 437.817875 
+L 222.881118 437.817875 
+Q 227.050976 437.817875 227.050976 435.3119 
+L 227.050976 318.032239 
+Q 227.050976 315.526264 222.881118 315.526264 
+L 27.731773 315.526264 
+Q 23.561915 315.526264 23.561915 318.032239 
+L 23.561915 435.3119 
+Q 23.561915 437.817875 27.731773 437.817875 
+z
+" style="fill: #fac72c; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #fac72c; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_9"/>
+   <g id="matplotlib.axis_10"/>
+   <g id="text_33">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #fac72c" x="222.25564" y="325.92458" transform="rotate(-0 222.25564 325.92458)">needs deriving</text>
+   </g>
+   <g id="text_34">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="31.484645" y="327.46583" transform="rotate(-0 31.484645 327.46583)">(e)</text>
+   </g>
+   <g id="text_35">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="31.484645" y="345.435179" transform="rotate(-0 31.484645 345.435179)">What the search cost</text>
+   </g>
+   <g id="text_36">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="360.53721" transform="rotate(-0 31.484645 360.53721)">~10^4 assayed variants against a &gt;10^12 library</text>
+   </g>
+   <g id="text_37">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="371.38721" transform="rotate(-0 31.484645 371.38721)">the draft's '(put real savings here!)'</text>
+   </g>
+   <g id="text_38">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="382.23721" transform="rotate(-0 31.484645 382.23721)">DECIDE FIRST what greedy means here, or the saving is</text>
+   </g>
+   <g id="text_39">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="393.001897" transform="rotate(-0 31.484645 393.001897)">a number with no denominator</text>
+   </g>
+   <g id="text_40">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #fac72c" x="31.484645" y="430.956747" transform="rotate(-0 31.484645 430.956747)">computable; the greedy comparator needs defining</text>
+   </g>
+  </g>
+  <g id="axes_6">
+   <g id="patch_12">
+    <path d="M 252.487109 439.321461 
+L 460.98 439.321461 
+L 460.98 314.022678 
+L 252.487109 314.022678 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_13">
+    <path d="M 259.158882 437.817875 
+L 454.308227 437.817875 
+Q 458.478085 437.817875 458.478085 435.3119 
+L 458.478085 318.032239 
+Q 458.478085 315.526264 454.308227 315.526264 
+L 259.158882 315.526264 
+Q 254.989024 315.526264 254.989024 318.032239 
+L 254.989024 435.3119 
+Q 254.989024 437.817875 259.158882 437.817875 
+z
+" style="fill: #aac32f; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #aac32f; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_11"/>
+   <g id="matplotlib.axis_12"/>
+   <g id="text_41">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #aac32f" x="453.682749" y="325.92458" transform="rotate(-0 453.682749 325.92458)">data in hand</text>
+   </g>
+   <g id="text_42">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="262.911754" y="327.46583" transform="rotate(-0 262.911754 327.46583)">(f)</text>
+   </g>
+   <g id="text_43">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="262.911754" y="345.435179" transform="rotate(-0 262.911754 345.435179)">Against the natural PETases</text>
+   </g>
+   <g id="text_44">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="359.641001" transform="rotate(-0 262.911754 359.641001)">one plate: designs, natives AND momi WT together</text>
+   </g>
+   <g id="text_45">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="366.22959" transform="rotate(-0 262.911754 366.22959)">  best design 150.4    kubu_pm12 56.7</text>
+   </g>
+   <g id="text_46">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="372.854848" transform="rotate(-0 262.911754 372.854848)">  ThermoPETase 44.5    FAST_PETase 44.3</text>
+   </g>
+   <g id="text_47">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="379.354514" transform="rotate(-0 262.911754 379.354514)">  LCC 19.8             momi WT 0.383</text>
+   </g>
+   <g id="text_48">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="385.99719" transform="rotate(-0 262.911754 385.99719)">so, with no cross-experiment factor at all:</text>
+   </g>
+   <g id="text_49">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="392.496855" transform="rotate(-0 262.911754 392.496855)">  393x over momi WT,  3.4x FastPETase,  7.6x LCC</text>
+   </g>
+   <g id="text_50">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="399.139532" transform="rotate(-0 262.911754 399.139532)">CAVEATS: overnight 37 C, n=1 per construct, and</text>
+   </g>
+   <g id="text_51">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="405.639197" transform="rotate(-0 262.911754 405.639197)">the denominator sits near background. This plate's</text>
+   </g>
+   <g id="text_52">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="412.281873" transform="rotate(-0 262.911754 412.281873)">own G20/momi is 34.0x, not the 19.7x of Fig 4(f)</text>
+   </g>
+   <g id="text_53">
+    <text style="font-size: 5.867117px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="418.781539" transform="rotate(-0 262.911754 418.781539)">-- never mix the two</text>
+   </g>
+   <g id="text_54">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #aac32f" x="262.911754" y="430.977528" transform="rotate(-0 262.911754 430.977528)">jq_e0328, 37 C overnight kinetics</text>
+   </g>
+  </g>
+  <g id="axes_7">
+   <g id="patch_14">
+    <path d="M 21.06 589.68 
+L 229.552891 589.68 
+L 229.552891 464.381217 
+L 21.06 464.381217 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_15">
+    <path d="M 27.731773 588.176415 
+L 222.881118 588.176415 
+Q 227.050976 588.176415 227.050976 585.670439 
+L 227.050976 468.390778 
+Q 227.050976 465.884803 222.881118 465.884803 
+L 27.731773 465.884803 
+Q 23.561915 465.884803 23.561915 468.390778 
+L 23.561915 585.670439 
+Q 23.561915 588.176415 27.731773 588.176415 
+z
+" style="fill: #e44a3e; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #e44a3e; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_13"/>
+   <g id="matplotlib.axis_14"/>
+   <g id="text_55">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #e44a3e" x="222.25564" y="476.283119" transform="rotate(-0 222.25564 476.283119)">needs collecting</text>
+   </g>
+   <g id="text_56">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="31.484645" y="477.824369" transform="rotate(-0 31.484645 477.824369)">(g)</text>
+   </g>
+   <g id="text_57">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="31.484645" y="495.793718" transform="rotate(-0 31.484645 495.793718)">Probe gains do not reach bulk PET</text>
+   </g>
+   <g id="text_58">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="510.895749" transform="rotate(-0 31.484645 510.895749)">probe activity vs nanoPET / pellet activity, same designs</text>
+   </g>
+   <g id="text_59">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="521.745749" transform="rotate(-0 31.484645 521.745749)">the draft states this negative result in prose.</text>
+   </g>
+   <g id="text_60">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="532.510437" transform="rotate(-0 31.484645 532.510437)">A stated negative needs its panel, or cut the sentence.</text>
+   </g>
+   <g id="text_61">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="31.484645" y="543.445749" transform="rotate(-0 31.484645 543.445749)">Also jq_e0331 / jq_e0333 HPLC validation sets</text>
+   </g>
+   <g id="text_62">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #e44a3e" x="31.484645" y="581.315286" transform="rotate(-0 31.484645 581.315286)">jq_e0334 nanopet titration -- notebook only</text>
+   </g>
+  </g>
+  <g id="axes_8">
+   <g id="patch_16">
+    <path d="M 252.487109 589.68 
+L 460.98 589.68 
+L 460.98 464.381217 
+L 252.487109 464.381217 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_17">
+    <path d="M 259.158882 588.176415 
+L 454.308227 588.176415 
+Q 458.478085 588.176415 458.478085 585.670439 
+L 458.478085 468.390778 
+Q 458.478085 465.884803 454.308227 465.884803 
+L 259.158882 465.884803 
+Q 254.989024 465.884803 254.989024 468.390778 
+L 254.989024 585.670439 
+Q 254.989024 588.176415 259.158882 588.176415 
+z
+" style="fill: #aac32f; fill-opacity: 0.078431; stroke-dasharray: 3.6,2.7; stroke-dashoffset: 0; stroke: #aac32f; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_15"/>
+   <g id="matplotlib.axis_16"/>
+   <g id="text_63">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #aac32f" x="453.682749" y="476.283119" transform="rotate(-0 453.682749 476.283119)">data in hand</text>
+   </g>
+   <g id="text_64">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="262.911754" y="477.824369" transform="rotate(-0 262.911754 477.824369)">(h)</text>
+   </g>
+   <g id="text_65">
+    <text style="font-size: 8px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="262.911754" y="495.891218" transform="rotate(-0 262.911754 495.891218)">Active variants far from the parent</text>
+   </g>
+   <g id="text_66">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="510.895749" transform="rotate(-0 262.911754 510.895749)">activity vs distance from momi, final libraries</text>
+   </g>
+   <g id="text_67">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="521.745749" transform="rotate(-0 262.911754 521.745749)">WARNING: in the FIRST library activity fell monotonically</text>
+   </g>
+   <g id="text_68">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="532.595749" transform="rotate(-0 262.911754 532.595749)">with distance (median 218 at 0-9 mutations, 0.2 at 50+).</text>
+   </g>
+   <g id="text_69">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="543.445749" transform="rotate(-0 262.911754 543.445749)">key_results.md section 7. If libraries 2/3 reverse that,</text>
+   </g>
+   <g id="text_70">
+    <text style="font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #9ca3af" x="262.911754" y="554.210437" transform="rotate(-0 262.911754 554.210437)">that reversal is the result -- show both, do not show one</text>
+   </g>
+   <g id="text_71">
+    <text style="font-style: italic; font-size: 7px; font-family: 'Arial', 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #aac32f" x="262.911754" y="581.336067" transform="rotate(-0 262.911754 581.336067)">snapshot -- but check the sign before writing it</text>
+   </g>
+  </g>
+ </g>
+</svg>

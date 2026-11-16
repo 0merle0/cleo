@@ -28,8 +28,15 @@ PDFS := $(patsubst $(SVG_DIR)/%.svg,$(PDF_DIR)/%.pdf,$(SVGS))
 #
 # Order matters only for fig3: momi_fragments regenerates the per-part table
 # it reads, and that table is gated to the second PETase library.
+#
+# The fig1..fig5 set is the story draft's figures, blocked out: real panels
+# where the data exists, labelled placeholders where it does not. See
+# figure_plan_story.md. The older concept_*/fig2_libraries/fig3_momi scripts
+# stay because their panels are what gets dropped into those slots.
 FIG_SCRIPTS = momi_fragments concept_library concept_loop fig2_libraries \
-              fig3_momi figS_posthoc
+              fig3_momi figS_posthoc \
+              fig1_concept fig2_benchmark fig3_petase_design \
+              fig4_platform fig5_rounds
 
 figures:
 	@for f in $(FIG_SCRIPTS); do \
