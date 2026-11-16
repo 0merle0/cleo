@@ -6,9 +6,26 @@ the setup here keeps all of them true at once.
 
     cd paper && make figures       # rebuild every figure in the paper
 
-Output lands in `paper/figures/svg/`. That is the deliverable — open any of
-them in Inkscape, change what you like, save. PDFs beside them in
-`paper/figures/pdf/` are derived and disposable.
+Output is split in two:
+
+| | |
+|---|---|
+| `paper/figures/svg/main/` | **the four numbered figures of the paper** |
+| `paper/figures/svg/` | the panel sources they are assembled from |
+
+`main/` is the deliverable — open any of them in Inkscape, change what you
+like, save. Everything in the parent directory is an ingredient: the concept
+panels, the built AME and PETase panels, Jason's pipeline strip, the
+supplementary. Without the split one directory holds both, and nothing in a
+filename says which is which.
+
+PDFs mirror the same two levels under `paper/figures/pdf/` and are derived
+and disposable.
+
+A script chooses its tree with one argument:
+
+    save(fig, "fig1_method", subdir="main")   # -> svg/main/
+    save(fig, "concept_loop")                 # -> svg/
 
 ## Why SVG rather than a PDF out of LaTeX
 

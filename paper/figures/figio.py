@@ -26,12 +26,20 @@ PDF_DIR = Path(__file__).resolve().parent / "pdf"
 DPI = 300
 
 
-def save(fig, name, dpi=DPI, tight=True):
-    """Write `fig` to figures/svg/<name>.svg. -> the path written.
+def save(fig, name, dpi=DPI, tight=True, subdir=None):
+    """Write `fig` to figures/svg/[subdir/]<name>.svg. -> the path written.
 
     `name` may be given with or without a .svg suffix; any other suffix is
     rejected rather than silently corrected, since a script asking for .png is
     a script whose output the Makefile will not pick up.
+
+    `subdir` separates the paper's numbered figures from the panel sources
+    they are assembled out of. The four main figures pass `subdir="main"` and
+    land in figures/svg/main/; everything else -- the concept panels, the
+    built AME and PETase panels, the supplementary -- stays in figures/svg/.
+    Without the split the one directory holds both the deliverable and its
+    ingredients, and there is no way to tell from a filename which is which.
+    The PDF mirrors the same subdirectory, so the two trees stay parallel.
     """
     stem = Path(name)
     if stem.suffix and stem.suffix.lower() != ".svg":
@@ -63,8 +71,10 @@ def save(fig, name, dpi=DPI, tight=True):
               f" (floor {MIN_FONT:.0f}).")
 
     kw = {"bbox_inches": "tight"} if tight else {}
-    out = SVG_DIR / f"{stem.stem}.svg"
-    SVG_DIR.mkdir(parents=True, exist_ok=True)
+    svg_dir = SVG_DIR / subdir if subdir else SVG_DIR
+    pdf_dir = PDF_DIR / subdir if subdir else PDF_DIR
+    out = svg_dir / f"{stem.stem}.svg"
+    svg_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, format="svg", dpi=dpi, **kw)
 
     # ALSO write the PDF the Makefile would have produced.
@@ -78,8 +88,8 @@ def save(fig, name, dpi=DPI, tight=True):
     #
     # SVG remains the source of truth: this is the same figure written twice
     # from one canvas, not a second rendering path that could drift.
-    PDF_DIR.mkdir(parents=True, exist_ok=True)
-    pdf = PDF_DIR / f"{stem.stem}.pdf"
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    pdf = pdf_dir / f"{stem.stem}.pdf"
     fig.savefig(pdf, format="pdf", dpi=dpi, **kw)
 
     print(f"wrote {out} and {pdf}")

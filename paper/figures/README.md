@@ -58,3 +58,10 @@ panel b was drawn over both, slots 2 and 3 read 8.1 and 7.0 mean mutations
 against the true 4.4 and 4.4. Every table `fig3_momi.py` reads goes through one
 `only()` helper that exits if the filter leaves nothing, so a new panel cannot
 quietly skip the step.
+
+## Where the output goes
+
+`svg/main/` holds the paper's four numbered figures -- `fig1_method`,
+`fig2_petase_design`, `fig3_platform`, `fig4_rounds`. `svg/` holds the
+panel sources they are assembled from. A script picks its tree by
+passing `subdir="main"` to `figio.save`; see docs/FIGURES.md.

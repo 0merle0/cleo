@@ -236,7 +236,7 @@ def main():
              "200, so the pooled tail is a lower bound",
          ])
 
-    save(fig, "fig1_method", dpi=900, tight=False)
+    save(fig, "fig1_method", dpi=900, tight=False, subdir="main")
 
 
 if __name__ == "__main__":

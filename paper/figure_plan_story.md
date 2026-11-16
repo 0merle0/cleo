@@ -21,6 +21,9 @@ The draft's own numbering stands:
 | **Fig 3** | the experimental platform and the three libraries |
 | **Fig 4** | searching a 10^12 library in four rounds |
 
+They are built into `figures/svg/main/`, separate from the panel sources in
+`figures/svg/` that get dropped into their slots.
+
 Figure 1 is doing the most work — eight panels, and at 6.5 in wide it is
 9.9 in tall. That is the cost of the four-figure format and the thing to
 watch when it is placed. If it has to come down, panel (d) (cost vs library

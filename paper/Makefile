@@ -16,7 +16,12 @@ PDF_DIR = figures/pdf
 # and is 1.3 MB after, with axes and text still vector and selectable.
 #
 # Find all SVGs and map them to PDF outputs.
-SVGS := $(wildcard $(SVG_DIR)/*.svg)
+#
+# Two levels, because $(SVG_DIR)/main/ holds the paper's four numbered
+# figures and $(SVG_DIR)/ holds the panel sources they are assembled from. A
+# single-level wildcard silently skipped main/, which is the half that goes
+# in the document -- so both are globbed and the PDF tree mirrors the SVG one.
+SVGS := $(wildcard $(SVG_DIR)/*.svg) $(wildcard $(SVG_DIR)/main/*.svg)
 PDFS := $(patsubst $(SVG_DIR)/%.svg,$(PDF_DIR)/%.pdf,$(SVGS))
 
 # `make pdf` builds the paper only. The experimental record is a separate
@@ -44,7 +49,8 @@ figures:
 	  (cd .. && uv run python paper/figures/$$f.py >/dev/null 2>&1) \
 	    && echo OK || echo FAILED; \
 	done
-	@echo "figures/svg/ is the editable set; open any of them in Inkscape."
+	@echo "figures/svg/main/ holds the paper's four figures -- open them in Inkscape."
+	@echo "figures/svg/ holds the panel sources they are assembled from."
 
 all: pdf notebook library campaigns
 
@@ -73,6 +79,7 @@ svg2pdf: $(PDFS)
 
 $(PDF_DIR)/%.pdf: $(SVG_DIR)/%.svg | $(PDF_DIR)
 	@which inkscape > /dev/null || (echo "inkscape not found — install it or convert SVGs by hand into $(PDF_DIR)/"; exit 1)
+	@mkdir -p "$(dir $@)"
 	inkscape "$<" --export-type=pdf --export-filename="$@"
 
 $(PDF_DIR):

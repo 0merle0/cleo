@@ -121,7 +121,7 @@ def main():
              "(docs/MOMI_NORMALISATION.md)",
          ])
 
-    save(fig, "fig3_platform", dpi=900, tight=False)
+    save(fig, "fig3_platform", dpi=900, tight=False, subdir="main")
 
 
 if __name__ == "__main__":

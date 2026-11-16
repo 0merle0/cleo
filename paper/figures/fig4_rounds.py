@@ -118,7 +118,7 @@ def main():
              "that reversal is the result -- show both, do not show one",
          ])
 
-    save(fig, "fig4_rounds", dpi=900, tight=False)
+    save(fig, "fig4_rounds", dpi=900, tight=False, subdir="main")
 
 
 if __name__ == "__main__":

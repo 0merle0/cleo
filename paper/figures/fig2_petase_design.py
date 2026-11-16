@@ -82,7 +82,7 @@ def main():
              "compute it, do not read it",
          ])
 
-    save(fig, "fig2_petase_design", dpi=900, tight=False)
+    save(fig, "fig2_petase_design", dpi=900, tight=False, subdir="main")
 
 
 if __name__ == "__main__":
