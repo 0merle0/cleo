@@ -34,7 +34,7 @@ there was nothing to point at. Figure 1's letters are now fixed, so the
 prose can be pointed at them:
 
     (a) three landscapes (2D)   (f) diversity, per backbone
-    (b) fragment shuffling      (g) catalytic-atom spread
+    (b) fragment shuffling      (g) motif RMSD, all backbones
     (c) the GRPO objective      (h) oracle calls vs library size
     (d) DNA cost at several k   (i) where in sequence space
     (e) pass rate, per backbone (j) how fine it can be cut
@@ -282,10 +282,22 @@ variance and improves positioning ... of active site residues". On AME that
 is measurable, and it is Figure 1(g).
 
 `rfd2_motif_rmsd` is the predicted motif's RMSD to the theozyme it was
-scaffolded around. Each design is folded best-of-5, so the spread decomposes
-(`motif_variance.py`), over EVERY design rather than only passing ones --
-conditioning on passing truncates at the threshold and would manufacture the
-very reduction being claimed:
+scaffolded around. Figure 1(g) shows it as a strip, **all three backbones
+pooled**, 768 designs per arm, one point per design averaged over its five
+diffusion samples:
+
+| | median | IQR | within 1.5 A | worst |
+|---|---:|---:|---:|---:|
+| stock ProteinMPNN | 1.84 | 1.48 - 2.24 | 26% | 53.4 |
+| **this work** | **1.28** | **0.99 - 1.42** | **84%** | 12.1 |
+
+Fine-tuning lowers motif RMSD and tightens it: the median falls 0.56 A, the
+IQR narrows from 0.76 to 0.43, and the share of the library placing its
+catalytic atoms within the benchmark's own 1.5 A criterion goes 26% to 84%.
+
+Per backbone (`motif_variance.py` prints it), over EVERY design rather than
+only passing ones -- conditioning on passing truncates at the threshold and
+would manufacture the very reduction being claimed:
 
 | backbone | arm | median | sd between designs | IQR | frac <= 1.5 A |
 |---|---|---:|---:|---:|---:|
@@ -296,12 +308,15 @@ very reduction being claimed:
 | M0315 | stock | 1.83 | 5.04 | 0.69 | 0.23 |
 | M0315 | **this work** | 0.92 | **0.38** | **0.10** | **0.97** |
 
-Between-design spread falls **2.1x / 2.4x / 13.4x**; the IQR, which is not
-moved by the tail, falls **3.3x / 3.8x / 7.0x**. The claim holds, and holds
-strongly.
+Between-design spread falls **2.1x / 2.4x / 13.4x**.
 
 **Two things to state with it.**
 
+0. **The pooled strip mixes three backbones of different difficulty.**
+   M0255 is the hard one and M0315 the easy one, so part of the pooled
+   cloud's width is that mixture rather than within-library spread. The
+   simple panel is the right one for the claim; the per-backbone table above
+   is what to quote if the width is questioned.
 1. **The gain is between designs, not within one.** The within-design
    spread -- across the five diffusion samples of a single sequence -- goes
    0.33 to 0.42 on M0097, i.e. slightly UP. Fine-tuning tightens the

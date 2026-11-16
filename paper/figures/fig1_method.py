@@ -423,66 +423,66 @@ def panel_diversity(ax, d, arms=("sampled", "chimera")):
     _pooled_bars(ax, d, "subs", "Distinct substitutions\n(rarefied)", arms)
 
 
-def panel_motif_var(ax, md, arms=("sampled", "chimera")):
-    """How tightly each library holds its catalytic atoms.
+def panel_motif_var(ax, md, arms=("sampled", "chimera"), seed=0):
+    """What fine-tuning does to catalytic geometry, in one view.
 
     y is `rfd2_motif_rmsd` -- the predicted motif's RMSD to the theozyme it
     was scaffolded around -- one point per DESIGN, averaged over its five
-    diffusion samples. Its SPREAD is the quantity: a library whose members
-    all place the catalytic atoms in the same place has a tight box,
-    whatever its median.
+    diffusion samples. Lower is a better-placed active site. The whole claim
+    of the panel is that the right cloud sits lower than the left one.
 
-    LOG y, because the stock arm has a tail the method does not. M0315's
-    worst stock design sits at 53 A against a 1.83 A median; on a linear
-    axis that one design sets the scale and flattens every box to a line.
+    POOLED ACROSS ALL THREE BACKBONES, 768 designs per arm. The three are
+    not equally hard -- M0255 is the difficult one and M0315 the easy one --
+    so the pooled cloud is a mixture, and its width is partly that mixture
+    rather than within-library spread alone. That is the right trade here:
+    the panel is making one simple point and the per-backbone breakdown
+    lives in motif_variance.py, which prints it.
 
-    Box is median and IQR, whiskers 5th-95th percentile. Over EVERY design,
-    not only passing ones -- conditioning on passing truncates at the pass
-    threshold and manufactures the very reduction being claimed, since the
-    method passes more often and so keeps more of its own tail.
+    LOG y, because the stock arm has a tail the method does not: the worst
+    stock design sits at 53 A against a median near 1.8. On a linear axis
+    that single design sets the scale and compresses both clouds to a line.
+
+    Points are rasterised. 1,536 of them as vector paths is 1,536 objects in
+    an SVG that is meant to be edited; as one image the axes, ticks, labels
+    and the median rules stay vector and selectable.
     """
-    width = 0.34
-    for j, arm in enumerate(arms):
-        for i, site in enumerate(SITES):
-            v = md[(md.site == site) & (md.arm == arm)].rmsd.to_numpy()
-            if not len(v):
-                continue
-            x = i + (j - (len(arms) - 1) / 2) * width
-            q1, med, q3 = np.percentile(v, [25, 50, 75])
-            lo, hi = np.percentile(v, [5, 95])
-            c = ARMC[arm]
-            ax.plot([x, x], [lo, hi], color=c, lw=0.9, zorder=3,
-                    solid_capstyle="butt")
-            ax.add_patch(plt.Rectangle(
-                (x - width * 0.36, q1), width * 0.72, q3 - q1,
-                facecolor=c, alpha=0.55, edgecolor=c, linewidth=0.8,
-                zorder=4))
-            ax.plot([x - width * 0.36, x + width * 0.36], [med, med],
-                    color="white", lw=1.2, zorder=5, solid_capstyle="butt")
+    rng = np.random.default_rng(seed)
+    for x, arm in enumerate(arms):
+        v = md[md.arm == arm].rmsd.to_numpy()
+        if not len(v):
+            continue
+        # Normal jitter, not uniform: a uniform strip has hard edges that
+        # read as part of the distribution.
+        jx = x + rng.normal(0, 0.075, len(v))
+        ax.plot(jx, v, "o", ms=1.9, mfc=ARMC[arm], mec="none", alpha=0.35,
+                ls="none", rasterized=True, zorder=3)
+
+        # White casing under the median rule. In the arm's own colour alone
+        # it sits inside its own cloud and disappears, which is the one mark
+        # on the panel a reader needs to find.
+        med = float(np.median(v))
+        ax.plot([x - 0.27, x + 0.27], [med, med], color="white", lw=3.4,
+                solid_capstyle="round", zorder=5)
+        ax.plot([x - 0.26, x + 0.26], [med, med], color=ARMC[arm], lw=1.9,
+                solid_capstyle="round", zorder=6)
 
     # The benchmark's own criterion: 1.5 A is where AME calls a motif
-    # recovered, so the line is the reason the spread matters.
+    # recovered, so the line is why the shift matters rather than an
+    # annotation laid on top of it.
     ax.axhline(1.5, color=PALETTE["red"], lw=0.9, ls=(0, (3, 2)), zorder=2)
-    ax.text(len(SITES) - 0.45, 1.56, "1.5 A", fontsize=fs(6),
-            color=PALETTE["red"], ha="right", va="bottom")
+    ax.text(len(arms) - 0.45, 1.58, "1.5 A", fontsize=fs(6),
+            color=PALETTE["red"], ha="right", va="bottom", zorder=6)
 
     ax.set_yscale("log")
-    ax.set_ylim(0.3, 60)
+    ax.set_ylim(0.3, 70)
     ax.set_yticks([0.5, 1, 2, 5, 10, 50])
     ax.set_yticklabels(["0.5", "1", "2", "5", "10", "50"])
-    ax.set_xticks(range(len(SITES)))
-    ax.set_xticklabels(SITES, fontsize=fs(6.5))
+    ax.set_xticks(range(len(arms)))
+    ax.set_xticklabels([ARM_LABEL[a].replace(" ", "\n", 1) for a in arms],
+                       fontsize=fs(6.5))
     ax.tick_params(axis="x", length=0)
-    ax.set_xlim(-0.6, len(SITES) - 0.4)
+    ax.set_xlim(-0.55, len(arms) - 0.45)
     _tidy(ax, ylab="Motif RMSD to theozyme (A)")
-
-    from matplotlib.lines import Line2D
-    ax.legend(handles=[Line2D([], [], marker="s", ms=5, mfc=ARMC[a],
-                              mec=ARMC[a], ls="none", label=ARM_LABEL[a])
-                       for a in arms],
-              fontsize=fs(6.5), loc="upper left", frameon=False,
-              handlelength=0.8, borderpad=0.0, labelspacing=0.22,
-              handletextpad=0.4)
 
 
 # ================================================================ panel (g)
