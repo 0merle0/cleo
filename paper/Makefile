@@ -45,7 +45,8 @@ PDFS := $(patsubst $(SVG_DIR)/%.svg,$(PDF_DIR)/%.pdf,$(SVGS))
 FIG_SCRIPTS = momi_fragments concept_library concept_loop fig2_libraries \
               fig3_momi figS_posthoc \
               fig1_method fig2_petase_design fig3_platform fig4_rounds \
-              fig1_panels fig2_panels fig3_panels
+              fig1_panels fig2_panels fig3_panels \
+              concept_alignment
 
 figures:
 	@for f in $(FIG_SCRIPTS); do \
