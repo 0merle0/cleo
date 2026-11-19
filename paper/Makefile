@@ -46,7 +46,7 @@ FIG_SCRIPTS = momi_fragments concept_library concept_loop fig2_libraries \
               fig3_momi figS_posthoc \
               fig1_method fig2_petase_design fig3_platform fig4_rounds \
               fig1_panels fig2_panels fig3_panels \
-              concept_alignment
+              concept_alignment concept_chem_seq
 
 figures:
 	@for f in $(FIG_SCRIPTS); do \
